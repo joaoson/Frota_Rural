@@ -1,7 +1,11 @@
 name: Convert Docx to PDF
+
 on:
   push:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   convert_to_pdf:
@@ -13,15 +17,18 @@ jobs:
       - name: Install Pandoc and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc python3-pip
-          sudo apt-get install -y wkhtmltopdf 
+          sudo apt-get install -y pandoc wkhtmltopdf
 
       - name: Run Conversion
         run: |
-            pandoc "BSI-Especificação do Projeto-Frota Rural.docx" -o "BSI-Especificação do Projeto-Frota Rural.pdf"
-      - 
-        name: Upload PDF
-        uses: actions/upload-artifact@v4
-        with:
-          name: converted-pdf
-          path: result.pdf
+          pandoc "BSI-Especificação do Projeto-Frota Rural.docx" \
+          --pdf-engine=wkhtmltopdf \
+          -o "BSI-Especificação do Projeto-Frota Rural.pdf"
+
+      - name: Commit and Push PDF
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add "BSI-Especificação do Projeto-Frota Rural.pdf"
+          git commit -m "docs: auto-generate PDF from docx" || true
+          git push
