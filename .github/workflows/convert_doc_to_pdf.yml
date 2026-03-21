@@ -2,11 +2,7 @@ name: Convert Docx to PDF
 
 on:
   push:
-    # Trigger on any branch EXCEPT main to avoid rule violations
     branches-ignore: [ main ]
-
-permissions:
-  contents: write
 
 jobs:
   convert_to_pdf:
@@ -14,26 +10,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          # Fetches the specific branch that triggered the action
-          ref: ${{ github.head_ref }}
 
-      - name: Install Pandoc and dependencies
+      - name: Install LibreOffice
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc wkhtmltopdf
+          sudo apt-get install -y libreoffice
 
       - name: Run Conversion
         run: |
-          pandoc "BSI-Especificação do Projeto-Frota Rural.docx" \
-          --pdf-engine=wkhtmltopdf \
-          -o "BSI-Especificação do Projeto-Frota Rural.pdf"
+          soffice --headless --convert-to pdf \
+            "BSI-Especificação do Projeto-Frota Rural.docx" \
+            --outdir .
 
-      - name: Commit and Push to current branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add "BSI-Especificação do Projeto-Frota Rural.pdf"
-          git commit -m "docs: auto-generate PDF from docx" || true
-          # Pushes back to the branch that triggered the workflow
-          git push origin HEAD:${{ github.ref }}
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BSI-Especificacao-do-Projeto-Frota-Rural
+          path: "BSI-Especificação do Projeto-Frota Rural.pdf"
