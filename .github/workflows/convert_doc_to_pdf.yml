@@ -31,9 +31,10 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin
-          git checkout ${{ github.head_ref }}
-          git pull --rebase origin ${{ github.head_ref }}
           git add "BSI-Especificação do Projeto-Frota Rural.pdf"
+          git stash
+          git fetch origin
+          git pull --rebase origin ${{ github.head_ref }}
+          git stash pop
           git commit -m "docs: auto-generate PDF from docx" || true
           git push origin HEAD:${{ github.head_ref }}
