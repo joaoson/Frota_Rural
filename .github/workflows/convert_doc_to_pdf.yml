@@ -4,17 +4,12 @@ on:
   push:
     branches-ignore: [ main ]
 
-permissions:
-  contents: write
-
 jobs:
   convert_to_pdf:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Install LibreOffice
         run: |
@@ -27,14 +22,8 @@ jobs:
             "BSI-Especificação do Projeto-Frota Rural.docx" \
             --outdir .
 
-      - name: Commit and Push to current branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add "BSI-Especificação do Projeto-Frota Rural.pdf"
-          git stash
-          git fetch origin
-          git pull --rebase origin ${{ github.head_ref }}
-          git stash pop
-          git commit -m "docs: auto-generate PDF from docx" || true
-          git push origin HEAD:${{ github.head_ref }}
+      - name: Upload PDF Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BSI-Especificacao-do-Projeto-Frota-Rural
+          path: "BSI-Especificação do Projeto-Frota Rural.pdf"
