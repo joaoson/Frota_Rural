@@ -36,7 +36,7 @@ CREATE TABLE credentials (
 CREATE INDEX idx_credentials_user_id ON credentials(user_id);
 
 -- Machineries
-CREATE TABLE machineries (
+CREATE TABLE machines(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     renagro_number VARCHAR(100) UNIQUE,
@@ -50,8 +50,8 @@ CREATE TABLE machineries (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Advertisements
-CREATE TABLE advertisements (
+-- postingss
+CREATE TABLE postings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     machinery_id UUID NOT NULL REFERENCES machineries(id) ON DELETE CASCADE,
     hourly_rate DECIMAL(10, 2) NOT NULL,
@@ -66,20 +66,20 @@ CREATE TABLE advertisements (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Advertisement Photos
-CREATE TABLE advertisement_photos (
+-- postings Photos
+CREATE TABLE postings_photos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    advertisement_id UUID NOT NULL REFERENCES advertisements(id) ON DELETE CASCADE,
+    postings_id UUID NOT NULL REFERENCES postings(id) ON DELETE CASCADE,
     image_url VARCHAR(1024) NOT NULL,
     is_primary BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_ad_photos_ad_id ON advertisement_photos(advertisement_id);
+CREATE INDEX idx_ad_photos_ad_id ON postings_photos(postings_id);
 
 -- Rentals
 CREATE TABLE rentals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    advertisement_id UUID NOT NULL REFERENCES advertisements(id),
+    postings_id UUID NOT NULL REFERENCES postingss(id),
     lessee_id UUID NOT NULL REFERENCES users(id),
     operator_id UUID REFERENCES users(id),
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
