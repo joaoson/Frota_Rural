@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Frota Rural Design System</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Epilogue:wght@700;800;900&amp;family=Inter:wght@400;500;600;700&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#343122",
+                        "on-secondary-container": "#6d4700",
+                        "tertiary-fixed": "#fcdeb7",
+                        "on-primary-fixed-variant": "#2c4f15",
+                        "inverse-on-surface": "#f8f1da",
+                        "surface-container": "#f5eed8",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#3f2e14",
+                        "surface-dim": "#e0dac4",
+                        "on-background": "#1e1c0e",
+                        "on-surface": "#1e1c0e",
+                        "background": "#fff9eb",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#43493d",
+                        "on-tertiary-container": "#cdb28e",
+                        "on-error": "#ffffff",
+                        "outline": "#73796c",
+                        "inverse-primary": "#a8d38a",
+                        "surface": "#fff9eb",
+                        "surface-variant": "#e9e2cd",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fff9eb",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#dfc29d",
+                        "primary-fixed-dim": "#a8d38a",
+                        "primary": "#173901",
+                        "error-container": "#ffdad6",
+                        "tertiary-container": "#584428",
+                        "outline-variant": "#c3c9b9",
+                        "on-primary-fixed": "#0a2100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e9e2cd",
+                        "on-tertiary-fixed": "#271902",
+                        "surface-container-low": "#fbf3dd",
+                        "on-secondary-fixed": "#291800",
+                        "secondary-fixed-dim": "#ffb94c",
+                        "on-tertiary-fixed-variant": "#574327",
+                        "surface-container-high": "#efe8d2",
+                        "primary-fixed": "#c4efa3",
+                        "on-primary-container": "#98c27b",
+                        "surface-tint": "#43682b",
+                        "secondary": "#815500",
+                        "on-secondary-fixed-variant": "#624000",
+                        "primary-container": "#2d5016",
+                        "secondary-fixed": "#ffddb2",
+                        "secondary-container": "#feb234"
+                    },
+                    fontFamily: {
+                        "headline": ["Epilogue"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        body {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-surface font-body">
+    <!-- TopNavBar -->
+    <nav
+        class="fixed top-0 w-full z-50 bg-[#fff9eb]/70 dark:bg-[#1e1c0e]/70 backdrop-blur-md shadow-sm dark:shadow-none">
+        <div class="flex justify-between items-center max-w-[1200px] mx-auto px-6 h-20">
+            <span class="text-2xl font-black text-[#173901] dark:text-[#d3eab8] tracking-tighter font-headline">Frota
+                Rural</span>
+            <div
+                class="hidden md:flex items-center gap-8 font-['Epilogue'] font-bold text-sm tracking-tight text-[#173901]">
+                <a class="text-[#173901] border-b-2 border-[#173901] pb-1 hover:text-[#2d5016] transition-colors duration-200"
+                    href="#hero">Início</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#typography">Tipografia</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#colors">Cores</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#ui-components">Componentes UI</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#la   yout">Layout</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#motion">Animações</a>
+                <a class="text-[#3f2e14] font-medium hover:text-[#2d5016] transition-colors duration-200"
+                    href="#icons">Ícones</a>
+            </div>
+            <button
+                class="bg-primary-container text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-all">
+                Acessar Plataforma
+            </button>
+        </div>
+    </nav>
+    <!-- 1. Hero Header -->
+    <header class="relative pt-32 pb-24 overflow-hidden min-h-[716px] flex items-center" id="hero">
+        <div class="absolute inset-0 z-0">
+            <img class="w-full h-full object-cover opacity-20 grayscale-[0.5]"
+                data-alt="expansive aerial view of a golden wheat field at sunset with a modern green tractor working in the distance, warm cinematic lighting"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBE6O1-lx_deWeGLq2RQFxNOL8Zfb3DXYghTj2w_mzR2q9moV_s0fRkZoTpWNNVSVAayNfFct9y-m7QiVwLIHOfd1B_K6R9-ECIK1rXH6Y0mXYoJMzos-PwsoXApUnscIlwyhOMknsk3INvjmtmY3g-g15fQTvDho8A52QethK6xiztWFGTVK5GViSttTNVsKFYxqAiSyVtRL4mDEDeq8X3Xwv9aRWbHYt1ZVQikXXGUKvM0HXZP0X1MGLP8D62uEpNqNDcPLHL3KI" />
+            <div class="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background"></div>
+        </div>
+        <div class="max-w-[1200px] mx-auto px-6 relative z-10">
+            <h1 class="font-headline text-[64px] font-black text-primary leading-[1.1] tracking-tighter mb-6 max-w-3xl">
+                Frota Rural Design System
+            </h1>
+            <p class="text-[20px] leading-[1.3] text-tertiary max-w-2xl font-medium">
+                Construindo o futuro do agronegócio brasileiro através de uma interface robusta e orgânica que conecta
+                produtores e proprietários de máquinas com precisão e confiança.
+            </p>
+        </div>
+    </header>
+    <main class="max-w-[1200px] mx-auto px-6 space-y-32 pb-32">
+        <!-- 2. Typography -->
+        <section class="scroll-mt-24" id="typography">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Tipografia</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <div class="space-y-12 bg-surface-container-low p-12 rounded-xl">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">H1 - 64px</span>
+                    <h1 class="md:col-span-2 font-headline text-[64px] font-black text-primary leading-tight">Mato
+                        Grosso Horizon</h1>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">H2 - 48px</span>
+                    <h2 class="md:col-span-2 font-headline text-[48px] font-bold text-primary">Precisão Cultivada</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">H3 - 40px</span>
+                    <h3 class="md:col-span-2 font-headline text-[40px] font-bold text-tertiary">Brutalismo Orgânico</h3>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">H4 - 32px</span>
+                    <h4 class="md:col-span-2 font-headline text-[32px] font-bold text-tertiary">Excelência em Locação
+                    </h4>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">Bold M -
+                        20px</span>
+                    <p class="md:col-span-2 font-body text-[20px] font-bold text-on-surface">Confiado por Milhares de
+                        Produtores</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">Parágrafo -
+                        20px</span>
+                    <p class="md:col-span-2 font-body text-[20px] leading-[1.3] text-on-surface">Nosso sistema de design
+                        baseia-se na força do maquinário pesado e no ritmo de respiração da natureza.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">Regular M -
+                        16px</span>
+                    <p class="md:col-span-2 font-body text-[16px] text-on-surface">O texto essencial para entradas de
+                        dados, pequenos cartões e informações secundárias.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-baseline">
+                    <span class="text-on-surface-variant font-label text-sm uppercase tracking-widest">Legenda -
+                        12px</span>
+                    <p
+                        class="md:col-span-2 font-body text-[12px] uppercase font-bold tracking-wider text-on-surface-variant">
+                        Informações legais, números de contrato e validaçẽs.</p>
+                </div>
+            </div>
+        </section>
+        <!-- 3. Colors & Surfaces -->
+        <section class="scroll-mt-24" id="colors">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Cores e Superfícies</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                <div class="space-y-3">
+                    <div
+                        class="aspect-square bg-primary-container rounded-xl shadow-lg border border-outline-variant/15">
+                    </div>
+                    <div class="font-bold text-sm">Verde Primário</div>
+                    <div class="text-xs text-on-surface-variant">#2d5016</div>
+                </div>
+                <div class="space-y-3">
+                    <div
+                        class="aspect-square bg-secondary-container rounded-xl shadow-lg border border-outline-variant/15">
+                    </div>
+                    <div class="font-bold text-sm">Ouro Destaque</div>
+                    <div class="text-xs text-on-surface-variant">#feb234</div>
+                </div>
+                <div class="space-y-3">
+                    <div
+                        class="aspect-square bg-surface-container rounded-xl shadow-lg border border-outline-variant/15">
+                    </div>
+                    <div class="font-bold text-sm">Bege Claro</div>
+                    <div class="text-xs text-on-surface-variant">#f5eed8</div>
+                </div>
+                <div class="space-y-3">
+                    <div class="aspect-square bg-tertiary rounded-xl shadow-lg border border-outline-variant/15"></div>
+                    <div class="font-bold text-sm text-tertiary">Marrom Terroso</div>
+                    <div class="text-xs text-on-surface-variant">#3f2e14</div>
+                </div>
+                <div class="space-y-3">
+                    <div class="aspect-square bg-white rounded-xl shadow-lg border border-outline-variant/15"></div>
+                    <div class="font-bold text-sm">Branco</div>
+                    <div class="text-xs text-on-surface-variant">#ffffff</div>
+                </div>
+                <div class="space-y-3">
+                    <div class="aspect-square bg-error rounded-xl shadow-lg border border-outline-variant/15"></div>
+                    <div class="font-bold text-sm">Vermelho Alerta</div>
+                    <div class="text-xs text-on-surface-variant">#ba1a1a</div>
+                </div>
+            </div>
+        </section>
+        <!-- 4. UI Components -->
+        <section class="scroll-mt-24 space-y-20" id="ui-components">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Componentes UI</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <!-- Buttons & Inputs -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                <!-- Buttons -->
+                <div class="space-y-8">
+                    <h3 class="font-headline text-xl font-bold mb-6">Botões</h3>
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <button
+                            class="px-8 py-3 bg-gradient-to-r from-primary to-primary-container text-white rounded-lg font-bold hover:shadow-lg transition-all">Buscar
+                            Maquinário</button>
+                        <button
+                            class="px-8 py-3 bg-transparent border-2 border-primary text-primary rounded-lg font-bold hover:bg-surface-container-high transition-all">Anunciar</button>
+                        <button
+                            class="px-8 py-3 bg-transparent border-2 border-error text-error rounded-lg font-bold hover:bg-error-container/20 transition-all">Cancelar</button>
+                        <button
+                            class="px-8 py-3 bg-surface-container-highest text-outline cursor-not-allowed rounded-lg font-bold"
+                            disabled="">Desativado</button>
+                    </div>
+                </div>
+                <!-- Inputs -->
+                <div class="space-y-6">
+                    <h3 class="font-headline text-xl font-bold mb-6">Campos de Entrada (Inputs)</h3>
+                    <div class="space-y-4">
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-on-surface-variant">CPF / CNPJ</label>
+                            <input
+                                class="w-full bg-surface-container-highest border-none rounded-lg p-3 focus:ring-2 focus:ring-primary-container"
+                                placeholder="000.000.000-00" type="text" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-bold text-on-surface-variant">Registro Renagro</label>
+                                <input
+                                    class="w-full bg-surface-container-highest border-none rounded-lg p-3 focus:ring-2 focus:ring-primary-container"
+                                    placeholder="Nº de Registro" type="text" />
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-sm font-bold text-on-surface-variant">Leitura Horímetro</label>
+                                <input
+                                    class="w-full bg-surface-container-highest border-none rounded-lg p-3 focus:ring-2 focus:ring-primary-container"
+                                    placeholder="1.250 h" type="number" />
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-bold text-on-surface-variant">Detalhes da Operação
+                                Agrícola</label>
+                            <textarea
+                                class="w-full bg-surface-container-highest border-none rounded-lg p-3 focus:ring-2 focus:ring-primary-container"
+                                placeholder="Plantio, pulverização..." rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Status Badges -->
+            <div>
+                <h3 class="font-headline text-xl font-bold mb-6">Tags de Status</h3>
+                <div class="flex flex-wrap gap-3">
+                    <span
+                        class="px-3 py-1 bg-primary/10 text-primary font-bold text-xs rounded uppercase tracking-wider">Ativo</span>
+                    <span
+                        class="px-3 py-1 bg-secondary-container/20 text-on-secondary-container font-bold text-xs rounded uppercase tracking-wider">Assinatura
+                        Pendente</span>
+                    <span
+                        class="px-3 py-1 bg-error/10 text-error font-bold text-xs rounded uppercase tracking-wider">Cancelado</span>
+                    <span
+                        class="px-3 py-1 bg-on-primary-fixed-variant/20 text-on-primary-fixed-variant font-bold text-xs rounded uppercase tracking-wider">Concluído</span>
+                    <span
+                        class="px-3 py-1 bg-tertiary/10 text-tertiary font-bold text-xs rounded uppercase tracking-wider">Em
+                        Operação</span>
+                </div>
+            </div>
+            <!-- Cartões Complexos -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Cartão de Anúncio -->
+                <div
+                    class="bg-surface-container-lowest rounded-xl overflow-hidden group hover:shadow-xl transition-all duration-300">
+                    <div class="h-48 relative overflow-hidden">
+                        <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            data-alt="side view of a powerful green John Deere tractor in a field under a bright blue sky, focus on mechanical details"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtoUVrL_WpNHvfnl1-RmMn703X1UApMRcTDTT28j9nTAS_SKZve_e4EHJKSdjmr14n-EsaVP8E5R8PBYQVhynt9Mh-yuRodV3Xntb6ihO5o0IItZJzZOC5Hmm_OPF6Q8cC0x84u1dNrSZCBbf_VfbvZCnD4UaM07abtgc7mV_kedh8HG5sVNnoTypKzPpMSXkM_Sq8JFVlXoP2t3mbAWSW21ZTU4epmgx0gdqofUqdG7T-TYTuWOHXP1vPZQMCsnU3DIKPnjHvWQs" />
+                        <div
+                            class="absolute top-4 right-4 bg-primary text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest">
+                            Disponível na Safra</div>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <h4 class="font-headline text-lg font-bold text-primary">Trator John Deere 6125J</h4>
+                            <div class="flex items-center gap-1 text-on-surface-variant text-sm">
+                                <span class="material-symbols-outlined text-sm">location_on</span>
+                                Sorriso, MT
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-end border-t border-outline-variant/15 pt-4">
+                            <div>
+                                <span class="text-xs text-on-surface-variant font-bold uppercase">Preço Estimado</span>
+                                <div class="text-xl font-black text-tertiary">R$ 250<span
+                                        class="text-sm font-normal">/h</span></div>
+                            </div>
+                            <button class="bg-primary-container text-on-primary px-4 py-2 rounded font-bold text-xs">Ver
+                                Anúncio</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Cartão de Contrato -->
+                <div
+                    class="bg-surface-container-low p-6 rounded-xl space-y-6 flex flex-col justify-between border-l-4 border-secondary-container">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-start">
+                            <span
+                                class="text-[10px] font-black uppercase tracking-widest text-on-secondary-container bg-secondary-container/20 px-2 py-1 rounded">Assinatura
+                                Pendente</span>
+                            <span class="text-xs text-on-surface-variant">#CTR-8821</span>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Partes
+                                    Registradas</div>
+                                <div class="font-bold text-tertiary text-sm">João Silva (Locador)</div>
+                                <div class="font-bold text-tertiary text-sm">Fazenda Boa Vista (Locatário)</div>
+                            </div>
+                            <div>
+                                <div class="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Período da
+                                    Operação</div>
+                                <div class="font-bold text-primary text-sm">12/03 - 15/03/2026</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button class="flex-1 bg-primary text-white py-2.5 rounded font-bold text-sm">Assinar
+                            Mútuo</button>
+                        <button
+                            class="flex-1 border-2 border-outline-variant text-on-surface-variant py-2.5 rounded font-bold text-sm">Recusar</button>
+                    </div>
+                </div>
+                <!-- Perfil e Chat Stack -->
+                <div class="space-y-8">
+                    <!-- Badge Perfil -->
+                    <div class="bg-surface-container-highest p-4 rounded-xl flex items-center gap-4">
+                        <img class="w-16 h-16 rounded-lg object-cover"
+                            data-alt="headshot of a mature smiling man in a denim shirt, rustic outdoor lighting, professional agricultural look"
+                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDB-3ZubUKwKsO5MNZjw1zKt4oomfwGH9ORqPR9_mgSuqCnlCnhxBn8o-nHPfKPeXWp3-O2OSVki4gMYoyYtM--YKYbubw4yGEshpFzb0xtyVPBik2oyhoV8J8gHf71llnQBCDhsVRDM_F86ZZdfeGKQQaMbpk18LQTmd3UgYsRr763H0ByxYAJswNWx-u42clGEEXsVQo1JR1EBQNy8HYDqXvPJOn4TXDTk_hE6Nfao4NKy0Zl_n4jThkXpnhDVOSTdoTIx31taBg" />
+                        <div>
+                            <div class="font-headline font-bold text-tertiary">Ricardo Mendes</div>
+                            <div class="flex items-center gap-2">
+                                <span
+                                    class="bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Locador</span>
+                                <div class="flex items-center text-secondary">
+                                    <span class="material-symbols-outlined text-sm"
+                                        style="font-variation-settings: 'FILL' 1;">star</span>
+                                    <span class="text-xs font-bold">4.5</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Bolha de Chat -->
+                    <div class="space-y-3">
+                        <div class="flex justify-start">
+                            <div
+                                class="bg-surface-container-highest p-3 rounded-xl rounded-bl-none text-sm max-w-[80%] text-on-surface">
+                                Bom dia, o trator está com a documentação do Renagro em dia?
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <div
+                                class="bg-primary-container text-on-primary-container p-3 rounded-xl rounded-br-none text-sm max-w-[80%]">
+                                Sim, tudo certo. Operador com NR-31 também.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recorrência Widget -->
+                <div class="bg-surface-container-low p-6 rounded-xl space-y-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-2 mb-4 text-tertiary">
+                            <span class="material-symbols-outlined">event_repeat</span>
+                            <h4 class="font-headline font-bold">Configurar Recorrência</h4>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="space-y-1.5">
+                                <label class="text-xs font-bold text-on-surface-variant uppercase">Frequência</label>
+                                <select
+                                    class="w-full bg-surface-container-highest border-none rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-primary-container">
+                                    <option>Semanalmente</option>
+                                    <option>Quinzenalmente</option>
+                                    <option>Mensalmente</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        class="w-full bg-secondary-container text-on-secondary-container font-bold py-2.5 rounded text-sm">Agendar
+                        Operações</button>
+                </div>
+
+                <!-- Credencial CNH/NR-31 -->
+                <div
+                    class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant space-y-4 flex flex-col items-center justify-center text-center">
+                    <span class="material-symbols-outlined text-5xl text-primary">verified_user</span>
+                    <div>
+                        <h4 class="font-headline font-bold text-tertiary">Credencial Validada</h4>
+                        <p class="text-xs text-on-surface-variant mt-1">CNH Categoria C e Certificado NR-31 verificados
+                            com sucesso no sistema Confia Rural.</p>
+                    </div>
+                    <button
+                        class="bg-surface-container-high text-on-surface-variant px-4 py-2 rounded font-bold text-xs hover:bg-surface-container-highest transition-colors">Visualizar
+                        PDF</button>
+                </div>
+
+            </div>
+
+            <!-- Avaliação Widget -->
+            <div class="max-w-md mx-auto bg-surface-container-low p-8 rounded-xl text-center space-y-6">
+                <h4 class="font-headline font-bold text-tertiary">Avalie sua experiência de Locação</h4>
+                <div class="flex justify-center gap-2 text-secondary-container">
+                    <span class="material-symbols-outlined text-4xl cursor-pointer"
+                        style="font-variation-settings: 'FILL' 1;">star</span>
+                    <span class="material-symbols-outlined text-4xl cursor-pointer"
+                        style="font-variation-settings: 'FILL' 1;">star</span>
+                    <span class="material-symbols-outlined text-4xl cursor-pointer"
+                        style="font-variation-settings: 'FILL' 1;">star</span>
+                    <span class="material-symbols-outlined text-4xl cursor-pointer"
+                        style="font-variation-settings: 'FILL' 1;">star</span>
+                    <span class="material-symbols-outlined text-4xl cursor-pointer gap-2">star</span>
+                </div>
+                <textarea class="w-full bg-surface-container-lowest border-none rounded-lg p-3"
+                    placeholder="Deixe seu comentário sobre a máquina, operador ou locador..." rows="3"></textarea>
+                <button
+                    class="w-full bg-secondary-container text-on-secondary-container font-bold py-3 rounded-lg hover:brightness-95 transition-all">Enviar
+                    Avaliação</button>
+            </div>
+        </section>
+        <!-- 5. Layout & Spacing -->
+        <section class="scroll-mt-24" id="layout">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Layout e Espaçamento</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <div class="space-y-12">
+                <div class="bg-surface-container-low p-8 rounded-xl border border-dashed border-outline-variant">
+                    <div class="text-xs font-bold uppercase text-on-surface-variant mb-4">Sistema de Grid (3 Colunas)
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div
+                            class="h-24 bg-primary/10 rounded border border-primary/20 flex items-center justify-center font-bold text-primary">
+                            Coluna 1/3</div>
+                        <div
+                            class="h-24 bg-primary/10 rounded border border-primary/20 flex items-center justify-center font-bold text-primary">
+                            Coluna 1/3</div>
+                        <div
+                            class="h-24 bg-primary/10 rounded border border-primary/20 flex items-center justify-center font-bold text-primary">
+                            Coluna 1/3</div>
+                    </div>
+                </div>
+                <div class="bg-surface-container-low p-8 rounded-xl border border-dashed border-outline-variant">
+                    <div class="text-xs font-bold uppercase text-on-surface-variant mb-4">Layout de Formulário (2
+                        Colunas)</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div
+                            class="h-48 bg-secondary-container/10 rounded border border-secondary-container/20 flex items-center justify-center font-bold text-secondary">
+                            Grupo de Dados</div>
+                        <div
+                            class="h-48 bg-secondary-container/10 rounded border border-secondary-container/20 flex items-center justify-center font-bold text-secondary">
+                            Painel de Ação</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- 6. Motion & Interaction -->
+        <section class="scroll-mt-24" id="motion">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Animações e Interações</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                <div class="space-y-6">
+                    <p class="text-[20px] leading-relaxed text-on-surface">
+                        Nossa linguagem de movimento é intencional e sutil, refletindo a precisão da engenharia e a
+                        fluidez orgânica do campo.
+                    </p>
+                    <ul class="space-y-4">
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+                            <div>
+                                <strong class="text-tertiary">Estados de Hover:</strong>
+                                <span class="text-on-surface-variant">Transições de cor suaves (200ms) e elevação física
+                                    (translateY -2px) com sombras difusas.</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary mt-1">check_circle</span>
+                            <div>
+                                <strong class="text-tertiary">Modais e Popups:</strong>
+                                <span class="text-on-surface-variant">Fade-in progressivo com escala sutil (0.95 to 1.0)
+                                    para criar senso de profundidade.</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-surface-container-highest p-12 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-32 h-32 bg-primary rounded-xl flex items-center justify-center cursor-pointer hover:-translate-y-2 hover:shadow-2xl transition-all duration-300">
+                        <span class="material-symbols-outlined text-white text-5xl">ads_click</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!-- 7. Icons -->
+        <section class="scroll-mt-24" id="icons">
+            <div class="mb-12">
+                <h2 class="font-headline text-4xl font-bold text-primary mb-4">Ícones</h2>
+                <div class="h-1 w-24 bg-secondary-container"></div>
+            </div>
+            <div class="grid grid-cols-3 md:grid-cols-5 gap-8">
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">agriculture</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">maquinário</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">calendar_month</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">safra</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">chat_bubble</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">mensagens</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">person</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">perfil</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">settings</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">ajustes</span>
+                </div>
+                <!-- V2 Requirements Icons -->
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">description</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">contratos</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">verified_user</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">credenciais</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span
+                        class="material-symbols-outlined text-4xl text-primary group-hover:text-white">event_repeat</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">recorrência</span>
+                </div>
+                <div
+                    class="flex flex-col items-center gap-3 p-6 bg-surface-container-low rounded-xl group hover:bg-primary transition-colors duration-300">
+                    <span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">star</span>
+                    <span class="text-xs font-bold uppercase group-hover:text-white">avaliação</span>
+                </div>
+            </div>
+        </section>
+    </main>
+    <!-- Footer -->
+    <footer class="bg-[#fbf3dd] dark:bg-[#1e1c0e] w-full py-12 border-t border-[#e9e2cd]/15">
+        <div class="max-w-[1200px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="flex flex-col items-center md:items-start gap-2">
+                <span class="text-lg font-bold text-[#173901] dark:text-[#d3eab8]">Frota Rural</span>
+                <p class="font-['Inter'] text-sm text-[#3f2e14]">© 2024 Frota Rural. Organic Brutalism Design System.
+                </p>
+            </div>
+            <div class="flex gap-8 font-['Inter'] text-sm text-[#3f2e14]/70">
+                <a class="hover:underline decoration-[#feb234]" href="#">Documentação</a>
+                <a class="hover:underline decoration-[#feb234]" href="#">Suporte</a>
+                <a class="hover:underline decoration-[#feb234]" href="#">Privacidade</a>
+                <a class="hover:underline decoration-[#feb234]" href="#">Termos</a>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>
