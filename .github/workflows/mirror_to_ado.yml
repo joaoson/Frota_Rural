@@ -11,9 +11,7 @@ jobs:
       - name: Checkout GitHub Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Ensures full history is synced
-
+          fetch-depth: 0 
       - name: Push to Azure Repos
         run: |
-          # Use the ADO_PAT secret you created in GitHub Settings
           git push --force https://x-token-auth:${{ secrets.ADO_PAT }}@dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_git/Frota_Rural main

@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR" style="scroll-behavior: smooth;">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Frota Rural - Component Library V2</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#343122",
+                        "on-secondary-container": "#6d4700",
+                        "tertiary-fixed": "#fcdeb7",
+                        "on-primary-fixed-variant": "#2c4f15",
+                        "inverse-on-surface": "#f8f1da",
+                        "surface-container": "#f5eed8",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#3f2e14",
+                        "surface-dim": "#e0dac4",
+                        "on-background": "#1e1c0e",
+                        "on-surface": "#1e1c0e",
+                        "background": "#fff9eb",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#43493d",
+                        "on-tertiary-container": "#cdb28e",
+                        "on-error": "#ffffff",
+                        "outline": "#73796c",
+                        "inverse-primary": "#a8d38a",
+                        "surface": "#fff9eb",
+                        "surface-variant": "#e9e2cd",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fff9eb",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#dfc29d",
+                        "primary-fixed-dim": "#a8d38a",
+                        "primary": "#173901",
+                        "error-container": "#ffdad6",
+                        "tertiary-container": "#584428",
+                        "outline-variant": "#c3c9b9",
+                        "on-primary-fixed": "#0a2100",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#e9e2cd",
+                        "on-tertiary-fixed": "#271902",
+                        "surface-container-low": "#fbf3dd",
+                        "on-secondary-fixed": "#291800",
+                        "secondary-fixed-dim": "#ffb94c",
+                        "on-tertiary-fixed-variant": "#574327",
+                        "surface-container-high": "#efe8d2",
+                        "primary-fixed": "#c4efa3",
+                        "on-primary-container": "#98c27b",
+                        "surface-tint": "#43682b",
+                        "secondary": "#815500",
+                        "on-secondary-fixed-variant": "#624000",
+                        "primary-container": "#2d5016",
+                        "secondary-fixed": "#ffddb2",
+                        "secondary-container": "#feb234"
+                    },
+                    fontFamily: {
+                        "headline": ["Epilogue"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem", "2xl": "1rem" },
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Scrollbar for sidebar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--tw-colors-outline-variant);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body min-h-screen flex flex-col">
+
+  <!-- Main Header -->
+  <header class="sticky top-0 z-50 w-full bg-surface-container-lowest/90 backdrop-blur-md border-b border-outline-variant/30 px-6 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+       <!-- Mobile menu button -->
+       <button class="lg:hidden text-primary hover:text-primary-container flex items-center justify-center">
+         <span class="material-symbols-outlined">menu</span>
+       </button>
+       <div class="font-headline font-black text-xl text-primary tracking-tighter">Frota Rural UI</div>
+    </div>
+    
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="./design-system.html" class="text-sm font-bold text-tertiary hover:text-primary transition-colors hover:underline">Design System V2</a>
+      <a href="./components.html" class="text-sm font-bold text-tertiary hover:text-primary transition-colors hover:underline">Página Única</a>
+      <a href="https://github.com" target="_blank" class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant hover:bg-outline-variant/30 transition-colors">
+        <span class="material-symbols-outlined text-[18px]">code</span>
+      </a>
+    </nav>
+  </header>
+
+  <div class="flex flex-1 max-w-[1400px] w-full mx-auto">
+    
+    <!-- Sidebar -->
+    <aside class="hidden lg:block w-72 shrink-0 border-r border-outline-variant/30 h-[calc(100vh-4rem)] sticky top-16 overflow-y-auto py-8 pl-4 pr-6">
+       
+       <div class="mb-8">
+          <h4 class="font-bold text-xs uppercase tracking-wider text-outline mb-3">Introdução</h4>
+          <ul class="space-y-1">
+             <li><a href="#getting-started" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Como Começar</a></li>
+             <li><a href="#typography" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Tipografia e Cores</a></li>
+          </ul>
+       </div>
+
+       <div>
+          <h4 class="font-bold text-xs uppercase tracking-wider text-outline mb-3">Componentes</h4>
+          <ul class="space-y-1">
+             <li><a href="#botoes" class="block px-3 py-2 text-sm font-bold text-primary bg-primary/5 rounded-lg border-l-2 border-primary transition-colors">Botões e Ações</a></li>
+             <li><a href="#formularios" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Entradas e Formulários</a></li>
+             <li><a href="#status" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Status e Indicadores</a></li>
+             <li><a href="#cartoes" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Cartões Funcionais</a></li>
+             <li><a href="#recursos" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Recursos Específicos</a></li>
+             <li><a href="#novos" class="block px-3 py-2 text-sm font-medium text-tertiary rounded-lg hover:bg-surface-container-high transition-colors">Novos Componentes</a></li>
+          </ul>
+       </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 min-w-0 py-8 px-6 md:px-12 lg:px-16 pb-24 space-y-24">
+       
+       <!-- Hero -->
+       <div class="max-w-3xl space-y-4" id="getting-started">
+          <h1 class="font-headline text-5xl font-black text-primary leading-tight">Componentes de Interface V2</h1>
+          <p class="text-[20px] text-tertiary mt-4 font-medium max-w-2xl text-on-surface-variant">Catálogo de componentes baseados na identidade orgânica e nos casos de uso reais da especificação do projeto Frota Rural.</p>
+          <div class="flex gap-4 pt-4">
+             <a href="#botoes" class="bg-primary text-white px-6 py-2.5 rounded-lg font-bold hover:shadow-lg hover:bg-primary/95 transition-all inline-flex items-center gap-2">
+                Começar <span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+             </a>
+             <button class="bg-surface-container-high text-on-surface px-6 py-2.5 rounded-lg font-bold hover:bg-outline-variant/30 transition-all">
+                Ver Código Fonte
+             </button>
+          </div>
+       </div>
+
+       <!-- Section: Botões -->
+       <section id="botoes" class="scroll-mt-24 max-w-4xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Botões e Ações</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+            <p class="mt-4 text-on-surface-variant">Variantes de botões baseadas no fluxo de locação e negociação.</p>
+          </div>
+
+          <!-- Component Showcase Card -->
+          <div class="border border-outline-variant/50 rounded-2xl overflow-hidden bg-surface-container-lowest">
+            <div class="p-8 md:p-12 flex flex-wrap gap-6 items-center justify-center bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjIiIGZpbGw9IiNjM2M5YjkiIGZpbGwtb3BhY2l0eT0iMC40Ii8+PC9zdmc+')]">
+                <!-- Default / Primary -->
+                <button class="px-8 py-3 bg-gradient-to-r from-primary to-primary-container text-white rounded-lg font-bold shadow hover:shadow-lg transition-all flex items-center gap-2">
+                  Buscar Maquinário (RF5)
+                </button>
+                <!-- Primary Action -->
+                <button class="px-8 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition-all flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[20px]">edit_document</span>
+                  Assinar Mútuo (RF8)
+                </button>
+                <!-- Secondary Alert -->
+                <button class="px-8 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold hover:brightness-95 transition-all">
+                  Anunciar Equipamento (RF4)
+                </button>
+                <!-- Outline -->
+                <button class="px-8 py-3 bg-transparent border-2 border-primary text-primary rounded-lg font-bold hover:bg-surface-container-high transition-all">
+                  Solicitar Edição (RF9)
+                </button>
+                <!-- Destructive -->
+                <button class="px-8 py-3 bg-transparent border-2 border-error text-error rounded-lg font-bold hover:bg-error-container/20 transition-all flex items-center gap-2">
+                  <span class="material-symbols-outlined text-[20px]">cancel</span>
+                  Cancelar Locação
+                </button>
+                <!-- Disabled -->
+                <button class="px-8 py-3 bg-surface-container-highest text-outline cursor-not-allowed rounded-lg font-bold flex items-center gap-2" disabled>
+                  <span class="material-symbols-outlined text-[20px]">hourglass_empty</span>
+                  Aguardando Aceite
+                </button>
+            </div>
+            
+            <!-- Code Block Placeholder -->
+            <div class="bg-[#1e1e1e] p-6 text-sm text-gray-300 font-mono overflow-x-auto border-t border-outline-variant/30">
+<pre><code>&lt;button class="bg-primary text-white px-8 py-3 rounded-lg font-bold"&gt;
+  Assinar Mútuo
+&lt;/button&gt;</code></pre>
+            </div>
+          </div>
+       </section>
+
+       <!-- Section: Formulários -->
+       <section id="formularios" class="scroll-mt-24 max-w-4xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Entradas e Formulários</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+            <p class="mt-4 text-on-surface-variant">Campos necessários para cadastro e gerenciamento de frota e contratos.</p>
+          </div>
+
+          <div class="border border-outline-variant/30 rounded-2xl bg-surface-container-lowest p-8 md:p-10">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <!-- Identificação & Frota -->
+              <div class="space-y-6">
+                <h3 class="font-headline text-xl font-bold text-tertiary">Identificação e Frota</h3>
+                <div class="space-y-2">
+                  <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">CPF / CNPJ do Locatário (RF1)</label>
+                  <input type="text" placeholder="000.000.000-00" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                  <p class="text-xs text-outline mt-1 font-medium">Requisito para formalização do contrato na plataforma.</p>
+                </div>
+                
+                <div class="space-y-2">
+                  <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Nº Registro Renagro (RF3)</label>
+                  <input type="text" placeholder="BR1029304899" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="space-y-2">
+                    <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">speed</span> Horím. Inicial</label>
+                    <input type="number" placeholder="1250 h" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                  </div>
+                  <div class="space-y-2">
+                    <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">speed</span> Horím. Final</label>
+                    <input type="number" placeholder="1300 h" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Locação & Detalhes -->
+              <div class="space-y-6">
+                <h3 class="font-headline text-xl font-bold text-tertiary">Locação e Detalhes</h3>
+                <div class="space-y-2">
+                  <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Atividade Agrícola (RF5)</label>
+                  <select class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow">
+                    <option>Plantio</option>
+                    <option>Pulverização</option>
+                    <option>Colheita</option>
+                    <option>Preparo de Solo</option>
+                  </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                   <div class="space-y-2">
+                    <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Início Safra</label>
+                    <input type="date" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                  </div>
+                   <div class="space-y-2">
+                    <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Fim Safra</label>
+                    <input type="date" class="w-full bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow" />
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <label class="text-sm font-bold text-on-surface-variant uppercase tracking-wider">Detalhes da Operação</label>
+                  <textarea placeholder="Ex: Preciso de trator com GPS..." class="w-full min-h-[100px] bg-surface-container border-none rounded-lg p-3.5 focus:ring-2 focus:ring-primary-container text-on-surface transition-shadow"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+       </section>
+       
+       <!-- Section: Status Badges -->
+       <section id="status" class="scroll-mt-24 max-w-4xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Status e Indicadores</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+          </div>
+          <div class="flex flex-wrap gap-4 p-8 border border-outline-variant/30 rounded-2xl bg-surface-container-lowest shadow-sm">
+            <span class="px-4 py-1.5 bg-primary/10 text-primary font-bold text-xs rounded uppercase tracking-wider flex items-center gap-1.5 border border-primary/20 hover:bg-primary/20 transition-colors cursor-default">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+              Em Operação (Ativo)
+            </span>
+            <span class="px-4 py-1.5 bg-secondary-container/20 text-on-secondary-container font-bold text-xs rounded uppercase tracking-wider flex items-center gap-1.5 border border-secondary-container/30 hover:bg-secondary-container/30 transition-colors cursor-default">
+              <span class="material-symbols-outlined text-[14px]">edit_document</span>
+              Assinatura Pendente
+            </span>
+            <span class="px-4 py-1.5 bg-tertiary-fixed border border-tertiary-container/20 text-on-tertiary-container font-bold text-xs rounded uppercase tracking-wider flex items-center gap-1.5 cursor-default hover:brightness-95 transition-all">
+              <span class="material-symbols-outlined text-[14px]">verified</span>
+              Locador Verificado
+            </span>
+            <span class="px-4 py-1.5 bg-error-container text-on-error-container font-bold text-xs rounded uppercase tracking-wider flex items-center gap-1.5 border border-error/20 hover:bg-error/30 transition-colors cursor-default">
+              <span class="material-symbols-outlined text-[14px]">warning</span>
+              Locação Cancelada
+            </span>
+            <span class="px-4 py-1.5 bg-surface-container-highest text-on-surface-variant font-bold text-xs rounded uppercase tracking-wider flex items-center gap-1.5 border border-outline-variant/50 hover:bg-outline-variant/40 transition-colors cursor-default">
+              <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
+              Aguardando Validação
+            </span>
+          </div>
+       </section>
+
+       <!-- Section: Cards Funcionais -->
+       <section id="cartoes" class="scroll-mt-24 max-w-6xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Cartões Funcionais</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+            <p class="mt-4 text-on-surface-variant">Cartões de anúncios de frota e gerenciamento de contratos gerados no fluxo RF4 a RF9.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            
+            <!-- Card 1 -->
+            <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden group shadow-sm hover:shadow-xl transition-all duration-300">
+              <div class="h-56 relative overflow-hidden bg-surface-container-high">
+                <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 mix-blend-multiply"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBE6O1-lx_deWeGLq2RQFxNOL8Zfb3DXYghTj2w_mzR2q9moV_s0fRkZoTpWNNVSVAayNfFct9y-m7QiVwLIHOfd1B_K6R9-ECIK1rXH6Y0mXYoJMzos-PwsoXApUnscIlwyhOMknsk3INvjmtmY3g-g15fQTvDho8A52QethK6xiztWFGTVK5GViSttTNVsKFYxqAiSyVtRL4mDEDeq8X3Xwv9aRWbHYt1ZVQikXXGUKvM0HXZP0X1MGLP8D62uEpNqNDcPLHL3KI" />
+                <div class="absolute top-4 right-4 bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-widest shadow-lg">
+                  Safra 2026 Ativa
+                </div>
+                <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px] text-primary">verified_user</span>
+                    <span class="text-xs font-bold text-tertiary">Operador com NR-31</span>
+                </div>
+              </div>
+              <div class="p-6 space-y-5">
+                <div>
+                  <div class="flex justify-between items-start mb-1">
+                     <h4 class="font-headline text-2xl font-bold text-primary leading-tight">Colheitadeira JD S700</h4>
+                     <div class="flex items-center text-secondary-container bg-secondary-container/10 px-2 py-0.5 rounded">
+                        <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+                        <span class="text-xs font-bold text-on-secondary-container ml-1">4.8</span>
+                     </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 text-on-surface-variant font-medium text-sm">
+                    <span class="material-symbols-outlined text-[16px]">location_on</span>
+                    Sorriso, MT - Entrega até 100km
+                  </div>
+                </div>
+                
+                <div class="flex gap-4 border-t border-b border-outline-variant/20 py-4">
+                  <div class="flex-1">
+                     <div class="text-[10px] uppercase font-bold text-outline tracking-wider">Atividade</div>
+                     <div class="text-sm font-bold text-tertiary mt-0.5">Colheita Safra Soja</div>
+                  </div>
+                  <div class="flex-1 border-l border-outline-variant/20 pl-4">
+                     <div class="text-[10px] uppercase font-bold text-outline tracking-wider">Horímetro Atual</div>
+                     <div class="text-sm font-bold text-tertiary mt-0.5">2.450 h</div>
+                  </div>
+                </div>
+    
+                <div class="flex justify-between items-end pt-2">
+                  <div>
+                    <span class="text-xs text-on-surface-variant font-bold uppercase tracking-wider block mb-1">Custo Estimado</span>
+                    <div class="text-3xl font-black text-primary leading-none">R$ 480<span class="text-sm font-bold text-tertiary">/hora</span></div>
+                  </div>
+                  <button class="bg-primary text-white px-6 py-3 rounded-lg font-bold text-sm shadow hover:bg-primary/90 transition-colors">
+                    Reservar
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Card 2 -->
+            <div class="bg-surface-container-low p-8 rounded-2xl flex flex-col border border-outline-variant/30 shadow-sm relative overflow-hidden group hover:border-primary/50 transition-colors">
+              <div class="absolute left-0 top-0 bottom-0 w-2 bg-secondary-container group-hover:bg-primary transition-colors"></div>
+              
+              <div class="flex-1 space-y-6 ml-2">
+                <div class="flex justify-between items-start">
+                  <span class="px-3 py-1 bg-secondary-container/20 text-on-secondary-container font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1">
+                    Assinatura Pendente (RF8)
+                  </span>
+                  <span class="text-sm font-bold text-outline">#CTR-8821</span>
+                </div>
+                
+                <div class="space-y-4 pt-2">
+                  <div class="grid grid-cols-2 gap-6 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20">
+                    <div>
+                      <div class="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Locador</div>
+                      <div class="font-bold text-primary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">person</span> João Silva</div>
+                    </div>
+                    <div>
+                      <div class="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Locatário</div>
+                      <div class="font-bold text-tertiary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">storefront</span> Fazenda Aurora</div>
+                    </div>
+                  </div>
+                  
+                  <div class="flex justify-between items-center py-2 border-b border-outline-variant/20">
+                     <div>
+                        <div class="text-[10px] font-bold text-outline uppercase tracking-wider">Maquinário</div>
+                        <div class="font-bold text-on-surface">Trator Valtra BH194</div>
+                     </div>
+                     <div class="text-right">
+                        <div class="text-[10px] font-bold text-outline uppercase tracking-wider">Período Referência</div>
+                        <div class="font-bold text-primary">02 - 10 Fev/2026</div>
+                     </div>
+                  </div>
+                  
+                  <div class="bg-primary/5 p-4 rounded-xl border border-primary/10">
+                     <div class="flex justify-between items-center mb-1">
+                        <div class="text-xs font-bold text-on-surface-variant">Uso Contratado (Horímetro)</div>
+                        <div class="text-xs font-bold text-tertiary">80 h</div>
+                     </div>
+                     <div class="flex justify-between items-center">
+                        <div class="text-[10px] uppercase font-bold text-outline tracking-wider">Valor Total Parcial</div>
+                        <div class="text-lg font-black text-primary">R$ 15.000,00</div>
+                     </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex gap-3 mt-8 ml-2">
+                <button class="flex-1 bg-primary text-white py-3 rounded-lg font-bold text-sm hover:shadow-md transition-shadow flex justify-center items-center gap-2">
+                  <span class="material-symbols-outlined text-[18px]">gesture</span>
+                  Assinar Mútuo
+                </button>
+                <button class="px-6 border-2 border-error/50 text-error hover:bg-error/10 py-3 rounded-lg font-bold text-sm transition-colors">
+                  Recusar
+                </button>
+              </div>
+            </div>
+
+          </div>
+       </section>
+
+       <!-- Section: Recursos Específicos -->
+       <section id="recursos" class="scroll-mt-24 max-w-6xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Recursos Específicos</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+            <p class="mt-4 text-on-surface-variant">Componentes focados nas histórias de usuário avançadas (Uploads, Chat, Avaliações, Recorrência).</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            
+            <!-- Recorrência (RF16) -->
+            <div class="bg-surface-container p-8 rounded-2xl border border-outline-variant/30 relative shadow-sm">
+               <div class="absolute -top-4 -right-4 bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg">
+                 <span class="material-symbols-outlined text-[20px]">event_repeat</span>
+               </div>
+               <h3 class="font-headline text-xl font-bold text-tertiary mb-6">Programar Recorrência de Aluguel</h3>
+               
+               <div class="space-y-5">
+                  <p class="text-sm text-on-surface-variant font-medium">Garante a disponibilidade do equipamento para o mesmo locatário em safras futuras sem nova busca (RF16).</p>
+                  
+                  <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                      <label class="text-xs font-bold uppercase tracking-wider text-outline">Frequência</label>
+                      <select class="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary font-medium text-tertiary shadow-sm">
+                        <option>Semanalmente</option>
+                        <option>Quinzenalmente</option>
+                        <option selected>Mensalmente (Durante Safra)</option>
+                        <option>Anualmente</option>
+                      </select>
+                    </div>
+                    <div class="space-y-2">
+                      <label class="text-xs font-bold uppercase tracking-wider text-outline">Término</label>
+                      <input type="date" value="2026-05-30" class="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary font-medium text-tertiary shadow-sm" />
+                    </div>
+                  </div>
+                  
+                  <button class="w-full bg-secondary-container text-on-secondary-container font-bold py-3.5 rounded-lg hover:brightness-95 transition-all mt-4">
+                    Salvar Programação de Escala
+                  </button>
+               </div>
+            </div>
+
+            <!-- Chat Interno (RF14) -->
+            <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 flex flex-col min-h-[400px] overflow-hidden shadow-sm">
+              <div class="bg-surface-container p-4 border-b border-outline-variant/30 flex items-center justify-between">
+                 <div class="flex items-center gap-3">
+                   <div class="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">RM</div>
+                   <div>
+                      <div class="font-bold text-sm text-primary">Ricardo Mendes (Locador)</div>
+                      <div class="text-[10px] font-bold text-secondary flex items-center gap-1 uppercase tracking-wider">
+                         <span class="w-1.5 h-1.5 bg-secondary-container rounded-full"></span> Online no Chat
+                      </div>
+                   </div>
+                 </div>
+                 <span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary transition-colors">more_vert</span>
+              </div>
+              
+              <div class="flex-1 p-6 space-y-4 overflow-y-auto bg-surface/50">
+                <!-- Received -->
+                <div class="flex flex-col items-start gap-1">
+                  <span class="text-[10px] font-bold text-outline">09:14 AM</span>
+                  <div class="bg-surface-container p-3.5 rounded-2xl rounded-tl-sm text-sm text-tertiary max-w-[85%] leading-relaxed font-medium shadow-sm">
+                    Bom dia! Confirmando que o trator já passou pela revisão. A CNH do operador precisa constar categoria C, correto?
+                  </div>
+                </div>
+                <!-- Sent -->
+                <div class="flex flex-col items-end gap-1">
+                  <span class="text-[10px] font-bold text-outline">09:18 AM</span>
+                  <div class="bg-primary text-white p-3.5 rounded-2xl rounded-tr-sm text-sm max-w-[85%] leading-relaxed font-medium shadow-sm">
+                    Exato! E lembre de anexar o certificado NR-31 também para efetuarmos a validação na plataforma conforme o protocolo.
+                  </div>
+                </div>
+              </div>
+              
+              <div class="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
+                 <button class="text-outline hover:text-primary transition-colors"><span class="material-symbols-outlined">attach_file</span></button>
+                 <input type="text" placeholder="Digite sua mensagem (RF14)..." class="flex-1 bg-surface-container border-none rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface" />
+                 <button class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-sm">
+                   <span class="material-symbols-outlined text-[18px]">send</span>
+                 </button>
+              </div>
+            </div>
+
+            <!-- Avaliação (RF12 / RF13) -->
+            <div class="bg-surface-container p-8 rounded-2xl border border-outline-variant/30 flex flex-col items-center justify-center text-center space-y-6 shadow-sm">
+               <div>
+                 <span class="inline-flex text-[10px] font-bold uppercase tracking-wider bg-surface-container-highest px-3 py-1 rounded-full mb-3 text-on-surface-variant">Conclusão de Locação</span>
+                 <h3 class="font-headline text-2xl font-bold text-tertiary">Avalie o Serviço Prestado</h3>
+                 <p class="text-sm text-on-surface-variant max-w-[300px] mx-auto mt-2 leading-relaxed">Sua avaliação compõe a reputação do operador e do equipamento (RF12/RF13).</p>
+               </div>
+               
+               <div class="flex gap-2">
+                 <span class="material-symbols-outlined text-5xl text-secondary-container cursor-pointer hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">star</span>
+                 <span class="material-symbols-outlined text-5xl text-secondary-container cursor-pointer hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">star</span>
+                 <span class="material-symbols-outlined text-5xl text-secondary-container cursor-pointer hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">star</span>
+                 <span class="material-symbols-outlined text-5xl text-secondary-container cursor-pointer hover:scale-110 transition-transform" style="font-variation-settings: 'FILL' 1;">star</span>
+                 <span class="material-symbols-outlined text-5xl text-outline/40 cursor-pointer hover:scale-110 transition-transform hover:text-secondary-container">star</span>
+               </div>
+               
+               <div class="w-full space-y-4 pt-2">
+                 <textarea class="w-full bg-surface-container-lowest border-none rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary shadow-sm" placeholder="O trator desempenhou bem na colheita? O operador foi pontual?" rows="2"></textarea>
+                 <button class="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:shadow-lg transition-all">Enviar Avaliação</button>
+               </div>
+            </div>
+
+            <!-- Validação Credencial (RF15) -->
+            <div class="bg-surface-container-lowest p-8 rounded-2xl border border-outline-variant/30 space-y-6 shadow-sm">
+                <h3 class="font-headline text-xl font-bold text-tertiary">Upload de Credenciais Operacionais</h3>
+                <p class="text-sm text-on-surface-variant">Obrigatório para operadores de maquinário agrícola (RF15).</p>
+                
+                <div class="space-y-4 relative">
+                   
+                   <!-- Success Upload State -->
+                   <div class="border-2 border-primary/40 bg-primary/5 rounded-xl p-4 flex items-center justify-between transition-colors">
+                      <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-primary/20 text-primary rounded-xl flex items-center justify-center">
+                           <span class="material-symbols-outlined">description</span>
+                        </div>
+                        <div>
+                           <div class="font-bold text-sm text-primary">CNH_Categoria_C_Validada.pdf</div>
+                           <div class="text-[10px] uppercase font-bold text-outline mt-0.5 tracking-wider">2.4 MB • Verificado pelo sistema Confia Rural</div>
+                        </div>
+                      </div>
+                      <span class="material-symbols-outlined text-primary text-[24px]">check_circle</span>
+                   </div>
+
+                   <!-- Empty Upload State -->
+                   <div class="border-2 border-dashed border-outline-variant/60 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group">
+                      <span class="material-symbols-outlined text-4xl text-outline group-hover:text-primary transition-colors mb-2">upload_file</span>
+                      <div class="font-bold text-tertiary">Anexar Certificado NR-31</div>
+                      <div class="text-[11px] font-medium text-outline mt-1 uppercase tracking-wider">Selecione ou arraste o arquivo PDF (Max 5MB)</div>
+                   </div>
+
+                </div>
+                
+                <button class="w-full bg-secondary-container text-on-secondary-container font-bold py-3.5 rounded-xl hover:brightness-95 transition-all opacity-50 cursor-not-allowed">
+                  Concluir Validação
+                </button>
+            </div>
+
+          </div>
+       </section>
+
+    
+       <!-- Section: Novos Componentes -->
+       <section id="novos" class="scroll-mt-24 max-w-6xl space-y-8">
+          <div>
+            <h2 class="font-headline text-3xl font-bold text-primary mb-2">Novos Componentes (RFs)</h2>
+            <div class="h-1 w-16 bg-secondary-container"></div>
+            <p class="mt-4 text-on-surface-variant">Componentes adicionais exigidos pela especificação técnica.</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            
+            <!-- Autenticação (RF2) -->
+            <div class="bg-surface-container p-8 rounded-2xl border border-outline-variant/30 relative shadow-sm">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-3">
+                        <span class="material-symbols-outlined text-[32px]">lock</span>
+                    </div>
+                    <h3 class="font-headline text-2xl font-bold text-tertiary">Acesso à Plataforma</h3>
+                    <p class="text-sm text-on-surface-variant mt-1">Autenticação de Usuário (RF2)</p>
+                </div>
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-outline">E-mail ou CPF</label>
+                        <input type="text" placeholder="contato@fazenda.com" class="w-full bg-surface-container-lowest border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-outline">Senha</label>
+                        <input type="password" placeholder="••••••••" class="w-full bg-surface-container-lowest border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm">
+                    </div>
+                    <div class="flex justify-between items-center pt-2">
+                        <label class="flex items-center gap-2 text-sm font-medium text-on-surface-variant cursor-pointer">
+                            <input type="checkbox" class="rounded text-primary focus:ring-primary bg-surface border-outline-variant">
+                            Lembrar-me
+                        </label>
+                        <a href="#" class="text-sm font-bold text-primary hover:underline">Esqueceu a senha?</a>
+                    </div>
+                    <button class="w-full bg-primary text-white font-bold py-3.5 rounded-lg hover:shadow-lg transition-all mt-4">
+                        Entrar na Plataforma
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumo de Pagamento (RF6) -->
+            <div class="bg-surface p-8 rounded-2xl border border-outline-variant/30 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-secondary-container"></div>
+                <h3 class="font-headline text-xl font-bold text-tertiary mb-2">Processar Pagamento</h3>
+                <p class="text-sm text-on-surface-variant mb-6">Contratação de Aluguel (RF6)</p>
+                
+                <div class="bg-surface-container-low rounded-xl p-5 mb-6 border border-outline-variant/20">
+                    <div class="flex justify-between text-sm mb-3">
+                        <span class="text-on-surface-variant font-medium">Diárias (5x R$ 800)</span>
+                        <span class="font-bold text-tertiary">R$ 4.000,00</span>
+                    </div>
+                    <div class="flex justify-between text-sm mb-3">
+                        <span class="text-on-surface-variant font-medium">Taxa da Plataforma</span>
+                        <span class="font-bold text-tertiary">R$ 200,00</span>
+                    </div>
+                    <hr class="border-outline-variant/20 my-3">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-outline uppercase tracking-wider text-xs">Total Apurado</span>
+                        <span class="font-black text-2xl text-primary">R$ 4.200,00</span>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <label class="flex items-center justify-between p-4 border border-primary bg-primary/5 rounded-xl cursor-pointer">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-primary">qr_code_2</span>
+                            <span class="font-bold text-sm text-tertiary">Pix (Aprovação Imediata)</span>
+                        </div>
+                        <input type="radio" name="payment" checked class="text-primary focus:ring-primary bg-surface border-outline-variant">
+                    </label>
+                    <label class="flex items-center justify-between p-4 border border-outline-variant/30 rounded-xl cursor-pointer hover:bg-surface-container-lowest">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-outline">credit_card</span>
+                            <span class="font-bold text-sm text-on-surface-variant">Cartão de Crédito</span>
+                        </div>
+                        <input type="radio" name="payment" class="text-primary focus:ring-primary bg-surface border-outline-variant">
+                    </label>
+                </div>
+                
+                <button class="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:shadow-lg transition-all mt-6 flex justify-center items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">lock</span>
+                    Pagar com Segurança
+                </button>
+            </div>
+
+            <!-- Atualização de Locação (RF11) -->
+            <div class="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/30 shadow-sm lg:col-span-2">
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="flex-1 space-y-4">
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-secondary-container/20 text-on-secondary-container font-bold text-[10px] rounded uppercase tracking-wider">
+                            <span class="material-symbols-outlined text-[14px]">edit_calendar</span>
+                            Atualizar Locação (RF11)
+                        </div>
+                        <h3 class="font-headline text-2xl font-bold text-tertiary">Solicitar Reagendamento</h3>
+                        <p class="text-sm text-on-surface-variant leading-relaxed">Surgiu um imprevisto climático? Você pode solicitar novas datas diretamente ao locador. A alteração dependerá da disponibilidade e do aceite dele.</p>
+                    </div>
+                    
+                    <div class="w-full md:w-[400px] bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/30 shadow-sm">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Início</label>
+                                <input type="date" value="2026-06-15" class="w-full bg-surface-container border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-tertiary font-medium">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Fim</label>
+                                <input type="date" value="2026-06-20" class="w-full bg-surface-container border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-tertiary font-medium">
+                            </div>
+                        </div>
+                        <div class="space-y-2 mb-6">
+                            <label class="text-xs font-bold uppercase tracking-wider text-outline">Motivo da Alteração</label>
+                            <textarea placeholder="Ex: Chuvas atrasaram o preparo do solo..." class="w-full bg-surface-container border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-tertiary font-medium" rows="2"></textarea>
+                        </div>
+                        <button class="w-full bg-primary text-white font-bold py-3 rounded-lg hover:brightness-110 transition-all flex justify-center items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">send</span> Enviar Solicitação
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Painel de Moderação (RF17 / RF18) -->
+            <div class="bg-[#1e1e1e] text-gray-200 p-8 rounded-2xl shadow-lg relative lg:col-span-2 overflow-hidden border border-[#333]">
+                <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+                    <span class="material-symbols-outlined text-[120px]">admin_panel_settings</span>
+                </div>
+                
+                <div class="flex items-center gap-3 mb-6 relative">
+                    <div class="w-10 h-10 bg-error/20 text-error rounded-lg flex items-center justify-center">
+                        <span class="material-symbols-outlined">security</span>
+                    </div>
+                    <div>
+                        <h3 class="font-headline text-xl font-bold text-white">Painel de Moderação</h3>
+                        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Acesso Restrito ao Administrador (RF17/RF18)</div>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto relative">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="border-b border-[#333]">
+                                <th class="py-3 px-4 font-bold text-gray-400 uppercase tracking-wider text-xs">Tipo</th>
+                                <th class="py-3 px-4 font-bold text-gray-400 uppercase tracking-wider text-xs">Alvo / Solicitação</th>
+                                <th class="py-3 px-4 font-bold text-gray-400 uppercase tracking-wider text-xs">Motivo do Alerta</th>
+                                <th class="py-3 px-4 font-bold text-gray-400 text-right uppercase tracking-wider text-xs">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-[#333]/50 hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-4"><span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Anúncio</span></td>
+                                <td class="py-4 px-4 font-medium text-white">Trator Modelo Y <br><span class="text-xs text-gray-500">ID: #4092</span></td>
+                                <td class="py-4 px-4 text-gray-400 text-xs">Fotos incompatíveis ou suspeitas (RF17)</td>
+                                <td class="py-4 px-4 text-right flex justify-end gap-2">
+                                    <button class="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 px-3 py-1.5 rounded text-xs font-bold transition-colors">Aprovar</button>
+                                    <button class="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-3 py-1.5 rounded text-xs font-bold transition-colors">Rejeitar</button>
+                                </td>
+                            </tr>
+                            <tr class="hover:bg-white/5 transition-colors">
+                                <td class="py-4 px-4"><span class="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">Usuário</span></td>
+                                <td class="py-4 px-4 font-medium text-white">Carlos Eduardo <br><span class="text-xs text-gray-500">Locatário</span></td>
+                                <td class="py-4 px-4 text-gray-400 text-xs">Denúncia de comportamento (RF18)</td>
+                                <td class="py-4 px-4 text-right flex justify-end gap-2">
+                                    <button class="border border-gray-600 hover:bg-gray-800 text-gray-300 px-3 py-1.5 rounded text-xs font-bold transition-colors">Revisar Contexto</button>
+                                    <button class="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-3 py-1.5 rounded text-xs font-bold transition-colors">Banir</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+          </div>
+       </section>
+
+    </main>
+
+  </div>
+  
+  <script>
+    // Simple script to highlight active section in sidebar
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('aside a[href^="#"]');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop;
+        if (pageYOffset >= sectionTop - 150) {
+          current = section.getAttribute('id');
+        }
+      });
+
+      navLinks.forEach(li => {
+        li.classList.remove('text-primary', 'bg-primary/5', 'border-l-2', 'border-primary', 'font-bold');
+        li.classList.add('text-tertiary', 'font-medium', 'hover:bg-surface-container-high');
+        
+        if (li.getAttribute('href') === `#${current}`) {
+          li.classList.remove('text-tertiary', 'font-medium', 'hover:bg-surface-container-high');
+          li.classList.add('text-primary', 'bg-primary/5', 'border-l-2', 'border-primary', 'font-bold');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
