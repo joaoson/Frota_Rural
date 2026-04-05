@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# FrontEnd — Setup
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Resumo**
 
-Currently, two official plugins are available:
+Este documento descreve o setup mínimo para rodar o FrontEnd do projeto (Vite + React).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**Requisitos mínimos**
 
-## React Compiler
+- Node: 20+
+- npm: 10+
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Dependências importantes instaladas**
 
-## Expanding the ESLint configuration
+- `shadcn` — biblioteca de componentes/estilos usada no projeto
+- `tailwindcss` — framework de utilitários CSS
+- `axios` — para requisições HTTP
+- `zod` — validação de formulários
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+**Como executar o projeto**
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. Abra um terminal e entre na pasta do frontend:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd FrontEnd
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Instale as dependências definidas no `package.json`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm i
 ```
+
+3. Rode o servidor de desenvolvimento (Vite):
+
+```bash
+npm run dev
+```
+
+4. Verifique versões, se necessário:
+
+```bash
+node -v
+npm -v
+```
+
+Observações:
+
+- O comando `npm i` baixa todas as dependências listadas em `FrontEnd/package.json`.
+- O projeto está configurado com Vite + React; o TailwindCSS e `shadcn` já estão integrados como dependências.
+
+**Estrutura de pastas**
+
+| Caminho / Item     | Descrição                                          |
+| ------------------ | -------------------------------------------------- |
+| src/               | Código-fonte da aplicação                          |
+| src/assets/        | Arquivos estáticos, como imagens, sons, logos etc. |
+| src/components/    | Componentes reutilizáveis                          |
+| src/components/ui/ | Componentes shadcn (gerados automaticamente)       |
+| src/pages/         | Páginas / rotas                                    |
+| src/hooks/         | Custom hooks (ex: useAuth)                         |
+| src/lib/           | Utilitários (api.ts, utils.ts)                     |
+| src/services/      | Chamadas de API organizadas por domínio            |
+| src/types/         | Tipagens TypeScript                                |
+| src/routes/        | Configuração das rotas                             |
+| src/App.tsx        | Componente principal (pode ficar em `src/`)        |
+| src/main.tsx       | Ponto de entrada (Vite)                            |
