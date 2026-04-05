@@ -74,6 +74,7 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
 
 ## Notas Adicionais
 
+- Vídeo de base para REST API em Django: https://www.youtube.com/watch?v=NoLF7Dlu5mc
 - Se você encontrar problemas de conexão com o banco de dados, verifique as configurações do seu arquivo `.env` e certifique-se de que o PostgreSQL esteja em execução.
 - Para implantação em produção, considere usar variáveis de ambiente ou um sistema de gerenciamento de segredos em vez do arquivo `.env`.
 - Certifique-se de manter seu ambiente virtual ativado sempre que trabalhar com o projeto.
