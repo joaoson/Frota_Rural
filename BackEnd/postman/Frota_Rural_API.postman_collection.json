@@ -1,0 +1,174 @@
+{
+  "info": {
+    "name": "Frota Rural API",
+    "description": "Django REST API under /api. Set collection variables: baseUrl, userId, machineId, userEmail.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000/api" },
+    { "key": "userId", "value": "00000000-0000-0000-0000-000000000001" },
+    { "key": "machineId", "value": "00000000-0000-0000-0000-000000000002" },
+    { "key": "userEmail", "value": "joao.silva@email.com" }
+  ],
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users/"
+          }
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Teste API\",\n  \"document\": \"999.888.777-66\",\n  \"email\": \"teste.api@example.com\",\n  \"password\": \"senhaSegura123\",\n  \"phone\": \"(11) 99999-0000\",\n  \"role\": \"locador\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/users/create"
+          }
+        },
+        {
+          "name": "Get user by email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users/email/{{userEmail}}"
+          }
+        },
+        {
+          "name": "Get user by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Update user (full)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nome Atualizado\",\n  \"document\": \"111.222.333-01\",\n  \"email\": \"joao.silva@email.com\",\n  \"password\": \"novaSenha123\",\n  \"phone\": \"(11) 91111-0001\",\n  \"role\": \"locador\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Warn user",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{userId}}/warn"
+          }
+        },
+        {
+          "name": "Suspend user",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{userId}}/suspend"
+          }
+        },
+        {
+          "name": "Ban user",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": "{{baseUrl}}/users/{{userId}}/ban"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Machines",
+      "item": [
+        {
+          "name": "List machines",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Optional query params: owner (UUID), status, brand, model.",
+            "url": "{{baseUrl}}/machines/"
+          }
+        },
+        {
+          "name": "List machines (filtered example)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/machines/?status=active&brand=John%20Deere"
+          }
+        },
+        {
+          "name": "Create machine",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner\": \"{{userId}}\",\n  \"renagro_number\": \"BR-RENAGRO-TEST-001\",\n  \"brand\": \"John Deere\",\n  \"model\": \"S700\",\n  \"year\": 2022,\n  \"usage_purpose\": \"Plantio\",\n  \"technical_specifications\": \"Motor, plataforma, GPS.\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/machines/"
+          }
+        },
+        {
+          "name": "Get machine by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/machines/{{machineId}}"
+          }
+        },
+        {
+          "name": "Update machine (full PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"owner\": \"{{userId}}\",\n  \"renagro_number\": \"BR-RENAGRO-UPDATED-001\",\n  \"brand\": \"John Deere\",\n  \"model\": \"S700\",\n  \"year\": 2023,\n  \"usage_purpose\": \"Colheita\",\n  \"technical_specifications\": \"Atualizado via Postman\",\n  \"status\": \"active\"\n}"
+            },
+            "url": "{{baseUrl}}/machines/{{machineId}}"
+          }
+        },
+        {
+          "name": "Patch machine (partial)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"technical_specifications\": \"Apenas este campo alterado.\"\n}"
+            },
+            "url": "{{baseUrl}}/machines/{{machineId}}"
+          }
+        },
+        {
+          "name": "Delete machine",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/machines/{{machineId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
