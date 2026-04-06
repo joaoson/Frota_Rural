@@ -1,5 +1,16 @@
 from django.urls import path
-from .views import get_users, create_user, user_detail, get_user_by_email, warn_user, suspend_user, ban_user
+
+from .views import (
+    ban_user,
+    create_user,
+    get_user_by_email,
+    get_users,
+    machine_detail,
+    machines_list,
+    suspend_user,
+    user_detail,
+    warn_user,
+)
 
 urlpatterns = [
     path('users/create', create_user, name='create_user'),
@@ -9,4 +20,6 @@ urlpatterns = [
     path('users/<uuid:pk>/warn', warn_user, name='warn_user'),
     path('users/<uuid:pk>/suspend', suspend_user, name='suspend_user'),
     path('users/<uuid:pk>/ban', ban_user, name='ban_user'),
+    path('machines/', machines_list, name='machines_list'),
+    path('machines/<uuid:pk>', machine_detail, name='machine_detail'),
 ]
