@@ -15,6 +15,7 @@ import {
 import {Controller, useForm} from "react-hook-form";
 import {zodResolver} from "@hookform/resolvers/zod";
 import {Field, FieldError, FieldGroup, FieldLabel} from "@/components/ui/field.tsx";
+import { toast } from "sonner";
 import {maskCPF} from "@/utils/maskCPF.ts";
 import {maskCEP} from "@/utils/maskCEP.ts";
 import {maskPhone} from "@/utils/maskPhone.ts";
@@ -41,11 +42,13 @@ function Signup() {
     // TODO: SHOULD CALCULATE SUM FOR CPF/CNPJ VALIDATION
     async function onSubmit(data: z.infer<typeof signupFormSchema>) {
         try {
-            console.log(data)
-            const response = await userService.register(data)
-            console.log(response)
+            await userService.register(data)
+            const name: string = data.name
+            toast.success(`Cadastro realizado com sucesso. Que bom ter você aqui, ${name}!`)
+
         } catch (error) {
             console.log(error)
+            toast.error("Ocorreu um problema com o cadastro. Tente novamente mais tarde.")
         }
     }
 
@@ -76,7 +79,6 @@ function Signup() {
                                             id="lessee-form-name"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="João da Silva"
-                                            autoComplete="off"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -128,7 +130,6 @@ function Signup() {
                                             id="lessee-form-email"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="contato@email.com"
-                                            autoComplete="off"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
