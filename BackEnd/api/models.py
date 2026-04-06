@@ -145,7 +145,7 @@ class Users(models.Model):
     name = models.CharField(max_length=255)
     document = models.CharField(unique=True, max_length=20)
     email = models.CharField(unique=True, max_length=255)
-    password_hash = models.CharField(max_length=255)
+    password = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, blank=True, null=True)
     role = models.TextField()  # This field type is a guess.
     status = models.CharField(max_length=50, blank=True, null=True)
