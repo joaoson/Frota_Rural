@@ -1,15 +1,11 @@
 {
   "info": {
+    "_postman_id": "05830260-f722-443b-997b-e3c00e81d5f3",
     "name": "Frota Rural API",
     "description": "Django REST API under /api. Set collection variables: baseUrl, userId, machineId, userEmail.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "32464980"
   },
-  "variable": [
-    { "key": "baseUrl", "value": "http://127.0.0.1:8000/api" },
-    { "key": "userId", "value": "00000000-0000-0000-0000-000000000001" },
-    { "key": "machineId", "value": "00000000-0000-0000-0000-000000000002" },
-    { "key": "userEmail", "value": "joao.silva@email.com" }
-  ],
   "item": [
     {
       "name": "Users",
@@ -19,80 +15,184 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/users/"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ""
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Create user",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Teste API\",\n  \"document\": \"999.888.777-66\",\n  \"email\": \"teste.api@example.com\",\n  \"password\": \"senhaSegura123\",\n  \"phone\": \"(11) 99999-0000\",\n  \"role\": \"locador\",\n  \"status\": \"active\"\n}"
             },
-            "url": "{{baseUrl}}/users/create"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "create"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Get user by email",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/users/email/{{userEmail}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/email/{{userEmail}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "email",
+                "{{userEmail}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Get user by id",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/users/{{userId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Update user (full)",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Nome Atualizado\",\n  \"document\": \"111.222.333-01\",\n  \"email\": \"joao.silva@email.com\",\n  \"password\": \"novaSenha123\",\n  \"phone\": \"(11) 91111-0001\",\n  \"role\": \"locador\",\n  \"status\": \"active\"\n}"
             },
-            "url": "{{baseUrl}}/users/{{userId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Delete user",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/users/{{userId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Warn user",
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{baseUrl}}/users/{{userId}}/warn"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/warn",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "warn"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Suspend user",
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{baseUrl}}/users/{{userId}}/suspend"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "suspend"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Ban user",
           "request": {
             "method": "PUT",
             "header": [],
-            "url": "{{baseUrl}}/users/{{userId}}/ban"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/ban",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "ban"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -104,71 +204,242 @@
           "request": {
             "method": "GET",
             "header": [],
-            "description": "Optional query params: owner (UUID), status, brand, model.",
-            "url": "{{baseUrl}}/machines/"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                ""
+              ]
+            },
+            "description": "Optional query params: owner (UUID), status, brand, model."
+          },
+          "response": []
         },
         {
           "name": "List machines (filtered example)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/machines/?status=active&brand=John%20Deere"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/?status=active&brand=John%20Deere",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "brand",
+                  "value": "John%20Deere"
+                }
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Create machine",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"owner\": \"{{userId}}\",\n  \"renagro_number\": \"BR-RENAGRO-TEST-001\",\n  \"brand\": \"John Deere\",\n  \"model\": \"S700\",\n  \"year\": 2022,\n  \"usage_purpose\": \"Plantio\",\n  \"technical_specifications\": \"Motor, plataforma, GPS.\",\n  \"status\": \"active\"\n}"
             },
-            "url": "{{baseUrl}}/machines/"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                ""
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Get machine by id",
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/machines/{{machineId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/{{machineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                "{{machineId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Update machine (full PUT)",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"owner\": \"{{userId}}\",\n  \"renagro_number\": \"BR-RENAGRO-UPDATED-001\",\n  \"brand\": \"John Deere\",\n  \"model\": \"S700\",\n  \"year\": 2023,\n  \"usage_purpose\": \"Colheita\",\n  \"technical_specifications\": \"Atualizado via Postman\",\n  \"status\": \"active\"\n}"
             },
-            "url": "{{baseUrl}}/machines/{{machineId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/{{machineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                "{{machineId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Patch machine (partial)",
           "request": {
             "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"technical_specifications\": \"Apenas este campo alterado.\"\n}"
             },
-            "url": "{{baseUrl}}/machines/{{machineId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/{{machineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                "{{machineId}}"
+              ]
+            }
+          },
+          "response": []
         },
         {
           "name": "Delete machine",
           "request": {
             "method": "DELETE",
             "header": [],
-            "url": "{{baseUrl}}/machines/{{machineId}}"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/machines/{{machineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "machines",
+                "{{machineId}}"
+              ]
+            }
+          },
+          "response": []
         }
       ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"tiago@gmail.com\",\n    \"password\": \"Teste123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzc2MDMyMzE5LCJpYXQiOjE3NzYwMzE0MTksImp0aSI6Ijk5ZWIzZWQwMTc2NjQ4YzNiMWZkMThkNzZTE1MDI4IiwidXNlcl9pZCI6IjA2ODQwMjNkLWE3ZTctNDMzNy04ZDlkLWY3MTVkYzY0NzAyOSIsImVtYWlsIjoidGlhZ29AZ21haWwuY29tIiwicm9sZSI6ImxvY2F0YXJpbyJ9.DJiF2yQU4A4YqN8pig0xwEkSk3B7MwgAjHadciw3l0w\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/login/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login",
+                "verify"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000/api"
+    },
+    {
+      "key": "userId",
+      "value": "00000000-0000-0000-0000-000000000001"
+    },
+    {
+      "key": "machineId",
+      "value": "00000000-0000-0000-0000-000000000002"
+    },
+    {
+      "key": "userEmail",
+      "value": "joao.silva@email.com"
     }
   ]
 }
