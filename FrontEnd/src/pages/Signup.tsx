@@ -8,13 +8,11 @@ import { maskDocument } from "@/utils/maskDocument";
 import { maskCEP } from "@/utils/maskCEP";
 import { maskPhone } from "@/utils/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import {
-  userService,
-  type CreateUserRequest,
-  UserRole,
-} from "@/services/UserService/UserService";
+import { userService } from "@/services/UserService/UserService";
 import { validateCNPJ } from "@/utils/validateCNPJ";
 import { validateCPF } from "@/utils/validateCPF";
+import { UserRole } from "@/services/UserService/models/UserRole";
+import type { CreateUserRequest } from "@/services/UserService/models/CreateUserRequest";
 
 const Signup = () => {
   const [role, setRole] = useState<UserRole>(UserRole.Locatario);
@@ -94,8 +92,9 @@ const Signup = () => {
         navigate("/signup/profile-upload");
       }
     } catch (error) {
+      console.log(error);
       toast.error(
-        "Ocorreu um problema com o cadastro. Tente novamente mais tarde.",
+        `Ocorreu um problema com o cadastro. Tente novamente mais tarde.`,
       );
     } finally {
       setLoading(false);

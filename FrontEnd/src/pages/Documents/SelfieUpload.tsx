@@ -29,13 +29,6 @@ const SelfieUpload = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <div className="flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full">
-        <Link
-          to="/dashboard"
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
-        >
-          <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
-        </Link>
-
         <div className="mb-8 sm:mb-10">
           <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
             Foto Pessoal
