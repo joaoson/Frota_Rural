@@ -46,7 +46,6 @@ def user_detail(request, pk):
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
-# TODO: HASH PASSWORD BEFORE STORING USER
 @api_view(['POST'])
 def create_user(request):
     document = request.data.get('document')
