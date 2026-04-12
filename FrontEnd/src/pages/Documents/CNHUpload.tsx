@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import cnhExample from "@/assets/cnh_example.jpg";
 
 const instructions = [
   "Abra sua CNH e posicione conforme o exemplo ao lado",
@@ -48,7 +49,7 @@ const CNHUpload = () => {
             <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
               <div className="flex-1 flex justify-center items-center bg-surface-container-high px-6 py-6">
                 <img
-                  src="/cnh_example.jpg"
+                  src={cnhExample}
                   alt="Exemplo de posicionamento da CNH"
                   className="h-44 sm:h-52 w-full object-contain"
                 />

@@ -3,8 +3,7 @@ import type { LoginUserResponse } from "@/services/UserService/models/LoginUserR
 import { userService } from "@/services/UserService/UserService";
 import { toast } from "sonner";
 import { UserServiceError } from "@/services/UserService/errors/UserError";
-
-const STORAGE_KEY = "frota_rural_tokens";
+import { AppConstants } from "./Constants";
 
 type AuthContextType = {
   tokens: LoginUserResponse | null;
@@ -19,7 +18,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tokens, setTokens] = useState<LoginUserResponse | null>(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(AppConstants.STORAGE_KEY);
       return raw ? (JSON.parse(raw) as LoginUserResponse) : null;
     } catch {
       return null;
@@ -47,12 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function login(tokens: LoginUserResponse) {
     setTokens(tokens);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens));
+    localStorage.setItem(AppConstants.STORAGE_KEY, JSON.stringify(tokens));
   }
 
   function logout() {
     setTokens(null);
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(AppConstants.STORAGE_KEY);
   }
 
   return (

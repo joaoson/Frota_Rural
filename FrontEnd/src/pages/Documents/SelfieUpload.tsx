@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import selfieExample from "@/assets/selfie_example.jpg";
 
 const tips = [
   "Centralize seu rosto no centro da câmera",
@@ -47,7 +48,7 @@ const SelfieUpload = () => {
             <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
               <div className="flex-1 flex justify-center items-center bg-surface-container-high px-6 py-6">
                 <img
-                  src="/selfie_example.jpg"
+                  src={selfieExample}
                   alt="Exemplo de posicionamento de foto de perfil"
                   className="h-44 sm:h-52 w-44 sm:w-52 object-cover rounded-full"
                 />
