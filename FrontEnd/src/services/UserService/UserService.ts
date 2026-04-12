@@ -7,6 +7,7 @@ import { UserError, UserServiceError } from "./errors/UserError";
 class UserService {
   private SIGNUP_ENDPOINT = "users/create";
   private LOGIN_ENDPOINT = "login";
+  private VERIFY_ENDPOINT = "login/verify";
 
   async register(data: CreateUserRequest) {
     const response = await AxiosInstance.post(this.SIGNUP_ENDPOINT, data);
@@ -23,6 +24,23 @@ class UserService {
 
         if (status === 400 || status === 401 || status === 404) {
           throw new UserServiceError(UserError.InvalidCredentials);
+        }
+      }
+      throw new UserServiceError(UserError.ServerError);
+    }
+  }
+
+  async verify(token: String) {
+    try {
+      await AxiosInstance.post(this.VERIFY_ENDPOINT, {
+        token: token,
+      });
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const status = error.response?.status;
+
+        if (status === 400 || status === 401 || status === 404) {
+          throw new UserServiceError(UserError.AuthError);
         }
       }
       throw new UserServiceError(UserError.ServerError);

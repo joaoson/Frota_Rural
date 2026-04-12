@@ -8,13 +8,14 @@ import type { LoginUserRequest } from "@/services/UserService/models/LoginUserRe
 import { userService } from "@/services/UserService/UserService";
 import { UserServiceError } from "@/services/UserService/errors/UserError";
 import { toast } from "sonner";
-import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -26,8 +27,8 @@ const Login = () => {
     };
 
     try {
-      const response: LoginUserResponse = await userService.login(request);
-
+      const response = await userService.login(request);
+      login(response);
       toast.success("Login realizado com sucesso!");
       navigate("/dashboard");
     } catch (error) {

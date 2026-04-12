@@ -1,5 +1,5 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 from .views import (
     ban_user,
@@ -20,6 +20,7 @@ urlpatterns = [
     ## JWT TOKEN AUTH
     path('login', login, name='token_obtain_pair'),
     path('login/refresh', TokenRefreshView.as_view(), name='token_refresh'),
+    path('login/verify', TokenVerifyView.as_view(), name='token_verify'),
 
     ## USERS
     path('users/create', create_user, name='create_user'),

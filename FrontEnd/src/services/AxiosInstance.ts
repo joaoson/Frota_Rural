@@ -6,3 +6,14 @@ export const AxiosInstance = axios.create({
         "Content-Type": "application/json",
     },
 });
+
+AxiosInstance.interceptors.request.use((config) => {
+    try {
+        const raw = localStorage.getItem("frota_rural_tokens");
+        if (raw) {
+            const { access } = JSON.parse(raw);
+            config.headers.Authorization = `Bearer ${access}`;
+        }
+    } catch {}
+    return config;
+});
