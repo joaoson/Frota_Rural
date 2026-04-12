@@ -89,13 +89,6 @@ const Login = () => {
                 />
               </div>
               <div className="flex justify-between items-center">
-                <label className="flex items-center gap-2 text-sm font-medium text-on-surface-variant cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded text-primary focus:ring-primary bg-surface border-outline-variant"
-                  />
-                  Lembrar-me
-                </label>
                 <Link
                   to="#"
                   className="text-sm font-bold text-primary hover:underline"
