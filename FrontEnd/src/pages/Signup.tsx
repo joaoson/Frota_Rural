@@ -13,6 +13,7 @@ import { validateCNPJ } from "@/utils/validateCNPJ";
 import { validateCPF } from "@/utils/validateCPF";
 import { UserRole } from "@/services/UserService/models/UserRole";
 import type { CreateUserRequest } from "@/services/UserService/models/CreateUserRequest";
+import { passwordPattern } from "@/utils/regexPatterns";
 
 const Signup = () => {
   const [role, setRole] = useState<UserRole>(UserRole.Locatario);
@@ -319,8 +320,8 @@ const Signup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                   required
-                  pattern="(?=.*[A-Z])(?=.*[0-9]).{8,}"
-                  title="A senha deve ter no mínimo 8 caracteres, uma letra maiúscula e um número"
+                  pattern={passwordPattern.regex.source}
+                  title={passwordPattern.title}
                 />
               </div>
               <button
