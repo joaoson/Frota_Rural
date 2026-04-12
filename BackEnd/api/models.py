@@ -148,6 +148,8 @@ class Users(models.Model):
     password = models.CharField(max_length=255)
     phone = models.CharField(max_length=20, blank=True, null=True)
     role = models.TextField()  # This field type is a guess.
+    address = models.TextField()
+    birth_date = models.DateField()
     status = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
