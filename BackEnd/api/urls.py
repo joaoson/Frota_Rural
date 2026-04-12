@@ -10,6 +10,8 @@ from .views import (
     suspend_user,
     user_detail,
     warn_user,
+    postings_list,
+    posting_detail,
 )
 
 urlpatterns = [
@@ -22,4 +24,6 @@ urlpatterns = [
     path('users/<uuid:pk>/ban', ban_user, name='ban_user'),
     path('machines/', machines_list, name='machines_list'),
     path('machines/<uuid:pk>', machine_detail, name='machine_detail'),
+    path('postings/', postings_list, name='postings_list'),
+    path('postings/<uuid:pk>', posting_detail, name='posting_detail'),
 ]

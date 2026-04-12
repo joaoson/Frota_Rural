@@ -6,6 +6,8 @@ import App from "./App.tsx";
 import Help from "./pages/Help.tsx";
 import Signup from "@/pages/Signup/Signup.tsx";
 import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
+import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
+import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import RouteStub from "@/pages/RouteStub.tsx";
 import { Toaster } from "sonner";
 
@@ -18,7 +20,10 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/help" element={<Help />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/novo-equipamento" element={<NovoEquipamento />} />
-        <Route path="/dashboard" element={<RouteStub title="Dashboard" />} />
+        <Route path="/novo-anuncio" element={<NovoAnuncio />} />
+        <Route path="/dashboard" element={<DashboardLocador />} />
+        <Route path="/dashboard/novo-equipamento" element={<NovoEquipamento />} />
+        <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
         <Route path="/buscar" element={<RouteStub title="Explorar Máquinas" />} />
         <Route path="/login" element={<RouteStub title="Entrar" />} />
       </Routes>
