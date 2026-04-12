@@ -53,6 +53,11 @@ class MachineSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+
+
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postings
