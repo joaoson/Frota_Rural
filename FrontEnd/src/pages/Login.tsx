@@ -4,15 +4,39 @@ import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { passwordPattern } from "@/utils/regexPatterns";
+import type { LoginUserRequest } from "@/services/UserService/models/LoginUserRequest";
+import { userService } from "@/services/UserService/UserService";
+import { UserServiceError } from "@/services/UserService/errors/UserError";
+import { toast } from "sonner";
+import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    navigate("/dashboard");
+    setLoading(true);
+
+    const request: LoginUserRequest = {
+      email: email.toLowerCase().trim(),
+      password: password.trim(),
+    };
+
+    try {
+      const response: LoginUserResponse = await userService.login(request);
+
+      toast.success("Login realizado com sucesso!");
+      navigate("/dashboard");
+    } catch (error) {
+      if (error instanceof UserServiceError) {
+        toast.error(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,9 +104,17 @@ const Login = () => {
               </div>
               <button
                 type="submit"
+                disabled={loading}
                 className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >
-                <MaterialIcon icon="login" size={20} /> Entrar na Plataforma
+                {loading ? (
+                  "Carregando..."
+                ) : (
+                  <>
+                    <MaterialIcon icon="person_add" size={20} /> Entrar na
+                    Plataforma
+                  </>
+                )}
               </button>
             </form>
 

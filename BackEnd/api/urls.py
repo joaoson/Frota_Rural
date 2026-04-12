@@ -18,8 +18,8 @@ from .views import (
 
 urlpatterns = [
     ## JWT TOKEN AUTH
-    path('token/', login, name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('login', login, name='token_obtain_pair'),
+    path('login/refresh', TokenRefreshView.as_view(), name='token_refresh'),
 
     ## USERS
     path('users/create', create_user, name='create_user'),
