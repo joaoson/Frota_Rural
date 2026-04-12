@@ -1,21 +1,13 @@
-import type {SignupFormSchema} from "@/pages/Signup/Components/SignupFormSchema.ts";
-import {AxiosInstance} from "@/services/AxiosInstance.ts";
+import { AxiosInstance } from "@/services/AxiosInstance";
+import type { CreateUserRequest } from "./models/CreateUserRequest";
 
 class UserService {
-    private SIGNUP_ENDPOINT = "users/create"
+  private SIGNUP_ENDPOINT = "users/create";
 
-    async register(data: SignupFormSchema) {
-        try {
-            const response = await AxiosInstance.post(
-                this.SIGNUP_ENDPOINT,
-                data
-            )
-            return response.data;
-        } catch (error) {
-            console.log(error);
-            throw error;
-        }
-    }
+  async register(data: CreateUserRequest) {
+    const response = await AxiosInstance.post(this.SIGNUP_ENDPOINT, data);
+    return response.data;
+  }
 }
 
 export const userService = new UserService();

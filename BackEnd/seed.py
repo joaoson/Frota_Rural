@@ -48,7 +48,7 @@ users = []
 for name, doc, email, role, phone in users_data:
     u = Users.objects.create(
         id=uuid.uuid4(), name=name, document=doc, email=email,
-        password_hash="pbkdf2_sha256$fake_hash_for_seed",
+        password="pbkdf2_sha256$fake_hash_for_seed",
         phone=phone, role=role, status="active",
     )
     users.append(u)
