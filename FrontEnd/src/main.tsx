@@ -12,7 +12,7 @@ import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
 import Help from "./pages/Help.tsx";
-import Buscar from "./pages/buscar/Buscar.tsx";
+import Buscar from "./pages/Buscar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
