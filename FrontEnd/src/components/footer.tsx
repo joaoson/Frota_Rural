@@ -1,45 +1,73 @@
 import { Link } from "react-router";
-import { Mail, Phone } from "lucide-react";
+import MaterialIcon from "@/components/MaterialIcon";
 
 const Footer = () => {
   return (
-    <footer className="bg-[#1A2414] w-full py-16 border-t border-white/10">
+    <footer className="bg-inverse-surface w-full py-16 border-t border-outline-variant/15">
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between gap-12 mb-12">
           <div className="flex flex-col items-start gap-4 max-w-md">
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-white tracking-tight">Frota Rural</span>
-            </div>
-            <p className="text-sm text-white/60 leading-relaxed">
-              A plataforma que transforma maquinário parado em renda e garante que o campo nunca pare por falta de equipamento.
+            <span className="font-headline text-2xl font-black tracking-tighter text-secondary-container">
+              Frota Rural
+            </span>
+            <p className="font-body text-sm text-inverse-on-surface/70 leading-relaxed">
+              A plataforma que transforma maquinário parado em renda e garante que o campo nunca pare por falta de
+              equipamento.
             </p>
             <div className="flex items-center gap-3 mt-2">
-              <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer">
-                <Mail className="w-4 h-4 text-white/60" />
+              <div className="w-9 h-9 rounded-full bg-inverse-on-surface/10 flex items-center justify-center hover:bg-inverse-on-surface/20 transition-colors cursor-pointer">
+                <MaterialIcon icon="mail" className="text-inverse-on-surface/70" size={18} />
               </div>
-              <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer">
-                <Phone className="w-4 h-4 text-white/60" />
+              <div className="w-9 h-9 rounded-full bg-inverse-on-surface/10 flex items-center justify-center hover:bg-inverse-on-surface/20 transition-colors cursor-pointer">
+                <MaterialIcon icon="phone" className="text-inverse-on-surface/70" size={18} />
               </div>
             </div>
           </div>
           <div className="flex gap-16">
             <div className="flex flex-col gap-3">
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Plataforma</span>
-              <Link to="/buscar" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Buscar equipamentos</Link>
-              <Link to="/signup" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Anunciar frota</Link>
-              <Link to="/login" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Entrar na conta</Link>
+              <span className="text-[10px] font-bold text-inverse-on-surface/50 uppercase tracking-widest mb-1">
+                Plataforma
+              </span>
+              <Link
+                to="/buscar"
+                className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
+              >
+                Buscar equipamentos
+              </Link>
+              <Link
+                to="/novo-equipamento"
+                className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
+              >
+                Anunciar frota
+              </Link>
+              <Link
+                to="/login"
+                className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
+              >
+                Entrar na conta
+              </Link>
             </div>
             <div className="flex flex-col gap-3">
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Legal</span>
-              <Link to="#" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Termos de uso</Link>
-              <Link to="#" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Privacidade</Link>
-              <Link to="#" className="text-sm text-white/60 hover:text-[#F59E0B] transition-colors">Suporte</Link>
+              <span className="text-[10px] font-bold text-inverse-on-surface/50 uppercase tracking-widest mb-1">
+                Legal
+              </span>
+              <Link to="#" className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors">
+                Termos de uso
+              </Link>
+              <Link to="#" className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors">
+                Privacidade
+              </Link>
+              <Link to="/help" className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors">
+                Suporte
+              </Link>
             </div>
           </div>
         </div>
-        <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-white/30">© 2026 Frota Rural. Todos os direitos reservados.</p>
-          <p className="text-xs text-white/30">Conectando o agronegócio brasileiro com tecnologia e confiança.</p>
+        <div className="border-t border-inverse-on-surface/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="font-body text-xs text-inverse-on-surface/40">© 2026 Frota Rural. Todos os direitos reservados.</p>
+          <p className="font-body text-xs text-inverse-on-surface/40">
+            Conectando o agronegócio brasileiro com tecnologia e confiança.
+          </p>
         </div>
       </div>
     </footer>
