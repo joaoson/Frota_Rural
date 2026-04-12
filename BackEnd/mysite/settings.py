@@ -88,6 +88,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
+AUTH_USER_MODEL = 'api.Users'
+
 ## SETTING THE AUTHENTICATION
 
 REST_FRAMEWORK = {

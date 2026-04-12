@@ -6,6 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 import uuid
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
 
 # if id = models.UUIDField(primary_key=True), JSON request needs to contain an ID field.
@@ -140,19 +141,34 @@ class Reviews(models.Model):
         unique_together = (('rental', 'reviewer'),)
 
 
-class Users(models.Model):
+class UsersManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Email is required')
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+
+class Users(AbstractBaseUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     document = models.CharField(unique=True, max_length=20)
     email = models.CharField(unique=True, max_length=255)
-    password = models.CharField(max_length=255)
+    # password field provided by AbstractBaseUser
     phone = models.CharField(max_length=20, blank=True, null=True)
-    role = models.TextField()  # This field type is a guess.
+    role = models.TextField()
     address = models.TextField()
     birth_date = models.DateField()
     status = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name', 'document', 'role', 'address', 'birth_date']
+
+    objects = UsersManager()
 
     class Meta:
         # managed = False

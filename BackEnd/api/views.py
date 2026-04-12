@@ -1,7 +1,7 @@
-from django.contrib.auth.hashers import check_password
 from django.db import IntegrityError
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -22,7 +22,7 @@ def login(request):
     except Users.DoesNotExist:
         return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    if not check_password(request_password, user.password):
+    if not user.check_password(request_password):
         return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     if user.status in ('suspended', 'banned'):
