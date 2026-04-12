@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import Users, Machines, Postings, Rentals, Contracts
-from .serializer import MachineSerializer, UserSerializer
+from .serializer import MachineSerializer, UserSerializer, PostingSerializer
 
 @api_view(['GET'])
 def get_users(request):
@@ -192,6 +192,84 @@ def machine_detail(request, pk):
         return Response(
             {
                 "error": "Não é possível excluir esta máquina: existem registros dependentes (ex.: anúncios).",
+            },
+            status=status.HTTP_409_CONFLICT,
+        )
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _postings_queryset():
+    return Postings.objects.all().select_related("machinery", "machinery__owner")
+
+
+@api_view(["GET", "POST"])
+def postings_list(request):
+    if request.method == "GET":
+        qs = _postings_queryset().order_by("-created_at", "-id")
+        machinery_id = request.query_params.get("machinery")
+        if machinery_id:
+            qs = qs.filter(machinery_id=machinery_id)
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        serializer = PostingSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    serializer = PostingSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        serializer.save()
+    except IntegrityError:
+        return Response(
+            {"error": "Dados inválidos ou em conflito."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def posting_detail(request, pk):
+    try:
+        posting = _postings_queryset().get(pk=pk)
+    except Postings.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        return Response(PostingSerializer(posting).data, status=status.HTTP_200_OK)
+
+    if request.method == "PUT":
+        serializer = PostingSerializer(posting, data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.save()
+        except IntegrityError:
+            return Response(
+                {"error": "Dados inválidos ou em conflito."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == "PATCH":
+        serializer = PostingSerializer(posting, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.save()
+        except IntegrityError:
+            return Response(
+                {"error": "Dados inválidos ou em conflito."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    try:
+        posting.delete()
+    except IntegrityError:
+        return Response(
+            {
+                "error": "Não é possível excluir este anúncio: existem registros dependentes.",
             },
             status=status.HTTP_409_CONFLICT,
         )
