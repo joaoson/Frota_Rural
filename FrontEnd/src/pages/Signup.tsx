@@ -86,6 +86,9 @@ const Signup = () => {
       };
 
       await userService.register(payload);
+      toast.success(
+        `Cadastro realizado com sucesso. Que bom ter você aqui, ${name}!`,
+      );
 
       if (role === UserRole.Operador) {
         navigate("/signup/document-upload");
