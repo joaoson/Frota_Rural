@@ -1,8 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
 import { userService } from "@/services/UserService/UserService";
 import { toast } from "sonner";
-import { UserServiceError } from "@/services/UserService/errors/UserError";
+import {
+  UserError,
+  UserServiceError,
+} from "@/services/UserService/errors/UserError";
 import { AppConstants } from "./Constants";
 
 type AuthContextType = {
@@ -16,14 +19,23 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const sessionCorrupted = useRef(false);
+
   const [tokens, setTokens] = useState<LoginUserResponse | null>(() => {
     try {
       const raw = localStorage.getItem(AppConstants.STORAGE_KEY);
       return raw ? (JSON.parse(raw) as LoginUserResponse) : null;
     } catch {
+      sessionCorrupted.current = true;
       return null;
     }
   });
+
+  useEffect(() => {
+    if (!sessionCorrupted.current) return;
+    logout();
+    toast.error(UserError.AuthError);
+  }, []);
 
   const [isVerifying, setIsVerifying] = useState(tokens !== null);
   const isAuthenticated = tokens !== null;
@@ -51,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   function logout() {
     setTokens(null);
+    sessionCorrupted.current = false;
     localStorage.removeItem(AppConstants.STORAGE_KEY);
   }
 
