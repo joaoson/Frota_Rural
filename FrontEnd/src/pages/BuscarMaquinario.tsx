@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import { Search, MapPin, CalendarDays, SlidersHorizontal, X, SearchX, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, CalendarDays, SlidersHorizontal, X, SearchX, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +11,7 @@ import { postingService } from "@/services/PostingService/PostingService";
 const ITENS_POR_PAGINA = 9;
 const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
 
-// Ícone de grade que representa N colunas
+// Ícone de grade das colunas
 function IconeGrade({ n }: { n: number }) {
   const tamanho = 14;
   const espaco  = 1.5;
@@ -96,10 +96,10 @@ const BuscarMaquinario = () => {
   const [busca,       setBusca]       = useState("");
   const [atividade,   setAtividade]   = useState("");
   const [cidade,      setCidade]      = useState("");
-  const [precoMax,    setPrecoMax]    = useState("");
+  const [precoMaxInput, setPrecoMaxInput] = useState("");
+  const [precoMax,      setPrecoMax]      = useState("");
   const [dataInicio,  setDataInicio]  = useState("");
   const [dataFim,     setDataFim]     = useState("");
-  const [buscou,      setBuscou]      = useState(false);
 
   // Grade e ordenação
   const [colunas,   setColunas]   = useState<2 | 3>(3);
@@ -110,7 +110,7 @@ const BuscarMaquinario = () => {
 
   const refAnuncios = useRef<HTMLDivElement>(null);
 
-  // Scroll ao topo ao entrar na página
+  // Scroll ao entrar na página
   useEffect(() => { window.scrollTo(0, 0); }, []);
 
   // Busca única ao carregar a página
@@ -129,7 +129,13 @@ const BuscarMaquinario = () => {
       });
   }, []);
 
-  // Filtragem client-side 
+  // Debounce preço: aplica o filtro 400ms após o usuário parar de digitar
+  useEffect(() => {
+    const t = setTimeout(() => setPrecoMax(precoMaxInput), 400);
+    return () => clearTimeout(t);
+  }, [precoMaxInput]);
+
+  // Filtragem client-side
   const resultados = anuncios.filter((anuncio) => {
     // Busca livre: título, cidade, atividade e ano
     if (busca) {
@@ -165,22 +171,22 @@ const BuscarMaquinario = () => {
     return true;
   });
 
-  const temFiltro = busca || atividade || cidade || precoMax || dataInicio || dataFim;
+  const temFiltro = busca || atividade || cidade || precoMaxInput || dataInicio || dataFim;
+
+  // Resetar página ao mudar qualquer filtro
+  useEffect(() => { setPagina(1); }, [busca, atividade, cidade, precoMax, dataInicio, dataFim]);
 
   function irParaPagina(n: number) {
     setPagina(n);
     refAnuncios.current?.scrollIntoView({ behavior: "smooth" });
   }
 
-  function handleBuscar() { setBuscou(true); setPagina(1); }
-
   function handleLimpar() {
     setBusca(""); setAtividade(""); setCidade("");
-    setPrecoMax(""); setDataInicio(""); setDataFim("");
-    setBuscou(false); setPagina(1);
+    setPrecoMaxInput(""); setPrecoMax(""); setDataInicio(""); setDataFim("");
   }
 
-  const lista = buscou ? resultados : anuncios;
+  const lista = resultados;
 
   const listaOrdenada = [...lista].sort((a, b) => {
     if (ordenacao === "menor_preco") return a.preco - b.preco;
@@ -241,7 +247,7 @@ const BuscarMaquinario = () => {
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preço máx. (R$/h)</label>
-              <Input type="number" placeholder="Ex: 400" min={0} value={precoMax} onChange={(evento) => setPrecoMax(evento.target.value)} />
+              <Input type="number" placeholder="Ex: 400" min={0} value={precoMaxInput} onChange={(evento) => setPrecoMaxInput(evento.target.value)} />
             </div>
 
             <div className="space-y-2">
@@ -259,16 +265,13 @@ const BuscarMaquinario = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-100">
-            {temFiltro && (
+          {temFiltro && (
+            <div className="flex justify-end mt-6 pt-6 border-t border-gray-100">
               <Button variant="outline" onClick={handleLimpar} className="gap-2 text-gray-500">
                 <X className="w-4 h-4" /> Limpar filtros
               </Button>
-            )}
-            <Button onClick={handleBuscar} className="bg-[#2D3F1E] hover:bg-[#1A2414] text-white gap-2 px-8">
-              <Search className="w-4 h-4" /> Buscar
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Loading */}
@@ -291,23 +294,22 @@ const BuscarMaquinario = () => {
         {!loading && !erro && (
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <p className="text-sm text-gray-500">
-              {buscou ? (
-                <><span className="font-bold text-[#2D3F1E]">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} encontrado{resultados.length !== 1 ? "s" : ""}</>
-              ) : (
-                <><span className="font-bold text-[#2D3F1E]">{anuncios.length}</span> equipamento{anuncios.length !== 1 ? "s" : ""} disponíve{anuncios.length !== 1 ? "is" : "l"}</>
-              )}
+              <span className="font-bold text-[#2D3F1E]">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} disponíve{resultados.length !== 1 ? "is" : "l"}
             </p>
 
             <div className="flex items-center gap-3">
-              <Select value={ordenacao} onValueChange={(v) => { setOrdenacao(v as typeof ordenacao); setPagina(1); }}>
-                <SelectTrigger className="w-44 h-9 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="relevancia">Relevância</SelectItem>
-                  <SelectItem value="menor_preco">Menor Preço</SelectItem>
-                  <SelectItem value="maior_preco">Maior Preço</SelectItem>
-                  <SelectItem value="recentes">Recentes</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 whitespace-nowrap">Ordenar por</span>
+                <Select value={ordenacao} onValueChange={(v) => { setOrdenacao(v as typeof ordenacao); setPagina(1); }}>
+                  <SelectTrigger className="w-44 h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="relevancia">Relevância</SelectItem>
+                    <SelectItem value="menor_preco">Menor Preço</SelectItem>
+                    <SelectItem value="maior_preco">Maior Preço</SelectItem>
+                    <SelectItem value="recentes">Recentes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <div className="flex gap-1 border border-gray-200 rounded-xl p-1 bg-white">
                 {([2, 3] as const).map((n) => (
@@ -328,7 +330,7 @@ const BuscarMaquinario = () => {
         )}
 
         {/* Sem resultados */}
-        {!loading && !erro && buscou && resultados.length === 0 && (
+        {!loading && !erro && temFiltro && resultados.length === 0 && (
           <div className="text-center py-20 bg-white rounded-[24px] border border-gray-100">
             <div className="bg-[#F3F0E6] w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
               <SearchX className="w-8 h-8 text-[#2D3F1E]" />
