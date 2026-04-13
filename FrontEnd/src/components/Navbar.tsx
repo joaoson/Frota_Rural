@@ -9,7 +9,7 @@ const Navbar = () => {
         </Link>
         <div className="hidden md:flex items-center gap-8 font-headline font-bold text-sm tracking-tight">
           <Link
-            to="/buscar"
+            to="/buscar-maquinario"
             className="text-primary border-b-2 border-primary pb-1 hover:text-primary-container transition-colors duration-200"
           >
             Explorar Máquinas

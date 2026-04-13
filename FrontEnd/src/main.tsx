@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
+import BuscarMaquinario from "@/pages/BuscarMaquinario.tsx";
+import AnuncioDetalhe from "@/pages/AnuncioDetalhe.tsx";
 import Signup from "@/pages/Signup.tsx";
 import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
 import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
@@ -41,6 +43,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />
+          <Route path="/buscar-maquinario" element={<BuscarMaquinario />} />
+          <Route path="/anuncio/:id" element={<AnuncioDetalhe />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

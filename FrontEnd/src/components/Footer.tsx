@@ -29,7 +29,7 @@ const Footer = () => {
                 Plataforma
               </span>
               <Link
-                to="/buscar"
+                to="/buscar-maquinario"
                 className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
               >
                 Buscar equipamentos
