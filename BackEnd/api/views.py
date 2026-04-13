@@ -1,10 +1,42 @@
 from django.db import IntegrityError
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Users, Machines, Postings, Rentals, Contracts
-from .serializer import MachineSerializer, UserSerializer, PostingSerializer
+from .models import Contracts, Machines, Postings, Rentals, Users
+from .serializer import LoginSerializer, MachineSerializer, PostingSerializer, UserSerializer
+
+@api_view(['POST'])
+def login(request):
+    serializer = LoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    request_password = serializer.validated_data['password']
+
+    try:
+        user = Users.objects.get(email=email)
+    except Users.DoesNotExist:
+        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.check_password(request_password):
+        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if user.status in ('suspended', 'banned'):
+        return Response({'detail': 'Account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
+
+    refresh = RefreshToken.for_user(user)
+    refresh['email'] = user.email
+    refresh['role'] = user.role
+
+    return Response({
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 def get_users(request):

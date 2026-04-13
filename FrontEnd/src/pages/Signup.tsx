@@ -4,15 +4,16 @@ import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { maskDocument } from "@/utils/maskDocument";
-import { maskCEP } from "@/utils/maskCEP";
-import { maskPhone } from "@/utils/maskPhone";
+import { maskDocument } from "@/utils/masks/maskDocument";
+import { maskCEP } from "@/utils/masks/maskCEP";
+import { maskPhone } from "@/utils/masks/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { userService } from "@/services/UserService/UserService";
-import { validateCNPJ } from "@/utils/validateCNPJ";
-import { validateCPF } from "@/utils/validateCPF";
+import { validateCNPJ } from "@/utils/validation/validateCNPJ";
+import { validateCPF } from "@/utils/validation/validateCPF";
 import { UserRole } from "@/services/UserService/models/UserRole";
 import type { CreateUserRequest } from "@/services/UserService/models/CreateUserRequest";
+import { passwordPattern } from "@/utils/regexPatterns";
 
 const Signup = () => {
   const [role, setRole] = useState<UserRole>(UserRole.Locatario);
@@ -85,6 +86,9 @@ const Signup = () => {
       };
 
       await userService.register(payload);
+      toast.success(
+        `Cadastro realizado com sucesso. Que bom ter você aqui, ${name}!`,
+      );
 
       if (role === UserRole.Operador) {
         navigate("/signup/document-upload");
@@ -319,8 +323,8 @@ const Signup = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                   required
-                  pattern="(?=.*[A-Z])(?=.*[0-9]).{8,}"
-                  title="A senha deve ter no mínimo 8 caracteres, uma letra maiúscula e um número"
+                  pattern={passwordPattern.regex.source}
+                  title={passwordPattern.title}
                 />
               </div>
               <button
