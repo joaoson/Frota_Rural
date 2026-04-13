@@ -9,15 +9,19 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
 django.setup()
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from api.models import (
     Users, Credentials, Machines, Postings, PostingsPhotos,
     Rentals, Contracts, Messages, Reviews,
 )
+from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 
 now = timezone.now()
+
+DEFAULT_PASSWORD = "Teste1234"
+_seed_password_hash = make_password(DEFAULT_PASSWORD)
 
 
 # ── Users (20) ──────────────────────────────────────────────────────────────
@@ -45,15 +49,16 @@ users_data = [
 ]
 
 users = []
-for name, doc, email, role, phone, address, birth_date in users_data:
+for i, (name, doc, email, role, phone) in enumerate(users_data):
     u = Users.objects.create(
         id=uuid.uuid4(), name=name, document=doc, email=email,
-        password="pbkdf2_sha256$fake_hash_for_seed",
-        phone=phone, role=role, address=address,
-        birth_date=birth_date, status="active",
+        password=_seed_password_hash,
+        phone=phone, role=role, status="active",
+        address=f"Rua Exemplo, {100 + i} - Curitiba/PR",
+        birth_date=date(1980 + (i % 30), 1 + (i % 12), 1 + (i % 27)),
     )
     users.append(u)
-print(f"✔ {len(users)} Users created")
+print(f"[OK]{len(users)} Users created (senha padrão: {DEFAULT_PASSWORD})")
 
 # Helpers: users by role
 locadores = [u for u in users if u.role == "locador"]
@@ -76,7 +81,7 @@ for i in range(20):
         created_at=now - timedelta(days=30 - i),
     )
     credentials.append(c)
-print(f"✔ {len(credentials)} Credentials created")
+print(f"[OK]{len(credentials)} Credentials created")
 
 
 # ── Machines (20) ──────────────────────────────────────────────────────────
@@ -117,7 +122,7 @@ for i, (brand, model, year, purpose) in enumerate(machines_data):
         updated_at=now - timedelta(days=i),
     )
     machines.append(m)
-print(f"✔ {len(machines)} Machines created")
+print(f"[OK]{len(machines)} Machines created")
 
 
 # ── Postings (20) ──────────────────────────────────────────────────────────
@@ -163,7 +168,7 @@ for i in range(20):
         updated_at=now - timedelta(days=i),
     )
     postings.append(p)
-print(f"✔ {len(postings)} Postings created")
+print(f"[OK]{len(postings)} Postings created")
 
 
 # ── PostingsPhotos (20) ────────────────────────────────────────────────────
@@ -177,7 +182,7 @@ for i in range(20):
         created_at=now - timedelta(days=19 - i),
     )
     photos.append(ph)
-print(f"✔ {len(photos)} PostingsPhotos created")
+print(f"[OK]{len(photos)} PostingsPhotos created")
 
 
 # ── Rentals (20) ───────────────────────────────────────────────────────────
@@ -202,7 +207,7 @@ for i in range(20):
         updated_at=now - timedelta(days=i),
     )
     rentals.append(r)
-print(f"✔ {len(rentals)} Rentals created")
+print(f"[OK]{len(rentals)} Rentals created")
 
 
 # ── Contracts (20) ─────────────────────────────────────────────────────────
@@ -219,7 +224,7 @@ for i in range(20):
         created_at=now - timedelta(days=14 - i),
     )
     contracts.append(ct)
-print(f"✔ {len(contracts)} Contracts created")
+print(f"[OK]{len(contracts)} Contracts created")
 
 
 # ── Messages (20) ──────────────────────────────────────────────────────────
@@ -260,7 +265,7 @@ for i in range(20):
         flagged_for_moderation=(i == 15),
     )
     messages.append(m)
-print(f"✔ {len(messages)} Messages created")
+print(f"[OK]{len(messages)} Messages created")
 
 
 # ── Reviews (20) ───────────────────────────────────────────────────────────
@@ -301,6 +306,6 @@ for i in range(20):
         created_at=now - timedelta(days=10 - i),
     )
     reviews.append(rv)
-print(f"✔ {len(reviews)} Reviews created")
+print(f"[OK]{len(reviews)} Reviews created")
 
-print("\n🌱 Seed completo! Banco populado com sucesso.")
+print("\nSeed completo! Banco populado com sucesso.")

@@ -9,6 +9,7 @@ import Signup from "@/pages/Signup.tsx";
 import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
 import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
+import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
 import { Toaster } from "sonner";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
@@ -39,6 +40,7 @@ createRoot(document.getElementById("root")!).render(
               element={<NovoEquipamento />}
             />
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
+            <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />
           <Route path="/buscar-maquinario" element={<BuscarMaquinario />} />
