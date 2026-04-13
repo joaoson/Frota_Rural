@@ -2,15 +2,22 @@ import { AxiosError } from "axios";
 import { AxiosInstance } from "@/services/AxiosInstance";
 import type { CreateUserRequest } from "./models/CreateUserRequest";
 import type { LoginUserRequest } from "./models/LoginUserRequest";
+import type { User } from "./models/User";
 import { UserError, UserServiceError } from "./errors/UserError";
 
 class UserService {
   private SIGNUP_ENDPOINT = "users/create";
+  private LIST_ENDPOINT = "users/";
   private LOGIN_ENDPOINT = "login";
   private VERIFY_ENDPOINT = "login/verify";
 
   async register(data: CreateUserRequest) {
     const response = await AxiosInstance.post(this.SIGNUP_ENDPOINT, data);
+    return response.data;
+  }
+
+  async list(): Promise<User[]> {
+    const response = await AxiosInstance.get<User[]>(this.LIST_ENDPOINT);
     return response.data;
   }
 
