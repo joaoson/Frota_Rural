@@ -6,8 +6,8 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://127.0.0.1:8000/api" },
-    { "key": "userId", "value": "00000000-0000-0000-0000-000000000001" },
-    { "key": "machineId", "value": "00000000-0000-0000-0000-000000000002" },
+    { "key": "userId", "value": "ae94feba-2ffb-46f4-ad9b-e55f7f84c1f4" },
+    { "key": "machineId", "value": "6b1fc247-e2be-4d94-ba61-34ba31f56b19" },
     { "key": "userEmail", "value": "joao.silva@email.com" }
   ],
   "item": [
