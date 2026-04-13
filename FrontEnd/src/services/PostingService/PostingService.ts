@@ -34,7 +34,7 @@ class PostingService {
     return response.data;
   }
 
-  async list(filters?: { machinery?: string; status?: string }) {
+  async list(filters?: { machinery?: string; status?: string; available_from?: string; available_until?: string }) {
     const response = await AxiosInstance.get(this.POSTINGS_ENDPOINT, {
       params: filters,
     });
@@ -53,6 +53,18 @@ class PostingService {
 
   async delete(id: string) {
     const response = await AxiosInstance.delete(`${this.POSTINGS_ENDPOINT}${id}`);
+    return response.data;
+  }
+
+  async uploadPhoto(postingId: string, file: File, isPrimary: boolean) {
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("is_primary", String(isPrimary));
+    const response = await AxiosInstance.post(
+      `${this.POSTINGS_ENDPOINT}${postingId}/photos/`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
     return response.data;
   }
 }

@@ -22,34 +22,35 @@ now = timezone.now()
 
 # ── Users (20) ──────────────────────────────────────────────────────────────
 users_data = [
-    ("João Silva", "111.222.333-01", "joao.silva@email.com", "locador", "(11) 91111-0001"),
-    ("Maria Oliveira", "111.222.333-02", "maria.oliveira@email.com", "locatario", "(11) 91111-0002"),
-    ("Carlos Santos", "111.222.333-03", "carlos.santos@email.com", "operador", "(11) 91111-0003"),
-    ("Ana Pereira", "111.222.333-04", "ana.pereira@email.com", "locador", "(11) 91111-0004"),
-    ("Pedro Costa", "111.222.333-05", "pedro.costa@email.com", "locatario", "(11) 91111-0005"),
-    ("Fernanda Lima", "111.222.333-06", "fernanda.lima@email.com", "operador", "(11) 91111-0006"),
-    ("Ricardo Almeida", "111.222.333-07", "ricardo.almeida@email.com", "locador", "(11) 91111-0007"),
-    ("Juliana Ferreira", "111.222.333-08", "juliana.ferreira@email.com", "locatario", "(11) 91111-0008"),
-    ("Marcos Souza", "111.222.333-09", "marcos.souza@email.com", "operador", "(11) 91111-0009"),
-    ("Patrícia Rocha", "111.222.333-10", "patricia.rocha@email.com", "locador", "(11) 91111-0010"),
-    ("Gustavo Martins", "111.222.333-11", "gustavo.martins@email.com", "locatario", "(11) 91111-0011"),
-    ("Camila Ribeiro", "111.222.333-12", "camila.ribeiro@email.com", "locador", "(11) 91111-0012"),
-    ("Lucas Barbosa", "111.222.333-13", "lucas.barbosa@email.com", "operador", "(11) 91111-0013"),
-    ("Beatriz Carvalho", "111.222.333-14", "beatriz.carvalho@email.com", "locatario", "(11) 91111-0014"),
-    ("Rafael Gomes", "111.222.333-15", "rafael.gomes@email.com", "locador", "(11) 91111-0015"),
-    ("Larissa Araújo", "111.222.333-16", "larissa.araujo@email.com", "locatario", "(11) 91111-0016"),
-    ("Diego Nascimento", "111.222.333-17", "diego.nascimento@email.com", "operador", "(11) 91111-0017"),
-    ("Vanessa Castro", "111.222.333-18", "vanessa.castro@email.com", "locador", "(11) 91111-0018"),
-    ("Thiago Mendes", "111.222.333-19", "thiago.mendes@email.com", "admin", "(11) 91111-0019"),
-    ("Isabela Dias", "111.222.333-20", "isabela.dias@email.com", "admin", "(11) 91111-0020"),
+    ("João Silva",       "111.222.333-01", "joao.silva@email.com",       "locador",   "(11) 91111-0001", "Rua das Palmeiras, 10, São Paulo, SP",      "1985-03-15"),
+    ("Maria Oliveira",   "111.222.333-02", "maria.oliveira@email.com",   "locatario", "(11) 91111-0002", "Av. Brasil, 200, Rio de Janeiro, RJ",        "1990-07-22"),
+    ("Carlos Santos",    "111.222.333-03", "carlos.santos@email.com",    "operador",  "(11) 91111-0003", "Rua Ipê, 33, Belo Horizonte, MG",           "1988-11-05"),
+    ("Ana Pereira",      "111.222.333-04", "ana.pereira@email.com",      "locador",   "(11) 91111-0004", "Rua das Flores, 45, Curitiba, PR",          "1982-06-30"),
+    ("Pedro Costa",      "111.222.333-05", "pedro.costa@email.com",      "locatario", "(11) 91111-0005", "Av. Central, 77, Brasília, DF",             "1995-02-14"),
+    ("Fernanda Lima",    "111.222.333-06", "fernanda.lima@email.com",    "operador",  "(11) 91111-0006", "Rua da Paz, 88, Porto Alegre, RS",          "1992-09-18"),
+    ("Ricardo Almeida",  "111.222.333-07", "ricardo.almeida@email.com",  "locador",   "(11) 91111-0007", "Av. do Campo, 99, Salvador, BA",            "1979-12-01"),
+    ("Juliana Ferreira", "111.222.333-08", "juliana.ferreira@email.com", "locatario", "(11) 91111-0008", "Rua Norte, 12, Recife, PE",                 "1993-04-25"),
+    ("Marcos Souza",     "111.222.333-09", "marcos.souza@email.com",     "operador",  "(11) 91111-0009", "Rua Sul, 56, Fortaleza, CE",                "1987-08-08"),
+    ("Patrícia Rocha",   "111.222.333-10", "patricia.rocha@email.com",   "locador",   "(11) 91111-0010", "Av. Leste, 34, Goiânia, GO",               "1983-01-19"),
+    ("Gustavo Martins",  "111.222.333-11", "gustavo.martins@email.com",  "locatario", "(11) 91111-0011", "Rua Oeste, 67, Vitória, ES",                "1996-05-07"),
+    ("Camila Ribeiro",   "111.222.333-12", "camila.ribeiro@email.com",   "locador",   "(11) 91111-0012", "Rua das Acácias, 23, São Luís, MA",         "1981-10-31"),
+    ("Lucas Barbosa",    "111.222.333-13", "lucas.barbosa@email.com",    "operador",  "(11) 91111-0013", "Av. das Nações, 90, Bauru, SP",             "1994-03-03"),
+    ("Beatriz Carvalho", "111.222.333-14", "beatriz.carvalho@email.com", "locatario", "(11) 91111-0014", "Rua das Laranjeiras, 15, Ribeirão Preto, SP","1991-07-17"),
+    ("Rafael Gomes",     "111.222.333-15", "rafael.gomes@email.com",     "locador",   "(11) 91111-0015", "Av. Paraná, 41, Londrina, PR",              "1980-11-22"),
+    ("Larissa Araújo",   "111.222.333-16", "larissa.araujo@email.com",   "locatario", "(11) 91111-0016", "Rua dos Ipês, 72, Juiz de Fora, MG",       "1997-09-09"),
+    ("Diego Nascimento", "111.222.333-17", "diego.nascimento@email.com", "operador",  "(11) 91111-0017", "Av. Atlântica, 5, Florianópolis, SC",       "1989-02-28"),
+    ("Vanessa Castro",   "111.222.333-18", "vanessa.castro@email.com",   "locador",   "(11) 91111-0018", "Rua Mato Grosso, 18, Campo Grande, MS",     "1986-06-14"),
+    ("Thiago Mendes",    "111.222.333-19", "thiago.mendes@email.com",    "admin",     "(11) 91111-0019", "Av. Nazaré, 100, Belém, PA",                "1984-12-20"),
+    ("Isabela Dias",     "111.222.333-20", "isabela.dias@email.com",     "admin",     "(11) 91111-0020", "Rua dos Parintins, 8, Manaus, AM",          "1998-04-11"),
 ]
 
 users = []
-for name, doc, email, role, phone in users_data:
+for name, doc, email, role, phone, address, birth_date in users_data:
     u = Users.objects.create(
         id=uuid.uuid4(), name=name, document=doc, email=email,
         password="pbkdf2_sha256$fake_hash_for_seed",
-        phone=phone, role=role, status="active",
+        phone=phone, role=role, address=address,
+        birth_date=birth_date, status="active",
     )
     users.append(u)
 print(f"✔ {len(users)} Users created")
