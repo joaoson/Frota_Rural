@@ -1,6 +1,5 @@
 import uuid
 
-from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -16,8 +15,11 @@ class UserSerializer(serializers.ModelSerializer):
         }
 
     def create(self, validated_data):
-        validated_data['password'] = make_password(validated_data['password'])
-        return super(UserSerializer, self).create(validated_data)
+        password = validated_data.pop('password')
+        user = Users(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
 
 
 class MachineSerializer(serializers.ModelSerializer):
@@ -51,6 +53,11 @@ class MachineSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         validated_data["updated_at"] = timezone.now()
         return super().update(instance, validated_data)
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
 
 class PostingSerializer(serializers.ModelSerializer):
