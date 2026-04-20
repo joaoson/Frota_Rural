@@ -35,8 +35,8 @@ CREATE TABLE credentials (
 );
 CREATE INDEX idx_credentials_user_id ON credentials(user_id);
 
--- Machineries
-CREATE TABLE machines(
+-- Machines (Referenced as 'machines' below)
+CREATE TABLE machines (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     renagro_number VARCHAR(100) UNIQUE,
@@ -50,10 +50,10 @@ CREATE TABLE machines(
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- postingss
+-- Postings
 CREATE TABLE postings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    machinery_id UUID NOT NULL REFERENCES machineries(id) ON DELETE CASCADE,
+    machinery_id UUID NOT NULL REFERENCES machines(id) ON DELETE CASCADE, -- Fixed table name
     hourly_rate DECIMAL(10, 2) NOT NULL,
     location_lat DECIMAL(10, 8),
     location_lng DECIMAL(11, 8),
@@ -66,7 +66,7 @@ CREATE TABLE postings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- postings Photos
+-- Postings Photos
 CREATE TABLE postings_photos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     postings_id UUID NOT NULL REFERENCES postings(id) ON DELETE CASCADE,
@@ -79,7 +79,7 @@ CREATE INDEX idx_ad_photos_ad_id ON postings_photos(postings_id);
 -- Rentals
 CREATE TABLE rentals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    postings_id UUID NOT NULL REFERENCES postingss(id),
+    postings_id UUID NOT NULL REFERENCES postings(id), -- Fixed table name typo (postingss -> postings)
     lessee_id UUID NOT NULL REFERENCES users(id),
     operator_id UUID REFERENCES users(id),
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -126,4 +126,3 @@ CREATE TABLE reviews (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(rental_id, reviewer_id)
 );
-
