@@ -8,6 +8,8 @@ import {
 } from "@/services/UserService/errors/UserError";
 import { AppConstants } from "./Constants";
 
+// Salvar o endereço de Token em State no AuthContext? (onde deixar o token no client-side)
+
 type AuthContextType = {
   tokens: LoginUserResponse | null;
   isAuthenticated: boolean;

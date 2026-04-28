@@ -1,16 +1,31 @@
+import hashlib
+import secrets
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import IntegrityError
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Contracts, Machines, Postings, PostingsPhotos, Rentals, Users
-from .serializer import LoginSerializer, MachineSerializer, PostingDetailSerializer, PostingListSerializer, PostingSerializer, UserSerializer
+from .email import send_password_reset_email
+from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
+from .serializer import (
+    LoginSerializer,
+    MachineSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    PostingDetailSerializer,
+    PostingListSerializer,
+    PostingSerializer,
+    UserSerializer,
+)
 
 @api_view(['POST'])
 def login(request):
@@ -41,6 +56,64 @@ def login(request):
         'refresh': str(refresh),
     }, status=status.HTTP_200_OK)
 
+## - PASSWORD RESET
+@api_view(['POST'])
+def request_password_reset(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    safe_response = {'message': 'If an account with that email exists, a reset link has been sent.'}
+
+    try:
+        user = Users.objects.get(email=email)
+    except Users.DoesNotExist:
+        return Response(safe_response, status=status.HTTP_200_OK)
+
+    PasswordResets.objects.filter(user=user, used=False).update(used=True)
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    PasswordResets.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT),
+    )
+
+    send_password_reset_email(user.email, raw_token)
+
+    return Response(safe_response, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def confirm_password_reset(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    raw_token = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    try:
+        reset = PasswordResets.objects.get(
+            token_hash=token_hash,
+            used=False,
+            expires_at__gt=timezone.now(),
+        )
+    except PasswordResets.DoesNotExist:
+        return Response({'detail': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = reset.user
+    user.set_password(new_password)
+    user.save()
+
+    reset.used = True
+    reset.save()
+
+    return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 def get_users(request):
