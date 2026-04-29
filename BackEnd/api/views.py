@@ -51,10 +51,37 @@ def login(request):
     refresh['email'] = user.email
     refresh['role'] = user.role
 
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-    }, status=status.HTTP_200_OK)
+    response = Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+    response.set_cookie(
+        key='refresh_token',
+        value=str(refresh),
+        max_age=7 * 24 * 60 * 60,
+        httponly=True,
+        samesite='Lax',
+        secure=not settings.DEBUG,
+        path='/api/login',
+    )
+    return response
+
+## - AUTH
+@api_view(['POST'])
+def refresh_token(request):
+    raw = request.COOKIES.get('refresh_token')
+    if not raw:
+        return Response({'detail': 'No refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+    try:
+        refresh = RefreshToken(raw)
+        return Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+    except Exception:
+        return Response({'detail': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+@api_view(['POST'])
+def logout_view(request):
+    response = Response(status=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie('refresh_token', path='/api/login')
+    return response
+
 
 ## - PASSWORD RESET
 @api_view(['POST'])

@@ -2,6 +2,7 @@ import { AxiosError } from "axios";
 import { AxiosInstance } from "@/services/AxiosInstance";
 import type { CreateUserRequest } from "./models/CreateUserRequest";
 import type { LoginUserRequest } from "./models/LoginUserRequest";
+import type { LoginUserResponse } from "./models/LoginUserResponse";
 import type { User } from "./models/User";
 import { UserError, UserServiceError } from "./errors/UserError";
 
@@ -9,7 +10,8 @@ class UserService {
   private SIGNUP_ENDPOINT = "users/create";
   private LIST_ENDPOINT = "users/";
   private LOGIN_ENDPOINT = "login";
-  private VERIFY_ENDPOINT = "login/verify";
+  private REFRESH_ENDPOINT = "login/refresh";
+  private LOGOUT_ENDPOINT = "logout";
 
   async register(data: CreateUserRequest) {
     const response = await AxiosInstance.post(this.SIGNUP_ENDPOINT, data);
@@ -37,21 +39,16 @@ class UserService {
     }
   }
 
-  async verify(token: String) {
-    try {
-      await AxiosInstance.post(this.VERIFY_ENDPOINT, {
-        token: token,
-      });
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        const status = error.response?.status;
+  async silentRefresh(): Promise<LoginUserResponse> {
+    // withCredentials em AxiosInstance passa o cookie no header automaticamente
+    const response = await AxiosInstance.post<LoginUserResponse>(
+      this.REFRESH_ENDPOINT,
+    );
+    return response.data;
+  }
 
-        if (status === 400 || status === 401 || status === 404) {
-          throw new UserServiceError(UserError.AuthError);
-        }
-      }
-      throw new UserServiceError(UserError.ServerError);
-    }
+  async logout(): Promise<void> {
+    await AxiosInstance.post(this.LOGOUT_ENDPOINT);
   }
 }
 
