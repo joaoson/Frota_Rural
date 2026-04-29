@@ -11,6 +11,7 @@ import { PasswordResetServiceError } from "@/services/PasswordResetService/error
 
 // cleanup temporário para lidar com o token vindo do e-mail fake que
 // o django fornece em ambiente de dev (pode tirar quando tivermos o fluxo real com resend ou outra coisa)
+// PASSAR NA REQUEST SE ESTIVER USANDO DJANGO EMAIL
 function decodeQPToken(raw: string): string {
   const stripped = raw.replace(/=/g, "");
   if (stripped.length === 45 && stripped.startsWith("3D")) {
@@ -38,7 +39,7 @@ const ResetPassword = () => {
     setLoading(true);
 
     const request: PasswordResetConfirmRequest = {
-      token: decodeQPToken(token!),
+      token: token!,
       new_password: newPassword,
     };
 
