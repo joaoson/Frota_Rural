@@ -457,19 +457,25 @@
           "request": {
             "method": "POST",
             "header": [],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"refresh\": \"<cole-aqui-o-refresh-token-retornado-no-login>\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
+            "description": "Troca o refresh token (HttpOnly cookie) por um novo access token. Nenhum body necessário — o cookie é enviado automaticamente pelo navegador.",
             "url": {
               "raw": "{{baseUrl}}/login/refresh",
               "host": ["{{baseUrl}}"],
               "path": ["login", "refresh"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Invalida a sessão limpando o cookie HttpOnly de refresh token no servidor. Nenhum body necessário.",
+            "url": {
+              "raw": "{{baseUrl}}/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["logout"]
             }
           },
           "response": []
