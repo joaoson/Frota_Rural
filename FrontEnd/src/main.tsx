@@ -14,6 +14,8 @@ import { Toaster } from "sonner";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
+import ForgotPassword from "./pages/PasswordReset/ForgotPassword.tsx";
+import ResetPassword from "./pages/PasswordReset/ResetPassword.tsx";
 import Help from "./pages/Help.tsx";
 import Buscar from "./pages/Buscar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -27,8 +29,12 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/help" element={<Help />} />
-          <Route path="/login" element={<Login />} />
+          // Auth
           <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          // Credenciais e documentos
           <Route path="/signup/document-upload" element={<CNHUpload />} />
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
           <Route path="/novo-equipamento" element={<NovoEquipamento />} />

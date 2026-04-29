@@ -38,15 +38,24 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
    - Crie um usuário com permissões apropriadas (ex.: `postgres`).
 
 5. **Crie a configuração do ambiente**:
-   - Copie ou crie um arquivo `.env` na pasta `environment/` com suas credenciais do banco de dados:
+   - Copie ou crie um arquivo `.env` na pasta `environment/` com o seguinte conteúdo:
      ```
      DB_NAME=frota_rural
      DB_USER=postgres
      DB_PASSWORD=sua_senha
      DB_HOST=localhost
      DB_PORT=5432
+
+     FRONTEND_URL=http://localhost:5173
+
+     RESEND_API_KEY=re_sua_chave_aqui
+     RESEND_EMAIL=onboarding@resend.dev
      ```
-   - Ajuste os valores de acordo com sua configuração do PostgreSQL.
+   - Ajuste as credenciais do banco de dados conforme sua configuração do PostgreSQL.
+   - Para o envio de e-mails (leia sobre Resend):
+     - Crie uma conta e gere uma API key no painel da Resend.
+     - Em **desenvolvimento**, você pode usar `onboarding@resend.dev` como remetente sem configuração adicional.
+     - Em **produção**, adicione e verifique seu domínio na Resend (configuração de DNS) e troque `RESEND_EMAIL` pelo seu próprio endereço.
 
 ## Executando o Projeto
 

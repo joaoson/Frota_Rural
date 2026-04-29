@@ -1,17 +1,11 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
 import { userService } from "@/services/UserService/UserService";
-import { toast } from "sonner";
-import {
-  UserError,
-  UserServiceError,
-} from "@/services/UserService/errors/UserError";
-import { AppConstants } from "./Constants";
+import { setAccessToken, setLogoutCallback } from "@/services/AxiosInstance";
 
 type AuthContextType = {
   tokens: LoginUserResponse | null;
   isAuthenticated: boolean;
-  isVerifying: boolean;
   login: (tokens: LoginUserResponse) => void;
   logout: () => void;
 };
@@ -19,57 +13,30 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const sessionCorrupted = useRef(false);
-
-  const [tokens, setTokens] = useState<LoginUserResponse | null>(() => {
-    try {
-      const raw = localStorage.getItem(AppConstants.STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as LoginUserResponse) : null;
-    } catch {
-      sessionCorrupted.current = true;
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    if (!sessionCorrupted.current) return;
-    logout();
-    toast.error(UserError.AuthError);
-  }, []);
-
-  const [isVerifying, setIsVerifying] = useState(tokens !== null);
+  const [tokens, setTokens] = useState<LoginUserResponse | null>(null);
   const isAuthenticated = tokens !== null;
 
-  /// This will fire on every page reload.
-  /// The intention is to check if the user is falsifying tokens in the frontend
-  useEffect(() => {
-    if (!tokens) return;
-
-    userService
-      .verify(tokens.access)
-      .catch((error) => {
-        if (error instanceof UserServiceError) {
-          toast.error(error.message);
-        }
-        logout();
-      })
-      .finally(() => setIsVerifying(false));
-  }, []);
-
-  function login(tokens: LoginUserResponse) {
-    setTokens(tokens);
-    localStorage.setItem(AppConstants.STORAGE_KEY, JSON.stringify(tokens));
+  function login(newTokens: LoginUserResponse) {
+    setTokens(newTokens); // Para AuthContext
+    setAccessToken(newTokens.access); // Para AxiosInstance interceptor
   }
 
   function logout() {
+    userService.logout().catch(() => {});
     setTokens(null);
-    sessionCorrupted.current = false;
-    localStorage.removeItem(AppConstants.STORAGE_KEY);
+    setAccessToken(null);
   }
+
+  useEffect(() => {
+    // Conecta o logout do AuthContext com AxiosInstance
+    // Ocorre pois, se AxiosInstance falhar ao fazer refresh do token, ele
+    // chama a função de logout do AuthContext e UserService
+    setLogoutCallback(logout);
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ tokens, isAuthenticated, isVerifying, login, logout }}
+      value={{ tokens, isAuthenticated, login, logout }}
     >
       {children}
     </AuthContext.Provider>

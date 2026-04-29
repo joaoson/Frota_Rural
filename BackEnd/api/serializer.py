@@ -60,6 +60,15 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+
+
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postings
