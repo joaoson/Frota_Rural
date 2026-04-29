@@ -6,7 +6,6 @@ import { setAccessToken, setLogoutCallback } from "@/services/AxiosInstance";
 type AuthContextType = {
   tokens: LoginUserResponse | null;
   isAuthenticated: boolean;
-  isVerifying: boolean;
   login: (tokens: LoginUserResponse) => void;
   logout: () => void;
 };
@@ -15,7 +14,6 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [tokens, setTokens] = useState<LoginUserResponse | null>(null);
-  const [isVerifying, setIsVerifying] = useState(true);
   const isAuthenticated = tokens !== null;
 
   function login(newTokens: LoginUserResponse) {
@@ -34,17 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Ocorre pois, se AxiosInstance falhar ao fazer refresh do token, ele
     // chama a função de logout do AuthContext e UserService
     setLogoutCallback(logout);
-
-    userService
-      .silentRefresh()
-      .then((response) => login(response))
-      .catch(() => {})
-      .finally(() => setIsVerifying(false));
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ tokens, isAuthenticated, isVerifying, login, logout }}
+      value={{ tokens, isAuthenticated, login, logout }}
     >
       {children}
     </AuthContext.Provider>
