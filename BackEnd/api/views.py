@@ -84,6 +84,9 @@ def request_password_reset(request):
 
     send_password_reset_email(user.email, raw_token)
 
+    if settings.DEBUG:
+        print(f'\n[PASSWORD RESET] Raw token: {raw_token}\n', flush=True)
+
     return Response(safe_response, status=status.HTTP_200_OK)
 
 @api_view(['POST'])

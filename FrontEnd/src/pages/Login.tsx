@@ -90,7 +90,7 @@ const Login = () => {
               </div>
               <div className="flex justify-between items-center">
                 <Link
-                  to="#"
+                  to="/forgot-password"
                   className="text-sm font-bold text-primary hover:underline"
                 >
                   Esqueceu a senha?
