@@ -23,13 +23,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", ""]
             }
           },
           "response": []
@@ -50,13 +45,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/create",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                "create"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "create"]
             }
           },
           "response": []
@@ -68,14 +58,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/email/{{userEmail}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                "email",
-                "{{userEmail}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "email", "{{userEmail}}"]
             }
           },
           "response": []
@@ -87,13 +71,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/{{userId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
             }
           },
           "response": []
@@ -114,13 +93,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/users/{{userId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
             }
           },
           "response": []
@@ -132,13 +106,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/users/{{userId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "users",
-                "{{userId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
             }
           },
           "response": []
@@ -156,15 +125,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}/warn",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                "{{userId}}",
-                "warn"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}", "warn"]
             }
           },
           "response": []
@@ -176,15 +138,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}/suspend",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                "{{userId}}",
-                "suspend"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}", "suspend"]
             }
           },
           "response": []
@@ -196,15 +151,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/admin/users/{{userId}}/ban",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                "{{userId}}",
-                "ban"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", "{{userId}}", "ban"]
             }
           },
           "response": []
@@ -221,13 +169,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/machines/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", ""]
             },
             "description": "Optional query params: owner (UUID), status, brand, model."
           },
@@ -240,13 +183,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/machines/?status=active&brand=John%20Deere",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                ""
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", ""],
               "query": [
                 {
                   "key": "status",
@@ -277,13 +215,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/machines/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", ""]
             }
           },
           "response": []
@@ -295,13 +228,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/machines/{{machineId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                "{{machineId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", "{{machineId}}"]
             }
           },
           "response": []
@@ -322,13 +250,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/machines/{{machineId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                "{{machineId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", "{{machineId}}"]
             }
           },
           "response": []
@@ -349,13 +272,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/machines/{{machineId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                "{{machineId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", "{{machineId}}"]
             }
           },
           "response": []
@@ -367,13 +285,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/machines/{{machineId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "machines",
-                "{{machineId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["machines", "{{machineId}}"]
             }
           },
           "response": []
@@ -390,13 +303,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/postings/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", ""]
             },
             "description": "Optional query params: machinery (UUID), status."
           },
@@ -409,13 +317,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/postings/?status=active&machinery={{machineId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                ""
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", ""],
               "query": [
                 {
                   "key": "status",
@@ -446,13 +349,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/postings/",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                ""
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", ""]
             }
           },
           "response": []
@@ -464,13 +362,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/postings/{{postingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                "{{postingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", "{{postingId}}"]
             }
           },
           "response": []
@@ -491,13 +384,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/postings/{{postingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                "{{postingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", "{{postingId}}"]
             }
           },
           "response": []
@@ -518,13 +406,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/postings/{{postingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                "{{postingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", "{{postingId}}"]
             }
           },
           "response": []
@@ -536,13 +419,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/postings/{{postingId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "postings",
-                "{{postingId}}"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["postings", "{{postingId}}"]
             }
           },
           "response": []
@@ -568,12 +446,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["login"]
             }
           },
           "response": []
@@ -594,13 +468,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/login/refresh",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "login",
-                "refresh"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["login", "refresh"]
             }
           },
           "response": []
@@ -621,13 +490,57 @@
             },
             "url": {
               "raw": "{{baseUrl}}/login/verify",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "login",
-                "verify"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["login", "verify"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Password Reset",
+      "item": [
+        {
+          "name": "Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"tiago@gmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/password-reset/request",
+              "host": ["{{baseUrl}}"],
+              "path": ["password-reset", "request"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"8ZO2mhxqjuIGoL_xadMPPNc7sCXKpKJazWN4du5is7I\",\n    \"new_password\": \"Teste123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/password-reset/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["password-reset", "confirm"]
             }
           },
           "response": []
