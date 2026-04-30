@@ -3,7 +3,7 @@ from django.conf import settings
 
 def send_password_reset_email(to_email: str, reset_token: str) -> None:
     resend.api_key = settings.RESEND_API_KEY
-    from_email = settings.RESEND_EMAIL
+    from_email = settings.RESEND_SUPPORT_EMAIL
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
     timeout_minutes = settings.PASSWORD_RESET_TIMEOUT / 60
 

@@ -176,4 +176,4 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
 # Resend (transactional email)
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-RESEND_EMAIL = os.getenv('RESEND_EMAIL', 'onboarding@resend.dev')
+RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')

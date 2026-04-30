@@ -49,13 +49,13 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
      FRONTEND_URL=http://localhost:5173
 
      RESEND_API_KEY=re_sua_chave_aqui
-     RESEND_EMAIL=onboarding@resend.dev
+     RESEND_SUPPORT_EMAIL=suporte@contato.frotarural.app
      ```
    - Ajuste as credenciais do banco de dados conforme sua configuração do PostgreSQL.
    - Para o envio de e-mails (leia sobre Resend):
      - Crie uma conta e gere uma API key no painel da Resend.
-     - Em **desenvolvimento**, você pode usar `onboarding@resend.dev` como remetente sem configuração adicional.
-     - Em **produção**, adicione e verifique seu domínio na Resend (configuração de DNS) e troque `RESEND_EMAIL` pelo seu próprio endereço.
+     - Em **desenvolvimento**, você pode usar `onboarding@resend.dev` como remetente sem configuração adicional. Mas já temos o e-mail de suporte, o de cima ali do env de exemplo.
+     - Em **produção**, adicione e verifique seu domínio na Resend (configuração de DNS) e troque os valores.
 
 ## Executando o Projeto
 
