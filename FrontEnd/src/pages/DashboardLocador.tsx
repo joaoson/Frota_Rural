@@ -29,6 +29,17 @@ import NotificationPopover from "@/components/NotificationPopover";
 import EditEquipamentoModal, {
   type EquipamentoData,
 } from "@/components/EditEquipamentoModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const revenueData = [
   { month: "Set", value: 8200 },
@@ -58,6 +69,7 @@ const sidebarItems = [
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
   { icon: "person", label: "Minha Conta", tab: "conta" },
+  { icon: "logout", label: "Sair", tab: "sair" },
 ] as const;
 
 const mockMachines = [
@@ -210,7 +222,7 @@ function validateDocument(value: string): boolean {
 }
 
 const DashboardLocador = () => {
-  const { userId } = useAuth();
+  const { userId, logout } = useAuth();
   const [user, setUser] = useState<User | null>(null);
 
   // Formulário dados pessoais
@@ -600,20 +612,50 @@ const DashboardLocador = () => {
           </Link>
         </div>
         <nav className="flex-1 px-3 space-y-1">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.tab}
-              onClick={() => setTab(item.tab)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                tab === item.tab
-                  ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
-                  : "text-on-surface-variant hover:bg-surface-container-high"
-              }`}
-            >
-              <MaterialIcon icon={item.icon} size={20} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {sidebarItems.map((item) => {
+            const buttonEl = (
+              <button
+                key={item.tab}
+                onClick={
+                  item.tab !== "sair" ? () => setTab(item.tab) : undefined
+                }
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  tab === item.tab
+                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+              >
+                <MaterialIcon icon={item.icon} size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+
+            if (item.tab === "sair") {
+              return (
+                <AlertDialog key={item.tab}>
+                  <AlertDialogTrigger asChild>{buttonEl}</AlertDialogTrigger>
+                  <AlertDialogContent size="sm">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sair da conta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja sair?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel variant="outline">
+                        Cancelar
+                      </AlertDialogCancel>
+                      <AlertDialogAction onClick={logout}>
+                        Sair
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              );
+            }
+
+            return buttonEl;
+          })}
         </nav>
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
