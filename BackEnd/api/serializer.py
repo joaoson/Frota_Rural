@@ -69,6 +69,11 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     new_password = serializers.CharField(min_length=8)
 
 
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postings

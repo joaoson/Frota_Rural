@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
 import type { User } from "@/services/UserService/models/User";
+import { AxiosError } from "axios";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
@@ -333,7 +334,7 @@ const DashboardLocador = () => {
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
@@ -355,7 +356,9 @@ const DashboardLocador = () => {
     }
   };
 
-  const handleUpdatePassword = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleUpdatePassword = async (
+    e: React.SubmitEvent<HTMLFormElement>,
+  ) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       confirmPasswordRef.current?.setCustomValidity("As senhas não coincidem.");
@@ -363,7 +366,23 @@ const DashboardLocador = () => {
       return;
     }
     confirmPasswordRef.current?.setCustomValidity("");
-    // TODO: alterar senha no backend
+    try {
+      await userService.updatePassword({
+        id: userId!,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Senha alterada com sucesso.");
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 400) {
+        toast.error("Senha atual incorreta.");
+      } else {
+        toast.error("Não foi possível alterar a senha. Tente novamente.");
+      }
+    }
   };
 
   const activeRentals = useMemo(

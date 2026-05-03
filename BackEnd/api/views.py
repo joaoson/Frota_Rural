@@ -17,6 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .email import send_password_reset_email
 from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
 from .serializer import (
+    ChangePasswordSerializer,
     LoginSerializer,
     MachineSerializer,
     PasswordResetConfirmSerializer,
@@ -190,6 +191,28 @@ def user_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def change_password(request, pk):
+    try:
+        user = Users.objects.get(pk=pk)
+    except Users.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ChangePasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.check_password(serializer.validated_data['current_password']):
+        return Response(
+            {'error': 'Senha atual incorreta.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(serializer.validated_data['new_password'])
+    user.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
 @api_view(['POST'])
