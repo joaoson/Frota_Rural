@@ -17,6 +17,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .email import send_password_reset_email
 from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
 from .serializer import (
+    ChangePasswordSerializer,
     LoginSerializer,
     MachineSerializer,
     PasswordResetConfirmSerializer,
@@ -160,7 +161,7 @@ def get_user_by_email(request, email):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def user_detail(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -174,7 +175,30 @@ def user_detail(request, pk):
     elif request.method == 'PUT':
         serializer = UserSerializer(user, data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'PATCH':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -183,6 +207,28 @@ def user_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def change_password(request, pk):
+    try:
+        user = Users.objects.get(pk=pk)
+    except Users.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ChangePasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.check_password(serializer.validated_data['current_password']):
+        return Response(
+            {'error': 'Senha atual incorreta.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(serializer.validated_data['new_password'])
+    user.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
 @api_view(['POST'])
@@ -193,7 +239,15 @@ def create_user(request):
 
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            error_msg = str(e).lower()
+            if 'email' in error_msg:
+                return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+            if 'document' in error_msg:
+                return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+            return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

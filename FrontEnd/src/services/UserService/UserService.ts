@@ -5,6 +5,7 @@ import type { LoginUserRequest } from "./models/LoginUserRequest";
 import type { LoginUserResponse } from "./models/LoginUserResponse";
 import type { User } from "./models/User";
 import { UserError, UserServiceError } from "./errors/UserError";
+import type { UpdatePasswordRequest } from "./models/UpdatePasswordRequest";
 
 class UserService {
   private SIGNUP_ENDPOINT = "users/create";
@@ -21,6 +22,34 @@ class UserService {
   async list(): Promise<User[]> {
     const response = await AxiosInstance.get<User[]>(this.LIST_ENDPOINT);
     return response.data;
+  }
+
+  async getById(id: string): Promise<User> {
+    const response = await AxiosInstance.get<User>(
+      `${this.LIST_ENDPOINT}${id}`,
+    );
+    return response.data;
+  }
+
+  async updateProfile(
+    id: string,
+    data: Pick<User, "name" | "document" | "email" | "phone" | "address">,
+  ): Promise<User> {
+    const response = await AxiosInstance.patch<User>(
+      `${this.LIST_ENDPOINT}${id}`,
+      data,
+    );
+    return response.data;
+  }
+
+  async updatePassword(data: UpdatePasswordRequest) {
+    await AxiosInstance.post(
+      `${this.LIST_ENDPOINT}${data.id}/change-password`,
+      {
+        current_password: data.currentPassword,
+        new_password: data.newPassword,
+      },
+    );
   }
 
   async login(data: LoginUserRequest) {
