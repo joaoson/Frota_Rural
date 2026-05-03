@@ -363,7 +363,18 @@ const DashboardLocador = () => {
       });
       setUser(updated);
       toast.success("Dados atualizados com sucesso.");
-    } catch {
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.data) {
+        const data = error.response.data;
+        if (data.email) {
+          toast.error("Este e-mail já está em uso.");
+          return;
+        }
+        if (data.document) {
+          toast.error("Este documento já está cadastrado.");
+          return;
+        }
+      }
       toast.error("Não foi possível salvar as alterações. Tente novamente.");
     }
   };

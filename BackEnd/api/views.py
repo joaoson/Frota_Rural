@@ -175,14 +175,30 @@ def user_detail(request, pk):
     elif request.method == 'PUT':
         serializer = UserSerializer(user, data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'PATCH':
         serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -223,7 +239,15 @@ def create_user(request):
 
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            error_msg = str(e).lower()
+            if 'email' in error_msg:
+                return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+            if 'document' in error_msg:
+                return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+            return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

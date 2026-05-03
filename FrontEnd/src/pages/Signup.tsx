@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router";
+import { AxiosError } from "axios";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
@@ -87,18 +88,25 @@ const Signup = () => {
 
       await userService.register(payload);
       toast.success(
-        `Cadastro realizado com sucesso. Que bom ter você aqui, ${name}!`,
+        `Cadastro realizado com sucesso! Prossiga para o login e aproveite a plataforma.`,
       );
 
-      if (role === UserRole.Operador) {
-        navigate("/signup/document-upload");
-      } else {
-        navigate("/signup/profile-upload");
-      }
+      navigate("/login");
     } catch (error) {
-      console.log(error);
+      if (error instanceof AxiosError && error.response?.data) {
+        const data = error.response.data;
+        if (data.document) {
+          toast.error("Este documento já está cadastrado.");
+          return;
+        }
+
+        if (data.email) {
+          toast.error("Este e-mail já está em uso.");
+          return;
+        }
+      }
       toast.error(
-        `Ocorreu um problema com o cadastro. Tente novamente mais tarde.`,
+        "Ocorreu um problema com o cadastro. Tente novamente mais tarde.",
       );
     } finally {
       setLoading(false);
