@@ -23,6 +23,13 @@ class UserService {
     return response.data;
   }
 
+  async getById(id: string): Promise<User> {
+    const response = await AxiosInstance.get<User>(
+      `${this.LIST_ENDPOINT}${id}`,
+    );
+    return response.data;
+  }
+
   async login(data: LoginUserRequest) {
     try {
       const response = await AxiosInstance.post(this.LOGIN_ENDPOINT, data);

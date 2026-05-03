@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { useAuth } from "@/contexts/AuthContext";
+import { userService } from "@/services/UserService/UserService";
+import type { User } from "@/services/UserService/models/User";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
@@ -63,7 +66,15 @@ const mockRentals = [
 
 type Tab = (typeof sidebarItems)[number]["tab"];
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 const DashboardLocador = () => {
+  const { userId } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
@@ -121,6 +132,11 @@ const DashboardLocador = () => {
         return { icon: "", classes: "", label: "" };
     }
   };
+
+  useEffect(() => {
+    if (!userId) return;
+    userService.getById(userId).then(setUser).catch(() => {});
+  }, [userId]);
 
   const activeRentals = useMemo(() => mockRentals.filter((r) => r.status === "pending" || r.status === "active"), []);
   const pastRentals = useMemo(() => mockRentals.filter((r) => r.status === "completed" || r.status === "cancelled"), []);
@@ -291,11 +307,11 @@ const DashboardLocador = () => {
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary-container text-on-primary rounded-full flex items-center justify-center font-headline font-bold text-sm">
-              JS
+              {user ? getInitials(user.name) : "…"}
             </div>
             <div>
-              <div className="font-bold text-sm text-on-surface">João Silva</div>
-              <div className="text-[11px] text-on-surface-variant">Locador</div>
+              <div className="font-bold text-sm text-on-surface">{user?.name ?? "…"}</div>
+              <div className="text-[11px] text-on-surface-variant capitalize">{user?.role ?? "…"}</div>
             </div>
           </div>
         </div>
@@ -340,7 +356,9 @@ const DashboardLocador = () => {
           {tab === "dashboard" ? (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Bom dia, João</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary">
+                  Bom dia, {user?.name.split(" ")[0] ?? "…"}
+                </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Veja o resumo das suas atividades</p>
               </div>
@@ -1028,7 +1046,7 @@ const DashboardLocador = () => {
                   <div className="flex items-center gap-6 pb-2">
                     <div className="relative group">
                       <div className="w-20 h-20 bg-primary-container text-on-primary rounded-full flex items-center justify-center font-headline font-bold text-2xl">
-                        JS
+                        {user ? getInitials(user.name) : "…"}
                       </div>
                       <label className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <MaterialIcon icon="photo_camera" className="text-white" size={24} />
@@ -1036,21 +1054,21 @@ const DashboardLocador = () => {
                       </label>
                     </div>
                     <div>
-                      <div className="font-bold text-on-surface">João Silva</div>
-                      <div className="text-sm text-on-surface-variant mb-2">Locador</div>
+                      <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
+                      <div className="text-sm text-on-surface-variant mb-2 capitalize">{user?.role ?? "…"}</div>
                       <label className="text-xs font-bold text-primary cursor-pointer hover:underline flex items-center gap-1">
                         <MaterialIcon icon="upload" size={14} /> Alterar foto
                         <input type="file" accept="image/*" className="hidden" />
                       </label>
                     </div>
                   </div>
-                  <div className="space-y-4">
+                  <div key={user?.id} className="space-y-4">
                     {[
-                      { label: "Nome Completo", value: "João Silva", type: "text" },
-                      { label: "CPF / CNPJ", value: "000.000.000-00", type: "text" },
-                      { label: "E-mail", value: "joao.silva@email.com", type: "email" },
-                      { label: "Telefone", value: "(66) 99999-0000", type: "tel" },
-                      { label: "Endereço", value: "Fazenda Esperança, Sorriso – MT", type: "text" },
+                      { label: "Nome Completo", value: user?.name ?? "", type: "text" },
+                      { label: "CPF / CNPJ", value: user?.document ?? "", type: "text" },
+                      { label: "E-mail", value: user?.email ?? "", type: "email" },
+                      { label: "Telefone", value: user?.phone ?? "", type: "tel" },
+                      { label: "Endereço", value: user?.address ?? "", type: "text" },
                     ].map((field) => (
                       <div key={field.label} className="space-y-2">
                         <label className="text-xs font-bold uppercase tracking-wider text-outline">{field.label}</label>
