@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
 import type { User } from "@/services/UserService/models/User";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskPhone } from "@/utils/masks/maskPhone";
+import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { validateCPF } from "@/utils/validation/validateCPF";
 import { validateCNPJ } from "@/utils/validation/validateCNPJ";
 import { passwordPattern } from "@/utils/regexPatterns";
@@ -331,14 +333,26 @@ const DashboardLocador = () => {
     }
   };
 
-  const handleUpdateProfile = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
       documentRef.current?.reportValidity();
       return;
     }
-    // TODO: salvar alterações no backend
+    try {
+      const updated = await userService.updateProfile(userId!, {
+        name: formName.trim(),
+        document: clearSpecialChars(formDocument),
+        email: formEmail.toLowerCase().trim(),
+        phone: `+55${clearSpecialChars(formPhone)}`,
+        address: formAddress.trim(),
+      });
+      setUser(updated);
+      toast.success("Dados atualizados com sucesso.");
+    } catch {
+      toast.error("Não foi possível salvar as alterações. Tente novamente.");
+    }
   };
 
   const handleUpdatePassword = (e: React.SubmitEvent<HTMLFormElement>) => {

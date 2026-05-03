@@ -30,6 +30,17 @@ class UserService {
     return response.data;
   }
 
+  async updateProfile(
+    id: string,
+    data: Pick<User, "name" | "document" | "email" | "phone" | "address">,
+  ): Promise<User> {
+    const response = await AxiosInstance.patch<User>(
+      `${this.LIST_ENDPOINT}${id}`,
+      data,
+    );
+    return response.data;
+  }
+
   async login(data: LoginUserRequest) {
     try {
       const response = await AxiosInstance.post(this.LOGIN_ENDPOINT, data);
