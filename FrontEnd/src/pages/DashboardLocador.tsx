@@ -1177,7 +1177,11 @@ const DashboardLocador = () => {
                                 toast.success("Equipamento removido com sucesso!");
                               } catch (error) {
                                 console.error("Erro ao remover equipamento:", error);
-                                toast.error("Não foi possível remover o equipamento.");
+                                if (error instanceof AxiosError && error.response?.data?.error) {
+                                  toast.error(error.response.data.error);
+                                } else {
+                                  toast.error("Não foi possível remover o equipamento.");
+                                }
                               }
                             }}
                           >
