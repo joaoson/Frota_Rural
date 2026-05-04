@@ -15,7 +15,7 @@ const Navbar = () => {
             Explorar Máquinas
           </Link>
           <Link
-            to="/novo-equipamento"
+            to="/dashboard/novo-equipamento"
             className="text-tertiary font-medium hover:text-primary-container transition-colors duration-200"
           >
             Anuncie seu Equipamento

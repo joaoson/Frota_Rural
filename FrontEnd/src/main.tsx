@@ -39,8 +39,6 @@ createRoot(document.getElementById("root")!).render(
           // Credenciais e documentos
           <Route path="/signup/document-upload" element={<CNHUpload />} />
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
-          <Route path="/novo-equipamento" element={<NovoEquipamento />} />
-          <Route path="/novo-anuncio" element={<NovoAnuncio />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardLocador />} />
             <Route
