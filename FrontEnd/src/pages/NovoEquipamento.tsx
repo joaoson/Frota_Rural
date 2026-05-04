@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { machineService } from "@/services/MachineService/MachineService";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const BRANDS = [
   { value: "john-deere", label: "John Deere", logo: "/brands/john-deere.png" },
@@ -29,6 +30,7 @@ const BrandLogo = ({ logo, label }: { logo: string; label: string }) => {
 };
 
 const NovoEquipamento = () => {
+  const { userId } = useAuth();
   const [isBrandSelectOpen, setIsBrandSelectOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<(typeof BRANDS)[number]["value"]>("john-deere");
   const [otherBrand, setOtherBrand] = useState("");
@@ -49,14 +51,13 @@ const NovoEquipamento = () => {
 
     setIsSubmitting(true);
     try {
-      const ownerId = await machineService.getRandomOwnerId();
-      if (!ownerId) {
-        toast.error("Nenhum usuário encontrado para vincular o equipamento. Crie um usuário e tente novamente.");
+      if (!userId) {
+        toast.error("Usuário não autenticado. Faça login para cadastrar o equipamento.");
         return;
       }
 
       await machineService.create({
-        owner: ownerId,
+        owner: userId,
         renagro_number: String(formData.get("renagro_number") ?? "").trim(),
         brand: brandToSend,
         model: String(formData.get("model") ?? "").trim(),

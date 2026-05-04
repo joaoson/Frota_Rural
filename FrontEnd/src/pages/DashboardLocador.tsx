@@ -3,6 +3,8 @@ import { Link } from "react-router";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
+import { machineService } from "@/services/MachineService/MachineService";
+import { postingService } from "@/services/PostingService/PostingService";
 import type { User } from "@/services/UserService/models/User";
 import { AxiosError } from "axios";
 import { maskDocument } from "@/utils/masks/maskDocument";
@@ -243,22 +245,23 @@ const DashboardLocador = () => {
   const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
 
-  const [machines, setMachines] = useState(mockMachines);
+  const [machines, setMachines] = useState<any[]>([]);
+  const [postings, setPostings] = useState<any[]>([]);
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
   const [selectedEquipamento, setSelectedEquipamento] =
     useState<EquipamentoData>({
-      id: String(mockMachines[0]?.id ?? ""),
-      registroRenagro: mockMachines[0]?.renagro ?? "",
-      marca: mockMachines[0]?.brand ?? "",
-      modelo: mockMachines[0]?.model ?? "",
-      anoFabricacao: String(mockMachines[0]?.year ?? ""),
-      finalidade: mockMachines[0]?.purpose ?? "Plantio",
+      id: "",
+      registroRenagro: "",
+      marca: "",
+      modelo: "",
+      anoFabricacao: "",
+      finalidade: "Plantio",
       horimetroInicial: "",
       horimetroFinal: "",
       especificacoes: "",
     });
 
-  const openEditModalForMachine = (m: (typeof mockMachines)[number]) => {
+  const openEditModalForMachine = (m: any) => {
     setSelectedEquipamento({
       id: String(m.id),
       registroRenagro: m.renagro,
@@ -318,6 +321,32 @@ const DashboardLocador = () => {
       .getById(userId)
       .then(setUser)
       .catch(() => {});
+
+    Promise.all([
+      machineService.list({ owner: userId }),
+      postingService.list({})
+    ]).then(([machinesData, postingsData]) => {
+      const userMachineIds = new Set(machinesData.map((m: any) => m.id));
+      const userPostings = postingsData.filter((p: any) => userMachineIds.has(p.machinery));
+      
+      setMachines(machinesData.map((m: any) => ({
+        id: m.id,
+        renagro: m.renagro_number,
+        brand: m.brand,
+        model: m.model,
+        year: m.year,
+        status: m.status || "active",
+        purpose: m.usage_purpose || ""
+      })));
+
+      setPostings(userPostings.map((p: any) => ({
+        id: p.id,
+        machine: p.machinery_details ? `${p.machinery_details.brand} ${p.machinery_details.model}` : p.machinery,
+        price: p.hourly_rate,
+        location: p.location_address,
+        status: p.status || "active"
+      })));
+    }).catch(console.error);
   }, [userId]);
 
   useEffect(() => {
@@ -428,12 +457,12 @@ const DashboardLocador = () => {
   const frotaPerPage = 2;
   const anunciosPerPage = 2;
   const frotaTotalPages = Math.ceil(machines.length / frotaPerPage);
-  const anunciosTotalPages = Math.ceil(mockPostings.length / anunciosPerPage);
+  const anunciosTotalPages = Math.ceil(postings.length / anunciosPerPage);
   const paginatedFrota = machines.slice(
     (frotaPage - 1) * frotaPerPage,
     frotaPage * frotaPerPage,
   );
-  const paginatedAnuncios = mockPostings.slice(
+  const paginatedAnuncios = postings.slice(
     (anunciosPage - 1) * anunciosPerPage,
     anunciosPage * anunciosPerPage,
   );
@@ -723,24 +752,37 @@ const DashboardLocador = () => {
             open={isEditEquipamentoOpen}
             onOpenChange={setIsEditEquipamentoOpen}
             equipamento={selectedEquipamento}
-            onSave={(data) => {
-              setSelectedEquipamento(data);
-              setMachines((prev) =>
-                prev.map((m) =>
-                  String(m.id) === data.id
-                    ? {
-                        ...m,
-                        renagro: data.registroRenagro,
-                        brand: data.marca,
-                        model: data.modelo,
-                        year: data.anoFabricacao
-                          ? Number(data.anoFabricacao)
-                          : m.year,
-                        purpose: data.finalidade,
-                      }
-                    : m,
-                ),
-              );
+            onSave={async (data) => {
+              try {
+                await machineService.update(data.id, {
+                  renagro_number: data.registroRenagro,
+                  brand: data.marca,
+                  model: data.modelo,
+                  year: data.anoFabricacao ? Number(data.anoFabricacao) : undefined,
+                  usage_purpose: data.finalidade,
+                });
+                setSelectedEquipamento(data);
+                setMachines((prev) =>
+                  prev.map((m) =>
+                    String(m.id) === data.id
+                      ? {
+                          ...m,
+                          renagro: data.registroRenagro,
+                          brand: data.marca,
+                          model: data.modelo,
+                          year: data.anoFabricacao
+                            ? Number(data.anoFabricacao)
+                            : m.year,
+                          purpose: data.finalidade,
+                        }
+                      : m,
+                  ),
+                );
+                toast.success("Equipamento atualizado com sucesso!");
+              } catch (error) {
+                console.error("Erro ao atualizar equipamento:", error);
+                toast.error("Não foi possível atualizar o equipamento.");
+              }
             }}
           />
 
@@ -760,13 +802,13 @@ const DashboardLocador = () => {
                 {[
                   {
                     label: "EQUIPAMENTOS",
-                    value: "3",
+                    value: String(machines.length),
                     sub: "na frota ativa",
                     icon: "agriculture",
                   },
                   {
                     label: "ANÚNCIOS ATIVOS",
-                    value: "2",
+                    value: String(postings.length),
                     sub: "publicados",
                     icon: "campaign",
                     dotColor: "bg-primary",
@@ -1109,6 +1151,41 @@ const DashboardLocador = () => {
                     >
                       Editar
                     </button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button className="text-sm font-bold text-error hover:underline">
+                          Remover
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent size="sm">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remover Equipamento</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem certeza que deseja remover este equipamento? Esta ação não pode ser desfeita.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel variant="outline">
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-error hover:bg-error/90 text-on-error"
+                            onClick={async () => {
+                              try {
+                                await machineService.remove(String(m.id));
+                                setMachines((prev) => prev.filter((machine) => String(machine.id) !== String(m.id)));
+                                toast.success("Equipamento removido com sucesso!");
+                              } catch (error) {
+                                console.error("Erro ao remover equipamento:", error);
+                                toast.error("Não foi possível remover o equipamento.");
+                              }
+                            }}
+                          >
+                            Remover
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}
@@ -1182,9 +1259,9 @@ const DashboardLocador = () => {
                             /h
                           </span>
                         </div>
-                        <button className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors">
+                        <Link to={`/dashboard/gerenciar-anuncio/${p.id}`} className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors">
                           Gerenciar
-                        </button>
+                        </Link>
                       </div>
                     </div>
                   </div>

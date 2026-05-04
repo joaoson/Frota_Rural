@@ -31,8 +31,8 @@ interface PostingDetalheAPI {
 
 // Estrelas SVG com preenchimento parcial via linearGradient
 const CAMINHO_ESTRELA = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
-const COR_CHEIA  = "hsl(39,99%,60%)";
-const COR_VAZIA  = "hsl(100,8%,80%)";
+const COR_CHEIA = "hsl(39,99%,60%)";
+const COR_VAZIA = "hsl(100,8%,80%)";
 
 function EstrelasPorNota({ nota, total }: { nota: number; total: number }) {
   return (
@@ -73,9 +73,9 @@ function ordenarFotos(fotos: FotoAPI[]): FotoAPI[] {
 const AnuncioDetalhe = () => {
   const { id } = useParams<{ id: string }>();
 
-  const [anuncio, setAnuncio]                 = useState<PostingDetalheAPI | null>(null);
-  const [loading, setLoading]                 = useState(true);
-  const [erro, setErro]                       = useState<string | null>(null);
+  const [anuncio, setAnuncio] = useState<PostingDetalheAPI | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [fotoSelecionada, setFotoSelecionada] = useState(0);
 
   useEffect(() => {
@@ -95,9 +95,9 @@ const AnuncioDetalhe = () => {
       });
   }, [id]);
 
-  const fotos        = anuncio ? ordenarFotos(anuncio.photos) : [];
+  const fotos = anuncio ? ordenarFotos(anuncio.photos) : [];
   const urlFotoAtual = fotos[fotoSelecionada]?.url ?? FALLBACK_IMG;
-  const titulo       = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Sem título";
+  const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Sem título";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -167,11 +167,10 @@ const AnuncioDetalhe = () => {
                     <button
                       key={indice}
                       onClick={() => setFotoSelecionada(indice)}
-                      className={`rounded-xl overflow-hidden h-24 bg-surface-container-high cursor-pointer hover:opacity-80 transition-all border-2 ${
-                        indice === fotoSelecionada
+                      className={`rounded-xl overflow-hidden h-24 bg-surface-container-high cursor-pointer hover:opacity-80 transition-all border-2 ${indice === fotoSelecionada
                           ? "border-primary shadow-md"
                           : "border-outline-variant/20"
-                      }`}
+                        }`}
                     >
                       <img
                         src={foto.url}
@@ -218,12 +217,12 @@ const AnuncioDetalhe = () => {
               <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
                 <div className="grid grid-cols-2 gap-5">
                   {[
-                    { label: "Marca / Modelo",  valor: [anuncio.machine_brand, anuncio.machine_model].filter(Boolean).join(" ") || null },
-                    { label: "Ano",              valor: anuncio.machine_year ? String(anuncio.machine_year) : null },
-                    { label: "Atividade",        valor: anuncio.machine_usage_purpose },
-                    { label: "Nº Renagro",       valor: anuncio.machine_renagro_number },
-                    { label: "Disponível de",    valor: formatDate(anuncio.availability_start) },
-                    { label: "Disponível até",   valor: formatDate(anuncio.availability_end) },
+                    { label: "Marca / Modelo", valor: [anuncio.machine_brand, anuncio.machine_model].filter(Boolean).join(" ") || null },
+                    { label: "Ano", valor: anuncio.machine_year ? String(anuncio.machine_year) : null },
+                    { label: "Atividade", valor: anuncio.machine_usage_purpose },
+                    { label: "Nº Renagro", valor: anuncio.machine_renagro_number },
+                    { label: "Disponível de", valor: formatDate(anuncio.availability_start) },
+                    { label: "Disponível até", valor: formatDate(anuncio.availability_end) },
                   ].map((item) =>
                     item.valor ? (
                       <div key={item.label}>

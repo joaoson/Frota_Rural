@@ -49,7 +49,7 @@ users_data = [
 ]
 
 users = []
-for i, (name, doc, email, role, phone) in enumerate(users_data):
+for i, (name, doc, email, role, phone,address, birth_date) in enumerate(users_data):
     u = Users.objects.create(
         id=uuid.uuid4(), name=name, document=doc, email=email,
         password=_seed_password_hash,
