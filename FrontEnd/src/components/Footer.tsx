@@ -35,7 +35,7 @@ const Footer = () => {
                 Buscar equipamentos
               </Link>
               <Link
-                to="/novo-equipamento"
+                to="/dashboard/novo-equipamento"
                 className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
               >
                 Anunciar frota
