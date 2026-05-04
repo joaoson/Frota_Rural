@@ -168,3 +168,12 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Password Reset
+PASSWORD_RESET_TIMEOUT = 3600
+
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+
+# Resend (transactional email)
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')

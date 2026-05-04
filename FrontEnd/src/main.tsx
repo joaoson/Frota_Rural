@@ -3,17 +3,21 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
+import Index from "@/pages/Index.tsx";
 import BuscarMaquinario from "@/pages/BuscarMaquinario.tsx";
 import AnuncioDetalhe from "@/pages/AnuncioDetalhe.tsx";
 import Signup from "@/pages/Signup.tsx";
 import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
 import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
+import GerenciarAnuncio from "@/pages/GerenciarAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
 import { Toaster } from "sonner";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
+import ForgotPassword from "./pages/PasswordReset/ForgotPassword.tsx";
+import ResetPassword from "./pages/PasswordReset/ResetPassword.tsx";
 import Help from "./pages/Help.tsx";
 import Buscar from "./pages/Buscar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -25,10 +29,14 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <Toaster position="bottom-right" />
         <Routes>
-          <Route path="/" element={<App />} />
+          <Route path="/" element={<Index />} />
           <Route path="/help" element={<Help />} />
-          <Route path="/login" element={<Login />} />
+          // Auth
           <Route path="/signup" element={<Signup />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          // Credenciais e documentos
           <Route path="/signup/document-upload" element={<CNHUpload />} />
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
           <Route path="/novo-equipamento" element={<NovoEquipamento />} />
@@ -40,6 +48,7 @@ createRoot(document.getElementById("root")!).render(
               element={<NovoEquipamento />}
             />
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
+            <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />

@@ -173,3 +173,15 @@ class Users(AbstractBaseUser):
     class Meta:
         # managed = False
         db_table = 'users'
+
+
+class PasswordResets(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(Users, models.CASCADE)
+    token_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'password_resets'
