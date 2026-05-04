@@ -1,16 +1,32 @@
+import hashlib
+import secrets
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import IntegrityError
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Contracts, Machines, Postings, PostingsPhotos, Rentals, Users
-from .serializer import LoginSerializer, MachineSerializer, PostingDetailSerializer, PostingListSerializer, PostingSerializer, UserSerializer
+from .email import send_password_reset_email
+from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
+from .serializer import (
+    ChangePasswordSerializer,
+    LoginSerializer,
+    MachineSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    PostingDetailSerializer,
+    PostingListSerializer,
+    PostingSerializer,
+    UserSerializer,
+)
 
 @api_view(['POST'])
 def login(request):
@@ -36,11 +52,99 @@ def login(request):
     refresh['email'] = user.email
     refresh['role'] = user.role
 
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-    }, status=status.HTTP_200_OK)
+    response = Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+    response.set_cookie(
+        key='refresh_token',
+        value=str(refresh),
+        max_age=7 * 24 * 60 * 60,
+        httponly=True,
+        samesite='Lax',
+        secure=not settings.DEBUG,
+        path='/api/login',
+    )
+    return response
 
+## - AUTH
+@api_view(['POST'])
+def refresh_token(request):
+    raw = request.COOKIES.get('refresh_token')
+    if not raw:
+        return Response({'detail': 'No refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+    try:
+        refresh = RefreshToken(raw)
+        return Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+    except Exception:
+        return Response({'detail': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+@api_view(['POST'])
+def logout_view(request):
+    response = Response(status=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie('refresh_token', path='/api/login')
+    return response
+
+
+## - PASSWORD RESET
+@api_view(['POST'])
+def request_password_reset(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    email = serializer.validated_data['email']
+    safe_response = {'message': 'If an account with that email exists, a reset link has been sent.'}
+
+    try:
+        user = Users.objects.get(email=email)
+    except Users.DoesNotExist:
+        return Response(safe_response, status=status.HTTP_200_OK)
+
+    PasswordResets.objects.filter(user=user, used=False).update(used=True)
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    PasswordResets.objects.create(
+        user=user,
+        token_hash=token_hash,
+        expires_at=timezone.now() + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT),
+    )
+
+    send_password_reset_email(user.email, raw_token)
+
+    if settings.DEBUG:
+        print(f'\n[PASSWORD RESET] Raw token: {raw_token}\n', flush=True)
+
+    return Response(safe_response, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def confirm_password_reset(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    raw_token = serializer.validated_data['token']
+    new_password = serializer.validated_data['new_password']
+
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    try:
+        reset = PasswordResets.objects.get(
+            token_hash=token_hash,
+            used=False,
+            expires_at__gt=timezone.now(),
+        )
+    except PasswordResets.DoesNotExist:
+        return Response({'detail': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = reset.user
+    user.set_password(new_password)
+    user.save()
+
+    reset.used = True
+    reset.save()
+
+    return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 def get_users(request):
@@ -57,7 +161,7 @@ def get_user_by_email(request, email):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-@api_view(['GET', 'PUT', 'DELETE'])
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def user_detail(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -71,7 +175,30 @@ def user_detail(request, pk):
     elif request.method == 'PUT':
         serializer = UserSerializer(user, data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'PATCH':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            try:
+                serializer.save()
+            except IntegrityError as e:
+                error_msg = str(e).lower()
+                if 'email' in error_msg:
+                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+                if 'document' in error_msg:
+                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -80,6 +207,28 @@ def user_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def change_password(request, pk):
+    try:
+        user = Users.objects.get(pk=pk)
+    except Users.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ChangePasswordSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if not user.check_password(serializer.validated_data['current_password']):
+        return Response(
+            {'error': 'Senha atual incorreta.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(serializer.validated_data['new_password'])
+    user.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
 @api_view(['POST'])
@@ -90,7 +239,15 @@ def create_user(request):
 
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            error_msg = str(e).lower()
+            if 'email' in error_msg:
+                return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+            if 'document' in error_msg:
+                return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+            return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

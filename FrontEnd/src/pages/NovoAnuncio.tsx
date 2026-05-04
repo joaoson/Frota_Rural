@@ -6,11 +6,13 @@ import Footer from "@/components/Footer";
 import { machineService, type MachineListItem } from "@/services/MachineService/MachineService";
 import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT_TYPES = ["image/jpeg", "image/png"];
 
 const NovoAnuncio = () => {
+  const { userId } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [machines, setMachines] = useState<MachineListItem[]>([]);
@@ -23,7 +25,7 @@ const NovoAnuncio = () => {
     (async () => {
       setLoadingMachines(true);
       try {
-        const data = await machineService.list({ status: "active" });
+        const data = await machineService.list({ status: "active", owner: userId || undefined });
         if (!cancelled) setMachines(data);
       } catch {
         if (!cancelled) {
@@ -84,11 +86,6 @@ const NovoAnuncio = () => {
       toast.error("Informe a localização.");
       return;
     }
-    if (photoFiles.length < 1) {
-      toast.error("Adicione pelo menos uma foto do anúncio.");
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       await postingService.create({
@@ -219,7 +216,7 @@ const NovoAnuncio = () => {
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Fotos do Anúncio * (mín. 1)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Fotos do Anúncio (Opcional)</label>
             <input
               ref={fileInputRef}
               type="file"

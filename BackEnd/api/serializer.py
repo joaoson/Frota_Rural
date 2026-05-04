@@ -60,6 +60,20 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(min_length=8, write_only=True)
+
+
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Postings
@@ -106,6 +120,7 @@ class PostingListSerializer(serializers.ModelSerializer):
         model = Postings
         fields = [
             "id",
+            "machinery",
             "machine_brand",
             "machine_model",
             "machine_usage_purpose",
