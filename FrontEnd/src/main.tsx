@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
+import Index from "@/pages/Index.tsx";
 import BuscarMaquinario from "@/pages/BuscarMaquinario.tsx";
 import AnuncioDetalhe from "@/pages/AnuncioDetalhe.tsx";
 import Signup from "@/pages/Signup.tsx";
 import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
 import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
+import GerenciarAnuncio from "@/pages/GerenciarAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
 import { Toaster } from "sonner";
@@ -27,7 +29,7 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <Toaster position="bottom-right" />
         <Routes>
-          <Route path="/" element={<App />} />
+          <Route path="/" element={<Index />} />
           <Route path="/help" element={<Help />} />
           // Auth
           <Route path="/signup" element={<Signup />} />
@@ -46,6 +48,7 @@ createRoot(document.getElementById("root")!).render(
               element={<NovoEquipamento />}
             />
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
+            <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />

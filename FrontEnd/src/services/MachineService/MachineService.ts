@@ -50,6 +50,16 @@ class MachineService {
     const response = await AxiosInstance.post(this.MACHINES_ENDPOINT, data);
     return response.data;
   }
+
+  async update(id: string, data: Partial<CreateMachinePayload>) {
+    const response = await AxiosInstance.patch(`${this.MACHINES_ENDPOINT}${id}/`, data);
+    return response.data;
+  }
+
+  async remove(id: string) {
+    const response = await AxiosInstance.delete(`${this.MACHINES_ENDPOINT}${id}/`);
+    return response.data;
+  }
 }
 
 export const machineService = new MachineService();

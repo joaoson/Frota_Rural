@@ -120,6 +120,7 @@ class PostingListSerializer(serializers.ModelSerializer):
         model = Postings
         fields = [
             "id",
+            "machinery",
             "machine_brand",
             "machine_model",
             "machine_usage_purpose",
