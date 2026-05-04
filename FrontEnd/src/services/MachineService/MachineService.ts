@@ -52,12 +52,12 @@ class MachineService {
   }
 
   async update(id: string, data: Partial<CreateMachinePayload>) {
-    const response = await AxiosInstance.patch(`${this.MACHINES_ENDPOINT}${id}/`, data);
+    const response = await AxiosInstance.patch(`${this.MACHINES_ENDPOINT}${id}`, data);
     return response.data;
   }
 
   async remove(id: string) {
-    const response = await AxiosInstance.delete(`${this.MACHINES_ENDPOINT}${id}/`);
+    const response = await AxiosInstance.delete(`${this.MACHINES_ENDPOINT}${id}`);
     return response.data;
   }
 }
