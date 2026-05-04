@@ -11,6 +11,7 @@ import NovoEquipamento from "@/pages/NovoEquipamento.tsx";
 import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
 import GerenciarAnuncio from "@/pages/GerenciarAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
+import DashboardLocatario from "@/pages/DashboardLocatario.tsx";
 import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
 import { Toaster } from "sonner";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
@@ -41,6 +42,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardLocador />} />
+            <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
             <Route
               path="/dashboard/novo-equipamento"
               element={<NovoEquipamento />}
