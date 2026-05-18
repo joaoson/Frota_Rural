@@ -21,6 +21,7 @@ import ForgotPassword from "./pages/PasswordReset/ForgotPassword.tsx";
 import ResetPassword from "./pages/PasswordReset/ResetPassword.tsx";
 import Help from "./pages/Help.tsx";
 import Buscar from "./pages/Buscar.tsx";
+import Contrato from "./pages/Contrato/Contrato.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -54,6 +55,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/buscar" element={<Buscar />} />
           <Route path="/buscar-maquinario" element={<BuscarMaquinario />} />
           <Route path="/anuncio/:id" element={<AnuncioDetalhe />} />
+          <Route path="/contrato/:id" element={<Contrato />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
