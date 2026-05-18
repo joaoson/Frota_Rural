@@ -1,0 +1,216 @@
+.contrato-root *,
+.contrato-root *::before,
+.contrato-root *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.contrato-root .material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-size: inherit;
+  vertical-align: middle;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+  .contrato-root { background: white !important; padding: 0 !important; gap: 0 !important; }
+  .page { box-shadow: none !important; border-radius: 0 !important; page-break-after: always; width: 100% !important; }
+  .page:last-child { page-break-after: auto; }
+}
+
+.contrato-root {
+  background: #ccc8b8;
+  font-family: "Inter", sans-serif;
+  color: #1e1c0e;
+  padding: 40px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* ── Página ── */
+.contrato-root .page {
+  width: min(210mm, 100%);
+  background: white;
+  box-shadow: 0 2px 20px rgba(23, 57, 1, 0.07);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Cabeçalho ── */
+.contrato-root .page-header {
+  background: #173901;
+  padding: 22px 36px 20px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.contrato-root .header-brand { font-family: "Epilogue", sans-serif; font-size: 14px; font-weight: 900; color: white; letter-spacing: -0.02em; }
+.contrato-root .header-domain { font-size: 10px; color: rgba(168, 211, 138, 0.75); margin-left: 7px; }
+.contrato-root .header-title { font-family: "Epilogue", sans-serif; font-size: 20px; font-weight: 900; color: white; line-height: 1.25; margin-top: 11px; }
+.contrato-root .header-id { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 7px; padding: 12px 15px; min-width: 160px; flex-shrink: 0; }
+.contrato-root .header-id-label { font-size: 9px; color: #a8d38a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 9px; }
+.contrato-root .header-id-row { margin-bottom: 6px; }
+.contrato-root .header-id-row:last-child { margin-bottom: 0; }
+.contrato-root .header-id-key { font-size: 10px; color: rgba(255, 255, 255, 0.5); display: block; margin-bottom: 1px; }
+.contrato-root .header-id-val { font-size: 11px; color: white; font-weight: 700; }
+
+/* ── Mini header (p2, p3) ── */
+.contrato-root .mini-header {
+  background: #173901;
+  padding: 10px 36px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.contrato-root .mini-header-brand { font-family: "Epilogue", sans-serif; font-size: 12px; font-weight: 900; color: white; }
+.contrato-root .mini-header-sub { font-size: 10px; color: rgba(168, 211, 138, 0.75); }
+
+/* ── Corpo ── */
+.contrato-root .page-body { padding: 24px 36px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Rodapé ── */
+.contrato-root .page-footer {
+  background: #173901;
+  padding: 9px 32px;
+  border-radius: 0 0 10px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.contrato-root .footer-site { color: white; font-size: 10px; }
+.contrato-root .footer-num { background: #feb234; color: #173901; font-weight: 800; font-size: 10px; padding: 2px 9px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Cláusula ── */
+.contrato-root .clausula { display: flex; flex-direction: column; gap: 8px; }
+.contrato-root .clausula-num { font-size: 9.5px; font-weight: 700; color: #815500; text-transform: uppercase; letter-spacing: 0.15em; }
+.contrato-root .clausula-titulo { font-family: "Epilogue", sans-serif; font-size: 14px; font-weight: 800; color: #173901; line-height: 1.2; }
+.contrato-root .clausula-body { font-size: 12px; line-height: 1.72; color: #1e1c0e; display: flex; flex-direction: column; gap: 5px; }
+.contrato-root .item-num { font-weight: 700; color: #2d5016; }
+
+/* ── Partes ── */
+.contrato-root .partes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) {
+  .contrato-root .partes-grid { grid-template-columns: 1fr; }
+}
+.contrato-root .parte-card { border: 1px solid #e8e2d0; border-radius: 7px; padding: 13px 15px; background: #fafafa; }
+.contrato-root .parte-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.13em; color: #73796c; display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
+.contrato-root .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.contrato-root .parte-nome { font-size: 12.5px; font-weight: 700; color: #173901; line-height: 1.3; margin-bottom: 3px; }
+.contrato-root .parte-info { font-size: 11px; color: #43493d; line-height: 1.5; }
+.contrato-root .parte-sep { border-top: 1px solid #e8e2d0; margin: 7px 0; }
+
+/* ── Tabela dados ── */
+.contrato-root table.dados { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #e8e2d0; border-radius: 6px; overflow: hidden; }
+.contrato-root table.dados td { padding: 6px 10px; vertical-align: top; }
+.contrato-root table.dados tr:nth-child(even) td { background: #fbf3dd; }
+.contrato-root table.dados tr:nth-child(odd) td { background: #fafafa; }
+.contrato-root table.dados td:first-child { color: #43493d; font-weight: 600; width: 42%; border-right: 1px solid #ede8dc; }
+.contrato-root table.dados td:last-child { color: #1e1c0e; font-weight: 500; }
+
+/* ── Cards valor ── */
+.contrato-root .valor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.contrato-root .valor-card { border: 1px solid #e8e2d0; border-radius: 6px; padding: 11px 13px; background: #f5eed8; }
+.contrato-root .valor-card.destaque { background: #173901; border-color: #173901; }
+.contrato-root .valor-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: #73796c; margin-bottom: 5px; }
+.contrato-root .valor-card.destaque .valor-label { color: #a8d38a; }
+.contrato-root .valor-num { font-family: "Epilogue", sans-serif; font-size: 14px; font-weight: 900; color: #173901; word-break: break-word; overflow-wrap: break-word; }
+.contrato-root .valor-card.destaque .valor-num { color: white; }
+
+/* ── Prazo cards ── */
+.contrato-root .prazo-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+@media (max-width: 500px) {
+  .contrato-root .prazo-grid { grid-template-columns: 1fr; }
+}
+.contrato-root .prazo-card { border: 1px solid #e8e2d0; border-radius: 6px; padding: 10px 13px; background: #f5eed8; text-align: center; }
+.contrato-root .prazo-card.destaque { background: #173901; border-color: #173901; }
+.contrato-root .prazo-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: #73796c; margin-bottom: 4px; }
+.contrato-root .prazo-card.destaque .prazo-label { color: #a8d38a; }
+.contrato-root .prazo-val { font-family: "Epilogue", sans-serif; font-size: 13px; font-weight: 900; color: #173901; }
+.contrato-root .prazo-card.destaque .prazo-val { color: white; }
+
+/* ── Horímetro ── */
+.contrato-root .horim-box { border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+.contrato-root .horim-head { background: #f5eed8; padding: 8px 13px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #e8e2d0; }
+.contrato-root .horim-head-label { font-family: "Epilogue", sans-serif; font-size: 10.5px; font-weight: 800; color: #173901; text-transform: uppercase; letter-spacing: 0.08em; }
+.contrato-root .horim-nota { padding: 9px 13px; background: white; border-bottom: 1px solid #e8e2d0; font-size: 12px; line-height: 1.65; color: #1e1c0e; }
+.contrato-root table.horim { width: 100%; border-collapse: collapse; font-size: 12px; }
+.contrato-root table.horim th { background: #2d5016; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; text-align: left; }
+.contrato-root table.horim td { padding: 6px 12px; border-bottom: 1px solid #ede8dc; color: #1e1c0e; font-weight: 500; }
+.contrato-root table.horim tr:nth-child(even) td { background: #fafafa; }
+.contrato-root table.horim tr.total-row td { background: #f5eed8; font-weight: 700; color: #173901; border-top: 1px solid #c3c9b9; }
+.contrato-root table.horim tr.final-row td { background: #173901; color: white; font-weight: 700; border-bottom: none; }
+
+/* ── Obrigações ── */
+.contrato-root .obrig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) {
+  .contrato-root .obrig-grid { grid-template-columns: 1fr; }
+}
+.contrato-root .obrig-card { border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+.contrato-root .obrig-head { background: #f5eed8; padding: 8px 13px; border-bottom: 1px solid #e8e2d0; }
+.contrato-root .obrig-body { padding: 11px 13px; font-size: 11.5px; line-height: 1.65; color: #1e1c0e; display: flex; flex-direction: column; gap: 6px; }
+.contrato-root .obrig-item { display: flex; gap: 7px; align-items: flex-start; }
+.contrato-root .badge-l { background: #173901; color: white; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 2px; margin-top: 2px; flex-shrink: 0; white-space: nowrap; }
+.contrato-root .badge-r { background: #815500; color: white; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 2px; margin-top: 2px; flex-shrink: 0; white-space: nowrap; }
+
+/* ── Tabela responsabilidades ── */
+.contrato-root table.resp { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+.contrato-root table.resp th { background: #173901; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 7px 12px; text-align: left; }
+.contrato-root table.resp td { padding: 7px 12px; border-bottom: 1px solid #ede8dc; }
+.contrato-root table.resp tr:last-child td { border-bottom: none; }
+.contrato-root table.resp td:first-child { color: #43493d; width: 64%; font-weight: 500; }
+.contrato-root table.resp td:last-child { font-weight: 700; }
+.contrato-root table.resp tr:nth-child(even) td { background: #fafafa; }
+
+/* ── Multas ── */
+.contrato-root .multa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 500px) {
+  .contrato-root .multa-grid { grid-template-columns: 1fr; }
+}
+.contrato-root .multa-card { border-radius: 6px; padding: 11px 13px; font-size: 12px; line-height: 1.55; }
+.contrato-root .multa-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+
+/* ── Aviso legal ── */
+.contrato-root .aviso-legal { border: 1px solid #e8e2d0; border-radius: 7px; padding: 12px 15px; background: #fafafa; font-size: 11.5px; line-height: 1.65; color: #43493d; display: flex; gap: 10px; align-items: flex-start; }
+.contrato-root .aviso-icon { flex-shrink: 0; color: #73796c; font-size: 16px; margin-top: 1px; }
+
+/* ── Info block (assinatura) ── */
+.contrato-root .info-block { background: #f5eed8; border-left: 2px solid #c3c9b9; border-radius: 0 5px 5px 0; padding: 9px 13px; font-size: 11.5px; color: #43493d; line-height: 1.6; }
+
+/* ── Assinatura ── */
+.contrato-root .assin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 480px) {
+  .contrato-root .assin-grid { grid-template-columns: 1fr; }
+}
+.contrato-root .assinatura-box { border-top: 1.5px solid #173901; padding-top: 10px; }
+.contrato-root .assin-label { font-size: 9.5px; color: #73796c; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; margin-bottom: 5px; }
+.contrato-root .assin-nome { font-size: 13px; font-weight: 700; color: #173901; margin-bottom: 2px; }
+.contrato-root .assin-rep { font-size: 11.5px; color: #43493d; margin-bottom: 10px; }
+.contrato-root .assin-stamp { background: #f5eed8; border: 1px solid #e8e2d0; border-radius: 5px; padding: 7px 11px; display: flex; align-items: center; gap: 6px; }
+.contrato-root .assin-stamp-label { font-size: 9.5px; color: #73796c; font-weight: 600; }
+.contrato-root .assin-stamp-val { font-size: 11px; font-weight: 700; color: #173901; }
+
+/* ── Divisor cláusula ── */
+.contrato-root .clausula-divider { border: none; border-top: 1px solid #ede8dc; }
+
+/* ── Grid 2 col genérico ── */
+.contrato-root .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 500px) {
+  .contrato-root .grid-2 { grid-template-columns: 1fr; }
+}
+
+/* botão imprimir */
+.contrato-root .print-btn { display: flex; align-items: center; gap: 6px; background: #173901; color: white; font-family: "Inter", sans-serif; font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; }
+.contrato-root .print-btn-wrap { width: min(210mm, 100%); display: flex; justify-content: flex-end; }
