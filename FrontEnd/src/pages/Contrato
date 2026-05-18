@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contrato de Locação — Frota Rural</title>
+  <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      font-size: inherit;
+      vertical-align: middle;
+    }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; padding: 0 !important; gap: 0 !important; }
+      .page { box-shadow: none !important; border-radius: 0 !important; page-break-after: always; width: 100% !important; }
+      .page:last-child { page-break-after: auto; }
+    }
+
+    body {
+      background: #ccc8b8;
+      font-family: 'Inter', sans-serif;
+      color: #1e1c0e;
+      padding: 40px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      min-width: 320px;
+    }
+
+    /* ── Página ── */
+    .page {
+      width: min(210mm, 100%);
+      background: white;
+      box-shadow: 0 2px 20px rgba(23,57,1,0.07);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Cabeçalho ── */
+    .page-header {
+      background: #173901;
+      padding: 22px 36px 20px;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .header-brand { font-family: 'Epilogue', sans-serif; font-size: 14px; font-weight: 900; color: white; letter-spacing: -0.02em; }
+    .header-domain { font-size: 10px; color: rgba(168,211,138,0.75); margin-left: 7px; }
+    .header-title { font-family: 'Epilogue', sans-serif; font-size: 20px; font-weight: 900; color: white; line-height: 1.25; margin-top: 11px; }
+    .header-id { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.11); border-radius: 7px; padding: 12px 15px; min-width: 160px; flex-shrink: 0; }
+    .header-id-label { font-size: 9px; color: #a8d38a; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 9px; }
+    .header-id-row { margin-bottom: 6px; }
+    .header-id-row:last-child { margin-bottom: 0; }
+    .header-id-key { font-size: 10px; color: rgba(255,255,255,0.5); display: block; margin-bottom: 1px; }
+    .header-id-val { font-size: 11px; color: white; font-weight: 700; }
+
+    /* ── Mini header (p2, p3) ── */
+    .mini-header {
+      background: #173901;
+      padding: 10px 36px;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mini-header-brand { font-family: 'Epilogue', sans-serif; font-size: 12px; font-weight: 900; color: white; }
+    .mini-header-sub { font-size: 10px; color: rgba(168,211,138,0.75); }
+
+    /* ── Corpo ── */
+    .page-body { padding: 24px 36px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Rodapé ── */
+    .page-footer {
+      background: #173901;
+      padding: 9px 32px;
+      border-radius: 0 0 10px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .footer-site { color: white; font-size: 10px; }
+    .footer-num { background: #feb234; color: #173901; font-weight: 800; font-size: 10px; padding: 2px 9px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Cláusula ── */
+    .clausula { display: flex; flex-direction: column; gap: 8px; }
+    .clausula-num { font-size: 9.5px; font-weight: 700; color: #815500; text-transform: uppercase; letter-spacing: 0.15em; }
+    .clausula-titulo { font-family: 'Epilogue', sans-serif; font-size: 14px; font-weight: 800; color: #173901; line-height: 1.2; }
+    .clausula-body { font-size: 12px; line-height: 1.72; color: #1e1c0e; display: flex; flex-direction: column; gap: 5px; }
+    .item-num { font-weight: 700; color: #2d5016; }
+
+    /* ── Partes ── */
+    .partes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .partes-grid { grid-template-columns: 1fr; } }
+    .parte-card { border: 1px solid #e8e2d0; border-radius: 7px; padding: 13px 15px; background: #fafafa; }
+    .parte-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.13em; color: #73796c; display: flex; align-items: center; gap: 5px; margin-bottom: 7px; }
+    .dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+    .parte-nome { font-size: 12.5px; font-weight: 700; color: #173901; line-height: 1.3; margin-bottom: 3px; }
+    .parte-info { font-size: 11px; color: #43493d; line-height: 1.5; }
+    .parte-sep { border-top: 1px solid #e8e2d0; margin: 7px 0; }
+
+    /* ── Tabela dados ── */
+    table.dados { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #e8e2d0; border-radius: 6px; overflow: hidden; }
+    table.dados td { padding: 6px 10px; vertical-align: top; }
+    table.dados tr:nth-child(even) td { background: #fbf3dd; }
+    table.dados tr:nth-child(odd) td { background: #fafafa; }
+    table.dados td:first-child { color: #43493d; font-weight: 600; width: 42%; border-right: 1px solid #ede8dc; }
+    table.dados td:last-child { color: #1e1c0e; font-weight: 500; }
+
+    /* ── Cards valor ── */
+    .valor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .valor-card { border: 1px solid #e8e2d0; border-radius: 6px; padding: 11px 13px; background: #f5eed8; }
+    .valor-card.destaque { background: #173901; border-color: #173901; }
+    .valor-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: #73796c; margin-bottom: 5px; }
+    .valor-card.destaque .valor-label { color: #a8d38a; }
+    .valor-num { font-family: 'Epilogue', sans-serif; font-size: 14px; font-weight: 900; color: #173901; word-break: break-word; overflow-wrap: break-word; }
+    .valor-card.destaque .valor-num { color: white; }
+
+    /* ── Prazo cards ── */
+    .prazo-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    @media (max-width: 500px) { .prazo-grid { grid-template-columns: 1fr; } }
+    .prazo-card { border: 1px solid #e8e2d0; border-radius: 6px; padding: 10px 13px; background: #f5eed8; text-align: center; }
+    .prazo-card.destaque { background: #173901; border-color: #173901; }
+    .prazo-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: #73796c; margin-bottom: 4px; }
+    .prazo-card.destaque .prazo-label { color: #a8d38a; }
+    .prazo-val { font-family: 'Epilogue', sans-serif; font-size: 13px; font-weight: 900; color: #173901; }
+    .prazo-card.destaque .prazo-val { color: white; }
+
+    /* ── Horímetro ── */
+    .horim-box { border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+    .horim-head { background: #f5eed8; padding: 8px 13px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #e8e2d0; }
+    .horim-head-label { font-family: 'Epilogue', sans-serif; font-size: 10.5px; font-weight: 800; color: #173901; text-transform: uppercase; letter-spacing: 0.08em; }
+    .horim-nota { padding: 9px 13px; background: white; border-bottom: 1px solid #e8e2d0; font-size: 12px; line-height: 1.65; color: #1e1c0e; }
+    table.horim { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.horim th { background: #2d5016; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 12px; text-align: left; }
+    table.horim td { padding: 6px 12px; border-bottom: 1px solid #ede8dc; color: #1e1c0e; font-weight: 500; }
+    table.horim tr:nth-child(even) td { background: #fafafa; }
+    table.horim tr.total-row td { background: #f5eed8; font-weight: 700; color: #173901; border-top: 1px solid #c3c9b9; }
+    table.horim tr.final-row td { background: #173901; color: white; font-weight: 700; border-bottom: none; }
+
+    /* ── Obrigações ── */
+    .obrig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 500px) { .obrig-grid { grid-template-columns: 1fr; } }
+    .obrig-card { border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+    .obrig-head { background: #f5eed8; padding: 8px 13px; border-bottom: 1px solid #e8e2d0; }
+    .obrig-body { padding: 11px 13px; font-size: 11.5px; line-height: 1.65; color: #1e1c0e; display: flex; flex-direction: column; gap: 6px; }
+    .obrig-item { display: flex; gap: 7px; align-items: flex-start; }
+    .badge-l { background: #173901; color: white; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 2px; margin-top: 2px; flex-shrink: 0; white-space: nowrap; }
+    .badge-r { background: #815500; color: white; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 2px; margin-top: 2px; flex-shrink: 0; white-space: nowrap; }
+
+    /* ── Tabela responsabilidades ── */
+    table.resp { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #e8e2d0; border-radius: 7px; overflow: hidden; }
+    table.resp th { background: #173901; color: white; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 7px 12px; text-align: left; }
+    table.resp td { padding: 7px 12px; border-bottom: 1px solid #ede8dc; }
+    table.resp tr:last-child td { border-bottom: none; }
+    table.resp td:first-child { color: #43493d; width: 64%; font-weight: 500; }
+    table.resp td:last-child { font-weight: 700; }
+    table.resp tr:nth-child(even) td { background: #fafafa; }
+
+    /* ── Multas ── */
+    .multa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 500px) { .multa-grid { grid-template-columns: 1fr; } }
+    .multa-card { border-radius: 6px; padding: 11px 13px; font-size: 12px; line-height: 1.55; }
+    .multa-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 5px; }
+
+    /* ── Aviso legal ── */
+    .aviso-legal { border: 1px solid #e8e2d0; border-radius: 7px; padding: 12px 15px; background: #fafafa; font-size: 11.5px; line-height: 1.65; color: #43493d; display: flex; gap: 10px; align-items: flex-start; }
+    .aviso-icon { flex-shrink: 0; color: #73796c; font-size: 16px; margin-top: 1px; }
+
+    /* ── Info block (assinatura) ── */
+    .info-block { background: #f5eed8; border-left: 2px solid #c3c9b9; border-radius: 0 5px 5px 0; padding: 9px 13px; font-size: 11.5px; color: #43493d; line-height: 1.6; }
+
+    /* ── Assinatura ── */
+    .assin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    @media (max-width: 480px) { .assin-grid { grid-template-columns: 1fr; } }
+    .assinatura-box { border-top: 1.5px solid #173901; padding-top: 10px; }
+    .assin-label { font-size: 9.5px; color: #73796c; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; margin-bottom: 5px; }
+    .assin-nome { font-size: 13px; font-weight: 700; color: #173901; margin-bottom: 2px; }
+    .assin-rep { font-size: 11.5px; color: #43493d; margin-bottom: 10px; }
+    .assin-stamp { background: #f5eed8; border: 1px solid #e8e2d0; border-radius: 5px; padding: 7px 11px; display: flex; align-items: center; gap: 6px; }
+    .assin-stamp-label { font-size: 9.5px; color: #73796c; font-weight: 600; }
+    .assin-stamp-val { font-size: 11px; font-weight: 700; color: #173901; }
+
+    /* ── Divisor cláusula ── */
+    .clausula-divider { border: none; border-top: 1px solid #ede8dc; }
+
+    /* ── Grid 2 col genérico ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 500px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* botão imprimir */
+    .print-btn { display: flex; align-items: center; gap: 6px; background: #173901; color: white; font-family: 'Inter', sans-serif; font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; }
+    .print-btn-wrap { width: min(210mm, 100%); display: flex; justify-content: flex-end; }
+  </style>
+</head>
+
+<body>
+
+  <div class="print-btn-wrap no-print">
+    <button class="print-btn" onclick="window.print()">
+      <span class="material-symbols-outlined" style="font-size:16px;">print</span>
+      Imprimir / Salvar PDF
+    </button>
+  </div>
+
+
+  <!-- ══════════════════════
+       PÁGINA 1
+  ══════════════════════ -->
+  <div class="page">
+    <div class="page-header">
+      <div>
+        <div>
+          <span class="header-brand">Frota Rural</span>
+          <span class="header-domain">frotarural.app</span>
+        </div>
+        <div class="header-title">Contrato de Locação de<br>Maquinário Agrícola<br>com Prestação de Serviços</div>
+      </div>
+      <div class="header-id">
+        <div class="header-id-label">Identificação</div>
+        <div class="header-id-row">
+          <span class="header-id-key">Nº Contrato</span>
+          <span class="header-id-val">{{contrato.numero}}</span>
+        </div>
+        <div class="header-id-row">
+          <span class="header-id-key">Operação</span>
+          <span class="header-id-val">{{operacao.codigo}}</span>
+        </div>
+        <div class="header-id-row">
+          <span class="header-id-key">Gerado em</span>
+          <span class="header-id-val">{{contrato.data_geracao}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Partes -->
+      <div class="partes-grid">
+        <div class="parte-card">
+          <div class="parte-label"><span class="dot" style="background:#173901;"></span>Locador</div>
+          <div class="parte-nome">{{locador.razao_social}}</div>
+          <div class="parte-info">{{locador.tipo_documento}} nº {{locador.documento}}</div>
+          <div class="parte-info">{{locador.endereco_completo}}</div>
+          <div class="parte-sep"></div>
+          <div class="parte-info"><strong>{{locador.representante_nome}}</strong></div>
+          <div class="parte-info" style="color:#73796c;">CPF nº {{locador.representante_cpf}} · {{locador.representante_estado_civil}}</div>
+        </div>
+        <div class="parte-card">
+          <div class="parte-label"><span class="dot" style="background:#feb234;"></span>Locatário</div>
+          <div class="parte-nome">{{locatario.razao_social}}</div>
+          <div class="parte-info">{{locatario.tipo_documento}} nº {{locatario.documento}}</div>
+          <div class="parte-info">{{locatario.endereco_completo}}</div>
+          <div class="parte-sep"></div>
+          <div class="parte-info"><strong>{{locatario.representante_nome}}</strong></div>
+          <div class="parte-info" style="color:#73796c;">CPF nº {{locatario.representante_cpf}} · {{locatario.representante_estado_civil}}</div>
+        </div>
+      </div>
+
+      <!-- Legislação aplicável — discreta, à esquerda, antes da Cl.1 -->
+      <div style="font-size:11px; color:#73796c; line-height:1.6;">
+        Este contrato é regido pelo <strong style="color:#43493d;">Código de Defesa do Consumidor (Lei nº 8.078/1990)</strong> e, no que não estiver por ele previsto, pelo <strong style="color:#43493d;">Código Civil Brasileiro (Lei nº 10.406/2002)</strong>.
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusula 1 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 1</div>
+        <div class="clausula-titulo">Objeto do Contrato</div>
+        <table class="dados">
+          <tr><td>Tipo de equipamento</td><td>{{equipamento.tipo}}</td></tr>
+          <tr><td>Marca e Modelo</td><td>{{equipamento.marca}} {{equipamento.modelo}}</td></tr>
+          <tr><td>Ano de fabricação</td><td>{{equipamento.ano}}</td></tr>
+          <tr><td>Nº Renagro</td><td>{{equipamento.renagro}}</td></tr>
+          <tr><td>Valor de referência do equipamento</td><td><strong>R$ {{equipamento.valor_estimado}}</strong></td></tr>
+          <tr><td>Tipo de serviço</td><td>{{anuncio.tipo_servico}} — {{anuncio.finalidade_uso}}</td></tr>
+          <tr><td>Local de execução</td><td>{{locatario.local_servico}}</td></tr>
+        </table>
+        <div class="clausula-body">
+          <div><span class="item-num">1.1</span> O equipamento será entregue livre de defeitos conhecidos que possam impedir sua operação. Caso contrário, o Locador responderá pelos danos causados ao Locatário.</div>
+          <div><span class="item-num">1.2</span> A operação do equipamento deve ser realizada por operador habilitado, indicado pelo Locador, com credencial técnica válida para condução desse tipo de maquinário. O nome e os dados do operador serão informados antes do início dos serviços.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusula 2 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 2</div>
+        <div class="clausula-titulo">Prazo</div>
+        <div class="prazo-grid">
+          <div class="prazo-card">
+            <div class="prazo-label">Início</div>
+            <div class="prazo-val">{{contrato.data_inicio}}</div>
+          </div>
+          <div class="prazo-card">
+            <div class="prazo-label">Término</div>
+            <div class="prazo-val">{{contrato.data_fim}}</div>
+          </div>
+          <div class="prazo-card destaque">
+            <div class="prazo-label">Duração</div>
+            <div class="prazo-val">{{contrato.prazo_dias}} dias</div>
+          </div>
+        </div>
+        <div class="clausula-body">
+          <div><span class="item-num">2.1</span> Na devolução, o equipamento deve estar nas mesmas condições em que foi entregue. O desgaste natural do uso regular não gera custo adicional.</div>
+          <div><span class="item-num">2.2</span> A parte interessada em prorrogar deve comunicar a outra com pelo menos <strong>15 dias de antecedência</strong>. Com concordância mútua, a extensão do prazo é registrada na plataforma e o contrato segue nas mesmas condições.</div>
+          <div><span class="item-num">2.3</span> Paralisações por condições climáticas adversas comprovadas suspendem o prazo sem custo adicional ao Locatário, salvo acordo em contrário registrado na plataforma.</div>
+          <div><span class="item-num">2.4</span> Durante a vigência do contrato, qualquer parte pode solicitar alteração de data ou duração pela plataforma. A alteração só é efetivada com o aceite de Locador e Locatário. Enquanto pendente, os termos originais permanecem vigentes. Se o novo período conflitar com outra reserva confirmada do equipamento, a solicitação será bloqueada pela plataforma. Alterações de prazo acordadas entre as partes não geram multa.</div>
+          <div><span class="item-num">2.5</span> O Locatário pode programar recorrência deste contrato com frequência semanal, quinzenal ou mensal. Para cada período, a plataforma gerará um novo contrato com as mesmas condições, sujeito ao aceite das partes. Conflitos de disponibilidade do equipamento no período recorrente bloquearão a programação, com indicação das datas com conflito para ajuste.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusula 3 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 3</div>
+        <div class="clausula-titulo">Retirada e Devolução</div>
+        <div class="clausula-body">
+          <div><span class="item-num">3.1</span> O equipamento estará disponível para retirada a partir de <strong>{{contrato.data_inicio}}</strong>, no endereço: <strong>{{locador.endereco_equipamento}}</strong>.</div>
+          <div><span class="item-num">3.2</span> No momento da retirada e da devolução, as partes realizarão vistoria do equipamento, com registro fotográfico de seu estado e leitura do horímetro.</div>
+          <div><span class="item-num">3.3</span> Os custos de mobilização e desmobilização do equipamento são de responsabilidade do <strong>Locador</strong>.</div>
+        </div>
+      </div>
+
+    </div><!-- /page-body -->
+
+    <div class="page-footer">
+      <span class="footer-site">frotarural.app</span>
+      <span style="color:rgba(255,255,255,0.3); font-size:9.5px;">{{contrato.numero}}</span>
+      <span class="footer-num">01</span>
+    </div>
+  </div><!-- /page 1 -->
+
+
+  <!-- ══════════════════════
+       PÁGINA 2
+  ══════════════════════ -->
+  <div class="page">
+    <div class="mini-header">
+      <span class="mini-header-brand">Frota Rural</span>
+      <span class="mini-header-sub">frotarural.app</span>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Cláusula 4 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 4</div>
+        <div class="clausula-titulo">Preço, Pagamento e Horímetro</div>
+
+        <div class="valor-grid">
+          <div class="valor-card">
+            <div class="valor-label">Tarifa / hora</div>
+            <div class="valor-num">R$ {{contrato.valor_unitario}}</div>
+          </div>
+          <div class="valor-card">
+            <div class="valor-label">Estimativa</div>
+            <div class="valor-num">{{contrato.estimativa_horas}} h</div>
+          </div>
+          <div class="valor-card destaque">
+            <div class="valor-label">Valor estimado</div>
+            <div class="valor-num">R$ {{contrato.valor_total_estimado}}</div>
+          </div>
+        </div>
+
+        <div class="clausula-body">
+          <div><span class="item-num">4.1</span> O pagamento é realizado pela plataforma FrotaRural no momento da confirmação da reserva. O comprovante é gerado automaticamente. O repasse ao Locador ocorre após a conclusão da locação.</div>
+        </div>
+
+        <!-- Horímetro -->
+        <div class="horim-box">
+          <div class="horim-head">
+            <span class="material-symbols-outlined" style="color:#173901; font-size:14px;">speed</span>
+            <span class="horim-head-label">Horímetro — Check-in e Check-out</span>
+          </div>
+          <div class="horim-nota">
+            <span class="item-num">4.2</span> A leitura do horímetro é registrada em dois momentos obrigatórios na plataforma: no <strong>check-in</strong>, antes do início dos serviços, e no <strong>check-out</strong>, ao término. Em ambos, o operador deve fotografar o painel do horímetro e informar a leitura na plataforma. Esse registro é o documento oficial para o cálculo do valor final.
+          </div>
+          <table class="horim">
+            <thead>
+              <tr>
+                <th>Momento</th>
+                <th>Como registrar</th>
+                <th style="color:rgba(168,211,138,0.8); font-size:8.5px;">Responsável</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Check-in</strong> — início do serviço</td>
+                <td>Foto do horímetro anexada na plataforma</td>
+                <td style="color:#73796c; font-size:10.5px;">Operador / Locador</td>
+              </tr>
+              <tr>
+                <td><strong>Check-out</strong> — fim do serviço</td>
+                <td>Foto do horímetro anexada na plataforma</td>
+                <td style="color:#73796c; font-size:10.5px;">Operador / Locador</td>
+              </tr>
+              <tr class="total-row">
+                <td>Horas efetivamente utilizadas</td>
+                <td colspan="2">Informadas pelo operador no check-out &nbsp;·&nbsp; <span style="color:#815500; font-size:10.5px;">Confirmadas pelo Locador na plataforma</span></td>
+              </tr>
+              <tr class="final-row">
+                <td>Valor final apurado</td>
+                <td colspan="2" style="font-size:13px;"><strong>Tarifa × horas informadas</strong> <span style="font-size:9.5px; opacity:0.6;">· gerado após confirmação do Locador</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="clausula-body">
+          <div><span class="item-num">4.3</span> Se as horas informadas no check-out forem <strong>superiores</strong> à estimativa, o Locatário pagará a diferença diretamente ao Locador em até <strong>5 dias úteis</strong> após o registro do check-out. Se forem <strong>inferiores</strong>, não haverá devolução de valor — o montante pago corresponde à disponibilidade garantida do equipamento durante o período contratado.</div>
+          <div><span class="item-num">4.4</span> Registros de check-out com horímetro inferior ao do check-in, ou com valores inválidos, serão rejeitados pela plataforma. As partes devem regularizar o registro antes da conclusão da locação.</div>
+          <div><span class="item-num">4.5</span> O atraso no pagamento de valores devidos implica juros de mora de <strong>1% ao mês</strong> e multa de <strong>2%</strong> sobre o saldo em aberto.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusulas 5 e 6 -->
+      <div class="obrig-grid">
+        <div class="obrig-card">
+          <div class="obrig-head">
+            <div class="clausula-num" style="margin-bottom:1px;">Cláusula 5</div>
+            <div class="clausula-titulo" style="font-size:13px;">Obrigações do Locador</div>
+          </div>
+          <div class="obrig-body">
+            <div class="obrig-item"><span class="badge-l">5.1</span><span>Entregar o equipamento funcionando e com manutenção em dia;</span></div>
+            <div class="obrig-item"><span class="badge-l">5.2</span><span>Indicar operador com credencial técnica válida, responsável pelo cumprimento da NR-31;</span></div>
+            <div class="obrig-item"><span class="badge-l">5.3</span><span>Informar limitações técnicas que possam afetar a operação na área indicada;</span></div>
+            <div class="obrig-item"><span class="badge-l">5.4</span><span>Realizar o check-in e o check-out na plataforma, com foto do horímetro em cada momento;</span></div>
+            <div class="obrig-item"><span class="badge-l">5.5</span><span>Fornecer combustível, água e lubrificantes necessários à operação do equipamento;</span></div>
+            <div class="obrig-item"><span class="badge-l">5.6</span><span>Substituir o equipamento por equivalente em caso de defeito de sua responsabilidade.</span></div>
+          </div>
+        </div>
+        <div class="obrig-card">
+          <div class="obrig-head">
+            <div class="clausula-num" style="margin-bottom:1px;">Cláusula 6</div>
+            <div class="clausula-titulo" style="font-size:13px;">Obrigações do Locatário</div>
+          </div>
+          <div class="obrig-body">
+            <div class="obrig-item"><span class="badge-r">6.1</span><span>Efetuar os pagamentos nos prazos estabelecidos na Cláusula 4;</span></div>
+            <div class="obrig-item"><span class="badge-r">6.2</span><span>Garantir acesso à área de serviço e sinalizar obstáculos no terreno;</span></div>
+            <div class="obrig-item"><span class="badge-r">6.3</span><span>Informar previamente riscos no terreno (pedras, valas, cercas elétricas, tubulações);</span></div>
+            <div class="obrig-item"><span class="badge-r">6.4</span><span>Não operar o equipamento sem autorização do Locador, salvo habilitação técnica comprovada;</span></div>
+            <div class="obrig-item"><span class="badge-r">6.5</span><span>Zelar pela guarda do equipamento contra furto e roubo durante sua custódia.</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="page-footer">
+      <span class="footer-site">frotarural.app</span>
+      <span style="color:rgba(255,255,255,0.3); font-size:9.5px;">{{contrato.numero}}</span>
+      <span class="footer-num">02</span>
+    </div>
+  </div><!-- /page 2 -->
+
+
+  <!-- ══════════════════════
+       PÁGINA 3
+  ══════════════════════ -->
+  <div class="page">
+    <div class="mini-header">
+      <span class="mini-header-brand">Frota Rural</span>
+      <span class="mini-header-sub">frotarural.app</span>
+    </div>
+
+    <div class="page-body">
+
+      <!-- Cláusula 7 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 7</div>
+        <div class="clausula-titulo">Responsabilidades</div>
+        <table class="resp">
+          <thead><tr><th>Situação</th><th>Responsável</th></tr></thead>
+          <tbody>
+            <tr><td>Defeito mecânico preexistente à entrega</td><td style="color:#173901;">Locador</td></tr>
+            <tr><td>Dano causado por obstáculo não informado pelo Locatário</td><td style="color:#815500;">Locatário</td></tr>
+            <tr><td>Erro do operador indicado pelo Locador</td><td style="color:#173901;">Locador</td></tr>
+            <tr><td>Furto ou roubo enquanto o equipamento estiver com o Locatário</td><td style="color:#815500;">Locatário</td></tr>
+            <tr><td>Dano por evento imprevisível (raio, enchente, granizo)</td><td style="color:#73796c;">Nenhuma das partes</td></tr>
+          </tbody>
+        </table>
+        <div class="clausula-body">
+          <div><span class="item-num">7.2</span> Qualquer dano deve ser registrado com fotografia ou vídeo e comunicado pela plataforma. O valor do reparo será apurado com base em orçamento de oficina — cada parte pode indicar um, sendo adotada a média dos dois.</div>
+          <div><span class="item-num">7.3</span> O valor de referência do equipamento (<strong>R$ {{equipamento.valor_estimado}}</strong>) serve como limite de indenização em caso de dano total ou perda.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusula 8 — FrotaRural + aviso legal integrado -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 8</div>
+        <div class="clausula-titulo">Papel da Plataforma FrotaRural</div>
+        <!-- Aviso legal destacado dentro do corpo da cláusula -->
+        <div class="aviso-legal">
+          <span class="material-symbols-outlined aviso-icon">info</span>
+          <div>
+            <div style="font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.11em; color:#73796c; margin-bottom:4px;">Intermediação tecnológica</div>
+            <span>A FrotaRural não é parte deste contrato e não responde por danos causados pelo equipamento, acidentes de trabalho, inadimplemento das partes, estado de conservação do equipamento, resultado agronômico dos serviços, danos ambientais ou litígios entre as partes.</span>
+          </div>
+        </div>
+        <div class="clausula-body">
+          <div><span class="item-num">8.1</span> A FrotaRural opera como marketplace de intermediação tecnológica, nos termos do Marco Civil da Internet (Lei nº 12.965/2014), sem que isso gere vínculo empregatício, societário ou solidariedade com as partes contratantes.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusula 9 -->
+      <div class="clausula">
+        <div class="clausula-num">Cláusula 9</div>
+        <div class="clausula-titulo">Cancelamento e Rescisão</div>
+        <div class="clausula-body">
+          <div><span class="item-num">9.1</span> O cancelamento pode ser solicitado pelo módulo de contratos da plataforma, informando o motivo. O estorno seguirá a política de cancelamento vigente na data da operação.</div>
+          <div><span class="item-num">9.2</span> Se o contrato não for assinado por ambas as partes dentro do prazo estipulado, a reserva é cancelada automaticamente e o pagamento é estornado.</div>
+        </div>
+        <div class="multa-grid">
+          <div class="multa-card" style="background:#f0fae8; border:1px solid #c4efa3;">
+            <div class="multa-label" style="color:#2d5016;">Rescisão por culpa do Locatário</div>
+            <div style="color:#173901;">Multa de <strong>10%</strong> sobre o valor total estimado, acrescida de indenização por danos ao equipamento.</div>
+          </div>
+          <div class="multa-card" style="background:#fff8ee; border:1px solid #ffddb2;">
+            <div class="multa-label" style="color:#6d4700;">Rescisão por culpa do Locador</div>
+            <div style="color:#6d4700;">Multa de <strong>10%</strong> sobre o valor total estimado e restituição integral dos valores pagos.</div>
+          </div>
+        </div>
+        <div class="clausula-body">
+          <div><span class="item-num">9.5</span> Não há penalidade em caso de rescisão por caso fortuito ou força maior (art. 393 do Código Civil), nem em caso de alteração de prazo acordada entre as partes nos termos do item 2.4.</div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Cláusulas 10 e 11 -->
+      <div class="grid-2">
+        <div class="clausula">
+          <div class="clausula-num">Cláusula 10</div>
+          <div class="clausula-titulo" style="font-size:13px;">Disposições Gerais</div>
+          <div class="clausula-body" style="font-size:11.5px;">
+            <div><span class="item-num">10.1</span> Este contrato não cria vínculo empregatício entre o Locatário e pessoas indicadas pelo Locador.</div>
+            <div><span class="item-num">10.2</span> As informações compartilhadas são confidenciais, conforme a LGPD (Lei nº 13.709/2018).</div>
+          </div>
+        </div>
+        <div class="clausula">
+          <div class="clausula-num">Cláusula 11</div>
+          <div class="clausula-titulo" style="font-size:13px;">Foro</div>
+          <div class="clausula-body" style="font-size:11.5px;">
+            <div><span class="item-num">11.1</span> Fica eleito o foro do domicílio do Locatário — <strong>{{locatario.municipio}}/{{locatario.uf}}</strong> — para dirimir quaisquer conflitos oriundos deste contrato, nos termos do art. 101, I, do Código de Defesa do Consumidor. As partes comprometem-se a buscar solução por mediação antes de recorrer ao Judiciário.</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="clausula-divider">
+
+      <!-- Assinaturas -->
+      <div class="clausula">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span class="material-symbols-outlined" style="color:#173901; font-size:14px;">draw</span>
+          <span style="font-family:'Epilogue',sans-serif; font-size:11px; font-weight:800; color:#173901; text-transform:uppercase; letter-spacing:0.09em;">Assinatura Digital</span>
+        </div>
+        <div class="info-block">
+          Assinado digitalmente por meio da plataforma integrada à FrotaRural, com validade jurídica conforme a MP nº 2.200-2/2001 e a Lei nº 14.063/2020. Ao assinar, cada parte declara que leu, compreendeu e concorda com as condições deste contrato.
+        </div>
+        <div class="assin-grid">
+          <div class="assinatura-box">
+            <div class="assin-label">Locador</div>
+            <div class="assin-nome">{{locador.razao_social}}</div>
+            <div class="assin-rep">{{locador.representante_nome}}</div>
+            <div class="assin-stamp">
+              <span class="material-symbols-outlined" style="color:#173901; font-size:13px;">verified</span>
+              <div>
+                <div class="assin-stamp-label">Assinado digitalmente em</div>
+                <div class="assin-stamp-val">{{assinatura.data_locador}}</div>
+              </div>
+            </div>
+          </div>
+          <div class="assinatura-box">
+            <div class="assin-label">Locatário</div>
+            <div class="assin-nome">{{locatario.razao_social}}</div>
+            <div class="assin-rep">{{locatario.representante_nome}}</div>
+            <div class="assin-stamp">
+              <span class="material-symbols-outlined" style="color:#173901; font-size:13px;">verified</span>
+              <div>
+                <div class="assin-stamp-label">Assinado digitalmente em</div>
+                <div class="assin-stamp-val">{{assinatura.data_locatario}}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="page-footer">
+      <span class="footer-site">frotarural.app</span>
+      <span style="color:rgba(255,255,255,0.3); font-size:9.5px;">{{contrato.numero}}</span>
+      <span class="footer-num">03</span>
+    </div>
+  </div><!-- /page 3 -->
+
+</body>
+</html>
