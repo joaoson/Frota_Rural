@@ -29,7 +29,7 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
 3. **Instale as dependências**:
 
    ```bash
-   pip install -r environment/requirements.txt
+   pip install -r docs/requirements.txt
    ```
 
 4. **Configure o banco de dados PostgreSQL**:
@@ -38,7 +38,7 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
    - Crie um usuário com permissões apropriadas (ex.: `postgres`).
 
 5. **Crie a configuração do ambiente**:
-   - Copie ou crie um arquivo `.env` na pasta `environment/` com o seguinte conteúdo:
+   - Copie ou crie um arquivo `.env` na pasta raiz do projeto com o seguinte conteúdo:
      ```
      DB_NAME=frota_rural
      DB_USER=postgres
@@ -80,6 +80,7 @@ Antes de executar este projeto, certifique-se de ter o seguinte instalado:
 
 4. **Acesse a aplicação**:
    - Abra seu navegador e vá para `http://127.0.0.1:8000/`
+   - Para popular o banco de dados, é possível executar o arquivo `seed.py` 
 
 ## Notas Adicionais
 
