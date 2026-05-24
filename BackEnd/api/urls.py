@@ -3,11 +3,7 @@ from rest_framework_simplejwt.views import TokenVerifyView
 
 from .views import (
     ban_user,
-    change_password,
     confirm_password_reset,
-    create_user,
-    get_user_by_email,
-    get_users,
     login,
     logout_view,
     machine_detail,
@@ -17,7 +13,6 @@ from .views import (
     refresh_token,
     request_password_reset,
     suspend_user,
-    user_detail,
     warn_user,
     posting_photos,
 )
@@ -34,11 +29,6 @@ urlpatterns = [
     path('password-reset/confirm', confirm_password_reset, name='password_reset_confirm'),
 
     ## USERS
-    path('users/create', create_user, name='create_user'),
-    path('users/', get_users, name='get_users'),
-    path('users/email/<str:email>', get_user_by_email, name='get_user_by_email'),
-    path('users/<uuid:pk>', user_detail, name='user_detail'),
-    path('users/<uuid:pk>/change-password', change_password, name='change_password'),
     path('admin/users/<uuid:pk>/warn', warn_user, name='warn_user'),
     path('admin/users/<uuid:pk>/suspend', suspend_user, name='suspend_user'),
     path('admin/users/<uuid:pk>/ban', ban_user, name='ban_user'),

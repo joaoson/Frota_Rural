@@ -3,7 +3,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
 from rest_framework_simplejwt.settings import api_settings
 
-from .models import Users
+from users.models import Users
 
 
 class AppJWTAuthentication(JWTAuthentication):

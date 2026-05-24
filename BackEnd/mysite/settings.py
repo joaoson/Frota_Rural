@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'api',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -90,7 +91,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mysite.wsgi.application'
 
-AUTH_USER_MODEL = 'api.Users'
+AUTH_USER_MODEL = 'users.Users'
 
 ## SETTING THE AUTHENTICATION
 
