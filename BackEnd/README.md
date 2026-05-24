@@ -97,7 +97,7 @@ O endereço base da API é:
 http://127.0.0.1:8000/api/
 ```
 
-Você pode ver todas as rotas no arquivo mysite/urls.py.
+Você pode ver todas as rotas no arquivo djangoapi/urls.py.
 
 As requisições podem ser feitas via Postman (ou qualquer cliente HTTP). Exemplo de requisição POST para criar um usuário (rota: users/create):
 

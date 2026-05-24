@@ -6,7 +6,7 @@ import os
 import uuid
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 django.setup()
 
 from authentication.models import Credentials
