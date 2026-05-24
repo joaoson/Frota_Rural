@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'users',
     'authentication',
     'postings',
+    'machines'
 ]
 
 MIDDLEWARE = [
