@@ -5,6 +5,7 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+
 from django.db import models
 
 # if id = models.UUIDField(primary_key=True), JSON request needs to contain an ID field.
@@ -59,40 +60,9 @@ class Messages(models.Model):
         db_table = 'messages'
 
 
-class Postings(models.Model):
-    id = models.UUIDField(primary_key=True)
-    machinery = models.ForeignKey(Machines, models.DO_NOTHING)
-    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
-    location_lat = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
-    location_lng = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
-    location_address = models.TextField(blank=True, null=True)
-    availability_start = models.DateTimeField(blank=True, null=True)
-    availability_end = models.DateTimeField(blank=True, null=True)
-    description = models.TextField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
-    created_at = models.DateTimeField(blank=True, null=True)
-    updated_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        # managed = False
-        db_table = 'postings'
-
-
-class PostingsPhotos(models.Model):
-    id = models.UUIDField(primary_key=True)
-    postings = models.ForeignKey(Postings, models.DO_NOTHING)
-    image_url = models.CharField(max_length=1024)
-    is_primary = models.BooleanField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        # managed = False
-        db_table = 'postings_photos'
-
-
 class Rentals(models.Model):
     id = models.UUIDField(primary_key=True)
-    postings = models.ForeignKey(Postings, models.DO_NOTHING)
+    postings = models.ForeignKey('postings.Postings', models.DO_NOTHING)
     lessee = models.ForeignKey('users.Users', models.DO_NOTHING)
     operator = models.ForeignKey('users.Users', models.DO_NOTHING, related_name='rentals_operator_set', blank=True, null=True)
     start_date = models.DateTimeField()
