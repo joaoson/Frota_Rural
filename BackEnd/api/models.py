@@ -14,7 +14,8 @@ from django.db import models
 # For auto date in created_at, field should equal to models.DateTimeField(auto_now_add=True)
 # For auto date in updated_at, field should equal to models.DateTimeField(auto_now=True)
 
-# TODO: CONFORME FOR AVANÇANDO NO PROJETO, CRIAR APPS PARA MODULARIZAR TUDO
+# TODO: CONFORME FOR AVANÇANDO NO PROJETO, CRIAR APPS PARA MODULARIZAR TUDO E NÃO CRIAR MAIS TUDO DENTRO DE API
+# TODO: A IDEIA É QUE ESSA PASTA API DEIXE DE EXISTIR E FIQUE TUDO MODULARIZADO
 class Contracts(models.Model):
     id = models.UUIDField(primary_key=True)
     rental = models.OneToOneField('Rentals', models.DO_NOTHING)
