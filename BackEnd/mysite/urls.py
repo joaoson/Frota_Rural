@@ -23,9 +23,9 @@ BASE_PATH = 'api/'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path(BASE_PATH, include('administration.urls')),
     path(BASE_PATH, include('users.urls')),
     path(BASE_PATH, include('postings.urls')),
     path(BASE_PATH, include('machines.urls')),
     path(BASE_PATH, include('authentication.urls')),
-    path(BASE_PATH, include('api.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

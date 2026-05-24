@@ -1,11 +1,13 @@
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
+from api.models import Rentals, Contracts
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users
-from .models import Contracts, Rentals
 
+# Create your views here.
 @api_view(['PUT'])
 def warn_user(request, pk):
     try:
