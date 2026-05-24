@@ -9,10 +9,14 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
 django.setup()
 
+from authentication.models import Credentials
+from machines.models import Machines
+from postings.models import Postings, PostingsPhotos
+from users.models import Users
+
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from api.models import (
-    Users, Credentials, Machines, Postings, PostingsPhotos,
     Rentals, Contracts, Messages, Reviews,
 )
 from django.contrib.auth.hashers import make_password
