@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'api',
     'users',
+    'authentication',
 ]
 
 MIDDLEWARE = [
@@ -99,7 +100,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
         'rest_framework.authentication.SessionAuthentication',
-        'api.authentication.AppJWTAuthentication',
+        'authentication.extensions.authentication.AppJWTAuthentication',
     ]
 }
 

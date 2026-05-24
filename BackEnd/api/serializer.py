@@ -3,7 +3,7 @@ import uuid
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Machines, Users, Postings, PostingsPhotos
+from .models import Machines, Postings, PostingsPhotos
 
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,20 +36,6 @@ class MachineSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         validated_data["updated_at"] = timezone.now()
         return super().update(instance, validated_data)
-
-
-class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-
-
-class PasswordResetRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-
-
-class PasswordResetConfirmSerializer(serializers.Serializer):
-    token = serializers.CharField()
-    new_password = serializers.CharField(min_length=8)
 
 
 class PostingSerializer(serializers.ModelSerializer):
