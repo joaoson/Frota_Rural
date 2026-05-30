@@ -9,7 +9,7 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 django.setup()
 
-from authentication.models import Credentials
+from document_validation.models import Credentials
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from users.models import Users

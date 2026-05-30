@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('api', '0001_initial'),
+        ('machines', '0001_initial'),
     ]
 
     operations = [
@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                 ('status', models.TextField(blank=True, null=True)),
                 ('created_at', models.DateTimeField(blank=True, null=True)),
                 ('updated_at', models.DateTimeField(blank=True, null=True)),
-                ('machinery', models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, to='api.machines')),
+                ('machinery', models.ForeignKey(on_delete=django.db.models.deletion.DO_NOTHING, to='machines.machines')),
             ],
             options={
                 'db_table': 'postings',

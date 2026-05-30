@@ -28,4 +28,5 @@ urlpatterns = [
     path(BASE_PATH, include('postings.urls')),
     path(BASE_PATH, include('machines.urls')),
     path(BASE_PATH, include('authentication.urls')),
+    path(BASE_PATH, include('document_validation.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
