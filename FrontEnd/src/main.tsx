@@ -63,6 +63,10 @@ createRoot(document.getElementById("root")!).render(
               path="/document/certification"
               element={<CertificationUpload />}
             />
+            <Route
+              path="/document/certification/:id"
+              element={<CertificationUpload />}
+            />
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />

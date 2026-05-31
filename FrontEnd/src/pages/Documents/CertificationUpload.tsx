@@ -1,5 +1,5 @@
-import { type FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { type FormEvent, useState, useEffect } from "react";
+import { Link, useNavigate, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const CertificationUpload = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
+  const { id } = useParams();
 
   const [issuingOrganization, setIssuingOrganization] = useState("");
   const [title, setTitle] = useState("");
@@ -22,6 +23,24 @@ const CertificationUpload = () => {
   const [dragging, setDragging] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(!!id);
+
+  const isEditing = !!id;
+
+  useEffect(() => {
+    if (!id) return;
+
+    operatorDocumentService
+      .getCertificationById(id)
+      .then((cert) => {
+        setIssuingOrganization(cert.issuing_organization);
+        setTitle(cert.title);
+        setIssueDate(cert.issue_date);
+        setCredentialCode(cert.credential_code ?? "");
+        setDescription(cert.description);
+      })
+      .finally(() => setIsLoading(false));
+  }, [id]);
 
   const handleFile = (selected: File) => {
     const allowed =
@@ -59,15 +78,22 @@ const CertificationUpload = () => {
         media_url: undefined,
       };
 
-      await operatorDocumentService.createCertification(payload);
-      toast.success("Certificação cadastrada com sucesso.");
+      if (isEditing) {
+        await operatorDocumentService.updateCertification(id, payload);
+        toast.success("Certificação atualizada com sucesso.");
+      } else {
+        await operatorDocumentService.createCertification(payload);
+        toast.success("Certificação cadastrada com sucesso.");
+      }
       navigate("/dashboard");
     } catch (error) {
       if (error instanceof OperatorDocumentServiceError) {
         toast.error(error.message);
       } else {
         toast.error(
-          "Erro ao cadastrar certificação. Verifique os dados e tente novamente.",
+          isEditing
+            ? "Erro ao atualizar certificação. Verifique os dados e tente novamente."
+            : "Erro ao cadastrar certificação. Verifique os dados e tente novamente.",
         );
       }
     } finally {
@@ -86,13 +112,21 @@ const CertificationUpload = () => {
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
 
+        {isLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+        <>
         <div className="mb-8 sm:mb-10">
           <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
-            Nova Certificação
+            {isEditing ? "Editar Certificação" : "Nova Certificação"}
           </h1>
           <div className="h-1 w-16 bg-secondary-container mb-3" />
           <p className="text-on-surface-variant text-sm">
-            Informe os dados do seu curso ou certificação profissionalizante
+            {isEditing
+              ? "Atualize os dados da sua certificação profissionalizante"
+              : "Informe os dados do seu curso ou certificação profissionalizante"}
           </p>
         </div>
 
@@ -242,9 +276,17 @@ const CertificationUpload = () => {
             className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <MaterialIcon icon="workspace_premium" size={20} />{" "}
-            {isSubmitting ? "Cadastrando..." : "Cadastrar Certificação"}
+            {isSubmitting
+              ? isEditing
+                ? "Atualizando..."
+                : "Cadastrando..."
+              : isEditing
+                ? "Atualizar Certificação"
+                : "Cadastrar Certificação"}
           </button>
         </form>
+        </>
+        )}
       </div>
       <Footer />
     </div>
