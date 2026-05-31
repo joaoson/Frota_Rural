@@ -4,6 +4,7 @@ export type Certification = {
   issuing_organization: string;
   title: string;
   issue_date: string;
+  expiration_date?: string | null;
   credential_code?: string | null;
   description: string;
   media_url?: string | null;

@@ -62,6 +62,7 @@ class CertificationSerializer(serializers.ModelSerializer):
             "issuing_organization",
             "title",
             "issue_date",
+            "expiration_date",
             "credential_code",
             "description",
             "media_url",

@@ -83,6 +83,7 @@ class Certification(models.Model):
     issuing_organization = models.CharField(max_length=255)
     title = models.CharField(max_length=255)
     issue_date = models.DateField()
+    expiration_date = models.DateField(blank=True, null=True)
     credential_code = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField()
     media_url = models.CharField(max_length=1024, blank=True, null=True)

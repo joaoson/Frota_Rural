@@ -78,6 +78,14 @@ const CNHUpload = () => {
   const navigate = useNavigate();
   const cpfRef = useRef<HTMLInputElement>(null);
   const rgRef = useRef<HTMLInputElement>(null);
+  const birthDateRef = useRef<HTMLInputElement>(null);
+
+  const today = new Date().toISOString().split("T")[0];
+  const maxBirthDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split("T")[0];
+  })();
 
   const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -181,6 +189,17 @@ const CNHUpload = () => {
     if (digits.length === 0) return;
     if (!validateCPF(digits)) {
       input.setCustomValidity("CPF inválido. Verifique os dígitos informados.");
+      input.reportValidity();
+    } else {
+      input.setCustomValidity("");
+    }
+  };
+
+  const handleBirthDateBlur = () => {
+    const input = birthDateRef.current;
+    if (!input || !birthDate) return;
+    if (birthDate > maxBirthDate) {
+      input.setCustomValidity("O condutor deve ter pelo menos 18 anos.");
       input.reportValidity();
     } else {
       input.setCustomValidity("");
@@ -449,7 +468,13 @@ const CNHUpload = () => {
               <input
                 type="date"
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                ref={birthDateRef}
+                max={maxBirthDate}
+                onChange={(e) => {
+                  setBirthDate(e.target.value);
+                  birthDateRef.current?.setCustomValidity("");
+                }}
+                onBlur={handleBirthDateBlur}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                 required
               />
@@ -622,6 +647,7 @@ const CNHUpload = () => {
               <input
                 type="date"
                 value={firstLicenseDate}
+                max={today}
                 onChange={(e) => setFirstLicenseDate(e.target.value)}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                 required
@@ -637,6 +663,7 @@ const CNHUpload = () => {
               <input
                 type="date"
                 value={issueDate}
+                max={today}
                 onChange={(e) => setIssueDate(e.target.value)}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                 required
