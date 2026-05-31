@@ -14,7 +14,7 @@ import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import DashboardLocatario from "@/pages/DashboardLocatario.tsx";
 import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
 import { Toaster } from "sonner";
-import CNHUpload from "./pages/Documents/CNHUpload.tsx";
+
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
 import ForgotPassword from "./pages/PasswordReset/ForgotPassword.tsx";
@@ -24,6 +24,7 @@ import Buscar from "./pages/Buscar.tsx";
 import Contrato from "./pages/Contrato/Contrato.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -43,13 +44,20 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardLocador />} />
-            <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
+            <Route
+              path="/dashboard-locatario"
+              element={<DashboardLocatario />}
+            />
             <Route
               path="/dashboard/novo-equipamento"
               element={<NovoEquipamento />}
             />
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
-            <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
+            <Route
+              path="/dashboard/gerenciar-anuncio/:id"
+              element={<GerenciarAnuncio />}
+            />
+            <Route path="/document/cnh" element={<CNHUpload />} />
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />
