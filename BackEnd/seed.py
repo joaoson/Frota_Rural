@@ -9,7 +9,7 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 django.setup()
 
-from document_validation.models import Credentials
+from document_validation.models import OperatorLicense, Certification
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from users.models import Users
@@ -70,22 +70,78 @@ locatarios = [u for u in users if u.role == "locatario"]
 operadores = [u for u in users if u.role == "operador"]
 
 
-# ── Credentials (20) ───────────────────────────────────────────────────────
-cred_statuses = ["pending", "approved", "rejected"]
-credentials = []
-for i in range(20):
-    c = Credentials.objects.create(
+# ── OperatorLicense (5 — operadores) ───────────────────────────────────────
+cnh_data = [
+    ("Carlos Santos",    "111.222.333-03", "MG-12.345.678", "12345678901", "98765432101", "C",  "SP", "Maria Santos",    "José Santos",     "Brasileiro", "Belo Horizonte – MG", "active"),
+    ("Fernanda Lima",    "111.222.333-06", "RS-23.456.789", "23456789012", "87654321012", "D",  "RS", "Ana Lima",        "Paulo Lima",      "Brasileira", "Porto Alegre – RS",   "active"),
+    ("Marcos Souza",     "111.222.333-09", "CE-34.567.890", "34567890123", "76543210923", "AB", "CE", "Lucia Souza",     "Pedro Souza",     "Brasileiro", "Fortaleza – CE",      "expired"),
+    ("Lucas Barbosa",    "111.222.333-13", "SP-45.678.901", "45678901234", "65432109834", "AE", "SP", "Teresa Barbosa",  "Roberto Barbosa", "Brasileiro", "Bauru – SP",          "active"),
+    ("Diego Nascimento", "111.222.333-17", "SC-56.789.012", "56789012345", "54321098745", "B",  "SC", "Carla Nascimento", None,              "Brasileiro", "Florianópolis – SC",  "ppd"),
+]
+
+validation_statuses = ["pending", "approved", "rejected"]
+operator_licenses = []
+for i, (name, cpf, rg, renach, cnh_num, cat, uf, mother, father, nat, bp, sit) in enumerate(cnh_data):
+    op = operadores[i % len(operadores)]
+    ol = OperatorLicense.objects.create(
         id=uuid.uuid4(),
-        user=users[i],
-        type="cnh" if i % 2 == 0 else "certificado",
-        document_number=f"DOC-{1000 + i}",
-        expiration_date=(now + timedelta(days=365 - i * 10)).date(),
-        file_url=f"https://storage.example.com/credentials/{i + 1}.pdf",
-        status=cred_statuses[i % 3],
+        user=op,
+        name=name,
+        birth_date=op.birth_date,
+        cpf=cpf,
+        rg=rg,
+        mother_name=mother,
+        father_name=father,
+        nationality=nat,
+        birth_place=bp,
+        renach_number=renach,
+        cnh_number=cnh_num,
+        category=cat,
+        first_license_date=date(2010 + i, 1 + (i % 12), 1 + (i % 27)),
+        issue_date=date(2024, 1 + (i % 12), 1 + (i % 27)),
+        expiration_date=date(2029, 1 + (i % 12), 1 + (i % 27)),
+        issuing_state=uf,
+        issuing_authority=f"DETRAN-{uf}",
+        situation=sit,
+        acc=i % 3 == 0,
+        ear=i % 2 == 0,
+        points=i * 4,
+        file_url=f"https://storage.example.com/cnh/{i + 1}.pdf",
+        validation_status=validation_statuses[i % 3],
         created_at=now - timedelta(days=30 - i),
+        updated_at=now - timedelta(days=i),
     )
-    credentials.append(c)
-print(f"[OK]{len(credentials)} Credentials created")
+    operator_licenses.append(ol)
+print(f"[OK]{len(operator_licenses)} OperatorLicenses created")
+
+
+# ── Certification (5 — distribuídas entre usuários) ────────────────────────
+cert_data = [
+    ("SENAR",                          "Operação de Colheitadeiras",            "Curso completo de operação e manutenção de colheitadeiras automotrizes."),
+    ("SENAI",                          "Mecânica de Máquinas Agrícolas",        "Formação em manutenção preventiva e corretiva de tratores e implementos."),
+    ("Instituto Agronômico de Campinas", "Agricultura de Precisão",             "Capacitação em uso de GPS, drones e sensores para agricultura."),
+    ("SENAR",                          "Operação de Tratores e Implementos",    "Treinamento prático em operação segura de tratores de médio e grande porte."),
+    ("Fundação ABC",                   "Manejo Integrado de Pragas",            "Curso sobre técnicas de MIP aplicadas a culturas de soja e milho."),
+]
+
+certifications = []
+cert_users = operadores + locadores[:2]
+for i, (org, title, desc) in enumerate(cert_data):
+    c = Certification.objects.create(
+        id=uuid.uuid4(),
+        user=cert_users[i % len(cert_users)],
+        issuing_organization=org,
+        title=title,
+        issue_date=date(2022 + (i % 3), 3 + i, 15),
+        credential_code=f"CERT-{2024000 + i}" if i % 2 == 0 else None,
+        description=desc,
+        media_url=f"https://storage.example.com/certifications/{i + 1}.jpg" if i % 3 != 2 else None,
+        validation_status=validation_statuses[i % 3],
+        created_at=now - timedelta(days=25 - i),
+        updated_at=now - timedelta(days=i),
+    )
+    certifications.append(c)
+print(f"[OK]{len(certifications)} Certifications created")
 
 
 # ── Machines (20) ──────────────────────────────────────────────────────────
