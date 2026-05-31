@@ -10,7 +10,9 @@
     { "key": "userId", "value": "77a1d850-e5b0-4724-967c-5ff6b45a0c1a" },
     { "key": "machineId", "value": "c1fe4a4c-dffd-45cb-bcbd-93ed1b48d2a9" },
     { "key": "postingId", "value": "4322e750-1655-444d-8896-99e7be3ba443" },
-    { "key": "userEmail", "value": "joao.silva@email.com" }
+    { "key": "userEmail", "value": "joao.silva@email.com" },
+    { "key": "licenseId", "value": "" },
+    { "key": "certificationId", "value": "" }
   ],
   "item": [
     {
@@ -421,6 +423,244 @@
               "raw": "{{baseUrl}}/postings/{{postingId}}",
               "host": ["{{baseUrl}}"],
               "path": ["postings", "{{postingId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Operator Licenses",
+      "item": [
+        {
+          "name": "List licenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", ""]
+            },
+            "description": "Optional query params: user (UUID), validation_status (pending|approved|rejected)."
+          },
+          "response": []
+        },
+        {
+          "name": "List licenses (filtered by user)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/?user={{userId}}&validation_status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", ""],
+              "query": [
+                { "key": "user", "value": "{{userId}}" },
+                { "key": "validation_status", "value": "pending" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create license",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"{{userId}}\",\n  \"name\": \"João da Silva\",\n  \"birth_date\": \"1990-03-15\",\n  \"cpf\": \"12345678901\",\n  \"rg\": \"123456789\",\n  \"mother_name\": \"Maria da Silva\",\n  \"father_name\": \"José da Silva\",\n  \"nationality\": \"Brasileiro(a)\",\n  \"birth_place\": \"São Paulo – SP\",\n  \"cnh_number\": \"98765432101\",\n  \"category\": \"C\",\n  \"first_license_date\": \"2010-06-20\",\n  \"issue_date\": \"2024-01-10\",\n  \"expiration_date\": \"2029-01-10\",\n  \"issuing_state\": \"SP\",\n  \"issuing_authority\": \"DETRAN-SP\",\n  \"situation\": \"active\",\n  \"acc\": false,\n  \"ear\": true,\n  \"medical_restrictions\": \"Obrigatório uso de lentes corretivas\",\n  \"observations\": \"\",\n  \"points\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get license by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/{{licenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", "{{licenseId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update license (full PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"{{userId}}\",\n  \"name\": \"João da Silva\",\n  \"birth_date\": \"1990-03-15\",\n  \"cpf\": \"12345678901\",\n  \"rg\": \"123456789\",\n  \"mother_name\": \"Maria da Silva\",\n  \"father_name\": \"José da Silva\",\n  \"nationality\": \"Brasileiro(a)\",\n  \"birth_place\": \"São Paulo – SP\",\n  \"cnh_number\": \"98765432101\",\n  \"category\": \"D\",\n  \"first_license_date\": \"2010-06-20\",\n  \"issue_date\": \"2024-06-01\",\n  \"expiration_date\": \"2029-06-01\",\n  \"issuing_state\": \"SP\",\n  \"issuing_authority\": \"DETRAN-SP\",\n  \"situation\": \"active\",\n  \"acc\": false,\n  \"ear\": true,\n  \"medical_restrictions\": \"\",\n  \"observations\": \"Categoria atualizada de C para D\",\n  \"points\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/{{licenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", "{{licenseId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Patch license (partial)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validation_status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/{{licenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", "{{licenseId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete license",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/operator-licenses/{{licenseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["operator-licenses", "{{licenseId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Certifications",
+      "item": [
+        {
+          "name": "List certifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/certifications/",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", ""]
+            },
+            "description": "Optional query params: user (UUID), validation_status (pending|approved|rejected)."
+          },
+          "response": []
+        },
+        {
+          "name": "List certifications (filtered by user)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/certifications/?user={{userId}}&validation_status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", ""],
+              "query": [
+                { "key": "user", "value": "{{userId}}" },
+                { "key": "validation_status", "value": "pending" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create certification",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"{{userId}}\",\n  \"issuing_organization\": \"SENAR\",\n  \"title\": \"Operação de Tratores Agrícolas\",\n  \"issue_date\": \"2024-08-15\",\n  \"expiration_date\": \"2027-08-15\",\n  \"credential_code\": \"SENAR-2024-001\",\n  \"description\": \"Curso de 40 horas sobre operação segura de tratores agrícolas, manutenção preventiva e boas práticas no campo.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/certifications/",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get certification by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/certifications/{{certificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", "{{certificationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update certification (full PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"{{userId}}\",\n  \"issuing_organization\": \"SENAR\",\n  \"title\": \"Operação de Tratores Agrícolas — Avançado\",\n  \"issue_date\": \"2024-08-15\",\n  \"expiration_date\": \"2028-08-15\",\n  \"credential_code\": \"SENAR-2024-001-ADV\",\n  \"description\": \"Curso avançado de 80 horas atualizado via Postman.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/certifications/{{certificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", "{{certificationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Patch certification (partial)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validation_status\": \"approved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/certifications/{{certificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", "{{certificationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete certification",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/certifications/{{certificationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["certifications", "{{certificationId}}"]
             }
           },
           "response": []
