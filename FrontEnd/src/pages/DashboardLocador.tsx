@@ -5,6 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
 import { machineService } from "@/services/MachineService/MachineService";
 import { postingService } from "@/services/PostingService/PostingService";
+import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
+import type { OperatorLicense } from "@/services/OperatorDocumentService/models/OperatorLicense";
+import type { Certification } from "@/services/OperatorDocumentService/models/Certification";
 import type { User } from "@/services/UserService/models/User";
 import { AxiosError } from "axios";
 import { maskDocument } from "@/utils/masks/maskDocument";
@@ -67,6 +70,7 @@ const sidebarItems = [
   { icon: "campaign", label: "Anúncios", tab: "anuncios" },
   { icon: "event_available", label: "Locações", tab: "reservas" },
   { icon: "description", label: "Contratos", tab: "contratos" },
+  { icon: "badge", label: "Documentos", tab: "documentos" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
@@ -247,6 +251,8 @@ const DashboardLocador = () => {
 
   const [machines, setMachines] = useState<any[]>([]);
   const [postings, setPostings] = useState<any[]>([]);
+  const [licenses, setLicenses] = useState<OperatorLicense[]>([]);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
   const [selectedEquipamento, setSelectedEquipamento] =
     useState<EquipamentoData>({
@@ -324,29 +330,48 @@ const DashboardLocador = () => {
 
     Promise.all([
       machineService.list({ owner: userId }),
-      postingService.list({})
-    ]).then(([machinesData, postingsData]) => {
-      const userMachineIds = new Set(machinesData.map((m: any) => m.id));
-      const userPostings = postingsData.filter((p: any) => userMachineIds.has(p.machinery));
-      
-      setMachines(machinesData.map((m: any) => ({
-        id: m.id,
-        renagro: m.renagro_number,
-        brand: m.brand,
-        model: m.model,
-        year: m.year,
-        status: m.status || "active",
-        purpose: m.usage_purpose || ""
-      })));
+      postingService.list({}),
+    ])
+      .then(([machinesData, postingsData]) => {
+        const userMachineIds = new Set(machinesData.map((m: any) => m.id));
+        const userPostings = postingsData.filter((p: any) =>
+          userMachineIds.has(p.machinery),
+        );
 
-      setPostings(userPostings.map((p: any) => ({
-        id: p.id,
-        machine: p.machinery_details ? `${p.machinery_details.brand} ${p.machinery_details.model}` : p.machinery,
-        price: p.hourly_rate,
-        location: p.location_address,
-        status: p.status || "active"
-      })));
-    }).catch(console.error);
+        setMachines(
+          machinesData.map((m: any) => ({
+            id: m.id,
+            renagro: m.renagro_number,
+            brand: m.brand,
+            model: m.model,
+            year: m.year,
+            status: m.status || "active",
+            purpose: m.usage_purpose || "",
+          })),
+        );
+
+        setPostings(
+          userPostings.map((p: any) => ({
+            id: p.id,
+            machine: p.machinery_details
+              ? `${p.machinery_details.brand} ${p.machinery_details.model}`
+              : p.machinery,
+            price: p.hourly_rate,
+            location: p.location_address,
+            status: p.status || "active",
+          })),
+        );
+      })
+      .catch(console.error);
+
+    operatorDocumentService
+      .listLicenses({ user: userId })
+      .then(setLicenses)
+      .catch(console.error);
+    operatorDocumentService
+      .listCertifications({ user: userId })
+      .then(setCertifications)
+      .catch(console.error);
   }, [userId]);
 
   useEffect(() => {
@@ -758,7 +783,9 @@ const DashboardLocador = () => {
                   renagro_number: data.registroRenagro,
                   brand: data.marca,
                   model: data.modelo,
-                  year: data.anoFabricacao ? Number(data.anoFabricacao) : undefined,
+                  year: data.anoFabricacao
+                    ? Number(data.anoFabricacao)
+                    : undefined,
                   usage_purpose: data.finalidade,
                 });
                 setSelectedEquipamento(data);
@@ -1159,9 +1186,12 @@ const DashboardLocador = () => {
                       </AlertDialogTrigger>
                       <AlertDialogContent size="sm">
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Remover Equipamento</AlertDialogTitle>
+                          <AlertDialogTitle>
+                            Remover Equipamento
+                          </AlertDialogTitle>
                           <AlertDialogDescription>
-                            Tem certeza que deseja remover este equipamento? Esta ação não pode ser desfeita.
+                            Tem certeza que deseja remover este equipamento?
+                            Esta ação não pode ser desfeita.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -1173,14 +1203,29 @@ const DashboardLocador = () => {
                             onClick={async () => {
                               try {
                                 await machineService.remove(String(m.id));
-                                setMachines((prev) => prev.filter((machine) => String(machine.id) !== String(m.id)));
-                                toast.success("Equipamento removido com sucesso!");
+                                setMachines((prev) =>
+                                  prev.filter(
+                                    (machine) =>
+                                      String(machine.id) !== String(m.id),
+                                  ),
+                                );
+                                toast.success(
+                                  "Equipamento removido com sucesso!",
+                                );
                               } catch (error) {
-                                console.error("Erro ao remover equipamento:", error);
-                                if (error instanceof AxiosError && error.response?.data?.error) {
+                                console.error(
+                                  "Erro ao remover equipamento:",
+                                  error,
+                                );
+                                if (
+                                  error instanceof AxiosError &&
+                                  error.response?.data?.error
+                                ) {
                                   toast.error(error.response.data.error);
                                 } else {
-                                  toast.error("Não foi possível remover o equipamento.");
+                                  toast.error(
+                                    "Não foi possível remover o equipamento.",
+                                  );
                                 }
                               }
                             }}
@@ -1198,6 +1243,270 @@ const DashboardLocador = () => {
                 totalPages={frotaTotalPages}
                 onPageChange={setFrotaPage}
               />
+            </div>
+          ) : null}
+
+          {tab === "documentos" ? (
+            <div className="space-y-10">
+              {/* ── Habilitação (CNH) ──────────────────────────────── */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="font-headline text-3xl font-bold text-primary">
+                      Habilitação (CNH)
+                    </h1>
+                    <div className="h-1 w-16 bg-secondary-container mt-2" />
+                    <p className="text-on-surface-variant text-sm mt-3">
+                      Carteira Nacional de Habilitação vinculada à sua conta
+                    </p>
+                  </div>
+                  <Link
+                    to="/document/cnh"
+                    className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <MaterialIcon
+                      icon={licenses.length > 0 ? "edit" : "add"}
+                      size={18}
+                    />{" "}
+                    {licenses.length > 0 ? "Editar CNH" : "Nova CNH"}
+                  </Link>
+                </div>
+
+                {licenses.length === 0 ? (
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center">
+                    <MaterialIcon
+                      icon="id_card"
+                      size={48}
+                      className="text-outline/40 mb-3"
+                    />
+                    <p className="text-on-surface-variant text-sm">
+                      Nenhuma CNH cadastrada
+                    </p>
+                  </div>
+                ) : (
+                  licenses.map((lic) => (
+                    <div
+                      key={lic.id}
+                      className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <MaterialIcon
+                            icon="id_card"
+                            className="text-primary"
+                            size={28}
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-headline font-bold text-on-surface text-lg">
+                            {lic.name}
+                          </h3>
+                          <p className="text-sm text-on-surface-variant">
+                            Categoria {lic.category} · Validade:{" "}
+                            {new Date(lic.expiration_date).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {lic.validation_status === "approved" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                            Aprovado
+                          </span>
+                        ) : lic.validation_status === "rejected" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="cancel" size={14} /> Recusado
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="hourglass_bottom" size={14} />{" "}
+                            Pendente
+                          </span>
+                        )}
+                        <Link
+                          to="/document/cnh"
+                          className="text-sm font-bold text-primary hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button className="text-sm font-bold text-error hover:underline">
+                              Remover
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent size="sm">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover CNH</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover sua CNH? Esta
+                                ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel variant="outline">
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-error hover:bg-error/90 text-on-error"
+                                onClick={async () => {
+                                  try {
+                                    await operatorDocumentService.removeLicense(
+                                      lic.id,
+                                    );
+                                    setLicenses((prev) =>
+                                      prev.filter((l) => l.id !== lic.id),
+                                    );
+                                    toast.success("CNH removida com sucesso!");
+                                  } catch {
+                                    toast.error(
+                                      "Não foi possível remover a CNH.",
+                                    );
+                                  }
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* ── Certificações ──────────────────────────────────── */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="font-headline text-3xl font-bold text-primary">
+                      Certificações
+                    </h1>
+                    <div className="h-1 w-16 bg-secondary-container mt-2" />
+                    <p className="text-on-surface-variant text-sm mt-3">
+                      Cursos e certificações profissionalizantes
+                    </p>
+                  </div>
+                  <Link
+                    to="/document/certification"
+                    className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <MaterialIcon icon="add" size={18} /> Nova Certificação
+                  </Link>
+                </div>
+
+                {certifications.length === 0 ? (
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center">
+                    <MaterialIcon
+                      icon="workspace_premium"
+                      size={48}
+                      className="text-outline/40 mb-3"
+                    />
+                    <p className="text-on-surface-variant text-sm">
+                      Nenhuma certificação cadastrada
+                    </p>
+                  </div>
+                ) : (
+                  certifications.map((cert) => (
+                    <div
+                      key={cert.id}
+                      className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <MaterialIcon
+                            icon="workspace_premium"
+                            className="text-primary"
+                            size={28}
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-headline font-bold text-on-surface text-lg">
+                            {cert.title}
+                          </h3>
+                          <p className="text-sm text-on-surface-variant">
+                            {cert.issuing_organization} ·{" "}
+                            {new Date(cert.issue_date).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {cert.validation_status === "approved" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                            Aprovado
+                          </span>
+                        ) : cert.validation_status === "rejected" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="cancel" size={14} /> Recusado
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="hourglass_bottom" size={14} />{" "}
+                            Pendente
+                          </span>
+                        )}
+                        <Link
+                          to={`/document/certification/${cert.id}`}
+                          className="text-sm font-bold text-primary hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button className="text-sm font-bold text-error hover:underline">
+                              Remover
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent size="sm">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Remover Certificação
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover esta
+                                certificação? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel variant="outline">
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-error hover:bg-error/90 text-on-error"
+                                onClick={async () => {
+                                  try {
+                                    await operatorDocumentService.removeCertification(
+                                      cert.id,
+                                    );
+                                    setCertifications((prev) =>
+                                      prev.filter((c) => c.id !== cert.id),
+                                    );
+                                    toast.success(
+                                      "Certificação removida com sucesso!",
+                                    );
+                                  } catch {
+                                    toast.error(
+                                      "Não foi possível remover a certificação.",
+                                    );
+                                  }
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           ) : null}
 
@@ -1263,7 +1572,10 @@ const DashboardLocador = () => {
                             /h
                           </span>
                         </div>
-                        <Link to={`/dashboard/gerenciar-anuncio/${p.id}`} className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors">
+                        <Link
+                          to={`/dashboard/gerenciar-anuncio/${p.id}`}
+                          className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+                        >
                           Gerenciar
                         </Link>
                       </div>
