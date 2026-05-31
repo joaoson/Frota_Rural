@@ -25,6 +25,7 @@ import Contrato from "./pages/Contrato/Contrato.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
+import CertificationUpload from "./pages/Documents/CertificationUpload.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -58,6 +59,10 @@ createRoot(document.getElementById("root")!).render(
               element={<GerenciarAnuncio />}
             />
             <Route path="/document/cnh" element={<CNHUpload />} />
+            <Route
+              path="/document/certification"
+              element={<CertificationUpload />}
+            />
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />

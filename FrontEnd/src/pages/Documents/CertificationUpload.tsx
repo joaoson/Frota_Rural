@@ -1,0 +1,254 @@
+import { type FormEvent, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import MaterialIcon from "@/components/MaterialIcon";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
+import { OperatorDocumentServiceError } from "@/services/OperatorDocumentService/errors/OperatorDocumentError";
+import type { CreateCertificationRequest } from "@/services/OperatorDocumentService/models/CreateCertificationRequest";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+
+const CertificationUpload = () => {
+  const { userId } = useAuth();
+  const navigate = useNavigate();
+
+  const [issuingOrganization, setIssuingOrganization] = useState("");
+  const [title, setTitle] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [credentialCode, setCredentialCode] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFile = (selected: File) => {
+    const allowed =
+      selected.type.startsWith("image/") || selected.type === "application/pdf";
+    if (allowed) setFile(selected);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    const dropped = e.dataTransfer.files[0];
+    if (dropped) handleFile(dropped);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      if (!userId) {
+        toast.error(
+          "Usuário não autenticado. Faça login para cadastrar a certificação.",
+        );
+        return;
+      }
+
+      const payload: CreateCertificationRequest = {
+        user: userId,
+        issuing_organization: issuingOrganization.trim(),
+        title: title.trim(),
+        issue_date: issueDate,
+        credential_code: credentialCode.trim() || undefined,
+        description: description.trim(),
+        media_url: undefined,
+      };
+
+      await operatorDocumentService.createCertification(payload);
+      toast.success("Certificação cadastrada com sucesso.");
+      navigate("/dashboard");
+    } catch (error) {
+      if (error instanceof OperatorDocumentServiceError) {
+        toast.error(error.message);
+      } else {
+        toast.error(
+          "Erro ao cadastrar certificação. Verifique os dados e tente novamente.",
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar />
+      <div className="flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full">
+        <Link
+          to="/dashboard"
+          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+        >
+          <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
+        </Link>
+
+        <div className="mb-8 sm:mb-10">
+          <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+            Nova Certificação
+          </h1>
+          <div className="h-1 w-16 bg-secondary-container mb-3" />
+          <p className="text-on-surface-variant text-sm">
+            Informe os dados do seu curso ou certificação profissionalizante
+          </p>
+        </div>
+
+        <form
+          className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
+          onSubmit={handleSubmit}
+        >
+          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+            Dados da Certificação
+          </p>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Título do Curso *
+            </label>
+            <input
+              type="text"
+              placeholder="Ex.: Operação de Tratores Agrícolas"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Organização Emissora *
+            </label>
+            <input
+              type="text"
+              placeholder="Ex.: SENAR"
+              value={issuingOrganization}
+              onChange={(e) => setIssuingOrganization(e.target.value)}
+              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Data de Emissão *
+              </label>
+              <input
+                type="date"
+                value={issueDate}
+                onChange={(e) => setIssueDate(e.target.value)}
+                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Código da Credencial (Opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Código fornecido pela instituição, se aplicável"
+                value={credentialCode}
+                onChange={(e) => setCredentialCode(e.target.value)}
+                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Descrição *
+            </label>
+            <textarea
+              placeholder="Descreva o conteúdo do curso, competências adquiridas ou informações relevantes"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              required
+            />
+          </div>
+
+          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+            Mídia (opcional)
+          </p>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Arquivo do Certificado
+            </label>
+            <label
+              className={`block border-2 border-dashed rounded-xl px-6 py-8 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                dragging
+                  ? "border-primary bg-primary/5"
+                  : file
+                    ? "border-primary/50 bg-primary/5"
+                    : "border-outline-variant/60 hover:border-primary/50 hover:bg-primary/5"
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+            >
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) handleFile(e.target.files[0]);
+                }}
+              />
+              {file ? (
+                <>
+                  <MaterialIcon
+                    icon="check_circle"
+                    size={40}
+                    className="text-primary mb-2"
+                  />
+                  <div className="font-bold text-primary text-sm">
+                    {file.name}
+                  </div>
+                  <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                    Clique para substituir
+                  </div>
+                </>
+              ) : (
+                <>
+                  <MaterialIcon
+                    icon="upload_file"
+                    className="text-outline mb-2"
+                    size={40}
+                  />
+                  <div className="font-bold text-tertiary text-sm">
+                    Arraste o arquivo ou clique para selecionar
+                  </div>
+                  <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                    PNG, JPG, PDF — Máx. 5MB
+                  </div>
+                </>
+              )}
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <MaterialIcon icon="workspace_premium" size={20} />{" "}
+            {isSubmitting ? "Cadastrando..." : "Cadastrar Certificação"}
+          </button>
+        </form>
+      </div>
+      <Footer />
+    </div>
+  );
+};
+
+export default CertificationUpload;
