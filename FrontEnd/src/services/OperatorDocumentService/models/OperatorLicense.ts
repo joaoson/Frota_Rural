@@ -9,7 +9,6 @@ export type OperatorLicense = {
   father_name?: string | null;
   nationality: string;
   birth_place: string;
-  renach_number: string;
   cnh_number: string;
   category: string;
   first_license_date: string;

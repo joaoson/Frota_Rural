@@ -18,7 +18,6 @@ class OperatorLicenseSerializer(serializers.ModelSerializer):
             "father_name",
             "nationality",
             "birth_place",
-            "renach_number",
             "cnh_number",
             "category",
             "first_license_date",

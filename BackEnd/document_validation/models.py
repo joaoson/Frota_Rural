@@ -39,7 +39,6 @@ class OperatorLicense(models.Model):
     nationality = models.CharField(max_length=100)
     birth_place = models.CharField(max_length=255)
 
-    renach_number = models.CharField(max_length=11)
     cnh_number = models.CharField(max_length=11)
     category = models.CharField(max_length=2, choices=Category.choices)
     first_license_date = models.DateField()

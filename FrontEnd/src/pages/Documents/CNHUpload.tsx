@@ -1,4 +1,4 @@
-import { type FormEvent, useState, useRef } from "react";
+import { type FormEvent, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
@@ -89,7 +89,6 @@ const CNHUpload = () => {
   const [birthCity, setBirthCity] = useState("");
   const [birthState, setBirthState] = useState("");
 
-  const [renachNumber, setRenachNumber] = useState("");
   const [cnhNumber, setCnhNumber] = useState("");
   const [category, setCategory] = useState("");
   const [firstLicenseDate, setFirstLicenseDate] = useState("");
@@ -109,6 +108,60 @@ const CNHUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingLicenseId, setExistingLicenseId] = useState<string | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  const isEditing = existingLicenseId !== null;
+
+  useEffect(() => {
+    if (!userId) {
+      setIsLoading(false);
+      return;
+    }
+
+    operatorDocumentService
+      .listLicenses({ user: userId })
+      .then((licenses) => {
+        if (licenses.length === 0) return;
+        const license = licenses[0];
+        setExistingLicenseId(license.id);
+
+        setName(license.name);
+        setBirthDate(license.birth_date);
+        setCpf(maskDocument(license.cpf));
+        setRg(maskRG(license.rg));
+        setMotherName(license.mother_name);
+        setFatherName(license.father_name ?? "");
+        setNationality(license.nationality);
+
+        const parts = license.birth_place.split(" – ");
+        if (parts.length === 2) {
+          setBirthCity(parts[0]);
+          setBirthState(parts[1]);
+        } else {
+          setBirthCity(license.birth_place);
+        }
+
+        setCnhNumber(license.cnh_number);
+        setCategory(license.category);
+        setFirstLicenseDate(license.first_license_date);
+        setIssueDate(license.issue_date);
+        setExpirationDate(license.expiration_date);
+        setIssuingState(license.issuing_state);
+        setIssuingAuthority(license.issuing_authority);
+
+        setSituation(license.situation);
+        setAcc(license.acc);
+        setEar(license.ear);
+
+        setMedicalRestrictions(license.medical_restrictions ?? "");
+        setObservations(license.observations ?? "");
+        setPoints(license.points);
+      })
+      .finally(() => setIsLoading(false));
+  }, [userId]);
 
   const handleFile = (selected: File) => {
     if (selected.type.startsWith("image/")) setFile(selected);
@@ -184,7 +237,6 @@ const CNHUpload = () => {
         father_name: fatherName.trim() || undefined,
         nationality: nationality.trim(),
         birth_place: `${birthCity.trim()} – ${birthState}`,
-        renach_number: renachNumber.trim(),
         cnh_number: cnhNumber.trim(),
         category,
         first_license_date: firstLicenseDate,
@@ -200,15 +252,25 @@ const CNHUpload = () => {
         points,
       };
 
-      await operatorDocumentService.createLicense(payload);
-      toast.success("CNH cadastrada com sucesso.");
+      if (isEditing) {
+        await operatorDocumentService.updateLicense(
+          existingLicenseId,
+          payload,
+        );
+        toast.success("CNH atualizada com sucesso.");
+      } else {
+        await operatorDocumentService.createLicense(payload);
+        toast.success("CNH cadastrada com sucesso.");
+      }
       navigate("/dashboard");
     } catch (error) {
       if (error instanceof OperatorDocumentServiceError) {
         toast.error(error.message);
       } else {
         toast.error(
-          "Erro ao cadastrar CNH. Verifique os dados e tente novamente.",
+          isEditing
+            ? "Erro ao atualizar CNH. Verifique os dados e tente novamente."
+            : "Erro ao cadastrar CNH. Verifique os dados e tente novamente.",
         );
       }
     } finally {
@@ -227,14 +289,21 @@ const CNHUpload = () => {
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
 
+        {isLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+        <>
         <div className="mb-8 sm:mb-10">
           <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
-            Cadastro de CNH
+            {isEditing ? "Editar CNH" : "Cadastro de CNH"}
           </h1>
           <div className="h-1 w-16 bg-secondary-container mb-3" />
           <p className="text-on-surface-variant text-sm">
-            Informe os dados da sua Carteira Nacional de Habilitação conforme
-            constam no documento
+            {isEditing
+              ? "Atualize os dados da sua Carteira Nacional de Habilitação"
+              : "Informe os dados da sua Carteira Nacional de Habilitação conforme constam no documento"}
           </p>
         </div>
 
@@ -513,25 +582,6 @@ const CNHUpload = () => {
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Nº RENACH *
-              </label>
-              <input
-                type="text"
-                placeholder="11 dígitos"
-                value={renachNumber}
-                onChange={(e) =>
-                  setRenachNumber(
-                    e.target.value.replace(/\D/g, "").slice(0, 11),
-                  )
-                }
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-                pattern="\d{11}"
-                title="O RENACH deve conter exatamente 11 dígitos"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                 Nº CNH *
               </label>
               <input
@@ -547,9 +597,6 @@ const CNHUpload = () => {
                 title="O número da CNH deve conter exatamente 11 dígitos"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                 Categoria *
@@ -750,9 +797,17 @@ const CNHUpload = () => {
             className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <MaterialIcon icon="id_card" size={20} />{" "}
-            {isSubmitting ? "Cadastrando..." : "Cadastrar CNH"}
+            {isSubmitting
+              ? isEditing
+                ? "Atualizando..."
+                : "Cadastrando..."
+              : isEditing
+                ? "Atualizar CNH"
+                : "Cadastrar CNH"}
           </button>
         </form>
+        </>
+        )}
       </div>
       <Footer />
     </div>
