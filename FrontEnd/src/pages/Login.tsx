@@ -9,10 +9,12 @@ import { userService } from "@/services/UserService/UserService";
 import { UserServiceError } from "@/services/UserService/errors/UserError";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { parseJwt, type JwtPayload } from "@/utils/jwt";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -28,9 +30,17 @@ const Login = () => {
 
     try {
       const response = await userService.login(request);
-      login(response);
+      const payload = parseJwt<JwtPayload>(response.access);
+      const user = await userService.getById(payload.user_id);
+      
+      login(response, user.role);
       toast.success("Login realizado com sucesso!");
-      navigate("/dashboard");
+      
+      if (user.role === "locador") {
+        navigate("/dashboard");
+      } else {
+        navigate("/dashboard-locatario");
+      }
     } catch (error) {
       if (error instanceof UserServiceError) {
         toast.error(error.message);
@@ -77,16 +87,25 @@ const Login = () => {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha
                 </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                  pattern={passwordPattern.regex.source}
-                  title={passwordPattern.title}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                    pattern={passwordPattern.regex.source}
+                    title={passwordPattern.title}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                  >
+                    <MaterialIcon icon={showPassword ? "visibility_off" : "visibility"} size={20} />
+                  </button>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <Link

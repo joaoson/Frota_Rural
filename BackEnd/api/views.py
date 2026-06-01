@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .email import send_password_reset_email
-from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
+from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users, Reviews
 from .serializer import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -26,6 +26,7 @@ from .serializer import (
     PostingListSerializer,
     PostingSerializer,
     UserSerializer,
+    ReviewSerializer,
 )
 
 @api_view(['POST'])
@@ -519,3 +520,84 @@ def posting_photos(request, pk):
         {"id": str(photo.id), "image_url": photo.image_url, "is_primary": photo.is_primary},
         status=status.HTTP_201_CREATED,
     )
+
+
+def _reviews_queryset():
+    return Reviews.objects.all().select_related("reviewer", "reviewee")
+
+
+@api_view(["GET", "POST"])
+def reviews_list(request):
+    if request.method == "GET":
+        qs = _reviews_queryset().order_by("-created_at", "-id")
+        reviewee_id = request.query_params.get("reviewee")
+        if reviewee_id:
+            qs = qs.filter(reviewee_id=reviewee_id)
+        reviewer_id = request.query_params.get("reviewer")
+        if reviewer_id:
+            qs = qs.filter(reviewer_id=reviewer_id)
+        rental_id = request.query_params.get("rental")
+        if rental_id:
+            qs = qs.filter(rental_id=rental_id)
+            
+        serializer = ReviewSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    serializer = ReviewSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        serializer.save()
+    except IntegrityError:
+        return Response(
+            {"error": "Dados inválidos ou em conflito (ex.: avaliação já existe para este aluguel)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def review_detail(request, pk):
+    try:
+        review = _reviews_queryset().get(pk=pk)
+    except Reviews.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
+
+    if request.method == "PUT":
+        serializer = ReviewSerializer(review, data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.save()
+        except IntegrityError:
+            return Response(
+                {"error": "Dados inválidos ou em conflito."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == "PATCH":
+        serializer = ReviewSerializer(review, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.save()
+        except IntegrityError:
+            return Response(
+                {"error": "Dados inválidos ou em conflito."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    try:
+        review.delete()
+    except IntegrityError:
+        return Response(
+            {"error": "Não é possível excluir esta avaliação."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return Response(status=status.HTTP_204_NO_CONTENT)
+

@@ -20,6 +20,8 @@ from .views import (
     user_detail,
     warn_user,
     posting_photos,
+    reviews_list,
+    review_detail,
 )
 
 urlpatterns = [
@@ -49,4 +51,8 @@ urlpatterns = [
     path('postings/', postings_list, name='postings_list'),
     path('postings/<uuid:pk>', posting_detail, name='posting_detail'),
     path('postings/<uuid:pk>/photos/', posting_photos, name='posting_photos'),
+
+    ## REVIEWS
+    path('reviews/', reviews_list, name='reviews_list'),
+    path('reviews/<uuid:pk>', review_detail, name='review_detail'),
 ]

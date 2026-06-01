@@ -23,6 +23,8 @@ function decodeQPToken(raw: string): string {
 const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -111,29 +113,47 @@ const ResetPassword = () => {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nova Senha
                 </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                  pattern={passwordPattern.regex.source}
-                  title={passwordPattern.title}
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                    pattern={passwordPattern.regex.source}
+                    title={passwordPattern.title}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                  >
+                    <MaterialIcon icon={showNewPassword ? "visibility_off" : "visibility"} size={20} />
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Confirmar Nova Senha
                 </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                  >
+                    <MaterialIcon icon={showConfirmPassword ? "visibility_off" : "visibility"} size={20} />
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"

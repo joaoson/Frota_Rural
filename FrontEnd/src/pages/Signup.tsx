@@ -28,6 +28,7 @@ const Signup = () => {
   const [uf, setUf] = useState("");
   const [cep, setCep] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const documentRef = useRef<HTMLInputElement>(null);
 
@@ -324,16 +325,25 @@ const Signup = () => {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha*
                 </label>
-                <input
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                  pattern={passwordPattern.regex.source}
-                  title={passwordPattern.title}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 8 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                    pattern={passwordPattern.regex.source}
+                    title={passwordPattern.title}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                  >
+                    <MaterialIcon icon={showPassword ? "visibility_off" : "visibility"} size={20} />
+                  </button>
+                </div>
               </div>
               <button
                 type="submit"

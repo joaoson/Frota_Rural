@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { reviewService, type Review } from "@/services/ReviewService/ReviewService";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
 import NotificationPopover from "@/components/NotificationPopover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import machine1 from "@/assets/machine-1.jpg";
 import machine2 from "@/assets/machine-2.jpg";
 
@@ -35,6 +50,7 @@ const sidebarItems = [
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
   { icon: "person", label: "Minha Conta", tab: "conta" },
+  { icon: "logout", label: "Sair", tab: "sair" },
 ];
 
 const mockRentals = [
@@ -43,14 +59,35 @@ const mockRentals = [
   { id: 4, owner: "Carlos Lima", machine: "Trator Massey 7700", period: "20 – 28 Nov/2025", status: "cancelled", total: "R$ 12.000,00", contract: "#CTR-8690", image: machine2 },
 ];
 
-type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta";
+type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta" | "sair";
 
 const DashboardLocatario = () => {
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showReagendar, setShowReagendar] = useState<number | null>(null);
   const [showRecorrencia, setShowRecorrencia] = useState<number | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  const { userId, logout } = useAuth();
+  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
+  const [givenReviews, setGivenReviews] = useState<Review[]>([]);
+  
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
+    reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
+  }, [userId]);
+
+
+  const togglePasswordVisibility = (label: string) => {
+    setShowPasswords(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -172,12 +209,59 @@ const DashboardLocatario = () => {
               <p className="text-sm text-on-surface-variant">Como foi sua experiência com {r.owner}?</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <MaterialIcon key={i} icon="star" filled={i <= 4} className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= 4 ? "text-secondary-container" : "text-outline/40"}`} />
+                  <MaterialIcon 
+                    key={i} 
+                    icon="star" 
+                    filled={i <= reviewRating} 
+                    onClick={() => setReviewRating(i)}
+                    className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= reviewRating ? "text-secondary-container" : "text-outline/40"}`} 
+                  />
                 ))}
               </div>
-              <textarea placeholder="Conte como foi a experiência..." rows={2} className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" />
-              <button className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm">
-                Enviar Avaliação
+              <textarea 
+                placeholder="Conte como foi a experiência..." 
+                rows={2} 
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" 
+              />
+              <button 
+                onClick={async () => {
+                  if (!userId) return;
+                  if (!reviewComment.trim()) {
+                    toast.error("Por favor, escreva um comentário.");
+                    return;
+                  }
+                  setIsSubmittingReview(true);
+                  try {
+                    await reviewService.createReview({
+                      reviewer: userId,
+                      reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80", // Valid Locador ID for testing
+                      rating: reviewRating,
+                      comment: reviewComment,
+                      rental: "fe6c805a-d5be-4dfe-970f-d2c3fae1cf00" // Valid Rental ID for testing
+                    });
+                    toast.success("Avaliação enviada com sucesso!");
+                    setShowAvaliar(null);
+                    setReviewRating(5);
+                    setReviewComment("");
+                    const updatedGiven = await reviewService.getReviewsByReviewer(userId);
+                    setGivenReviews(updatedGiven);
+                  } catch (error) {
+                    console.error("Erro ao enviar avaliação:", error);
+                    if (error instanceof AxiosError && error.response?.data?.error) {
+                      toast.error(error.response.data.error);
+                    } else {
+                      toast.error("Erro ao enviar avaliação.");
+                    }
+                  } finally {
+                    setIsSubmittingReview(false);
+                  }
+                }}
+                disabled={isSubmittingReview}
+                className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm disabled:opacity-50"
+              >
+                {isSubmittingReview ? "Enviando..." : "Enviar Avaliação"}
               </button>
             </div>
           )}
@@ -188,25 +272,66 @@ const DashboardLocatario = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className="w-64 shrink-0 border-r border-outline-variant/30 h-screen sticky top-0 bg-surface-container-low flex flex-col">
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`w-64 shrink-0 border-r border-outline-variant/30 h-screen fixed md:sticky top-0 bg-surface-container-low flex flex-col z-50 transform transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-6 pb-4">
           <Link to="/" className="font-headline font-black text-xl text-primary tracking-tighter">Frota Rural</Link>
         </div>
         <nav className="flex-1 px-3 space-y-1">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.tab}
-              onClick={() => setTab(item.tab as Tab)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                tab === item.tab
-                  ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
-                  : "text-on-surface-variant hover:bg-surface-container-high"
-              }`}
-            >
-              <MaterialIcon icon={item.icon} size={20} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {sidebarItems.map((item) => {
+            const buttonEl = (
+              <button
+                key={item.tab}
+                onClick={
+                  item.tab !== "sair" ? () => {
+                    setTab(item.tab as Tab);
+                    setIsSidebarOpen(false);
+                  } : undefined
+                }
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  tab === item.tab
+                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+              >
+                <MaterialIcon icon={item.icon} size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+
+            if (item.tab === "sair") {
+              return (
+                <AlertDialog key={item.tab}>
+                  <AlertDialogTrigger asChild>{buttonEl}</AlertDialogTrigger>
+                  <AlertDialogContent size="sm">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sair da conta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja sair?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel variant="outline">
+                        Cancelar
+                      </AlertDialogCancel>
+                      <AlertDialogAction onClick={logout}>
+                        Sair
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              );
+            }
+
+            return buttonEl;
+          })}
         </nav>
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
@@ -220,8 +345,15 @@ const DashboardLocatario = () => {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
-          <div />
+        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+            >
+              <MaterialIcon icon="menu" size={24} />
+            </button>
+          </div>
           <NotificationPopover
             notifications={[
               { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
@@ -283,7 +415,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
+                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
                       <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#colorSpend)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -309,7 +441,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value: number) => [`${value.toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
+                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
                       <Bar dataKey="rating" fill="hsl(39, 99%, 60%)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -423,8 +555,6 @@ const DashboardLocatario = () => {
                   </div>
                 </div>
               )}
-
-              <DashboardPagination currentPage={1} totalPages={3} onPageChange={() => {}} />
             </div>
           )}
 
@@ -500,7 +630,6 @@ const DashboardLocatario = () => {
                   </div>
                 </div>
               ))}
-              <DashboardPagination currentPage={1} totalPages={2} onPageChange={() => {}} />
             </div>
           )}
 
@@ -518,17 +647,14 @@ const DashboardLocatario = () => {
                   <MaterialIcon icon="inbox" size={22} className="text-primary" /> Avaliações Recebidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    { from: "João Silva", initials: "JS", machine: "Trator Valtra BH194", date: "11/02/2026", rating: 5, comment: "Locatária exemplar! Devolveu o trator em perfeito estado e cumpriu todos os prazos." },
-                    { from: "Pedro Souza", initials: "PS", machine: "Pulverizador Jacto", date: "06/12/2025", rating: 4, comment: "Boa locatária, apenas solicitou reagendamento mas tudo correu bem no final." },
-                  ].map((r, i) => (
-                    <div key={i} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
+                  {receivedReviews.length > 0 ? receivedReviews.map((r) => (
+                    <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.initials}</div>
+                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.reviewer_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.from}</div>
-                            <div className="text-xs text-on-surface-variant">{r.machine} · {r.date}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.reviewer_name}</div>
+                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>
                         <div className="flex gap-0.5">
@@ -539,7 +665,9 @@ const DashboardLocatario = () => {
                       </div>
                       <p className="text-sm text-on-surface leading-relaxed">"{r.comment}"</p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>
+                  )}
                 </div>
               </div>
 
@@ -548,18 +676,14 @@ const DashboardLocatario = () => {
                   <MaterialIcon icon="outbox" size={22} className="text-primary" /> Avaliações Fornecidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    { to: "João Silva", initials: "JS", machine: "Trator Valtra BH194", date: "11/02/2026", rating: 5, comment: "Equipamento impecável e operador com NR-31. Comunicação excelente durante toda a locação." },
-                    { to: "Pedro Souza", initials: "PS", machine: "Pulverizador Jacto", date: "06/12/2025", rating: 5, comment: "Pulverizador funcionou perfeitamente. Pedro foi muito prestativo." },
-                    { to: "Carlos Lima", initials: "CL", machine: "Trator Massey 7700", date: "29/11/2025", rating: 3, comment: "O trator apresentou problemas mecânicos durante a locação. Atendimento poderia ser melhor." },
-                  ].map((r, i) => (
-                    <div key={i} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
+                  {givenReviews.length > 0 ? givenReviews.map((r) => (
+                    <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.initials}</div>
+                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.to}</div>
-                            <div className="text-xs text-on-surface-variant">{r.machine} · {r.date}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.reviewee_name}</div>
+                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -568,17 +692,28 @@ const DashboardLocatario = () => {
                               <MaterialIcon key={j} icon="star" filled={j < r.rating} className={j < r.rating ? "text-secondary-container" : "text-outline/30"} size={16} />
                             ))}
                           </div>
-                          <button className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors" title="Excluir avaliação">
+                          <button
+                            onClick={() => {
+                              reviewService.deleteReview(r.id).then(() => {
+                                setGivenReviews(prev => prev.filter(review => review.id !== r.id));
+                                toast.success("Avaliação excluída com sucesso.");
+                              }).catch(() => toast.error("Erro ao excluir avaliação."));
+                            }}
+                            className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors" title="Excluir avaliação">
                             <MaterialIcon icon="close" size={16} />
                           </button>
                         </div>
                       </div>
                       <p className="text-sm text-on-surface leading-relaxed">"{r.comment}"</p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Você ainda não forneceu nenhuma avaliação.</p>
+                  )}
                 </div>
               </div>
-              <DashboardPagination currentPage={1} totalPages={2} onPageChange={() => {}} />
+              {(receivedReviews.length > 0 || givenReviews.length > 0) && (
+                <DashboardPagination currentPage={1} totalPages={Math.max(1, Math.ceil(Math.max(receivedReviews.length, givenReviews.length) / 5))} onPageChange={() => {}} />
+              )}
             </div>
           )}
 
@@ -721,7 +856,6 @@ const DashboardLocatario = () => {
                   </div>
                 ))}
               </div>
-              <DashboardPagination currentPage={1} totalPages={3} onPageChange={() => {}} />
             </div>
           )}
 
@@ -778,7 +912,16 @@ const DashboardLocatario = () => {
                     {["Senha Atual", "Nova Senha", "Confirmar Nova Senha"].map((label) => (
                       <div key={label} className="space-y-2">
                         <label className="text-xs font-bold uppercase tracking-wider text-outline">{label}</label>
-                        <input type="password" placeholder="••••••••" className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
+                        <div className="relative">
+                          <input type={showPasswords[label] ? "text" : "password"} placeholder="••••••••" className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
+                          <button
+                            type="button"
+                            onClick={() => togglePasswordVisibility(label)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          >
+                            <MaterialIcon icon={showPasswords[label] ? "visibility_off" : "visibility"} size={20} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

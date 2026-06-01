@@ -40,15 +40,21 @@ createRoot(document.getElementById("root")!).render(
           // Credenciais e documentos
           <Route path="/signup/document-upload" element={<CNHUpload />} />
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
-          <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedRoute allowedRoles={["locador"]} />}>
             <Route path="/dashboard" element={<DashboardLocador />} />
-            <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
             <Route
               path="/dashboard/novo-equipamento"
               element={<NovoEquipamento />}
             />
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
             <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={["locatario"]} />}>
+            <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/admin" element={<DashboardAdmin />} />
           </Route>
           <Route path="/buscar" element={<Buscar />} />
