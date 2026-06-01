@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -6,6 +7,13 @@ from api.models import Rentals, Contracts
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users
+from .models import PostingModeration
+
+
+def _moderator(request):
+    """Retorna o usuário autenticado (moderador) ou None se anônimo."""
+    user = getattr(request, "user", None)
+    return user if getattr(user, "is_authenticated", False) else None
 
 # Create your views here.
 @api_view(['PUT'])
@@ -60,3 +68,50 @@ def ban_user(request, pk):
     Contracts.objects.filter(rental_id__in=rental_ids, status='pending_signatures').update(status='cancelled')
 
     return Response({'message': f'Usuário {user.name} banido permanentemente.'}, status=status.HTTP_200_OK)
+
+
+# ── Moderação de Anúncios (RF17) ────────────────────────────────────────────
+@api_view(['PUT'])
+def approve_posting(request, pk):
+    try:
+        posting = Postings.objects.get(pk=pk)
+    except Postings.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    posting.status = 'active'
+    posting.updated_at = timezone.now()
+    posting.save()
+
+    PostingModeration.objects.create(
+        posting=posting,
+        moderator=_moderator(request),
+        action=PostingModeration.ACTION_APPROVED,
+    )
+    return Response({'message': 'Anúncio aprovado e mantido ativo.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+def reject_posting(request, pk):
+    reason = (request.data.get('reason') or '').strip()
+    if not reason:
+        return Response(
+            {'error': 'Informe o motivo da reprovação.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        posting = Postings.objects.get(pk=pk)
+    except Postings.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    posting.status = 'rejected'
+    posting.updated_at = timezone.now()
+    posting.save()
+
+    PostingModeration.objects.create(
+        posting=posting,
+        moderator=_moderator(request),
+        action=PostingModeration.ACTION_REJECTED,
+        reason=reason,
+    )
+    return Response({'message': 'Anúncio reprovado.'}, status=status.HTTP_200_OK)
