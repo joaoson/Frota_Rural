@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Frota Rural Analytics — Power BI</title>
+<link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f3f2f1;--border:#e1dfdd;--text:#252423;--muted:#605e5c;--light:#a19f9d;
+  --green:#173901;--yellow:#feb234;--green-lt:#a8d38a;--green-md:#2d5016;
+  --header-bg:#edebe9;--pbi-blue:#118dff;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+html,body{height:100%;margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:13px;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOP BAR */
+.topbar{height:48px;background:var(--green);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.topbar-logo{display:flex;align-items:center;gap:8px}
+.topbar-title{font-size:13px;font-weight:600;color:#fff;white-space:nowrap}
+.topbar-sep{width:1px;height:22px;background:rgba(255,255,255,.25)}
+.topbar-report{font-size:12px;color:rgba(255,255,255,.8)}
+.topbar-spacer{flex:1}
+.topbar-actions{display:flex;align-items:center;gap:6px}
+.topbar-btn{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:3px;font-size:11px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);background:rgba(255,255,255,.15);color:#fff;transition:background .12s}
+.topbar-btn:hover{background:rgba(255,255,255,.25)}
+.topbar-btn.primary{background:#fff;color:var(--green)}
+.topbar-avatar{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer}
+
+/* PAGE TABS */
+.pagetabs{height:36px;background:var(--header-bg);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:0 12px;gap:2px;flex-shrink:0}
+.ptab{height:30px;padding:0 16px;border-radius:4px 4px 0 0;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;border:1px solid transparent;border-bottom:none;transition:all .12s}
+.ptab.active{background:#fff;border-color:var(--border);color:var(--text)}
+.ptab:not(.active){color:var(--muted)}
+.ptab:not(.active):hover{background:rgba(0,0,0,.04)}
+.ptab-dot{width:7px;height:7px;border-radius:50%}
+
+/* CANVAS */
+.canvas{flex:1;overflow:auto;background:#e5e3e0;padding:16px;display:flex;justify-content:center;align-items:flex-start}
+.pages-wrap{width:1200px;min-width:900px;flex-shrink:0}
+.page{background:#fff;width:100%;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.18);border-radius:2px}
+.page.hidden{display:none}
+
+/* page-badge kept for potential future use */
+
+/* SLICERS */
+.slicers{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:2px 0}
+.slicer{background:#faf9f8;border:1px solid var(--border);border-radius:2px;padding:6px 9px}
+.slicer-label{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--light);margin-bottom:5px}
+.chips{display:flex;gap:3px;flex-wrap:wrap}
+.chip{padding:2px 8px;border-radius:2px;font-size:10px;font-weight:600;border:1px solid var(--border);cursor:pointer;background:#fff;color:var(--muted);transition:all .1s}
+.chip.on{background:var(--green);border-color:var(--green);color:#fff}
+.chip:hover:not(.on){background:#edebe9}
+.slicer-vsep{height:32px;width:1px;background:var(--border)}
+
+/* KPI */
+.kpi-row{display:grid;gap:8px}
+.kpi{background:#faf9f8;border:1px solid var(--border);border-radius:2px;padding:10px 13px;position:relative;overflow:hidden;cursor:default;transition:box-shadow .12s}
+.kpi:hover{box-shadow:0 4px 14px rgba(0,0,0,.1)}
+.kpi-stripe{position:absolute;bottom:0;left:0;right:0;height:3px}
+.kpi-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:4px}
+.kpi-val{font-size:20px;font-weight:700;color:var(--text);line-height:1.1}
+.kpi-val.sm{font-size:16px}
+.kpi-sub{font-size:9px;color:var(--light);margin-top:3px}
+.kpi-badge{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px}
+.pos{background:#dff6dd;color:#107c10}
+.neg{background:#fde7e9;color:#a4262c}
+
+/* GRIDS */
+.g-wide{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+.g-3{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:8px}
+.g-map{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g-half{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* VISUAL CARD */
+.vis{background:#faf9f8;border:1px solid var(--border);border-radius:2px;padding:10px 11px;position:relative;overflow:visible}
+.vis:hover .vis-actions{opacity:1}
+.vis-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.vis-title{font-size:11px;font-weight:700;color:var(--text)}
+.vis-sub{font-size:9px;color:var(--light);margin-top:1px}
+.vis-actions{display:flex;gap:3px;opacity:0;transition:opacity .12s}
+.vis-btn{width:22px;height:22px;border-radius:2px;background:transparent;border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;transition:background .1s}
+.vis-btn:hover{background:#edebe9}
+
+/* LEGEND */
+.legend-row{display:flex;align-items:center;gap:5px;margin-bottom:4px;cursor:pointer}
+.ldot{width:8px;height:8px;border-radius:1px;flex-shrink:0}
+.llbl{font-size:10px;color:var(--text);flex:1}
+.lval{font-size:10px;font-weight:700;color:var(--text)}
+.lpct{font-size:9px;color:var(--light);margin-left:2px}
+
+/* PROGRESS */
+.pr{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.pr-lbl{font-size:10px;color:var(--text);width:94px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-track{flex:1;height:7px;background:#edebe9;border-radius:1px;overflow:hidden}
+.pr-fill{height:100%;border-radius:1px}
+.pr-val{font-size:10px;font-weight:700;color:var(--text);width:26px;text-align:right}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:10.5px}
+.tbl thead tr{background:#edebe9;border-bottom:2px solid var(--green)}
+.tbl th{padding:4px 8px;text-align:left;font-weight:700;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.tbl td{padding:4px 8px;border-bottom:1px solid var(--border)}
+.tbl tbody tr:hover{background:#f3f2f1}
+.tbl tbody tr:nth-child(even){background:rgba(0,0,0,.012)}
+.bar-cell{display:flex;align-items:center;gap:4px}
+.bm{height:6px;border-radius:1px;min-width:2px}
+
+/* MAP */
+.map-region{transition:opacity .15s,filter .15s;cursor:pointer}
+.map-region:hover{opacity:.8;filter:brightness(1.05)}
+.map-tooltip{position:absolute;background:#252423;color:#fff;border-radius:3px;padding:6px 10px;font-size:10px;pointer-events:none;display:none;z-index:200;box-shadow:0 4px 14px rgba(0,0,0,.35);white-space:nowrap;line-height:1.6}
+
+/* STATUS BAR */
+.statusbar{height:22px;background:#edebe9;border-top:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:0;flex-shrink:0}
+.sb{font-size:9.5px;color:var(--muted);display:flex;align-items:center;gap:4px;padding:0 10px;border-right:1px solid var(--border)}
+.sb:first-child{padding-left:0}
+.sb:last-child{border-right:none;margin-left:auto;padding-right:0}
+.sb-green{width:6px;height:6px;border-radius:50%;background:#107c10}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#c8c6c4;border-radius:10px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="12" width="5" height="10" rx="1" fill="#f2c811"/>
+      <rect x="9.5" y="7" width="5" height="15" rx="1" fill="#f2c811"/>
+      <rect x="17" y="2" width="5" height="20" rx="1" fill="#f2c811"/>
+    </svg>
+    <span class="topbar-title">Power BI</span>
+  </div>
+  <div class="topbar-sep"></div>
+  <span class="topbar-report">Frota Rural — Analytics · Desempenho da Plataforma</span>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-actions">
+    <button class="topbar-btn">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M2 7l5 5 5-5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Exportar
+    </button>
+    <button class="topbar-btn">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M8 3l5 4-5 4" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
+      Compartilhar
+    </button>
+    <button class="topbar-btn primary">Editar</button>
+    <div class="topbar-avatar">AD</div>
+  </div>
+</div>
+
+<!-- PAGE TABS -->
+<div class="pagetabs">
+  <div class="ptab active" onclick="goPage(0)">
+    <span class="ptab-dot" style="background:#173901"></span>
+    Financeiro &amp; Locações
+  </div>
+  <div class="ptab" onclick="goPage(1)">
+    <span class="ptab-dot" style="background:#feb234"></span>
+    Máquinas, Anúncios &amp; Usuários
+  </div>
+</div>
+
+<!-- CANVAS -->
+<div class="canvas">
+<div class="pages-wrap">
+
+  <!-- ══════════════════════════════════════════
+       PÁGINA 1 — Financeiro & Locações
+  ══════════════════════════════════════════ -->
+  <div class="page" id="page0">
+
+    <!-- Slicers -->
+    <div class="slicers">
+      <div class="slicer">
+        <div class="slicer-label">Agregação Temporal</div>
+        <div class="chips">
+          <div class="chip per" onclick="sel(this,'.per')">Semana</div>
+          <div class="chip per on" onclick="sel(this,'.per')">Mês</div>
+          <div class="chip per" onclick="sel(this,'.per')">Semestre</div>
+          <div class="chip per" onclick="sel(this,'.per')">Ano</div>
+        </div>
+      </div>
+      <div class="slicer-vsep"></div>
+      <div class="slicer">
+        <div class="slicer-label">Região</div>
+        <div class="chips">
+          <div class="chip reg on" onclick="sel(this,'.reg')">Todas</div>
+          <div class="chip reg" onclick="sel(this,'.reg')">Norte</div>
+          <div class="chip reg" onclick="sel(this,'.reg')">Nordeste</div>
+          <div class="chip reg" onclick="sel(this,'.reg')">Centro-Oeste</div>
+          <div class="chip reg" onclick="sel(this,'.reg')">Sudeste</div>
+          <div class="chip reg" onclick="sel(this,'.reg')">Sul</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#173901"></div>
+        <div class="kpi-badge pos">▲ 18%</div>
+        <div class="kpi-lbl">Volume Financeiro Movimentado</div>
+        <div class="kpi-val">R$ 842.600</div>
+        <div class="kpi-sub">maio 2026</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#feb234"></div>
+        <div class="kpi-badge pos">▲ 12%</div>
+        <div class="kpi-lbl">Quantidade de Locações Realizadas</div>
+        <div class="kpi-val">338</div>
+        <div class="kpi-sub">maio 2026</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#a8d38a"></div>
+        <div class="kpi-badge pos">▲ 7%</div>
+        <div class="kpi-lbl">Ticket Médio por Locação</div>
+        <div class="kpi-val">R$ 6.480</div>
+        <div class="kpi-sub">maio 2026</div>
+      </div>
+    </div>
+
+    <!-- Linha faturamento + Donut status -->
+    <div class="g-wide">
+      <div class="vis">
+        <div class="vis-head">
+          <div><div class="vis-title">Volume Financeiro Movimentado</div><div class="vis-sub">Faturamento total por período · 2026 vs 2025</div></div>
+          <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+        </div>
+        <svg viewBox="0 0 520 148" width="100%" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+          <defs>
+            <linearGradient id="g26" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#173901" stop-opacity=".18"/><stop offset="100%" stop-color="#173901" stop-opacity="0"/></linearGradient>
+            <linearGradient id="g25" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a8d38a" stop-opacity=".12"/><stop offset="100%" stop-color="#a8d38a" stop-opacity="0"/></linearGradient>
+          </defs>
+          <line x1="38" y1="10" x2="510" y2="10" stroke="#e1dfdd" stroke-width=".7"/>
+          <line x1="38" y1="36" x2="510" y2="36" stroke="#e1dfdd" stroke-width=".7"/>
+          <line x1="38" y1="62" x2="510" y2="62" stroke="#e1dfdd" stroke-width=".7"/>
+          <line x1="38" y1="88" x2="510" y2="88" stroke="#e1dfdd" stroke-width=".7"/>
+          <line x1="38" y1="114" x2="510" y2="114" stroke="#e1dfdd" stroke-width=".7"/>
+          <text x="0" y="14" font-size="8" fill="#a19f9d">R$1M</text>
+          <text x="0" y="40" font-size="8" fill="#a19f9d">R$750k</text>
+          <text x="0" y="66" font-size="8" fill="#a19f9d">R$500k</text>
+          <text x="0" y="92" font-size="8" fill="#a19f9d">R$250k</text>
+          <text x="0" y="118" font-size="8" fill="#a19f9d">R$0</text>
+          <path d="M60,92 C145,85 232,75 318,79 C404,83 456,67 510,72 L510,114 L60,114 Z" fill="url(#g25)"/>
+          <path d="M60,92 C145,85 232,75 318,79 C404,83 456,67 510,72" fill="none" stroke="#a8d38a" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <path d="M60,103 C145,90 232,77 318,65 C404,53 456,37 510,20 L510,114 L60,114 Z" fill="url(#g26)"/>
+          <path d="M60,103 C145,90 232,77 318,65 C404,53 456,37 510,20" fill="none" stroke="#173901" stroke-width="2"/>
+          <circle cx="60" cy="103" r="3" fill="#173901"/>
+          <circle cx="168" cy="90" r="3" fill="#173901"/>
+          <circle cx="276" cy="77" r="3" fill="#173901"/>
+          <circle cx="384" cy="53" r="3" fill="#173901"/>
+          <circle cx="510" cy="20" r="4.5" fill="#173901" stroke="#fff" stroke-width="1.5"/>
+          <rect x="448" y="4" width="72" height="17" rx="2" fill="#252423"/>
+          <text x="484" y="15.5" font-size="7.5" fill="#fff" text-anchor="middle" font-weight="600">R$ 842.600</text>
+          <line x1="510" y1="20" x2="510" y2="114" stroke="#252423" stroke-width=".8" stroke-dasharray="3 2" opacity=".35"/>
+          <text x="52" y="128" font-size="8" fill="#a19f9d" text-anchor="middle">Jan</text>
+          <text x="160" y="128" font-size="8" fill="#a19f9d" text-anchor="middle">Fev</text>
+          <text x="268" y="128" font-size="8" fill="#a19f9d" text-anchor="middle">Mar</text>
+          <text x="376" y="128" font-size="8" fill="#a19f9d" text-anchor="middle">Abr</text>
+          <text x="502" y="128" font-size="8" fill="#252423" text-anchor="middle" font-weight="700">Mai</text>
+          <line x1="60" y1="142" x2="80" y2="142" stroke="#a8d38a" stroke-width="1.5" stroke-dasharray="5 3"/>
+          <text x="83" y="145" font-size="8" fill="#a19f9d">2025</text>
+          <line x1="115" y1="142" x2="135" y2="142" stroke="#173901" stroke-width="2"/>
+          <text x="138" y="145" font-size="8" fill="#252423" font-weight="600">2026</text>
+        </svg>
+      </div>
+
+      <div class="vis">
+        <div class="vis-head">
+          <div><div class="vis-title">Status das Locações</div><div class="vis-sub">Locações por status · mai/2026</div></div>
+          <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;justify-content:center;padding-top:4px">
+          <div style="width:120px;height:120px;flex-shrink:0">
+            <svg viewBox="0 0 120 120" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="60" cy="60" r="47" fill="none" stroke="#173901" stroke-width="20" stroke-dasharray="112 183" stroke-dashoffset="74"/>
+              <circle cx="60" cy="60" r="47" fill="none" stroke="#feb234" stroke-width="20" stroke-dasharray="100 195" stroke-dashoffset="-38"/>
+              <circle cx="60" cy="60" r="47" fill="none" stroke="#a8d38a" stroke-width="20" stroke-dasharray="53 242" stroke-dashoffset="-138"/>
+              <circle cx="60" cy="60" r="47" fill="none" stroke="#e1dfdd" stroke-width="20" stroke-dasharray="29 266" stroke-dashoffset="-191"/>
+              <text x="60" y="56" font-size="17" font-weight="700" fill="#252423" text-anchor="middle">338</text>
+              <text x="60" y="70" font-size="8" fill="#a19f9d" text-anchor="middle">total</text>
+            </svg>
+          </div>
+          <div style="flex:1">
+            <div class="legend-row"><div class="ldot" style="background:#173901"></div><span class="llbl">Em Operação</span><span class="lval">128<span class="lpct">38%</span></span></div>
+            <div class="legend-row"><div class="ldot" style="background:#feb234"></div><span class="llbl">Concluída</span><span class="lval">115<span class="lpct">34%</span></span></div>
+            <div class="legend-row"><div class="ldot" style="background:#a8d38a"></div><span class="llbl">Agendada</span><span class="lval">61<span class="lpct">18%</span></span></div>
+            <div class="legend-row"><div class="ldot" style="background:#e1dfdd;border:1px solid #c8c6c4"></div><span class="llbl">Cancelada</span><span class="lval">34<span class="lpct">10%</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barras locações/mês — largura total -->
+    <div class="vis">
+      <div class="vis-head">
+        <div><div class="vis-title">Quantidade de Locações Realizadas</div><div class="vis-sub">Locações por período · Jan–Mai 2026</div></div>
+        <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+      </div>
+      <svg viewBox="0 0 700 130" width="100%" xmlns="http://www.w3.org/2000/svg">
+        <line x1="30" y1="10" x2="690" y2="10" stroke="#e1dfdd" stroke-width=".7"/>
+        <line x1="30" y1="37" x2="690" y2="37" stroke="#e1dfdd" stroke-width=".7"/>
+        <line x1="30" y1="64" x2="690" y2="64" stroke="#e1dfdd" stroke-width=".7"/>
+        <line x1="30" y1="91" x2="690" y2="91" stroke="#e1dfdd" stroke-width=".7"/>
+        <text x="0" y="13" font-size="8" fill="#a19f9d">80</text>
+        <text x="0" y="40" font-size="8" fill="#a19f9d">60</text>
+        <text x="0" y="67" font-size="8" fill="#a19f9d">40</text>
+        <text x="0" y="94" font-size="8" fill="#a19f9d">20</text>
+        <!-- média -->
+        <line x1="30" y1="53" x2="690" y2="53" stroke="#feb234" stroke-width=".9" stroke-dasharray="5 4" opacity=".7"/>
+        <text x="660" y="50" font-size="8" fill="#815500" font-weight="600">méd.</text>
+        <!-- Jan=38 -->
+        <rect x="55" y="69" width="80" height="22" rx="1" fill="#2d5016"/>
+        <text x="95" y="112" font-size="9" fill="#a19f9d" text-anchor="middle">Jan</text>
+        <text x="95" y="65" font-size="9" fill="#252423" text-anchor="middle" font-weight="600">38</text>
+        <!-- Fev=52 -->
+        <rect x="183" y="56" width="80" height="35" rx="1" fill="#2d5016"/>
+        <text x="223" y="112" font-size="9" fill="#a19f9d" text-anchor="middle">Fev</text>
+        <text x="223" y="52" font-size="9" fill="#252423" text-anchor="middle" font-weight="600">52</text>
+        <!-- Mar=61 -->
+        <rect x="311" y="44" width="80" height="47" rx="1" fill="#173901"/>
+        <text x="351" y="112" font-size="9" fill="#a19f9d" text-anchor="middle">Mar</text>
+        <text x="351" y="40" font-size="9" fill="#252423" text-anchor="middle" font-weight="600">61</text>
+        <!-- Abr=57 -->
+        <rect x="439" y="49" width="80" height="42" rx="1" fill="#2d5016"/>
+        <text x="479" y="112" font-size="9" fill="#a19f9d" text-anchor="middle">Abr</text>
+        <text x="479" y="45" font-size="9" fill="#252423" text-anchor="middle" font-weight="600">57</text>
+        <!-- Mai=73 -->
+        <rect x="567" y="31" width="80" height="60" rx="1" fill="#feb234"/>
+        <text x="607" y="112" font-size="9" fill="#252423" text-anchor="middle" font-weight="700">Mai</text>
+        <text x="607" y="27" font-size="9" fill="#815500" text-anchor="middle" font-weight="700">73</text>
+      </svg>
+    </div>
+
+  </div><!-- /page0 -->
+
+
+  <!-- ══════════════════════════════════════════
+       PÁGINA 2 — Máquinas, Anúncios & Usuários
+  ══════════════════════════════════════════ -->
+  <div class="page hidden" id="page1">
+
+    <!-- Slicers -->
+    <div class="slicers">
+      <div class="slicer">
+        <div class="slicer-label">Agregação Temporal</div>
+        <div class="chips">
+          <div class="chip per2" onclick="sel(this,'.per2')">Semana</div>
+          <div class="chip per2 on" onclick="sel(this,'.per2')">Mês</div>
+          <div class="chip per2" onclick="sel(this,'.per2')">Semestre</div>
+          <div class="chip per2" onclick="sel(this,'.per2')">Ano</div>
+        </div>
+      </div>
+      <div class="slicer-vsep"></div>
+      <div class="slicer">
+        <div class="slicer-label">Região</div>
+        <div class="chips">
+          <div class="chip reg2 on" onclick="sel(this,'.reg2')">Todas</div>
+          <div class="chip reg2" onclick="sel(this,'.reg2')">Norte</div>
+          <div class="chip reg2" onclick="sel(this,'.reg2')">Nordeste</div>
+          <div class="chip reg2" onclick="sel(this,'.reg2')">Centro-Oeste</div>
+          <div class="chip reg2" onclick="sel(this,'.reg2')">Sudeste</div>
+          <div class="chip reg2" onclick="sel(this,'.reg2')">Sul</div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#173901"></div>
+        <div class="kpi-badge pos">▲ 5%</div>
+        <div class="kpi-lbl">Máquinas Mais Demandadas</div>
+        <div class="kpi-val">94</div>
+        <div class="kpi-sub">Valtra BH194 · 1º lugar</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#feb234"></div>
+        <div class="kpi-badge pos">▲ 3%</div>
+        <div class="kpi-lbl">Situação dos Anúncios</div>
+        <div class="kpi-val">318</div>
+        <div class="kpi-sub">ativos de 448 totais</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#a8d38a"></div>
+        <div class="kpi-badge pos">▲ 9%</div>
+        <div class="kpi-lbl">Usuários Cadastrados</div>
+        <div class="kpi-val sm">1.185</div>
+        <div class="kpi-sub">locatários, locadores e admins</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-stripe" style="background:#118dff"></div>
+        <div class="kpi-badge pos">▲ 11%</div>
+        <div class="kpi-lbl">Locações por Região</div>
+        <div class="kpi-val">148</div>
+        <div class="kpi-sub">Centro-Oeste · maior concentração</div>
+      </div>
+    </div>
+
+    <!-- Ranking máquinas + Anúncios donut -->
+    <div class="g-half">
+
+      <div class="vis">
+        <div class="vis-head">
+          <div><div class="vis-title">Máquinas Mais Demandadas</div><div class="vis-sub">Top 5 por volume de locações · mai/2026</div></div>
+          <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+        </div>
+        <div style="margin-top:4px">
+          <div class="pr"><div class="pr-lbl"><span style="color:#173901;font-weight:700">#1 </span>Valtra BH194</div><div class="pr-track"><div class="pr-fill" style="width:94%;background:#173901"></div></div><div class="pr-val">94</div></div>
+          <div class="pr"><div class="pr-lbl"><span style="color:#815500;font-weight:700">#2 </span>JD S790</div><div class="pr-track"><div class="pr-fill" style="width:81%;background:#feb234"></div></div><div class="pr-val">81</div></div>
+          <div class="pr"><div class="pr-lbl"><span style="color:#2d5016;font-weight:700">#3 </span>Jacto 3030</div><div class="pr-track"><div class="pr-fill" style="width:67%;background:#a8d38a"></div></div><div class="pr-val">67</div></div>
+          <div class="pr"><div class="pr-lbl"><span style="color:#605e5c;font-weight:700">#4 </span>MF 408</div><div class="pr-track"><div class="pr-fill" style="width:53%;background:#c8c6c4"></div></div><div class="pr-val">53</div></div>
+          <div class="pr"><div class="pr-lbl"><span style="color:#605e5c;font-weight:700">#5 </span>Tatu Marchesan</div><div class="pr-track"><div class="pr-fill" style="width:41%;background:#c8c6c4"></div></div><div class="pr-val">41</div></div>
+        </div>
+        <div style="margin-top:10px;overflow-x:auto">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Máquina</th><th>Loc.</th><th>Receita</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:700;color:#173901">1</td><td style="font-weight:600">Valtra BH194</td><td><div class="bar-cell"><div class="bm" style="width:48px;background:#173901"></div>94</div></td><td style="font-weight:700">R$218k</td></tr>
+              <tr><td style="font-weight:700;color:#815500">2</td><td style="font-weight:600">JD S790</td><td><div class="bar-cell"><div class="bm" style="width:41px;background:#feb234"></div>81</div></td><td style="font-weight:700">R$195k</td></tr>
+              <tr><td style="font-weight:700;color:#2d5016">3</td><td style="font-weight:600">Jacto 3030</td><td><div class="bar-cell"><div class="bm" style="width:34px;background:#a8d38a"></div>67</div></td><td style="font-weight:700">R$131k</td></tr>
+              <tr><td style="font-weight:700;color:#605e5c">4</td><td style="font-weight:600">MF 408</td><td><div class="bar-cell"><div class="bm" style="width:27px;background:#c8c6c4"></div>53</div></td><td style="font-weight:700">R$98k</td></tr>
+              <tr><td style="font-weight:700;color:#605e5c">5</td><td style="font-weight:600">Tatu</td><td><div class="bar-cell"><div class="bm" style="width:20px;background:#c8c6c4"></div>41</div></td><td style="font-weight:700">R$64k</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+
+        <!-- Anúncios -->
+        <div class="vis">
+          <div class="vis-head">
+            <div><div class="vis-title">Situação dos Anúncios</div><div class="vis-sub">Anúncios por status · 448 total</div></div>
+            <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <svg viewBox="0 0 90 90" width="90" height="90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+              <circle cx="45" cy="45" r="35" fill="none" stroke="#173901" stroke-width="16" stroke-dasharray="156 64" stroke-dashoffset="55"/>
+              <circle cx="45" cy="45" r="35" fill="none" stroke="#c8c6c4" stroke-width="16" stroke-dasharray="48 172" stroke-dashoffset="-101"/>
+              <circle cx="45" cy="45" r="35" fill="none" stroke="#feb234" stroke-width="16" stroke-dasharray="15 205" stroke-dashoffset="-149"/>
+              <text x="45" y="42" font-size="13" font-weight="700" fill="#252423" text-anchor="middle">448</text>
+              <text x="45" y="54" font-size="7.5" fill="#a19f9d" text-anchor="middle">anúncios</text>
+            </svg>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:1px;background:#173901;flex-shrink:0"></div><span style="font-size:10px;flex:1">Ativos</span><span style="font-size:10px;font-weight:700;color:#173901">318</span><span style="font-size:9px;color:#a19f9d;margin-left:3px">71%</span></div>
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px"><div style="width:8px;height:8px;border-radius:1px;background:#c8c6c4;flex-shrink:0"></div><span style="font-size:10px;flex:1">Inativos</span><span style="font-size:10px;font-weight:700;color:#605e5c">99</span><span style="font-size:9px;color:#a19f9d;margin-left:3px">22%</span></div>
+              <div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:1px;background:#feb234;flex-shrink:0"></div><span style="font-size:10px;flex:1">Em Revisão</span><span style="font-size:10px;font-weight:700;color:#815500">31</span><span style="font-size:9px;color:#a19f9d;margin-left:3px">7%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Usuários -->
+        <div class="vis" style="flex:1">
+          <div class="vis-head">
+            <div><div class="vis-title">Composição dos Usuários Cadastrados</div><div class="vis-sub">Usuários por perfil · 1.185 total</div></div>
+            <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+          </div>
+          <div class="pr"><div class="pr-lbl">Locatários</div><div class="pr-track"><div class="pr-fill" style="width:67%;background:#173901"></div></div><div class="pr-val" style="color:#173901">796</div></div>
+          <div class="pr"><div class="pr-lbl">Locadores</div><div class="pr-track"><div class="pr-fill" style="width:33%;background:#feb234"></div></div><div class="pr-val" style="color:#815500">385</div></div>
+          <div class="pr"><div class="pr-lbl">Admins</div><div class="pr-track"><div class="pr-fill" style="width:1%;background:#a8d38a"></div></div><div class="pr-val" style="color:#2d5016">4</div></div>
+          <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+            <div style="background:#f3f2f1;border-radius:2px;padding:6px 8px;text-align:center">
+              <div style="font-size:8.5px;color:#a19f9d;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Ativos</div>
+              <div style="font-size:15px;font-weight:700;color:#173901">892</div>
+            </div>
+            <div style="background:#f3f2f1;border-radius:2px;padding:6px 8px;text-align:center">
+              <div style="font-size:8.5px;color:#a19f9d;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Inativos</div>
+              <div style="font-size:15px;font-weight:700;color:#605e5c">293</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mapa Brasil -->
+    <div class="vis" style="position:relative">
+      <div class="vis-head">
+        <div><div class="vis-title">Concentração de Locações por Região</div><div class="vis-sub">Norte, Nordeste, Centro-Oeste, Sudeste e Sul · mai/2026</div></div>
+        <div class="vis-actions"><button class="vis-btn">⤢</button><button class="vis-btn">⋯</button></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <span style="font-size:9px;color:#a19f9d">Menor</span>
+        <div style="flex:1;height:8px;border-radius:2px;background:linear-gradient(to right,#c4efa3,#1e4a0a)"></div>
+        <span style="font-size:9px;color:#a19f9d">Maior</span>
+        <span style="font-size:9px;color:var(--muted);margin-left:4px">nº de locações</span>
+      </div>
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        <div style="position:relative;flex:1">
+          <div class="map-tooltip" id="maptip"></div>
+          <svg id="brasilmap" viewBox="70 20 430 520" width="100%" style="max-height:320px;cursor:default" xmlns="http://www.w3.org/2000/svg">
+            <!-- NORTE -->
+            <g class="map-region" data-region="Norte" data-loc="42" data-receita="R$ 78.000" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+              <path d="M100,85 L118,78 L140,72 L168,68 L195,65 L218,70 L235,78 L248,92 L255,108 L260,128 L255,148 L245,162 L230,172 L212,178 L195,182 L178,180 L162,174 L148,164 L135,152 L122,140 L110,125 L100,110 Z" fill="#c4efa3" stroke="#fff" stroke-width="1.2"/>
+              <path d="M248,92 L270,85 L295,80 L320,78 L342,82 L358,90 L368,104 L372,120 L368,138 L358,152 L342,162 L322,170 L302,174 L282,172 L265,165 L252,155 L245,142 L245,125 L248,108 Z" fill="#b8e896" stroke="#fff" stroke-width="1.2"/>
+              <path d="M168,68 L185,58 L205,50 L222,48 L238,54 L248,65 L248,80 L235,78 L218,70 L195,65 Z" fill="#c4efa3" stroke="#fff" stroke-width="1.2"/>
+              <path d="M320,78 L338,68 L355,62 L368,68 L372,82 L368,95 L358,90 L342,82 Z" fill="#c4efa3" stroke="#fff" stroke-width="1.2"/>
+              <path d="M178,180 L195,182 L212,185 L228,190 L238,200 L240,215 L232,225 L218,228 L204,224 L192,215 L182,204 L175,192 Z" fill="#b8e896" stroke="#fff" stroke-width="1.2"/>
+              <path d="M100,185 L118,180 L138,178 L155,182 L168,192 L172,204 L165,215 L150,220 L132,218 L115,210 L102,198 Z" fill="#c4efa3" stroke="#fff" stroke-width="1.2"/>
+              <path d="M295,172 L312,168 L328,172 L338,185 L340,202 L335,218 L322,228 L308,230 L295,225 L285,212 L282,198 L285,185 Z" fill="#b8e896" stroke="#fff" stroke-width="1.2"/>
+              <text x="165" y="108" font-size="11" font-weight="700" fill="#173901" text-anchor="middle" stroke="#c4efa3" stroke-width="3" paint-order="stroke" stroke-linejoin="round">NORTE</text>
+              <text x="165" y="120" font-size="9" font-weight="700" fill="#173901" text-anchor="middle" stroke="#c4efa3" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">42 loc.</text>
+            </g>
+            <!-- NORDESTE -->
+            <g class="map-region" data-region="Nordeste" data-loc="58" data-receita="R$ 105.000" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+              <path d="M338,152 L355,148 L372,150 L385,158 L392,170 L388,182 L375,190 L360,192 L345,188 L335,178 L335,165 Z" fill="#98c27b" stroke="#fff" stroke-width="1.2"/>
+              <path d="M385,158 L400,152 L415,155 L425,165 L428,178 L422,192 L410,200 L396,202 L384,195 L378,183 L380,170 Z" fill="#90ba72" stroke="#fff" stroke-width="1.2"/>
+              <path d="M415,148 L432,142 L448,145 L458,155 L460,168 L452,178 L438,182 L424,178 L415,168 L412,158 Z" fill="#88b268" stroke="#fff" stroke-width="1.2"/>
+              <path d="M448,138 L465,132 L480,135 L488,145 L485,158 L472,162 L460,158 L452,148 Z" fill="#90ba72" stroke="#fff" stroke-width="1.2"/>
+              <path d="M460,162 L478,158 L490,162 L492,172 L482,178 L468,178 L460,170 Z" fill="#98c27b" stroke="#fff" stroke-width="1.2"/>
+              <path d="M430,180 L448,176 L468,178 L480,185 L478,195 L462,200 L445,198 L432,192 L428,183 Z" fill="#88b268" stroke="#fff" stroke-width="1.2"/>
+              <path d="M465,198 L480,195 L488,202 L485,212 L472,215 L462,210 L460,202 Z" fill="#98c27b" stroke="#fff" stroke-width="1.2"/>
+              <path d="M460,212 L472,212 L480,220 L475,228 L462,228 L455,220 Z" fill="#90ba72" stroke="#fff" stroke-width="1.2"/>
+              <path d="M388,200 L408,198 L428,196 L445,202 L458,212 L462,228 L458,248 L448,265 L432,278 L415,285 L398,282 L382,272 L368,258 L358,242 L355,225 L358,210 L368,200 L380,196 Z" fill="#98c27b" stroke="#fff" stroke-width="1.2"/>
+              <text x="435" y="218" font-size="11" font-weight="700" fill="#173901" text-anchor="middle" stroke="#b8e896" stroke-width="3" paint-order="stroke" stroke-linejoin="round">NORDESTE</text>
+              <text x="435" y="232" font-size="9" font-weight="700" fill="#173901" text-anchor="middle" stroke="#b8e896" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">58 loc.</text>
+            </g>
+            <!-- CENTRO-OESTE -->
+            <g class="map-region" data-region="Centro-Oeste" data-loc="148" data-receita="R$ 342.000" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+              <path d="M195,228 L215,224 L235,228 L255,235 L272,245 L282,258 L285,275 L278,290 L265,298 L248,302 L230,298 L215,288 L202,275 L192,260 L188,245 L190,232 Z" fill="#1e4a0a" stroke="#fff" stroke-width="1.2"/>
+              <path d="M282,258 L300,252 L318,255 L332,265 L338,280 L335,295 L322,305 L305,308 L290,305 L278,294 L275,280 Z" fill="#1e4a0a" stroke="#fff" stroke-width="1.2"/>
+              <path d="M230,302 L248,305 L265,308 L280,318 L285,335 L280,350 L265,360 L248,362 L232,355 L218,342 L212,328 L215,312 Z" fill="#234e0c" stroke="#fff" stroke-width="1.2"/>
+              <path d="M318,280 L326,278 L330,285 L326,290 L318,290 L314,284 Z" fill="#173901" stroke="#fff" stroke-width="1"/>
+              <text x="255" y="284" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" stroke="#1e4a0a" stroke-width="3" paint-order="stroke" stroke-linejoin="round">CENTRO-OESTE</text>
+              <text x="255" y="298" font-size="9" font-weight="700" fill="#fff" text-anchor="middle" stroke="#1e4a0a" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">148 loc.</text>
+            </g>
+            <!-- SUDESTE -->
+            <g class="map-region" data-region="Sudeste" data-loc="124" data-receita="R$ 312.000" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+              <path d="M322,272 L340,265 L358,268 L372,280 L378,295 L375,312 L362,322 L345,328 L328,325 L314,315 L308,300 L310,285 Z" fill="#2d5016" stroke="#fff" stroke-width="1.2"/>
+              <path d="M378,295 L392,290 L400,300 L398,315 L388,322 L378,318 L372,308 L373,298 Z" fill="#335918" stroke="#fff" stroke-width="1.2"/>
+              <path d="M358,330 L374,322 L386,325 L390,338 L380,348 L365,348 L355,340 Z" fill="#2d5016" stroke="#fff" stroke-width="1.2"/>
+              <path d="M312,328 L330,328 L348,332 L362,342 L368,358 L362,372 L348,380 L330,382 L312,375 L298,362 L292,348 L298,335 Z" fill="#254812" stroke="#fff" stroke-width="1.2"/>
+              <text x="348" y="330" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" stroke="#254812" stroke-width="3" paint-order="stroke" stroke-linejoin="round">SUDESTE</text>
+              <text x="348" y="344" font-size="9" font-weight="700" fill="#fff" text-anchor="middle" stroke="#254812" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">124 loc.</text>
+            </g>
+            <!-- SUL -->
+            <g class="map-region" data-region="Sul" data-loc="112" data-receita="R$ 285.000" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">
+              <path d="M295,368 L312,362 L330,365 L345,375 L350,390 L342,402 L325,408 L308,405 L294,395 L288,382 Z" fill="#2d5016" stroke="#fff" stroke-width="1.2"/>
+              <path d="M288,408 L305,408 L322,412 L335,422 L332,435 L318,440 L302,438 L288,428 L282,418 Z" fill="#335918" stroke="#fff" stroke-width="1.2"/>
+              <path d="M280,442 L298,440 L315,445 L325,458 L322,475 L308,488 L290,492 L272,485 L260,472 L258,455 L265,445 Z" fill="#2d5016" stroke="#fff" stroke-width="1.2"/>
+              <text x="298" y="460" font-size="11" font-weight="700" fill="#fff" text-anchor="middle" stroke="#2d5016" stroke-width="3" paint-order="stroke" stroke-linejoin="round">SUL</text>
+              <text x="298" y="474" font-size="9" font-weight="700" fill="#fff" text-anchor="middle" stroke="#2d5016" stroke-width="2.5" paint-order="stroke" stroke-linejoin="round">112 loc.</text>
+            </g>
+          </svg>
+        </div>
+        <!-- Legenda lateral -->
+        <div style="width:180px;flex-shrink:0;padding-top:8px">
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:10px">Ranking por região</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <div style="width:10px;height:10px;border-radius:1px;background:#1e4a0a;flex-shrink:0"></div>
+                <span style="font-size:10px;font-weight:600;flex:1">Centro-Oeste</span>
+                <span style="font-size:11px;font-weight:700;color:#173901">148</span>
+              </div>
+              <div style="height:4px;background:#edebe9;border-radius:1px"><div style="width:100%;height:100%;background:#1e4a0a;border-radius:1px"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <div style="width:10px;height:10px;border-radius:1px;background:#254812;flex-shrink:0"></div>
+                <span style="font-size:10px;font-weight:600;flex:1">Sudeste</span>
+                <span style="font-size:11px;font-weight:700;color:#173901">124</span>
+              </div>
+              <div style="height:4px;background:#edebe9;border-radius:1px"><div style="width:84%;height:100%;background:#254812;border-radius:1px"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <div style="width:10px;height:10px;border-radius:1px;background:#2d5016;flex-shrink:0"></div>
+                <span style="font-size:10px;font-weight:600;flex:1">Sul</span>
+                <span style="font-size:11px;font-weight:700;color:#173901">112</span>
+              </div>
+              <div style="height:4px;background:#edebe9;border-radius:1px"><div style="width:76%;height:100%;background:#2d5016;border-radius:1px"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <div style="width:10px;height:10px;border-radius:1px;background:#88b268;flex-shrink:0"></div>
+                <span style="font-size:10px;font-weight:600;flex:1">Nordeste</span>
+                <span style="font-size:11px;font-weight:700;color:#173901">58</span>
+              </div>
+              <div style="height:4px;background:#edebe9;border-radius:1px"><div style="width:39%;height:100%;background:#88b268;border-radius:1px"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <div style="width:10px;height:10px;border-radius:1px;background:#b8e896;flex-shrink:0"></div>
+                <span style="font-size:10px;font-weight:600;flex:1">Norte</span>
+                <span style="font-size:11px;font-weight:700;color:#173901">42</span>
+              </div>
+              <div style="height:4px;background:#edebe9;border-radius:1px"><div style="width:28%;height:100%;background:#b8e896;border-radius:1px"></div></div>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--light);margin-bottom:6px">Total</div>
+            <div style="font-size:22px;font-weight:700;color:#173901">484</div>
+            <div style="font-size:9px;color:var(--light)">locações no período</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page1 -->
+
+</div><!-- /pages-wrap -->
+</div><!-- /canvas -->
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div class="sb"><span class="sb-green"></span>Conectado</div>
+  <div class="sb">Frota_Rural_Analytics.pbix</div>
+  <div class="sb">Atualizado: 25/05/2026 · 02:00</div>
+  <div class="sb" id="sb-page">Página 1 de 2</div>
+  <div class="sb">Modo Leitura</div>
+  <div class="sb">100%</div>
+</div>
+
+<script>
+function sel(el, group) {
+  document.querySelectorAll(group).forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+}
+
+function goPage(n) {
+  document.querySelectorAll('.page').forEach((p,i) => p.classList.toggle('hidden', i !== n));
+  document.querySelectorAll('.ptab').forEach((t,i) => t.classList.toggle('active', i === n));
+  document.getElementById('sb-page').textContent = `Página ${n+1} de 2`;
+}
+
+// Map tooltip
+const tip = document.getElementById('maptip');
+function showTip(e, el) {
+  tip.innerHTML = `<strong>${el.dataset.region}</strong><br>Locações: <strong>${el.dataset.loc}</strong><br>Receita: <strong>${el.dataset.receita}</strong>`;
+  tip.style.display = 'block';
+  moveTip(e);
+}
+function hideTip() { tip.style.display = 'none'; }
+document.getElementById('brasilmap').addEventListener('mousemove', moveTip);
+function moveTip(e) {
+  if (tip.style.display === 'none') return;
+  const r = document.getElementById('brasilmap').getBoundingClientRect();
+  tip.style.left = (e.clientX - r.left - tip.offsetWidth/2) + 'px';
+  tip.style.top  = (e.clientY - r.top  - tip.offsetHeight - 12) + 'px';
+}
+</script>
+</body>
+</html>
