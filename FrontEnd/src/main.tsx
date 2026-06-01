@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import "./index.css";
 import App from "./App.tsx";
 import Index from "@/pages/Index.tsx";
@@ -12,7 +12,9 @@ import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
 import GerenciarAnuncio from "@/pages/GerenciarAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import DashboardLocatario from "@/pages/DashboardLocatario.tsx";
-import DashboardAdmin from "@/pages/DashboardAdmin.tsx";
+import AdminLayout from "@/components/AdminLayout.tsx";
+import AdminUsers from "@/pages/Admin/Users.tsx";
+import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder.tsx";
 import { Toaster } from "sonner";
 
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
@@ -67,7 +69,26 @@ createRoot(document.getElementById("root")!).render(
               path="/document/certification/:id"
               element={<CertificationUpload />}
             />
-            <Route path="/admin" element={<DashboardAdmin />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="users" replace />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route
+                path="anuncios"
+                element={<AdminPlaceholder title="Anúncios" />}
+              />
+              <Route
+                path="credenciais"
+                element={<AdminPlaceholder title="Credenciais" />}
+              />
+              <Route
+                path="denuncias"
+                element={<AdminPlaceholder title="Denúncias" />}
+              />
+              <Route
+                path="relatorios"
+                element={<AdminPlaceholder title="Relatórios" />}
+              />
+            </Route>
           </Route>
           <Route path="/buscar" element={<Buscar />} />
           <Route path="/buscar-maquinario" element={<BuscarMaquinario />} />
