@@ -136,7 +136,9 @@ O projeto inclui um classificador de imagem baseado em TensorFlow que verifica s
 
 ### Preparar o dataset
 
-Coloque as imagens nas pastas correspondentes:
+Faça o download e coloque as imagens nas pastas correspondentes:
+
+- Datasets recomendados: `https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset` e `https://www.kaggle.com/datasets/prasunroy/natural-images`
 
 ```
 ml/data/cnh/        ← Fotos/scans de CNH (formato antigo ou novo)
@@ -144,7 +146,6 @@ ml/data/not_cnh/    ← Fotos aleatórias, selfies, outros documentos
 ```
 
 - Formatos aceitos: `.jpg`, `.png`, `.jpeg`
-- Quantidade recomendada: pelo menos 50 imagens por classe
 - As pastas devem ter quantidades aproximadamente iguais
 
 ### Treinar o modelo
