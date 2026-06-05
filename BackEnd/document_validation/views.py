@@ -6,7 +6,47 @@ from .models import OperatorLicense, Certification
 from .serializer import OperatorLicenseSerializer, CertificationSerializer
 
 
-# ── OperatorLicense ────────────────────────────────────────────────────────
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+
+
+@api_view(["POST"])
+def validate_cnh_document(request):
+    file = request.FILES.get("file")
+    if not file:
+        return Response(
+            {"error": "Nenhum arquivo enviado."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if file.content_type not in ALLOWED_TYPES:
+        return Response(
+            {"error": "Tipo de arquivo não suportado. Envie JPG, PNG ou PDF."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if file.size > MAX_FILE_SIZE:
+        return Response(
+            {"error": "Arquivo excede o tamanho máximo de 20MB."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        from .services.cnh_classifier import CnhClassifier
+
+        result = CnhClassifier.classify(file)
+        return Response(result, status=status.HTTP_200_OK)
+    except FileNotFoundError as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except Exception:
+        return Response(
+            {"error": "Erro ao processar o documento."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
 
 @api_view(["GET", "POST"])
 def operator_licenses_list(request):
@@ -73,8 +113,6 @@ def operator_license_detail(request, pk):
     license.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-# ── Certification ──────────────────────────────────────────────────────────
 
 @api_view(["GET", "POST"])
 def certifications_list(request):

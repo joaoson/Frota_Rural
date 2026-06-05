@@ -8,10 +8,42 @@ import {
   OperatorDocumentError,
   OperatorDocumentServiceError,
 } from "./errors/OperatorDocumentError";
+import type { CNHValidationResult } from "./models/CNHValidationResult";
 
 class OperatorDocumentService {
   private LICENSES_ENDPOINT = "operator-licenses/";
   private CERTIFICATIONS_ENDPOINT = "certifications/";
+
+  async validateCNHDocument(file: File): Promise<CNHValidationResult> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await AxiosInstance.post<CNHValidationResult>(
+        `${this.LICENSES_ENDPOINT}validate-document/`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const status = error.response?.status;
+        if (status === 400) {
+          throw new OperatorDocumentServiceError(
+            error.response?.data?.error || OperatorDocumentError.InvalidData,
+          );
+        }
+        if (status === 503) {
+          throw new OperatorDocumentServiceError(
+            OperatorDocumentError.ModelUnavailable,
+          );
+        }
+      }
+      throw new OperatorDocumentServiceError(
+        OperatorDocumentError.ValidationFailed,
+      );
+    }
+  }
 
   async listLicenses(params?: {
     user?: string;
@@ -49,9 +81,7 @@ class OperatorDocumentService {
           );
         }
       }
-      throw new OperatorDocumentServiceError(
-        OperatorDocumentError.ServerError,
-      );
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
     }
   }
 
@@ -79,9 +109,7 @@ class OperatorDocumentService {
           );
         }
       }
-      throw new OperatorDocumentServiceError(
-        OperatorDocumentError.ServerError,
-      );
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
     }
   }
 
@@ -125,9 +153,7 @@ class OperatorDocumentService {
           );
         }
       }
-      throw new OperatorDocumentServiceError(
-        OperatorDocumentError.ServerError,
-      );
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
     }
   }
 
@@ -155,9 +181,7 @@ class OperatorDocumentService {
           );
         }
       }
-      throw new OperatorDocumentServiceError(
-        OperatorDocumentError.ServerError,
-      );
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
     }
   }
 
