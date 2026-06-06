@@ -33,6 +33,7 @@ class OperatorLicenseSerializer(serializers.ModelSerializer):
             "points",
             "file_url",
             "validation_status",
+            "review_note",
             "created_at",
             "updated_at",
         ]
@@ -50,6 +51,8 @@ class OperatorLicenseSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data["updated_at"] = timezone.now()
+        validated_data["validation_status"] = "pending"
+        validated_data["review_note"] = None
         return super().update(instance, validated_data)
 
 
@@ -67,6 +70,7 @@ class CertificationSerializer(serializers.ModelSerializer):
             "description",
             "media_url",
             "validation_status",
+            "review_note",
             "created_at",
             "updated_at",
         ]
@@ -84,4 +88,6 @@ class CertificationSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data["updated_at"] = timezone.now()
+        validated_data["validation_status"] = "pending"
+        validated_data["review_note"] = None
         return super().update(instance, validated_data)

@@ -6,5 +6,5 @@ export type CreateCertificationRequest = {
   expiration_date?: string;
   credential_code?: string;
   description: string;
-  media_url?: string;
+  media_url?: string | null;
 };

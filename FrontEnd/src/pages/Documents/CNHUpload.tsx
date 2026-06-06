@@ -1,4 +1,4 @@
-import { type FormEvent, useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
 import { OperatorDocumentServiceError } from "@/services/OperatorDocumentService/errors/OperatorDocumentError";
 import type { CreateOperatorLicenseRequest } from "@/services/OperatorDocumentService/models/CreateOperatorLicenseRequest";
+import type { CNHValidationResult } from "@/services/OperatorDocumentService/models/CNHValidationResult";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { validateCPF } from "@/utils/validation/validateCPF";
@@ -68,9 +69,9 @@ const UF_OPTIONS = [
 
 const UPLOAD_INSTRUCTIONS = [
   "Abra sua CNH e posicione conforme o exemplo ao lado",
-  'A anotação "Exerce Atividade Remunerada (EAR)" deve estar presente no documento',
   "Não envie fotos de telas ou cópias",
   "Não recorte nem cubra partes do documento na foto",
+  "Salve o documento sob formato PNG, JPEG ou PDF",
 ];
 
 const CNHUpload = () => {
@@ -116,9 +117,13 @@ const CNHUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationResult, setValidationResult] =
+    useState<CNHValidationResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
   const [existingLicenseId, setExistingLicenseId] = useState<string | null>(
     null,
   );
+  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isEditing = existingLicenseId !== null;
@@ -167,12 +172,35 @@ const CNHUpload = () => {
         setMedicalRestrictions(license.medical_restrictions ?? "");
         setObservations(license.observations ?? "");
         setPoints(license.points);
+        setExistingFileUrl(license.file_url ?? null);
       })
       .finally(() => setIsLoading(false));
   }, [userId]);
 
   const handleFile = (selected: File) => {
-    if (selected.type.startsWith("image/")) setFile(selected);
+    const allowed =
+      selected.type.startsWith("image/") || selected.type === "application/pdf";
+    if (!allowed) return;
+
+    setFile(selected);
+    setValidationResult(null);
+    setIsValidating(true);
+
+    operatorDocumentService
+      .validateCNHDocument(selected)
+      .then(setValidationResult)
+      .catch((error) => {
+        setValidationResult({
+          is_valid: false,
+          confidence: "low",
+          score: 0,
+          error:
+            error instanceof OperatorDocumentServiceError
+              ? error.message
+              : "Erro inesperado ao validar o documento.",
+        });
+      })
+      .finally(() => setIsValidating(false));
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -219,7 +247,7 @@ const CNHUpload = () => {
     }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting) return;
 
@@ -246,6 +274,11 @@ const CNHUpload = () => {
         return;
       }
 
+      let uploadedFileUrl: string | undefined;
+      if (file) {
+        uploadedFileUrl = await operatorDocumentService.uploadDocument(file);
+      }
+
       const payload: CreateOperatorLicenseRequest = {
         user: userId,
         name: name.trim(),
@@ -269,13 +302,11 @@ const CNHUpload = () => {
         medical_restrictions: medicalRestrictions.trim() || undefined,
         observations: observations.trim() || undefined,
         points,
+        file_url: uploadedFileUrl || existingFileUrl || undefined,
       };
 
       if (isEditing) {
-        await operatorDocumentService.updateLicense(
-          existingLicenseId,
-          payload,
-        );
+        await operatorDocumentService.updateLicense(existingLicenseId, payload);
         toast.success("CNH atualizada com sucesso.");
       } else {
         await operatorDocumentService.createLicense(payload);
@@ -313,527 +344,626 @@ const CNHUpload = () => {
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-        <>
-        <div className="mb-8 sm:mb-10">
-          <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
-            {isEditing ? "Editar CNH" : "Cadastro de CNH"}
-          </h1>
-          <div className="h-1 w-16 bg-secondary-container mb-3" />
-          <p className="text-on-surface-variant text-sm">
-            {isEditing
-              ? "Atualize os dados da sua Carteira Nacional de Habilitação"
-              : "Informe os dados da sua Carteira Nacional de Habilitação conforme constam no documento"}
-          </p>
-        </div>
-
-        {/* ── Upload de Foto (separado do formulário) ──────────────── */}
-        <div className="mb-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm space-y-6 sm:space-y-8">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
-              Foto do Documento (opcional)
-            </p>
-            <p className="text-[11px] text-outline font-medium mt-2">
-              Envie uma foto da sua CNH para agilizar a validação. Você pode
-              enviar depois.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
-              <div className="flex-1 flex justify-center items-center bg-surface-container-high px-6 py-6">
-                <img
-                  src={cnhExample}
-                  alt="Exemplo de posicionamento da CNH"
-                  className="h-44 sm:h-52 w-full object-contain"
-                />
-              </div>
-              <div className="px-5 py-3 bg-surface-container border-t border-outline-variant/30">
-                <p className="text-[11px] text-outline font-medium text-center">
-                  Exemplo de posicionamento correto da CNH
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-outline-variant/40 bg-surface-container overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-outline-variant/30 bg-surface-container-high">
-                <MaterialIcon icon="info" size={18} className="text-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
-                  O que fazer
-                </span>
-              </div>
-              <ul className="px-5 py-4 space-y-4 flex-1">
-                {UPLOAD_INSTRUCTIONS.map((item, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-3 text-sm text-on-surface"
-                  >
-                    <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
-                      {i + 1}
-                    </span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-              Foto da CNH
-            </label>
-            <label
-              className={`block border-2 border-dashed rounded-xl px-6 py-8 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-                dragging
-                  ? "border-primary bg-primary/5"
-                  : file
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-outline-variant/60 hover:border-primary/50 hover:bg-primary/5"
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={handleDrop}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) handleFile(e.target.files[0]);
-                }}
-              />
-              {file ? (
-                <>
-                  <MaterialIcon
-                    icon="check_circle"
-                    size={40}
-                    className="text-primary mb-2"
-                  />
-                  <div className="font-bold text-primary text-sm">
-                    {file.name}
-                  </div>
-                  <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
-                    Clique para substituir
-                  </div>
-                </>
-              ) : (
-                <>
-                  <MaterialIcon
-                    icon="upload_file"
-                    className="text-outline mb-2"
-                    size={40}
-                  />
-                  <div className="font-bold text-tertiary text-sm">
-                    Arraste a foto ou clique para selecionar
-                  </div>
-                  <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
-                    JPG, PNG — Máx. 5MB
-                  </div>
-                </>
-              )}
-            </label>
-          </div>
-        </div>
-
-        <form
-          className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
-          onSubmit={handleSubmit}
-        >
-          {/* ── Identificação ────────────────────────────────────────── */}
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
-            Dados de Identificação
-          </p>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-              Nome Completo *
-            </label>
-            <input
-              type="text"
-              placeholder="Conforme consta na CNH"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Data de Nascimento *
-              </label>
-              <input
-                type="date"
-                value={birthDate}
-                ref={birthDateRef}
-                max={maxBirthDate}
-                onChange={(e) => {
-                  setBirthDate(e.target.value);
-                  birthDateRef.current?.setCustomValidity("");
-                }}
-                onBlur={handleBirthDateBlur}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                CPF *
-              </label>
-              <input
-                type="text"
-                placeholder="000.000.000-00"
-                value={cpf}
-                ref={cpfRef}
-                onChange={(e) => {
-                  setCpf(maskDocument(e.target.value));
-                  cpfRef.current?.setCustomValidity("");
-                }}
-                onBlur={handleCpfBlur}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-                pattern="\d{3}\.\d{3}\.\d{3}-\d{2}"
-                title="Informe um CPF válido no formato 000.000.000-00"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                RG *
-              </label>
-              <input
-                type="text"
-                placeholder="00.000.000-0"
-                value={rg}
-                ref={rgRef}
-                onChange={(e) => {
-                  setRg(maskRG(e.target.value));
-                  rgRef.current?.setCustomValidity("");
-                }}
-                onBlur={handleRgBlur}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Nacionalidade *
-              </label>
-              <select
-                value={nationality}
-                onChange={(e) => setNationality(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              >
-                <option value="Brasileiro(a)">Brasileiro(a)</option>
-                <option value="Estrangeiro(a)">Estrangeiro(a)</option>
-                <option value="Naturalizado(a)">Naturalizado(a)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Cidade de Nascimento *
-              </label>
-              <input
-                type="text"
-                placeholder="São Paulo"
-                value={birthCity}
-                onChange={(e) => setBirthCity(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Estado de Nascimento *
-              </label>
-              <select
-                value={birthState}
-                onChange={(e) => setBirthState(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              >
-                <option value="">Selecione</option>
-                {UF_OPTIONS.map((uf) => (
-                  <option key={uf} value={uf}>
-                    {uf}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Nome da Mãe *
-              </label>
-              <input
-                type="text"
-                placeholder="Nome completo"
-                value={motherName}
-                onChange={(e) => setMotherName(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Nome do Pai (opcional)
-              </label>
-              <input
-                type="text"
-                placeholder="Nome completo"
-                value={fatherName}
-                onChange={(e) => setFatherName(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-              />
-            </div>
-          </div>
-
-          {/* ── Dados da Habilitação ─────────────────────────────────── */}
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
-            Dados da Habilitação
-          </p>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Nº CNH *
-              </label>
-              <input
-                type="text"
-                placeholder="11 dígitos"
-                value={cnhNumber}
-                onChange={(e) =>
-                  setCnhNumber(e.target.value.replace(/\D/g, "").slice(0, 11))
-                }
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-                pattern="\d{11}"
-                title="O número da CNH deve conter exatamente 11 dígitos"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Categoria *
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              >
-                <option value="">Selecione</option>
-                {CNH_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Primeira Habilitação *
-              </label>
-              <input
-                type="date"
-                value={firstLicenseDate}
-                max={today}
-                onChange={(e) => setFirstLicenseDate(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Data de Emissão *
-              </label>
-              <input
-                type="date"
-                value={issueDate}
-                max={today}
-                onChange={(e) => setIssueDate(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Data de Validade *
-              </label>
-              <input
-                type="date"
-                value={expirationDate}
-                onChange={(e) => setExpirationDate(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                UF de Emissão *
-              </label>
-              <select
-                value={issuingState}
-                onChange={(e) => setIssuingState(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              >
-                <option value="">Selecione</option>
-                {UF_OPTIONS.map((uf) => (
-                  <option key={uf} value={uf}>
-                    {uf}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Órgão Emissor *
-              </label>
-              <input
-                type="text"
-                placeholder="DETRAN-SP"
-                value={issuingAuthority}
-                onChange={(e) => setIssuingAuthority(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              />
-            </div>
-          </div>
-
-          {/* ── Situação ─────────────────────────────────────────────── */}
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
-            Situação do Documento
-          </p>
-
-          <div className="grid grid-cols-2 gap-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Situação *
-              </label>
-              <select
-                value={situation}
-                onChange={(e) => setSituation(e.target.value)}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                required
-              >
-                <option value="">Selecione</option>
-                {CNH_SITUATIONS.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                Pontuação
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={points}
-                onChange={(e) =>
-                  setPoints(Math.max(0, Math.min(40, Number(e.target.value))))
-                }
-                min={0}
-                max={40}
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-              />
-              <p className="text-[11px] text-outline font-medium">
-                Pontos acumulados por infrações (0 a 40).
+          <>
+            <div className="mb-8 sm:mb-10">
+              <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+                {isEditing ? "Editar CNH" : "Cadastro de CNH"}
+              </h1>
+              <div className="h-1 w-16 bg-secondary-container mb-3" />
+              <p className="text-on-surface-variant text-sm">
+                {isEditing
+                  ? "Atualize os dados da sua Carteira Nacional de Habilitação"
+                  : "Informe os dados da sua Carteira Nacional de Habilitação conforme constam no documento"}
               </p>
             </div>
-          </div>
 
-          <div className="flex gap-8">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={ear}
-                onChange={(e) => setEar(e.target.checked)}
-                className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-on-surface">
-                EAR — Exerce Atividade Remunerada
-              </span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={acc}
-                onChange={(e) => setAcc(e.target.checked)}
-                className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
-              />
-              <span className="text-sm text-on-surface">
-                ACC — Autorização p/ Ciclomotor
-              </span>
-            </label>
-          </div>
+            {/* Upload de doc */}
+            <div className="mb-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm space-y-6 sm:space-y-8">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                  Foto do Documento
+                </p>
+                <p className="text-[11px] text-outline font-medium mt-2">
+                  Envie uma foto da sua CNH para que possamos validar seu
+                  documento e permitir o preenchimento de dados.
+                </p>
+              </div>
 
-          {/* ── Restrições / Observações ──────────────────────────────── */}
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
-            Restrições e Observações
-          </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
+                  <div className="flex-1 flex justify-center items-center bg-surface-container-high px-6 py-6">
+                    <img
+                      src={cnhExample}
+                      alt="Exemplo de posicionamento da CNH"
+                      className="h-44 sm:h-52 w-full object-contain"
+                    />
+                  </div>
+                  <div className="px-5 py-3 bg-surface-container border-t border-outline-variant/30">
+                    <p className="text-[11px] text-outline font-medium text-center">
+                      Exemplo de posicionamento correto da CNH
+                    </p>
+                  </div>
+                </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-              Restrições Médicas
-            </label>
-            <textarea
-              placeholder="Ex.: Obrigatório uso de lentes corretivas"
-              value={medicalRestrictions}
-              onChange={(e) => setMedicalRestrictions(e.target.value)}
-              rows={2}
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-            />
-          </div>
+                <div className="rounded-xl border border-outline-variant/40 bg-surface-container overflow-hidden flex flex-col">
+                  <div className="flex items-center gap-2 px-5 py-3.5 border-b border-outline-variant/30 bg-surface-container-high">
+                    <MaterialIcon
+                      icon="info"
+                      size={18}
+                      className="text-primary"
+                    />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                      O que fazer
+                    </span>
+                  </div>
+                  <ul className="px-5 py-4 space-y-4 flex-1">
+                    {UPLOAD_INSTRUCTIONS.map((item, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-3 text-sm text-on-surface"
+                      >
+                        <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                          {i + 1}
+                        </span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-              Observações
-            </label>
-            <textarea
-              placeholder="Informações adicionais do documento"
-              value={observations}
-              onChange={(e) => setObservations(e.target.value)}
-              rows={2}
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-            />
-          </div>
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  Foto da CNH
+                </label>
+                <label
+                  className={`block border-2 border-dashed rounded-xl px-6 py-8 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                    dragging
+                      ? "border-primary bg-primary/5"
+                      : file
+                        ? "border-primary/50 bg-primary/5"
+                        : "border-outline-variant/60 hover:border-primary/50 hover:bg-primary/5"
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleFile(e.target.files[0]);
+                    }}
+                  />
+                  {file ? (
+                    <>
+                      <MaterialIcon
+                        icon="check_circle"
+                        size={40}
+                        className="text-primary mb-2"
+                      />
+                      <div className="font-bold text-primary text-sm">
+                        {file.name}
+                      </div>
+                      <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                        Clique para substituir
+                      </div>
+                    </>
+                  ) : existingFileUrl ? (
+                    <>
+                      <MaterialIcon
+                        icon="insert_drive_file"
+                        size={40}
+                        className="text-primary mb-2"
+                      />
+                      <div className="font-bold text-primary text-sm">
+                        Documento enviado anteriormente
+                      </div>
+                      <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                        Clique para substituir
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <MaterialIcon
+                        icon="upload_file"
+                        className="text-outline mb-2"
+                        size={40}
+                      />
+                      <div className="font-bold text-tertiary text-sm">
+                        Arraste a foto ou clique para selecionar
+                      </div>
+                      <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                        PNG, JPG ou PDF — Máx. 20MB
+                      </div>
+                    </>
+                  )}
+                </label>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <MaterialIcon icon="id_card" size={20} />{" "}
-            {isSubmitting
-              ? isEditing
-                ? "Atualizando..."
-                : "Cadastrando..."
-              : isEditing
-                ? "Atualizar CNH"
-                : "Cadastrar CNH"}
-          </button>
-        </form>
-        </>
+                {isValidating && (
+                  <div className="flex items-center gap-2 mt-3 px-1">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-on-surface-variant">
+                      Analisando documento...
+                    </span>
+                  </div>
+                )}
+
+                {validationResult &&
+                  !isValidating &&
+                  (validationResult.error ? (
+                    <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg text-sm font-medium bg-error/10 text-error">
+                      <MaterialIcon icon="error" size={18} />
+                      {validationResult.error}
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex items-center gap-2 mt-3 px-3 py-2 rounded-lg text-sm font-medium ${
+                        validationResult.confidence === "high"
+                          ? "bg-primary/10 text-primary"
+                          : validationResult.confidence === "medium"
+                            ? "bg-tertiary/10 text-tertiary"
+                            : "bg-error/10 text-error"
+                      }`}
+                    >
+                      <MaterialIcon
+                        icon={
+                          validationResult.is_valid ? "verified" : "warning"
+                        }
+                        size={18}
+                      />
+                      {validationResult.confidence === "high"
+                        ? "Documento reconhecido como CNH. Prossiga com o preenchimento dos dados."
+                        : validationResult.confidence === "medium"
+                          ? "Documento possivelmente é uma CNH"
+                          : "Documento não reconhecido como CNH, favor seguir as instruções de captura de imagem"}
+                    </div>
+                  ))}
+              </div>
+
+              {existingFileUrl && !file && (
+                <div className="flex items-center gap-3 border-2 border-dashed border-outline-variant/60 rounded-xl p-3">
+                  {existingFileUrl.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                    <img
+                      src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                      alt="Documento CNH"
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-outline-variant/15 flex items-center justify-center flex-shrink-0">
+                      <MaterialIcon
+                        icon="picture_as_pdf"
+                        size={24}
+                        className="text-outline"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-on-surface truncate">
+                      Documento CNH
+                    </p>
+                    <p className="text-xs text-outline">
+                      {existingFileUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"} ·
+                      Enviado anteriormente
+                    </p>
+                  </div>
+                  <a
+                    href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors flex-shrink-0"
+                  >
+                    <MaterialIcon icon="download" size={16} />
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {((validationResult === null && isEditing) ||
+              validationResult?.is_valid) && (
+              <form
+                className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
+                onSubmit={handleSubmit}
+              >
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                  Dados de Identificação
+                </p>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Nome Completo *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Conforme consta na CNH"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Data de Nascimento *
+                    </label>
+                    <input
+                      type="date"
+                      value={birthDate}
+                      ref={birthDateRef}
+                      max={maxBirthDate}
+                      onChange={(e) => {
+                        setBirthDate(e.target.value);
+                        birthDateRef.current?.setCustomValidity("");
+                      }}
+                      onBlur={handleBirthDateBlur}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      CPF *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="000.000.000-00"
+                      value={cpf}
+                      ref={cpfRef}
+                      onChange={(e) => {
+                        setCpf(maskDocument(e.target.value));
+                        cpfRef.current?.setCustomValidity("");
+                      }}
+                      onBlur={handleCpfBlur}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                      pattern="\d{3}\.\d{3}\.\d{3}-\d{2}"
+                      title="Informe um CPF válido no formato 000.000.000-00"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      RG *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="00.000.000-0"
+                      value={rg}
+                      ref={rgRef}
+                      onChange={(e) => {
+                        setRg(maskRG(e.target.value));
+                        rgRef.current?.setCustomValidity("");
+                      }}
+                      onBlur={handleRgBlur}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Nacionalidade *
+                    </label>
+                    <select
+                      value={nationality}
+                      onChange={(e) => setNationality(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    >
+                      <option value="Brasileiro(a)">Brasileiro(a)</option>
+                      <option value="Estrangeiro(a)">Estrangeiro(a)</option>
+                      <option value="Naturalizado(a)">Naturalizado(a)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Cidade de Nascimento *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="São Paulo"
+                      value={birthCity}
+                      onChange={(e) => setBirthCity(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Estado de Nascimento *
+                    </label>
+                    <select
+                      value={birthState}
+                      onChange={(e) => setBirthState(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {UF_OPTIONS.map((uf) => (
+                        <option key={uf} value={uf}>
+                          {uf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Nome da Mãe *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome completo"
+                      value={motherName}
+                      onChange={(e) => setMotherName(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Nome do Pai (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome completo"
+                      value={fatherName}
+                      onChange={(e) => setFatherName(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                  Dados da Habilitação
+                </p>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Nº CNH *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="11 dígitos"
+                      value={cnhNumber}
+                      onChange={(e) =>
+                        setCnhNumber(
+                          e.target.value.replace(/\D/g, "").slice(0, 11),
+                        )
+                      }
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                      pattern="\d{11}"
+                      title="O número da CNH deve conter exatamente 11 dígitos"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Categoria *
+                    </label>
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {CNH_CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Primeira Habilitação *
+                    </label>
+                    <input
+                      type="date"
+                      value={firstLicenseDate}
+                      max={today}
+                      onChange={(e) => setFirstLicenseDate(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Data de Emissão *
+                    </label>
+                    <input
+                      type="date"
+                      value={issueDate}
+                      max={today}
+                      onChange={(e) => setIssueDate(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Data de Validade *
+                    </label>
+                    <input
+                      type="date"
+                      value={expirationDate}
+                      onChange={(e) => setExpirationDate(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      UF de Emissão *
+                    </label>
+                    <select
+                      value={issuingState}
+                      onChange={(e) => setIssuingState(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {UF_OPTIONS.map((uf) => (
+                        <option key={uf} value={uf}>
+                          {uf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Órgão Emissor *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="DETRAN-SP"
+                      value={issuingAuthority}
+                      onChange={(e) => setIssuingAuthority(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                  Situação do Documento
+                </p>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Situação *
+                    </label>
+                    <select
+                      value={situation}
+                      onChange={(e) => setSituation(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      required
+                    >
+                      <option value="">Selecione</option>
+                      {CNH_SITUATIONS.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                      Pontuação
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={points}
+                      onChange={(e) =>
+                        setPoints(
+                          Math.max(0, Math.min(40, Number(e.target.value))),
+                        )
+                      }
+                      min={0}
+                      max={40}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    />
+                    <p className="text-[11px] text-outline font-medium">
+                      Pontos acumulados por infrações (0 a 40).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-8">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ear}
+                      onChange={(e) => setEar(e.target.checked)}
+                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm text-on-surface">
+                      EAR — Exerce Atividade Remunerada
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={acc}
+                      onChange={(e) => setAcc(e.target.checked)}
+                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                    />
+                    <span className="text-sm text-on-surface">
+                      ACC — Autorização p/ Ciclomotor
+                    </span>
+                  </label>
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                  Restrições e Observações
+                </p>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Restrições Médicas
+                  </label>
+                  <textarea
+                    placeholder="Ex.: Obrigatório uso de lentes corretivas"
+                    value={medicalRestrictions}
+                    onChange={(e) => setMedicalRestrictions(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Observações
+                  </label>
+                  <textarea
+                    placeholder="Informações adicionais do documento"
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
+                    rows={2}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <MaterialIcon icon="id_card" size={20} />{" "}
+                  {isSubmitting
+                    ? isEditing
+                      ? "Atualizando..."
+                      : "Cadastrando..."
+                    : isEditing
+                      ? "Atualizar CNH"
+                      : "Cadastrar CNH"}
+                </button>
+              </form>
+            )}
+          </>
         )}
       </div>
       <Footer />

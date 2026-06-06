@@ -9,6 +9,7 @@ export type Certification = {
   description: string;
   media_url?: string | null;
   validation_status: string;
+  review_note?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 };

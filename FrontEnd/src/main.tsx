@@ -15,6 +15,7 @@ import DashboardLocatario from "@/pages/DashboardLocatario.tsx";
 import AdminLayout from "@/components/AdminLayout.tsx";
 import AdminUsers from "@/pages/Admin/Users.tsx";
 import AdminAnuncios from "@/pages/Admin/Anuncios.tsx";
+import AdminDocumentos from "@/pages/Admin/Documentos.tsx";
 import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder.tsx";
 import { Toaster } from "sonner";
 
@@ -75,10 +76,7 @@ createRoot(document.getElementById("root")!).render(
               <Route index element={<Navigate to="users" replace />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="anuncios" element={<AdminAnuncios />} />
-              <Route
-                path="credenciais"
-                element={<AdminPlaceholder title="Credenciais" />}
-              />
+              <Route path="documentos" element={<AdminDocumentos />} />
               <Route
                 path="denuncias"
                 element={<AdminPlaceholder title="Denúncias" />}
