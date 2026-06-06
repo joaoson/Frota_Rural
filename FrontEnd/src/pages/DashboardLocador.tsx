@@ -1180,7 +1180,7 @@ const DashboardLocador = () => {
                     </button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <button className="text-sm font-bold text-error hover:underline">
+                        <button className="text-sm font-bold text-error hover:underline cursor-pointer">
                           Remover
                         </button>
                       </AlertDialogTrigger>
@@ -1338,7 +1338,7 @@ const DashboardLocador = () => {
                         </Link>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <button className="text-sm font-bold text-error hover:underline">
+                            <button className="text-sm font-bold text-error hover:underline cursor-pointer">
                               Remover
                             </button>
                           </AlertDialogTrigger>
@@ -1469,7 +1469,7 @@ const DashboardLocador = () => {
                         </Link>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <button className="text-sm font-bold text-error hover:underline">
+                            <button className="text-sm font-bold text-error hover:underline cursor-pointer">
                               Remover
                             </button>
                           </AlertDialogTrigger>

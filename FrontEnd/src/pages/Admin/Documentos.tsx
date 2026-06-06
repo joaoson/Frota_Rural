@@ -535,7 +535,7 @@ const Documentos = () => {
         open={detailOpen}
         onOpenChange={(open) => (open ? null : closeDetail())}
       >
-        <DialogContent className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 shadow-xl max-w-3xl">
+        <DialogContent className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-xl max-w-3xl max-h-[90dvh] overflow-y-auto p-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-track]:my-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-outline-variant/50">
           <DialogHeader>
             <DialogTitle className="font-headline font-bold text-on-surface flex items-center gap-2">
               <MaterialIcon
@@ -574,6 +574,81 @@ const Documentos = () => {
                 </div>
               </div>
 
+              {(() => {
+                const fileUrl =
+                  selectedItem.type === "license"
+                    ? (selectedItem.raw as OperatorLicense).file_url
+                    : (selectedItem.raw as Certification).media_url;
+
+                if (!fileUrl) return null;
+
+                const fullUrl = `${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${fileUrl}`;
+                const isImage = /\.(jpg|jpeg|png|webp)$/i.test(fileUrl);
+
+                return (
+                  <div className="mt-4 bg-surface-container-low rounded-xl border border-outline-variant/30 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-outline-variant/30 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MaterialIcon
+                          icon={isImage ? "image" : "picture_as_pdf"}
+                          size={16}
+                          className="text-primary"
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                          Documento Anexado
+                        </span>
+                      </div>
+                      <a
+                        href={fullUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                      >
+                        <MaterialIcon icon="open_in_new" size={14} />
+                        Abrir
+                      </a>
+                    </div>
+                    {isImage ? (
+                      <div className="p-4 bg-surface-container flex items-center justify-center">
+                        <img
+                          src={fullUrl}
+                          alt="Documento anexado"
+                          className="max-h-80 w-full rounded-lg object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center flex-shrink-0">
+                          <MaterialIcon
+                            icon="picture_as_pdf"
+                            size={22}
+                            className="text-error"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-on-surface truncate">
+                            Arquivo PDF
+                          </p>
+                          <p className="text-xs text-on-surface-variant">
+                            Clique em &quot;Abrir&quot; para visualizar
+                          </p>
+                        </div>
+                        <a
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                        >
+                          <MaterialIcon icon="download" size={14} />
+                          Baixar
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="pt-2">
                 <label className="text-[10px] font-bold uppercase tracking-wider text-outline">
                   Observação / Motivo
@@ -594,7 +669,7 @@ const Documentos = () => {
               type="button"
               disabled={submitting}
               onClick={closeDetail}
-              className="px-4 py-2 rounded-lg font-bold text-sm text-on-surface-variant hover:bg-surface-container-high transition-colors"
+              className="px-4 py-2 rounded-lg font-bold text-sm text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
             >
               Cancelar
             </button>
@@ -602,26 +677,16 @@ const Documentos = () => {
               type="button"
               disabled={submitting || !reviewNote.trim()}
               onClick={() => runReview("rejected")}
-              className="px-4 py-2 rounded-lg font-bold text-sm bg-error text-on-error hover:opacity-90 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg font-bold text-sm bg-error text-on-error hover:opacity-90 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? (
-                <MaterialIcon icon="hourglass_bottom" size={16} />
-              ) : (
-                <MaterialIcon icon="block" size={16} />
-              )}
-              Rejeitar
+              Recusar
             </button>
             <button
               type="button"
               disabled={submitting}
               onClick={() => runReview("approved")}
-              className="px-4 py-2 rounded-lg font-bold text-sm bg-primary text-on-primary hover:opacity-90 transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="px-4 py-2 rounded-lg font-bold text-sm bg-primary text-on-primary hover:opacity-90 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? (
-                <MaterialIcon icon="hourglass_bottom" size={16} />
-              ) : (
-                <MaterialIcon icon="check_circle" size={16} />
-              )}
               Aprovar
             </button>
           </DialogFooter>

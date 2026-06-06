@@ -123,6 +123,7 @@ const CNHUpload = () => {
   const [existingLicenseId, setExistingLicenseId] = useState<string | null>(
     null,
   );
+  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const isEditing = existingLicenseId !== null;
@@ -171,6 +172,7 @@ const CNHUpload = () => {
         setMedicalRestrictions(license.medical_restrictions ?? "");
         setObservations(license.observations ?? "");
         setPoints(license.points);
+        setExistingFileUrl(license.file_url ?? null);
       })
       .finally(() => setIsLoading(false));
   }, [userId]);
@@ -272,6 +274,11 @@ const CNHUpload = () => {
         return;
       }
 
+      let uploadedFileUrl: string | undefined;
+      if (file) {
+        uploadedFileUrl = await operatorDocumentService.uploadDocument(file);
+      }
+
       const payload: CreateOperatorLicenseRequest = {
         user: userId,
         name: name.trim(),
@@ -295,6 +302,7 @@ const CNHUpload = () => {
         medical_restrictions: medicalRestrictions.trim() || undefined,
         observations: observations.trim() || undefined,
         points,
+        file_url: uploadedFileUrl || existingFileUrl || undefined,
       };
 
       if (isEditing) {
@@ -425,7 +433,7 @@ const CNHUpload = () => {
                 >
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.[0]) handleFile(e.target.files[0]);
@@ -440,6 +448,20 @@ const CNHUpload = () => {
                       />
                       <div className="font-bold text-primary text-sm">
                         {file.name}
+                      </div>
+                      <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                        Clique para substituir
+                      </div>
+                    </>
+                  ) : existingFileUrl ? (
+                    <>
+                      <MaterialIcon
+                        icon="insert_drive_file"
+                        size={40}
+                        className="text-primary mb-2"
+                      />
+                      <div className="font-bold text-primary text-sm">
+                        Documento enviado anteriormente
                       </div>
                       <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
                         Clique para substituir
@@ -502,9 +524,49 @@ const CNHUpload = () => {
                     </div>
                   ))}
               </div>
+
+              {existingFileUrl && !file && (
+                <div className="flex items-center gap-3 border-2 border-dashed border-outline-variant/60 rounded-xl p-3">
+                  {existingFileUrl.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                    <img
+                      src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                      alt="Documento CNH"
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-outline-variant/15 flex items-center justify-center flex-shrink-0">
+                      <MaterialIcon
+                        icon="picture_as_pdf"
+                        size={24}
+                        className="text-outline"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-on-surface truncate">
+                      Documento CNH
+                    </p>
+                    <p className="text-xs text-outline">
+                      {existingFileUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"} ·
+                      Enviado anteriormente
+                    </p>
+                  </div>
+                  <a
+                    href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors flex-shrink-0"
+                  >
+                    <MaterialIcon icon="download" size={16} />
+                    Baixar
+                  </a>
+                </div>
+              )}
             </div>
 
-            {(validationResult === null && isEditing || validationResult?.is_valid) && (
+            {((validationResult === null && isEditing) ||
+              validationResult?.is_valid) && (
               <form
                 className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
                 onSubmit={handleSubmit}
@@ -889,7 +951,7 @@ const CNHUpload = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <MaterialIcon icon="id_card" size={20} />{" "}
                   {isSubmitting

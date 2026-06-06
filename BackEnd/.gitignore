@@ -221,3 +221,6 @@ __marimo__/
 
 # ML Training
 ml/data/**
+
+# Local image cache
+/media

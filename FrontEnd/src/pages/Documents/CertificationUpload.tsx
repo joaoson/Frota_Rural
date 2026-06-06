@@ -26,6 +26,7 @@ const CertificationUpload = () => {
   const [dragging, setDragging] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingMediaUrl, setExistingMediaUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!!id);
 
   const isEditing = !!id;
@@ -42,6 +43,7 @@ const CertificationUpload = () => {
         setExpirationDate(cert.expiration_date ?? "");
         setCredentialCode(cert.credential_code ?? "");
         setDescription(cert.description);
+        setExistingMediaUrl(cert.media_url ?? null);
       })
       .finally(() => setIsLoading(false));
   }, [id]);
@@ -72,6 +74,11 @@ const CertificationUpload = () => {
         return;
       }
 
+      let uploadedMediaUrl: string | undefined;
+      if (file) {
+        uploadedMediaUrl = await operatorDocumentService.uploadDocument(file);
+      }
+
       const payload: CreateCertificationRequest = {
         user: userId,
         issuing_organization: issuingOrganization.trim(),
@@ -80,7 +87,7 @@ const CertificationUpload = () => {
         expiration_date: expirationDate || undefined,
         credential_code: credentialCode.trim() || undefined,
         description: description.trim(),
-        media_url: undefined,
+        media_url: uploadedMediaUrl || existingMediaUrl || undefined,
       };
 
       if (isEditing) {
@@ -270,6 +277,20 @@ const CertificationUpload = () => {
                         Clique para substituir
                       </div>
                     </>
+                  ) : existingMediaUrl ? (
+                    <>
+                      <MaterialIcon
+                        icon="insert_drive_file"
+                        size={40}
+                        className="text-primary mb-2"
+                      />
+                      <div className="font-bold text-primary text-sm">
+                        Arquivo enviado anteriormente
+                      </div>
+                      <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
+                        Clique para substituir
+                      </div>
+                    </>
                   ) : (
                     <>
                       <MaterialIcon
@@ -286,12 +307,46 @@ const CertificationUpload = () => {
                     </>
                   )}
                 </label>
+
+                {existingMediaUrl && !file && (
+                  <div className="mt-3 flex items-center gap-3 border-2 border-dashed border-outline-variant/60 rounded-xl p-3">
+                    {existingMediaUrl.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                      <img
+                        src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
+                        alt="Certificado"
+                        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-outline-variant/15 flex items-center justify-center flex-shrink-0">
+                        <MaterialIcon icon="picture_as_pdf" size={24} className="text-outline" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-on-surface truncate">
+                        Certificado
+                      </p>
+                      <p className="text-xs text-outline">
+                        {existingMediaUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"} · Enviado anteriormente
+                      </p>
+                    </div>
+                    <a
+                      href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors flex-shrink-0"
+                    >
+                      <MaterialIcon icon="download" size={16} />
+                      Baixar
+                    </a>
+                  </div>
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <MaterialIcon icon="workspace_premium" size={20} />{" "}
                 {isSubmitting

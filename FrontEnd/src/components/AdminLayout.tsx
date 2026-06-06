@@ -4,7 +4,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 const sidebarItems = [
   { icon: "groups", label: "Usuários", to: "/admin/users" },
   { icon: "campaign", label: "Anúncios", to: "/admin/anuncios" },
-  { icon: "badge", label: "Credenciais", to: "/admin/credenciais" },
+  { icon: "badge", label: "Documentos", to: "/admin/documentos" },
   { icon: "flag", label: "Denúncias", to: "/admin/denuncias" },
   { icon: "analytics", label: "Relatórios", to: "/admin/relatorios" },
 ] as const;
@@ -49,7 +49,9 @@ const AdminLayout = () => {
             </div>
             <div>
               <div className="font-bold text-sm text-on-surface">Admin</div>
-              <div className="text-[11px] text-on-surface-variant">Moderação</div>
+              <div className="text-[11px] text-on-surface-variant">
+                Moderação
+              </div>
             </div>
           </div>
         </div>

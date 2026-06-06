@@ -180,6 +180,45 @@ def certification_detail(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(["POST"])
+def upload_document(request):
+    file = request.FILES.get("file")
+    if not file:
+        return Response(
+            {"error": "Nenhum arquivo enviado."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if file.content_type not in ALLOWED_TYPES:
+        return Response(
+            {"error": "Tipo de arquivo não suportado. Envie JPG, PNG ou PDF."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if file.size > MAX_FILE_SIZE:
+        return Response(
+            {"error": "Arquivo excede o tamanho máximo de 20MB."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    import uuid
+    import os
+    from django.conf import settings
+
+    ext = os.path.splitext(file.name)[1].lower() or ".jpg"
+    filename = f"{uuid.uuid4()}{ext}"
+    upload_dir = os.path.join(settings.MEDIA_ROOT, "documents")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    filepath = os.path.join(upload_dir, filename)
+    with open(filepath, "wb") as dest:
+        for chunk in file.chunks():
+            dest.write(chunk)
+
+    url = f"{settings.MEDIA_URL}documents/{filename}"
+    return Response({"url": url}, status=status.HTTP_201_CREATED)
+
+
 VALID_STATUSES = {"approved", "rejected"}
 
 @api_view(["PATCH"])

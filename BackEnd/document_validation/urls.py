@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    upload_document,
     validate_cnh_document,
     operator_licenses_list,
     operator_license_detail,
@@ -10,6 +11,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path('documents/upload/', upload_document, name='upload_document'),
     path('operator-licenses/validate-document/', validate_cnh_document, name='validate_cnh_document'),
     path('operator-licenses/', operator_licenses_list, name='operator_licenses_list'),
     path('operator-licenses/<uuid:pk>/review', review_license, name='review_license'),
