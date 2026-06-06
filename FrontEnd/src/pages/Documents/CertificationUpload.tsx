@@ -87,7 +87,10 @@ const CertificationUpload = () => {
         expiration_date: expirationDate || undefined,
         credential_code: credentialCode.trim() || undefined,
         description: description.trim(),
-        media_url: uploadedMediaUrl || existingMediaUrl || undefined,
+        media_url:
+          uploadedMediaUrl ||
+          existingMediaUrl ||
+          (isEditing ? null : undefined),
       };
 
       if (isEditing) {
@@ -318,7 +321,11 @@ const CertificationUpload = () => {
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-outline-variant/15 flex items-center justify-center flex-shrink-0">
-                        <MaterialIcon icon="picture_as_pdf" size={24} className="text-outline" />
+                        <MaterialIcon
+                          icon="picture_as_pdf"
+                          size={24}
+                          className="text-outline"
+                        />
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
@@ -326,19 +333,28 @@ const CertificationUpload = () => {
                         Certificado
                       </p>
                       <p className="text-xs text-outline">
-                        {existingMediaUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"} · Enviado anteriormente
+                        {existingMediaUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"}{" "}
+                        · Enviado anteriormente
                       </p>
                     </div>
-                    <a
-                      href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors flex-shrink-0"
-                    >
-                      <MaterialIcon icon="download" size={16} />
-                      Baixar
-                    </a>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <a
+                        href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors"
+                      >
+                        <MaterialIcon icon="download" size={16} />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setExistingMediaUrl(null)}
+                        className="flex items-center px-2 py-2 rounded-lg text-on-surface hover:bg-primary/5 transition-colors cursor-pointer"
+                      >
+                        <MaterialIcon icon="delete" size={16} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

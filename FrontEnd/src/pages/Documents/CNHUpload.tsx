@@ -559,7 +559,6 @@ const CNHUpload = () => {
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-on-surface hover:bg-primary/5 transition-colors flex-shrink-0"
                   >
                     <MaterialIcon icon="download" size={16} />
-                    Baixar
                   </a>
                 </div>
               )}
