@@ -1307,6 +1307,11 @@ const DashboardLocador = () => {
                               "pt-BR",
                             )}
                           </p>
+                          {lic.validation_status === "rejected" && lic.review_note && (
+                            <p className="text-xs text-error mt-1">
+                              Motivo: {lic.review_note}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
@@ -1433,6 +1438,11 @@ const DashboardLocador = () => {
                               "pt-BR",
                             )}
                           </p>
+                          {cert.validation_status === "rejected" && cert.review_note && (
+                            <p className="text-xs text-error mt-1">
+                              Motivo: {cert.review_note}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">

@@ -178,3 +178,73 @@ def certification_detail(request, pk):
 
     certification.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+VALID_STATUSES = {"approved", "rejected"}
+
+@api_view(["PATCH"])
+def review_license(request, pk):
+    try:
+        license = OperatorLicense.objects.get(pk=pk)
+    except OperatorLicense.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    validation_status = request.data.get("validation_status")
+    if not validation_status or validation_status not in VALID_STATUSES:
+        return Response(
+            {"error": "Informe um validation_status válido (approved ou rejected)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    review_note = request.data.get("review_note")
+    if validation_status == "rejected" and not review_note:
+        return Response(
+            {"error": "O motivo da rejeição é obrigatório."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from django.utils import timezone
+
+    license.validation_status = validation_status
+    license.review_note = review_note or None
+    license.updated_at = timezone.now()
+    license.save(update_fields=["validation_status", "review_note", "updated_at"])
+
+    return Response(
+        OperatorLicenseSerializer(license).data,
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["PATCH"])
+def review_certification(request, pk):
+    try:
+        certification = Certification.objects.get(pk=pk)
+    except Certification.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    validation_status = request.data.get("validation_status")
+    if not validation_status or validation_status not in VALID_STATUSES:
+        return Response(
+            {"error": "Informe um validation_status válido (approved ou rejected)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    review_note = request.data.get("review_note")
+    if validation_status == "rejected" and not review_note:
+        return Response(
+            {"error": "O motivo da rejeição é obrigatório."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from django.utils import timezone
+
+    certification.validation_status = validation_status
+    certification.review_note = review_note or None
+    certification.updated_at = timezone.now()
+    certification.save(update_fields=["validation_status", "review_note", "updated_at"])
+
+    return Response(
+        CertificationSerializer(certification).data,
+        status=status.HTTP_200_OK,
+    )

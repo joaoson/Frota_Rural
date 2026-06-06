@@ -9,6 +9,7 @@ import {
   OperatorDocumentServiceError,
 } from "./errors/OperatorDocumentError";
 import type { CNHValidationResult } from "./models/CNHValidationResult";
+import type { ReviewDocumentRequest } from "./models/ReviewDocumentRequest";
 
 class OperatorDocumentService {
   private LICENSES_ENDPOINT = "operator-licenses/";
@@ -117,6 +118,25 @@ class OperatorDocumentService {
     await AxiosInstance.delete(`${this.LICENSES_ENDPOINT}${id}`);
   }
 
+  async reviewLicense(
+    id: string,
+    data: ReviewDocumentRequest,
+  ): Promise<OperatorLicense> {
+    try {
+      const response = await AxiosInstance.patch<OperatorLicense>(
+        `${this.LICENSES_ENDPOINT}${id}/review`,
+        data,
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const msg = error.response?.data?.error;
+        if (msg) throw new OperatorDocumentServiceError(msg);
+      }
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
+    }
+  }
+
   async listCertifications(params?: {
     user?: string;
     validation_status?: string;
@@ -187,6 +207,25 @@ class OperatorDocumentService {
 
   async removeCertification(id: string): Promise<void> {
     await AxiosInstance.delete(`${this.CERTIFICATIONS_ENDPOINT}${id}`);
+  }
+
+  async reviewCertification(
+    id: string,
+    data: ReviewDocumentRequest,
+  ): Promise<Certification> {
+    try {
+      const response = await AxiosInstance.patch<Certification>(
+        `${this.CERTIFICATIONS_ENDPOINT}${id}/review`,
+        data,
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const msg = error.response?.data?.error;
+        if (msg) throw new OperatorDocumentServiceError(msg);
+      }
+      throw new OperatorDocumentServiceError(OperatorDocumentError.ServerError);
+    }
   }
 }
 

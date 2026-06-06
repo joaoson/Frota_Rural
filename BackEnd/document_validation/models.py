@@ -62,6 +62,7 @@ class OperatorLicense(models.Model):
         choices=ValidationStatus.choices,
         default=ValidationStatus.PENDING,
     )
+    review_note = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
@@ -93,6 +94,7 @@ class Certification(models.Model):
         choices=ValidationStatus.choices,
         default=ValidationStatus.PENDING,
     )
+    review_note = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
