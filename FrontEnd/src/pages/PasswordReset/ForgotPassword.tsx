@@ -12,9 +12,26 @@ const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const validate = (val: string) => {
+    let errorMsg = "";
+    const trimmed = val.trim();
+    if (!trimmed) errorMsg = "E-mail é obrigatório.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) errorMsg = "E-mail inválido.";
+    setError(errorMsg);
+    return errorMsg;
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const validationError = validate(email);
+    if (validationError) {
+      toast.error("Por favor, informe um e-mail válido.");
+      return;
+    }
+
     setLoading(true);
 
     const request: PasswordResetRequest = {
@@ -24,9 +41,9 @@ const ForgotPassword = () => {
     try {
       await passwordResetService.requestPasswordReset(request);
       setSent(true);
-    } catch (error) {
-      if (error instanceof PasswordResetServiceError) {
-        toast.error(error.message);
+    } catch (err) {
+      if (err instanceof PasswordResetServiceError) {
+        toast.error(err.message);
       }
     } finally {
       setLoading(false);
@@ -75,7 +92,7 @@ const ForgotPassword = () => {
                   </p>
                 </div>
 
-                <form className="space-y-6" onSubmit={handleSubmit}>
+                <form className="space-y-6" onSubmit={handleSubmit} noValidate>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       E-mail
@@ -84,10 +101,15 @@ const ForgotPassword = () => {
                       type="email"
                       placeholder="contato@email.com"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) validate(e.target.value);
+                      }}
+                      onBlur={(e) => validate(e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${error ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {error && <p className="text-[11px] text-error font-medium mt-1">{error}</p>}
                   </div>
                   <button
                     type="submit"

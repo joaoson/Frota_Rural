@@ -24,22 +24,45 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
+  const validateField = (fieldName: string, value: string) => {
+    let errorMsg = "";
+    if (fieldName === "newPassword") {
+      if (!value) {
+        errorMsg = "Nova senha é obrigatória.";
+      } else if (!passwordPattern.regex.test(value)) {
+        errorMsg = passwordPattern.title;
+      }
+    } else if (fieldName === "confirmPassword") {
+      if (!value) {
+        errorMsg = "Confirmação de senha é obrigatória.";
+      } else if (value !== newPassword) {
+        errorMsg = "As senhas não coincidem.";
+      }
+    }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
+
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (newPassword !== confirmPassword) {
-      toast.error("As senhas não coincidem.");
+    const newPasswordError = validateField("newPassword", newPassword);
+    const confirmPasswordError = validateField("confirmPassword", confirmPassword);
+
+    if (newPasswordError || confirmPasswordError) {
+      toast.error("Por favor, corrija os erros no formulário antes de prosseguir.");
       return;
     }
 
     setLoading(true);
 
     const request: PasswordResetConfirmRequest = {
-      token: token!,
+      token: decodeQPToken(token!),
       new_password: newPassword,
     };
 
@@ -106,7 +129,7 @@ const ResetPassword = () => {
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit}>
+            <form className="space-y-6" onSubmit={handleSubmit} noValidate>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nova Senha
@@ -115,12 +138,15 @@ const ResetPassword = () => {
                   type="password"
                   placeholder="••••••••"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (errors.newPassword) validateField("newPassword", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("newPassword", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.newPassword ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
-                  pattern={passwordPattern.regex.source}
-                  title={passwordPattern.title}
                 />
+                {errors.newPassword && <p className="text-[11px] text-error font-medium mt-1">{errors.newPassword}</p>}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -130,10 +156,15 @@ const ResetPassword = () => {
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (errors.confirmPassword) validateField("confirmPassword", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("confirmPassword", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.confirmPassword ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.confirmPassword && <p className="text-[11px] text-error font-medium mt-1">{errors.confirmPassword}</p>}
               </div>
               <button
                 type="submit"

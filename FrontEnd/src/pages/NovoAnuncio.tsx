@@ -7,6 +7,8 @@ import { machineService, type MachineListItem } from "@/services/MachineService/
 import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { maskCEP } from "@/utils/masks/maskCEP";
+import { fetchAddressByCEP } from "@/services/ViaCEPService";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT_TYPES = ["image/jpeg", "image/png"];
@@ -18,6 +20,15 @@ const NovoAnuncio = () => {
   const [machines, setMachines] = useState<MachineListItem[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(true);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [machinery, setMachinery] = useState("");
+  const [hourlyRate, setHourlyRate] = useState("");
+  const [cep, setCep] = useState("");
+  const [location, setLocation] = useState("");
+  const [availabilityStart, setAvailabilityStart] = useState("");
+  const [availabilityEnd, setAvailabilityEnd] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -40,6 +51,43 @@ const NovoAnuncio = () => {
       cancelled = true;
     };
   }, []);
+
+  const validateField = (fieldName: string, value: string) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "machinery":
+        if (!value) errorMsg = "Selecione um equipamento da frota.";
+        break;
+      case "hourlyRate": {
+        const rate = Number(value.replace(",", "."));
+        if (!value) {
+          errorMsg = "Valor por hora é obrigatório.";
+        } else if (Number.isNaN(rate) || rate <= 0) {
+          errorMsg = "Informe um valor por hora maior que zero.";
+        }
+        break;
+      }
+      case "location":
+        if (!value.trim()) errorMsg = "Informe a localização.";
+        break;
+      case "availabilityStart":
+        if (value && value < new Date().toISOString().split("T")[0]) {
+          errorMsg = "A data de início não pode ser no passado.";
+        }
+        break;
+      case "availabilityEnd":
+        if (value) {
+          if (value < new Date().toISOString().split("T")[0]) {
+            errorMsg = "A data final não pode ser no passado.";
+          } else if (availabilityStart && value < availabilityStart) {
+            errorMsg = "A data final deve ser igual ou posterior à data de início.";
+          }
+        }
+        break;
+    }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
@@ -64,33 +112,26 @@ const NovoAnuncio = () => {
     event.preventDefault();
     if (isSubmitting) return;
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const machineryId = String(formData.get("machinery") ?? "").trim();
-    const hourlyRaw = String(formData.get("hourly_rate") ?? "").trim();
-    const location = String(formData.get("location_address") ?? "").trim();
-    const availabilityStart = String(formData.get("availability_start") ?? "").trim();
-    const availabilityEnd = String(formData.get("availability_end") ?? "").trim();
-    const description = String(formData.get("description") ?? "").trim();
+    const errorsList = {
+      machinery: validateField("machinery", machinery),
+      hourlyRate: validateField("hourlyRate", hourlyRate),
+      location: validateField("location", location),
+      availabilityStart: validateField("availabilityStart", availabilityStart),
+      availabilityEnd: validateField("availabilityEnd", availabilityEnd),
+    };
 
-    if (!machineryId) {
-      toast.error("Selecione um equipamento da frota.");
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
       return;
     }
-    const hourlyRate = Number(hourlyRaw.replace(",", "."));
-    if (!hourlyRaw || Number.isNaN(hourlyRate) || hourlyRate <= 0) {
-      toast.error("Informe um valor por hora válido.");
-      return;
-    }
-    if (!location) {
-      toast.error("Informe a localização.");
-      return;
-    }
+
+    const rate = Number(hourlyRate.replace(",", "."));
+
     setIsSubmitting(true);
     try {
       await postingService.create({
-        machinery: machineryId,
-        hourly_rate: hourlyRate,
+        machinery: machinery,
+        hourly_rate: rate,
         location_address: location,
         availability_start: availabilityStart ? `${availabilityStart}T00:00:00` : undefined,
         availability_end: availabilityEnd ? `${availabilityEnd}T23:59:59` : undefined,
@@ -100,7 +141,12 @@ const NovoAnuncio = () => {
       toast.success(
         "Anúncio publicado. O envio das fotos à API ainda não está disponível — as imagens foram apenas validadas neste formulário.",
       );
-      form.reset();
+      setMachinery("");
+      setHourlyRate("");
+      setLocation("");
+      setAvailabilityStart("");
+      setAvailabilityEnd("");
+      setDescription("");
       setPhotoFiles([]);
       navigate("/dashboard");
     } catch {
@@ -129,17 +175,23 @@ const NovoAnuncio = () => {
         <form
           className="space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-10 shadow-sm"
           onSubmit={handleSubmit}
+          noValidate
         >
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Equipamento da Frota *</label>
             <select
               name="machinery"
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow disabled:opacity-60"
+              value={machinery}
+              onChange={(e) => {
+                setMachinery(e.target.value);
+                if (errors.machinery) validateField("machinery", e.target.value);
+              }}
+              onBlur={(e) => validateField("machinery", e.target.value)}
+              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow disabled:opacity-60 ${errors.machinery ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               required
               disabled={loadingMachines}
-              defaultValue=""
             >
-              <option value="" disabled>
+              <option value="">
                 {loadingMachines ? "Carregando..." : "Selecione um equipamento"}
               </option>
               {machines.map((m) => (
@@ -148,6 +200,7 @@ const NovoAnuncio = () => {
                 </option>
               ))}
             </select>
+            {errors.machinery && <p className="text-[11px] text-error font-medium mt-1">{errors.machinery}</p>}
             {!loadingMachines && machines.length === 0 ? (
               <p className="text-[11px] text-outline font-medium">
                 Nenhum equipamento ativo.{" "}
@@ -167,20 +220,65 @@ const NovoAnuncio = () => {
               min={0}
               step="0.01"
               placeholder="480"
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              value={hourlyRate}
+              onChange={(e) => {
+                setHourlyRate(e.target.value);
+                if (errors.hourlyRate) validateField("hourlyRate", e.target.value);
+              }}
+              onBlur={(e) => validateField("hourlyRate", e.target.value)}
+              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.hourlyRate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               required
             />
+            {errors.hourlyRate && <p className="text-[11px] text-error font-medium mt-1">{errors.hourlyRate}</p>}
           </div>
 
-          <div className="space-y-3">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Localização *</label>
-            <input
-              name="location_address"
-              type="text"
-              placeholder="Sorriso, MT"
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-              required
-            />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">CEP</label>
+              <input
+                type="text"
+                placeholder="00000-000"
+                value={cep}
+                onChange={async (e) => {
+                  const masked = maskCEP(e.target.value);
+                  setCep(masked);
+                  const digits = masked.replace(/\D/g, "");
+                  if (digits.length === 8) {
+                    try {
+                      const data = await fetchAddressByCEP(digits);
+                      if (data) {
+                        const newLoc = `${data.localidade}, ${data.uf}`;
+                        setLocation(newLoc);
+                        if (errors.location) setErrors((prev) => ({ ...prev, location: "" }));
+                      } else {
+                        toast.error("CEP não encontrado.");
+                      }
+                    } catch (error) {
+                      console.error("Erro ao buscar CEP", error);
+                    }
+                  }
+                }}
+                className="w-full bg-surface-container border border-transparent rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none text-on-surface transition-shadow"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Localização *</label>
+              <input
+                name="location_address"
+                type="text"
+                placeholder="Sorriso, MT"
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  if (errors.location) validateField("location", e.target.value);
+                }}
+                onBlur={(e) => validateField("location", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.location ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                required
+              />
+              {errors.location && <p className="text-[11px] text-error font-medium mt-1">{errors.location}</p>}
+            </div>
             <div className="bg-surface-container-high rounded-xl h-48 flex items-center justify-center text-on-surface-variant text-sm border border-outline-variant/20">
               <MaterialIcon icon="map" size={24} className="mr-2 text-outline" /> Mapa de seleção de localização
             </div>
@@ -192,16 +290,30 @@ const NovoAnuncio = () => {
               <input
                 name="availability_start"
                 type="date"
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                value={availabilityStart}
+                onChange={(e) => {
+                  setAvailabilityStart(e.target.value);
+                  if (errors.availabilityStart) validateField("availabilityStart", e.target.value);
+                }}
+                onBlur={(e) => validateField("availabilityStart", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.availabilityStart ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               />
+              {errors.availabilityStart && <p className="text-[11px] text-error font-medium mt-1">{errors.availabilityStart}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Disponível até</label>
               <input
                 name="availability_end"
                 type="date"
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                value={availabilityEnd}
+                onChange={(e) => {
+                  setAvailabilityEnd(e.target.value);
+                  if (errors.availabilityEnd) validateField("availabilityEnd", e.target.value);
+                }}
+                onBlur={(e) => validateField("availabilityEnd", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.availabilityEnd ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               />
+              {errors.availabilityEnd && <p className="text-[11px] text-error font-medium mt-1">{errors.availabilityEnd}</p>}
             </div>
           </div>
 
@@ -211,6 +323,8 @@ const NovoAnuncio = () => {
               name="description"
               placeholder="Detalhes sobre o equipamento e condições..."
               rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
             />
           </div>

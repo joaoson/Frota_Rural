@@ -1,7 +1,9 @@
 import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Footer = () => {
+  const { userRole } = useAuth();
   return (
     <footer className="bg-inverse-surface w-full py-16 border-t border-outline-variant/15">
       <div className="max-w-[1200px] mx-auto px-6">
@@ -34,12 +36,14 @@ const Footer = () => {
               >
                 Buscar equipamentos
               </Link>
-              <Link
-                to="/dashboard/novo-equipamento"
-                className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
-              >
-                Anunciar frota
-              </Link>
+              {userRole !== "locatario" && (
+                <Link
+                  to="/dashboard/novo-equipamento"
+                  className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"
+                >
+                  Anunciar frota
+                </Link>
+              )}
               <Link
                 to="/login"
                 className="font-body text-sm text-inverse-on-surface/70 hover:text-inverse-primary transition-colors"

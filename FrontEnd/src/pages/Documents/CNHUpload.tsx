@@ -210,58 +210,147 @@ const CNHUpload = () => {
     if (dropped) handleFile(dropped);
   };
 
-  const handleCpfBlur = () => {
-    const input = cpfRef.current;
-    if (!input) return;
-    const digits = cpf.replace(/\D/g, "");
-    if (digits.length === 0) return;
-    if (!validateCPF(digits)) {
-      input.setCustomValidity("CPF inválido. Verifique os dígitos informados.");
-      input.reportValidity();
-    } else {
-      input.setCustomValidity("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (fieldName: string, value: any) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "name":
+        if (!value.trim()) errorMsg = "Nome completo é obrigatório.";
+        break;
+      case "birthDate":
+        if (!value) {
+          errorMsg = "Data de nascimento é obrigatória.";
+        } else if (value > maxBirthDate) {
+          errorMsg = "O condutor deve ter pelo menos 18 anos.";
+        } else if (value < "1900-01-01") {
+          errorMsg = "Data de nascimento inválida.";
+        }
+        break;
+      case "cpf": {
+        const digits = value.replace(/\D/g, "");
+        if (!digits) {
+          errorMsg = "CPF é obrigatório.";
+        } else if (!validateCPF(digits)) {
+          errorMsg = "CPF inválido. Verifique os dígitos informados.";
+        }
+        break;
+      }
+      case "rg": {
+        const digits = value.replace(/\D/g, "");
+        if (!digits) {
+          errorMsg = "RG é obrigatório.";
+        } else if (!validateRG(digits)) {
+          errorMsg = "RG inválido. Verifique os dígitos informados.";
+        } else if (!/^\d{2}\.\d{3}\.\d{3}-[\dXdx]$/.test(value)) {
+          errorMsg = "O RG deve seguir o formato XX.XXX.XXX-X.";
+        }
+        break;
+      }
+      case "nationality":
+        if (!value) errorMsg = "Nacionalidade é obrigatória.";
+        break;
+      case "birthCity":
+        if (!value.trim()) errorMsg = "Cidade de nascimento é obrigatória.";
+        break;
+      case "birthState":
+        if (!value) errorMsg = "Estado de nascimento é obrigatório.";
+        break;
+      case "motherName":
+        if (!value.trim()) errorMsg = "Nome da mãe é obrigatório.";
+        break;
+      case "cnhNumber": {
+        const cleaned = value.replace(/\D/g, "");
+        if (!cleaned) {
+          errorMsg = "Número da CNH é obrigatório.";
+        } else if (cleaned.length !== 11) {
+          errorMsg = "O número da CNH deve conter exatamente 11 dígitos.";
+        }
+        break;
+      }
+      case "category":
+        if (!value) errorMsg = "Categoria é obrigatória.";
+        break;
+      case "firstLicenseDate":
+        if (!value) {
+          errorMsg = "Data da primeira habilitação é obrigatória.";
+        } else if (value > today) {
+          errorMsg = "A data da primeira habilitação não pode ser no futuro.";
+        }
+        break;
+      case "issueDate":
+        if (!value) {
+          errorMsg = "Data de emissão é obrigatória.";
+        } else if (value > today) {
+          errorMsg = "A data de emissão não pode ser no futuro.";
+        }
+        break;
+      case "expirationDate":
+        if (!value) {
+          errorMsg = "Data de validade é obrigatória.";
+        } else if (situation === "active" && value < today) {
+          errorMsg = "A data de validade de uma CNH ativa deve ser no futuro.";
+        }
+        break;
+      case "issuingState":
+        if (!value) errorMsg = "UF de emissão é obrigatório.";
+        break;
+      case "issuingAuthority":
+        if (!value.trim()) errorMsg = "Órgão emissor é obrigatório.";
+        break;
+      case "situation":
+        if (!value) errorMsg = "Situação é obrigatória.";
+        break;
+      case "points": {
+        const p = Number(value);
+        if (value !== "" && (Number.isNaN(p) || p < 0 || p > 40)) {
+          errorMsg = "A pontuação deve ser entre 0 e 40.";
+        }
+        break;
+      }
     }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
+
+  const handleCpfBlur = () => {
+    validateField("cpf", cpf);
   };
 
   const handleBirthDateBlur = () => {
-    const input = birthDateRef.current;
-    if (!input || !birthDate) return;
-    if (birthDate > maxBirthDate) {
-      input.setCustomValidity("O condutor deve ter pelo menos 18 anos.");
-      input.reportValidity();
-    } else {
-      input.setCustomValidity("");
-    }
+    validateField("birthDate", birthDate);
   };
 
   const handleRgBlur = () => {
-    const input = rgRef.current;
-    if (!input) return;
-    const digits = rg.replace(/\D/g, "");
-    if (digits.length === 0) return;
-    if (!validateRG(digits)) {
-      input.setCustomValidity("RG inválido. Verifique os dígitos informados.");
-      input.reportValidity();
-    } else {
-      input.setCustomValidity("");
-    }
+    validateField("rg", rg);
   };
 
-  const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting) return;
 
-    const cpfDigits = cpf.replace(/\D/g, "");
-    if (!validateCPF(cpfDigits)) {
-      cpfRef.current?.setCustomValidity("CPF inválido.");
-      cpfRef.current?.reportValidity();
-      return;
-    }
+    const errorsList = {
+      name: validateField("name", name),
+      birthDate: validateField("birthDate", birthDate),
+      cpf: validateField("cpf", cpf),
+      rg: validateField("rg", rg),
+      nationality: validateField("nationality", nationality),
+      birthCity: validateField("birthCity", birthCity),
+      birthState: validateField("birthState", birthState),
+      motherName: validateField("motherName", motherName),
+      cnhNumber: validateField("cnhNumber", cnhNumber),
+      category: validateField("category", category),
+      firstLicenseDate: validateField("firstLicenseDate", firstLicenseDate),
+      issueDate: validateField("issueDate", issueDate),
+      expirationDate: validateField("expirationDate", expirationDate),
+      issuingState: validateField("issuingState", issuingState),
+      issuingAuthority: validateField("issuingAuthority", issuingAuthority),
+      situation: validateField("situation", situation),
+      points: validateField("points", points),
+    };
 
-    const rgDigits = rg.replace(/\D/g, "");
-    if (!validateRG(rgDigits)) {
-      rgRef.current?.setCustomValidity("RG inválido.");
-      rgRef.current?.reportValidity();
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
       return;
     }
 
@@ -569,6 +658,7 @@ const CNHUpload = () => {
               <form
                 className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
                 onSubmit={handleSubmit}
+                noValidate
               >
                 <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
                   Dados de Identificação
@@ -582,10 +672,15 @@ const CNHUpload = () => {
                     type="text"
                     placeholder="Conforme consta na CNH"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (errors.name) validateField("name", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("name", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.name ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     required
                   />
+                  {errors.name && <p className="text-[11px] text-error font-medium mt-1">{errors.name}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-5">
@@ -600,12 +695,13 @@ const CNHUpload = () => {
                       max={maxBirthDate}
                       onChange={(e) => {
                         setBirthDate(e.target.value);
-                        birthDateRef.current?.setCustomValidity("");
+                        if (errors.birthDate) validateField("birthDate", e.target.value);
                       }}
                       onBlur={handleBirthDateBlur}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.birthDate && <p className="text-[11px] text-error font-medium mt-1">{errors.birthDate}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -617,15 +713,15 @@ const CNHUpload = () => {
                       value={cpf}
                       ref={cpfRef}
                       onChange={(e) => {
-                        setCpf(maskDocument(e.target.value));
-                        cpfRef.current?.setCustomValidity("");
+                        const masked = maskDocument(e.target.value);
+                        setCpf(masked);
+                        if (errors.cpf) validateField("cpf", masked);
                       }}
                       onBlur={handleCpfBlur}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cpf ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
-                      pattern="\d{3}\.\d{3}\.\d{3}-\d{2}"
-                      title="Informe um CPF válido no formato 000.000.000-00"
                     />
+                    {errors.cpf && <p className="text-[11px] text-error font-medium mt-1">{errors.cpf}</p>}
                   </div>
                 </div>
 
@@ -640,13 +736,15 @@ const CNHUpload = () => {
                       value={rg}
                       ref={rgRef}
                       onChange={(e) => {
-                        setRg(maskRG(e.target.value));
-                        rgRef.current?.setCustomValidity("");
+                        const masked = maskRG(e.target.value);
+                        setRg(masked);
+                        if (errors.rg) validateField("rg", masked);
                       }}
                       onBlur={handleRgBlur}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.rg ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.rg && <p className="text-[11px] text-error font-medium mt-1">{errors.rg}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -654,14 +752,19 @@ const CNHUpload = () => {
                     </label>
                     <select
                       value={nationality}
-                      onChange={(e) => setNationality(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setNationality(e.target.value);
+                        if (errors.nationality) validateField("nationality", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("nationality", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.nationality ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     >
                       <option value="Brasileiro(a)">Brasileiro(a)</option>
                       <option value="Estrangeiro(a)">Estrangeiro(a)</option>
                       <option value="Naturalizado(a)">Naturalizado(a)</option>
                     </select>
+                    {errors.nationality && <p className="text-[11px] text-error font-medium mt-1">{errors.nationality}</p>}
                   </div>
                 </div>
 
@@ -674,10 +777,15 @@ const CNHUpload = () => {
                       type="text"
                       placeholder="São Paulo"
                       value={birthCity}
-                      onChange={(e) => setBirthCity(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setBirthCity(e.target.value);
+                        if (errors.birthCity) validateField("birthCity", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("birthCity", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthCity ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.birthCity && <p className="text-[11px] text-error font-medium mt-1">{errors.birthCity}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -685,8 +793,12 @@ const CNHUpload = () => {
                     </label>
                     <select
                       value={birthState}
-                      onChange={(e) => setBirthState(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setBirthState(e.target.value);
+                        if (errors.birthState) validateField("birthState", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("birthState", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthState ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     >
                       <option value="">Selecione</option>
@@ -696,6 +808,7 @@ const CNHUpload = () => {
                         </option>
                       ))}
                     </select>
+                    {errors.birthState && <p className="text-[11px] text-error font-medium mt-1">{errors.birthState}</p>}
                   </div>
                 </div>
 
@@ -708,10 +821,15 @@ const CNHUpload = () => {
                       type="text"
                       placeholder="Nome completo"
                       value={motherName}
-                      onChange={(e) => setMotherName(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setMotherName(e.target.value);
+                        if (errors.motherName) validateField("motherName", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("motherName", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.motherName ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.motherName && <p className="text-[11px] text-error font-medium mt-1">{errors.motherName}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -740,16 +858,16 @@ const CNHUpload = () => {
                       type="text"
                       placeholder="11 dígitos"
                       value={cnhNumber}
-                      onChange={(e) =>
-                        setCnhNumber(
-                          e.target.value.replace(/\D/g, "").slice(0, 11),
-                        )
-                      }
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 11);
+                        setCnhNumber(val);
+                        if (errors.cnhNumber) validateField("cnhNumber", val);
+                      }}
+                      onBlur={(e) => validateField("cnhNumber", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cnhNumber ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
-                      pattern="\d{11}"
-                      title="O número da CNH deve conter exatamente 11 dígitos"
                     />
+                    {errors.cnhNumber && <p className="text-[11px] text-error font-medium mt-1">{errors.cnhNumber}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -757,8 +875,12 @@ const CNHUpload = () => {
                     </label>
                     <select
                       value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setCategory(e.target.value);
+                        if (errors.category) validateField("category", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("category", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.category ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     >
                       <option value="">Selecione</option>
@@ -768,6 +890,7 @@ const CNHUpload = () => {
                         </option>
                       ))}
                     </select>
+                    {errors.category && <p className="text-[11px] text-error font-medium mt-1">{errors.category}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -777,10 +900,15 @@ const CNHUpload = () => {
                       type="date"
                       value={firstLicenseDate}
                       max={today}
-                      onChange={(e) => setFirstLicenseDate(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setFirstLicenseDate(e.target.value);
+                        if (errors.firstLicenseDate) validateField("firstLicenseDate", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("firstLicenseDate", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.firstLicenseDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.firstLicenseDate && <p className="text-[11px] text-error font-medium mt-1">{errors.firstLicenseDate}</p>}
                   </div>
                 </div>
 
@@ -793,10 +921,15 @@ const CNHUpload = () => {
                       type="date"
                       value={issueDate}
                       max={today}
-                      onChange={(e) => setIssueDate(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setIssueDate(e.target.value);
+                        if (errors.issueDate) validateField("issueDate", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("issueDate", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issueDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -805,10 +938,15 @@ const CNHUpload = () => {
                     <input
                       type="date"
                       value={expirationDate}
-                      onChange={(e) => setExpirationDate(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setExpirationDate(e.target.value);
+                        if (errors.expirationDate) validateField("expirationDate", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("expirationDate", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.expirationDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.expirationDate && <p className="text-[11px] text-error font-medium mt-1">{errors.expirationDate}</p>}
                   </div>
                 </div>
 
@@ -819,8 +957,12 @@ const CNHUpload = () => {
                     </label>
                     <select
                       value={issuingState}
-                      onChange={(e) => setIssuingState(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setIssuingState(e.target.value);
+                        if (errors.issuingState) validateField("issuingState", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("issuingState", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingState ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     >
                       <option value="">Selecione</option>
@@ -830,6 +972,7 @@ const CNHUpload = () => {
                         </option>
                       ))}
                     </select>
+                    {errors.issuingState && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingState}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -839,10 +982,15 @@ const CNHUpload = () => {
                       type="text"
                       placeholder="DETRAN-SP"
                       value={issuingAuthority}
-                      onChange={(e) => setIssuingAuthority(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setIssuingAuthority(e.target.value);
+                        if (errors.issuingAuthority) validateField("issuingAuthority", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("issuingAuthority", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingAuthority ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     />
+                    {errors.issuingAuthority && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingAuthority}</p>}
                   </div>
                 </div>
 
@@ -857,8 +1005,12 @@ const CNHUpload = () => {
                     </label>
                     <select
                       value={situation}
-                      onChange={(e) => setSituation(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      onChange={(e) => {
+                        setSituation(e.target.value);
+                        if (errors.situation) validateField("situation", e.target.value);
+                      }}
+                      onBlur={(e) => validateField("situation", e.target.value)}
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.situation ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                       required
                     >
                       <option value="">Selecione</option>
@@ -868,6 +1020,7 @@ const CNHUpload = () => {
                         </option>
                       ))}
                     </select>
+                    {errors.situation && <p className="text-[11px] text-error font-medium mt-1">{errors.situation}</p>}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -877,15 +1030,17 @@ const CNHUpload = () => {
                       type="number"
                       placeholder="0"
                       value={points}
-                      onChange={(e) =>
-                        setPoints(
-                          Math.max(0, Math.min(40, Number(e.target.value))),
-                        )
-                      }
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(40, Number(e.target.value)));
+                        setPoints(val);
+                        if (errors.points) validateField("points", val);
+                      }}
+                      onBlur={(e) => validateField("points", e.target.value)}
                       min={0}
                       max={40}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.points ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     />
+                    {errors.points && <p className="text-[11px] text-error font-medium mt-1">{errors.points}</p>}
                     <p className="text-[11px] text-outline font-medium">
                       Pontos acumulados por infrações (0 a 40).
                     </p>

@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import "./index.css";
-import App from "./App.tsx";
 import Index from "@/pages/Index.tsx";
 import BuscarMaquinario from "@/pages/BuscarMaquinario.tsx";
 import AnuncioDetalhe from "@/pages/AnuncioDetalhe.tsx";
@@ -24,7 +23,6 @@ import Login from "./pages/Login.tsx";
 import ForgotPassword from "./pages/PasswordReset/ForgotPassword.tsx";
 import ResetPassword from "./pages/PasswordReset/ResetPassword.tsx";
 import Help from "./pages/Help.tsx";
-import Buscar from "./pages/Buscar.tsx";
 import Contrato from "./pages/Contrato/Contrato.tsx";
 import Reservar from "@/pages/Reservar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -43,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
           // Auth
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/cadastro" element={<Navigate to="/login" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           // Credenciais e documentos
@@ -54,10 +53,12 @@ createRoot(document.getElementById("root")!).render(
               path="/dashboard-locatario"
               element={<DashboardLocatario />}
             />
-            <Route
-              path="/dashboard/novo-equipamento"
-              element={<NovoEquipamento />}
-            />
+            <Route element={<ProtectedRoute allowedRoles={["locador", "admin"]} />}>
+              <Route
+                path="/dashboard/novo-equipamento"
+                element={<NovoEquipamento />}
+              />
+            </Route>
             <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
             <Route
               path="/dashboard/gerenciar-anuncio/:id"
@@ -87,7 +88,7 @@ createRoot(document.getElementById("root")!).render(
               />
             </Route>
           </Route>
-          <Route path="/buscar" element={<Buscar />} />
+          <Route path="/buscar" element={<Navigate to="/buscar-maquinario" replace />} />
           <Route path="/buscar-maquinario" element={<BuscarMaquinario />} />
           <Route path="/anuncio/:id" element={<AnuncioDetalhe />} />
           <Route path="/reservar/:id" element={<Reservar />} />

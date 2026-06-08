@@ -67,10 +67,10 @@ const Index = () => {
             transition={{ duration: 0.7, delay: 0.4 }}
             className="flex flex-wrap gap-4"
           >
-            <Link to="/buscar" className="bg-primary text-on-primary px-8 py-4 rounded-lg font-bold text-lg hover:bg-primary-container transition-all shadow-lg hover:shadow-xl inline-flex items-center gap-2">
+            <Link to="/buscar-maquinario" className="bg-primary text-on-primary px-8 py-4 rounded-lg font-bold text-lg hover:bg-primary-container transition-all shadow-lg hover:shadow-xl inline-flex items-center gap-2">
               <MaterialIcon icon="search" size={20} /> Buscar Máquinas
             </Link>
-            <Link to="/cadastro" className="bg-secondary-container text-on-secondary-container px-8 py-4 rounded-lg font-bold text-lg hover:brightness-95 transition-all">
+            <Link to="/login" className="bg-secondary-container text-on-secondary-container px-8 py-4 rounded-lg font-bold text-lg hover:brightness-95 transition-all">
               Anuncie sua Frota
             </Link>
           </motion.div>
@@ -108,7 +108,7 @@ const Index = () => {
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Data Fim</label>
                 <input type="date" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
               </div>
-              <Link to="/buscar" className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
+              <Link to="/buscar-maquinario" className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
                 <MaterialIcon icon="search" size={18} /> Buscar
               </Link>
             </div>
@@ -168,7 +168,7 @@ const Index = () => {
                       <span className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block mb-1">Custo</span>
                       <div className="text-2xl font-black text-primary leading-none">{item.price}<span className="text-sm font-bold text-tertiary">/hora</span></div>
                     </div>
-                    <Link to="/buscar" className="bg-primary text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-primary/90 transition-colors">
+                    <Link to="/buscar-maquinario" className="bg-primary text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-primary/90 transition-colors">
                       Reservar
                     </Link>
                   </div>
@@ -263,7 +263,7 @@ const Index = () => {
           <p className="text-on-primary/70 text-lg max-w-xl mx-auto mb-8">
             Cadastre-se e comece a conectar sua fazenda com os melhores equipamentos disponíveis. Segurança e formalização garantidas.
           </p>
-          <Link to="/cadastro" className="inline-block bg-secondary-container text-on-secondary-container px-10 py-4 rounded-lg font-bold text-lg hover:brightness-95 transition-all">
+          <Link to="/login" className="inline-block bg-secondary-container text-on-secondary-container px-10 py-4 rounded-lg font-bold text-lg hover:brightness-95 transition-all">
             Criar conta
           </Link>
         </section>

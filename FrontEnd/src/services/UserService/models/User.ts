@@ -12,4 +12,5 @@ export interface User {
   status: UserStatus | string;
   created_at?: string;
   updated_at?: string;
+  cep?: string | null;
 }

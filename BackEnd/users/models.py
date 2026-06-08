@@ -22,6 +22,7 @@ class Users(AbstractBaseUser):
     phone = models.CharField(max_length=20, blank=True, null=True)
     role = models.TextField()
     address = models.TextField()
+    cep = models.CharField(max_length=9, blank=True, null=True)
     birth_date = models.DateField()
     status = models.CharField(max_length=50, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -5,6 +5,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { contractService } from "@/services/ContractService/ContractService";
 
 
 const HORAS_POR_DIARIA = 8;
@@ -115,6 +117,8 @@ function TituloSecao({ children }: { children: React.ReactNode }) {
 const Reservar = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { userId } = useAuth();
+  const [createdRental, setCreatedRental] = useState<any>(null);
 
   const [anuncio, setAnuncio] = useState<PostingReservaAPI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -126,6 +130,12 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+
+  const minStartDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  }, []);
 
   // Etapa 3 — assinatura
   const [aceitouTermos, setAceitouTermos] = useState(false);
@@ -171,6 +181,10 @@ const Reservar = () => {
       toast.error("Informe a data de início e a data de fim da locação.");
       return;
     }
+    if (dataInicio < minStartDate) {
+      toast.error("A data de início deve ser a partir de uma semana após o dia de hoje.");
+      return;
+    }
     if (diarias <= 0) {
       toast.error("A data de fim deve ser igual ou posterior à data de início.");
       return;
@@ -183,15 +197,31 @@ const Reservar = () => {
     if (processando) return;
     setProcessando(true);
     // Simula o processamento do pagamento 
-    setTimeout(() => {
-      setProcessando(false);
-      toast.success("Pagamento confirmado!");
-      setEtapa(3);
-      window.scrollTo(0, 0);
+    setTimeout(async () => {
+      try {
+        const rental = await contractService.createRental({
+          postingId: id || "",
+          lesseeId: userId || "locatario-default",
+          lessorId: "lessor-default",
+          machineName: titulo,
+          startDate: dataInicio,
+          endDate: dataFim,
+          total: total,
+          observacoes: observacoes,
+        });
+        setCreatedRental(rental);
+        setProcessando(false);
+        toast.success("Pagamento confirmado!");
+        setEtapa(3);
+        window.scrollTo(0, 0);
+      } catch (err) {
+        setProcessando(false);
+        toast.error("Erro ao criar locação.");
+      }
     }, 1200);
   };
 
-  const assinarContrato = () => {
+  const assinarContrato = async () => {
     if (!aceitouTermos) {
       toast.error("Você precisa aceitar os termos do contrato para continuar.");
       return;
@@ -200,8 +230,15 @@ const Reservar = () => {
       toast.error("Digite seu nome completo para assinar o contrato.");
       return;
     }
-    toast.success("Contrato assinado! Reserva efetivada com sucesso.");
-    navigate("/dashboard-locatario");
+    try {
+      if (createdRental) {
+        await contractService.signContract(createdRental.id, "locatario", nomeAssinatura);
+      }
+      toast.success("Contrato assinado! Reserva efetivada com sucesso.");
+      navigate("/dashboard-locatario");
+    } catch (err) {
+      toast.error("Erro ao assinar contrato.");
+    }
   };
 
   // ── Resumo de valores 
@@ -316,6 +353,7 @@ const Reservar = () => {
                       <input
                         type="date"
                         value={dataInicio}
+                        min={minStartDate}
                         onChange={(e) => setDataInicio(e.target.value)}
                         className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
                       />
@@ -379,7 +417,7 @@ const Reservar = () => {
                       const selecionada = formaPagamento === opcao.id;
                       return (
                         <button
-                          key={opcao.id}
+                           key={opcao.id}
                           onClick={() => setFormaPagamento(opcao.id)}
                           className={`w-full flex items-center gap-4 rounded-xl p-4 border-2 transition text-left ${
                             selecionada

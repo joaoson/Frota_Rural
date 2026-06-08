@@ -34,18 +34,80 @@ const NovoEquipamento = () => {
   const [isBrandSelectOpen, setIsBrandSelectOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<(typeof BRANDS)[number]["value"]>("john-deere");
   const [otherBrand, setOtherBrand] = useState("");
+  const [renagroNumber, setRenagroNumber] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
+  const [usagePurpose, setUsagePurpose] = useState("Plantio");
+  const [initialHorimeter, setInitialHorimeter] = useState("");
+  const [technicalSpecifications, setTechnicalSpecifications] = useState("");
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const selectedBrandData = BRANDS.find((brand) => brand.value === selectedBrand) ?? BRANDS[0];
+
+  const validateField = (fieldName: string, value: string) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "renagroNumber": {
+        const cleaned = value.trim();
+        if (!cleaned) {
+          errorMsg = "Registro Renagro é obrigatório.";
+        } else {
+          const regex = /^BR\d{10}$/i;
+          if (!regex.test(cleaned)) {
+            errorMsg = "O registro Renagro deve conter BR seguido de exatamente 10 dígitos (ex: BR1029304899).";
+          }
+        }
+        break;
+      }
+      case "brand":
+        if (selectedBrand === "outra" && !value.trim()) {
+          errorMsg = "Marca é obrigatória.";
+        }
+        break;
+      case "model":
+        if (!value.trim()) errorMsg = "Modelo é obrigatório.";
+        break;
+      case "year": {
+        if (value) {
+          const y = Number(value);
+          const currentYear = new Date().getFullYear();
+          if (Number.isNaN(y) || y < 1980 || y > currentYear + 1) {
+            errorMsg = `O ano deve ser entre 1980 e ${currentYear + 1}.`;
+          }
+        }
+        break;
+      }
+      case "initialHorimeter": {
+        if (value) {
+          const h = Number(value);
+          if (Number.isNaN(h) || h < 0) {
+            errorMsg = "O horímetro inicial deve ser um valor positivo.";
+          }
+        }
+        break;
+      }
+    }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting) return;
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
     const brandToSend = selectedBrand === "outra" ? otherBrand.trim() : selectedBrandData.label;
-    if (!brandToSend) {
-      toast.error("Informe a marca do equipamento.");
+
+    const errorsList = {
+      renagroNumber: validateField("renagroNumber", renagroNumber),
+      brand: validateField("brand", otherBrand),
+      model: validateField("model", model),
+      year: validateField("year", year),
+      initialHorimeter: validateField("initialHorimeter", initialHorimeter),
+    };
+
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
       return;
     }
 
@@ -58,18 +120,24 @@ const NovoEquipamento = () => {
 
       await machineService.create({
         owner: userId,
-        renagro_number: String(formData.get("renagro_number") ?? "").trim(),
+        renagro_number: renagroNumber.trim().toUpperCase(),
         brand: brandToSend,
-        model: String(formData.get("model") ?? "").trim(),
-        year: formData.get("year") ? Number(formData.get("year")) : undefined,
-        technical_specifications: String(formData.get("technical_specifications") ?? "").trim(),
-        usage_purpose: String(formData.get("usage_purpose") ?? "").trim(),
+        model: model.trim(),
+        year: year ? Number(year) : undefined,
+        technical_specifications: technicalSpecifications.trim(),
+        usage_purpose: usagePurpose.trim(),
       });
 
       toast.success("Equipamento cadastrado com sucesso.");
-      form.reset();
+      setRenagroNumber("");
       setSelectedBrand("john-deere");
       setOtherBrand("");
+      setModel("");
+      setYear("");
+      setUsagePurpose("Plantio");
+      setInitialHorimeter("");
+      setTechnicalSpecifications("");
+      setErrors({});
     } catch {
       toast.error("Erro ao cadastrar equipamento. Verifique os dados e tente novamente.");
     } finally {
@@ -94,6 +162,7 @@ const NovoEquipamento = () => {
         <form
           className="space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-10 shadow-sm"
           onSubmit={handleSubmit}
+          noValidate
         >
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Nº Registro Renagro *</label>
@@ -101,10 +170,20 @@ const NovoEquipamento = () => {
               name="renagro_number"
               type="text"
               placeholder="BR1029304899"
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              value={renagroNumber}
+              onChange={(e) => {
+                setRenagroNumber(e.target.value);
+                if (errors.renagroNumber) validateField("renagroNumber", e.target.value);
+              }}
+              onBlur={(e) => validateField("renagroNumber", e.target.value)}
+              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.renagroNumber ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               required
             />
-            <p className="text-[11px] text-outline font-medium">Requisito para formalização do contrato na plataforma.</p>
+            {errors.renagroNumber ? (
+              <p className="text-[11px] text-error font-medium mt-1">{errors.renagroNumber}</p>
+            ) : (
+              <p className="text-[11px] text-outline font-medium">Requisito para formalização do contrato na plataforma.</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-5">
@@ -114,7 +193,7 @@ const NovoEquipamento = () => {
                 <button
                   type="button"
                   onClick={() => setIsBrandSelectOpen((prev) => !prev)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm text-on-surface transition-shadow focus:ring-2 focus:ring-primary flex items-center justify-between gap-2"
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm text-on-surface transition-shadow focus:ring-2 focus:outline-none flex items-center justify-between gap-2 ${errors.brand ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                 >
                   <span className="flex items-center gap-2">
                     <BrandLogo logo={selectedBrandData.logo} label={selectedBrandData.label} />
@@ -132,6 +211,9 @@ const NovoEquipamento = () => {
                         onClick={() => {
                           setSelectedBrand(brand.value);
                           setIsBrandSelectOpen(false);
+                          if (brand.value !== "outra") {
+                            setErrors((prev) => ({ ...prev, brand: "" }));
+                          }
                         }}
                         className="w-full px-3 py-2 text-left rounded-md hover:bg-surface-container transition-colors text-sm text-on-surface flex items-center gap-2"
                       >
@@ -144,15 +226,22 @@ const NovoEquipamento = () => {
               </div>
 
               {selectedBrand === "outra" ? (
-                <input
-                  name="other_brand"
-                  type="text"
-                  placeholder="Digite a marca"
-                  className="w-full mt-2 bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  value={otherBrand}
-                  onChange={(e) => setOtherBrand(e.target.value)}
-                  required
-                />
+                <>
+                  <input
+                    name="other_brand"
+                    type="text"
+                    placeholder="Digite a marca"
+                    className={`w-full mt-2 bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.brand ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                    value={otherBrand}
+                    onChange={(e) => {
+                      setOtherBrand(e.target.value);
+                      if (errors.brand) validateField("brand", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("brand", e.target.value)}
+                    required
+                  />
+                  {errors.brand && <p className="text-[11px] text-error font-medium mt-1">{errors.brand}</p>}
+                </>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -161,9 +250,16 @@ const NovoEquipamento = () => {
                 name="model"
                 type="text"
                 placeholder="S700"
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  if (errors.model) validateField("model", e.target.value);
+                }}
+                onBlur={(e) => validateField("model", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.model ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                 required
               />
+              {errors.model && <p className="text-[11px] text-error font-medium mt-1">{errors.model}</p>}
             </div>
           </div>
 
@@ -174,12 +270,24 @@ const NovoEquipamento = () => {
                 name="year"
                 type="number"
                 placeholder="2022"
-                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                value={year}
+                onChange={(e) => {
+                  setYear(e.target.value);
+                  if (errors.year) validateField("year", e.target.value);
+                }}
+                onBlur={(e) => validateField("year", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.year ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               />
+              {errors.year && <p className="text-[11px] text-error font-medium mt-1">{errors.year}</p>}
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Finalidade de Uso</label>
-              <select name="usage_purpose" className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow">
+              <select
+                name="usage_purpose"
+                value={usagePurpose}
+                onChange={(e) => setUsagePurpose(e.target.value)}
+                className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              >
                 <option>Plantio</option>
                 <option>Pulverização</option>
                 <option>Colheita</option>
@@ -195,8 +303,15 @@ const NovoEquipamento = () => {
             <input
               type="number"
               placeholder="1250 h"
-              className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              value={initialHorimeter}
+              onChange={(e) => {
+                setInitialHorimeter(e.target.value);
+                if (errors.initialHorimeter) validateField("initialHorimeter", e.target.value);
+              }}
+              onBlur={(e) => validateField("initialHorimeter", e.target.value)}
+              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.initialHorimeter ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
             />
+            {errors.initialHorimeter && <p className="text-[11px] text-error font-medium mt-1">{errors.initialHorimeter}</p>}
           </div>
 
           <div className="space-y-2">
@@ -205,6 +320,8 @@ const NovoEquipamento = () => {
               name="technical_specifications"
               placeholder="Motor, plataforma, recursos adicionais..."
               rows={3}
+              value={technicalSpecifications}
+              onChange={(e) => setTechnicalSpecifications(e.target.value)}
               className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
             />
           </div>

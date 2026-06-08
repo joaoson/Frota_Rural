@@ -25,6 +25,49 @@ const CertificationUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateField = (fieldName: string, value: any) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "title":
+        if (!value.trim()) {
+          errorMsg = "Título do curso é obrigatório.";
+        } else if (value.trim().length < 3) {
+          errorMsg = "O título deve ter pelo menos 3 caracteres.";
+        }
+        break;
+      case "issuingOrganization":
+        if (!value.trim()) {
+          errorMsg = "Organização emissora é obrigatória.";
+        } else if (value.trim().length < 2) {
+          errorMsg = "A organização emissora deve ter pelo menos 2 caracteres.";
+        }
+        break;
+      case "issueDate":
+        if (!value) {
+          errorMsg = "Data de emissão é obrigatória.";
+        } else if (value > today) {
+          errorMsg = "A data de emissão não pode ser no futuro.";
+        }
+        break;
+      case "expirationDate":
+        if (value && issueDate && value <= issueDate) {
+          errorMsg = "A data de validade deve ser posterior à data de emissão.";
+        }
+        break;
+      case "description":
+        if (!value.trim()) {
+          errorMsg = "Descrição é obrigatória.";
+        } else if (value.trim().length < 10) {
+          errorMsg = "A descrição deve conter pelo menos 10 caracteres.";
+        }
+        break;
+    }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingMediaUrl, setExistingMediaUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!!id);
@@ -64,6 +107,19 @@ const CertificationUpload = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting) return;
+
+    const errorsList = {
+      title: validateField("title", title),
+      issuingOrganization: validateField("issuingOrganization", issuingOrganization),
+      issueDate: validateField("issueDate", issueDate),
+      expirationDate: validateField("expirationDate", expirationDate),
+      description: validateField("description", description),
+    };
+
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -148,6 +204,7 @@ const CertificationUpload = () => {
             <form
               className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
               onSubmit={handleSubmit}
+              noValidate
             >
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
                 Dados da Certificação
@@ -161,10 +218,15 @@ const CertificationUpload = () => {
                   type="text"
                   placeholder="Ex.: Operação de Tratores Agrícolas"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (errors.title) validateField("title", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("title", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.title ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.title && <p className="text-[11px] text-error font-medium mt-1">{errors.title}</p>}
               </div>
 
               <div className="space-y-2">
@@ -175,10 +237,15 @@ const CertificationUpload = () => {
                   type="text"
                   placeholder="Ex.: SENAR"
                   value={issuingOrganization}
-                  onChange={(e) => setIssuingOrganization(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setIssuingOrganization(e.target.value);
+                    if (errors.issuingOrganization) validateField("issuingOrganization", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("issuingOrganization", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingOrganization ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.issuingOrganization && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingOrganization}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-5">
@@ -190,10 +257,16 @@ const CertificationUpload = () => {
                     type="date"
                     value={issueDate}
                     max={today}
-                    onChange={(e) => setIssueDate(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setIssueDate(e.target.value);
+                      if (errors.issueDate) validateField("issueDate", e.target.value);
+                      if (expirationDate) validateField("expirationDate", expirationDate);
+                    }}
+                    onBlur={(e) => validateField("issueDate", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issueDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     required
                   />
+                  {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -202,9 +275,14 @@ const CertificationUpload = () => {
                   <input
                     type="date"
                     value={expirationDate}
-                    onChange={(e) => setExpirationDate(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setExpirationDate(e.target.value);
+                      if (errors.expirationDate) validateField("expirationDate", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("expirationDate", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.expirationDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   />
+                  {errors.expirationDate && <p className="text-[11px] text-error font-medium mt-1">{errors.expirationDate}</p>}
                 </div>
               </div>
 
@@ -228,11 +306,16 @@ const CertificationUpload = () => {
                 <textarea
                   placeholder="Descreva o conteúdo do curso, competências adquiridas ou informações relevantes"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (errors.description) validateField("description", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("description", e.target.value)}
                   rows={4}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.description ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.description && <p className="text-[11px] text-error font-medium mt-1">{errors.description}</p>}
               </div>
 
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
@@ -333,8 +416,8 @@ const CertificationUpload = () => {
                         Certificado
                       </p>
                       <p className="text-xs text-outline">
-                        {existingMediaUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"}{" "}
-                        · Enviado anteriormente
+                        {existingMediaUrl.match(/\.(pdf)$/i) ? "PDF" : "Imagem"} ·
+                        Enviado anteriormente
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

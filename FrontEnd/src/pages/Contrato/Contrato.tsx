@@ -1,12 +1,52 @@
-import { useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { useParams, Link } from "react-router";
 import "./Contrato.css";
-import { mockContrato } from "./mock";
 import type { ContratoData } from "./types";
+import { contractService } from "@/services/ContractService/ContractService";
 
 export default function Contrato() {
-  useParams<{ id: string }>();
+  const { id } = useParams<{ id: string }>();
+  const [data, setData] = useState<ContratoData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const data: ContratoData = mockContrato;
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    contractService
+      .getContractById(id)
+      .then((contractData) => {
+        setData(contractData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar contrato:", err);
+        setLoading(false);
+      });
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="contrato-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fcfdf7" }}>
+        <p style={{ color: "#73796c", fontFamily: "'Epilogue', sans-serif", fontSize: "14px" }}>
+          Carregando documento do contrato...
+        </p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="contrato-root" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fcfdf7", gap: "16px" }}>
+        <p style={{ color: "#ba1a1a", fontFamily: "'Epilogue', sans-serif", fontWeight: "bold", fontSize: "16px" }}>
+          Contrato não encontrado.
+        </p>
+        <Link to="/" style={{ padding: "10px 20px", background: "#386a20", color: "white", textDecoration: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "14px" }}>
+          Voltar ao Início
+        </Link>
+      </div>
+    );
+  }
+
   const { contrato, operacao, locador, locatario, equipamento, anuncio, assinatura } = data;
 
   return (
@@ -96,7 +136,7 @@ export default function Contrato() {
               </tbody>
             </table>
             <div className="clausula-body">
-              <div><span className="item-num">1.1</span> O equipamento será entregue livre de defeitos conhecidos que possam impedir sua operação. Caso contrário, o Locador responderá pelos danos causados ao Locatário.</div>
+              <div><span className="item-num">1.1</span> O equipamento será entregue livre de defeitos conhecidos que possam impedir sua operation. Caso contrário, o Locador responderá pelos danos causados ao Locatário.</div>
               <div><span className="item-num">1.2</span> A operação do equipamento deve ser realizada por operador habilitado, indicado pelo Locador, com credencial técnica válida para condução desse tipo de maquinário. O nome e os dados do operador serão informados antes do início dos serviços.</div>
             </div>
           </div>
