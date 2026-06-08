@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskCEP } from "@/utils/masks/maskCEP";
+import { fetchAddressByCEP } from "@/services/ViaCEPService";
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { userService } from "@/services/UserService/UserService";
@@ -28,10 +29,37 @@ const Signup = () => {
   const [uf, setUf] = useState("");
   const [cep, setCep] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const documentRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
+
+  const handleCEPLookup = async (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length === 8) {
+      try {
+        const data = await fetchAddressByCEP(digits);
+        if (data) {
+          const formattedAddress = [data.logradouro, data.bairro].filter(Boolean).join(", ");
+          setAddress(formattedAddress);
+          setCity(data.localidade);
+          setUf(data.uf.toUpperCase());
+          setErrors((prev) => ({
+            ...prev,
+            address: "",
+            city: "",
+            uf: "",
+          }));
+        } else {
+          toast.error("CEP não encontrado.");
+        }
+      } catch (error) {
+        console.error("Erro ao buscar CEP", error);
+      }
+    }
+  };
 
   function validateDocument(value: string): boolean {
     const digits = value.replace(/\D/g, "");
@@ -46,30 +74,110 @@ const Signup = () => {
     return d.toISOString().split("T")[0];
   }
 
-  const handleDocumentBlur = () => {
-    const input = documentRef.current;
-    if (!input) return;
-    const digits = document.replace(/\D/g, "");
-    if (digits.length === 0) return;
-    if (!validateDocument(document)) {
-      const msg =
-        digits.length === 14
-          ? "CNPJ inválido. Verifique os dígitos informados."
-          : "CPF inválido. Verifique os dígitos informados.";
-      input.setCustomValidity(msg);
-      input.reportValidity();
-    } else {
-      input.setCustomValidity("");
+  const validateField = (fieldName: string, value: string) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "name": {
+        const trimmed = value.trim();
+        if (!trimmed) errorMsg = "Nome é obrigatório.";
+        else if (trimmed.length < 3) errorMsg = "Nome deve ter no mínimo 3 caracteres.";
+        else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(trimmed)) errorMsg = "Nome deve conter apenas letras.";
+        break;
+      }
+      case "birthDate": {
+        if (!value) {
+          errorMsg = "Data de nascimento é obrigatória.";
+        } else {
+          const maxDate = calculateMaxBirthDate();
+          if (value > maxDate) {
+            errorMsg = "É necessário ter 18 anos ou mais para se cadastrar.";
+          } else if (value < "1900-01-01") {
+            errorMsg = "Data inválida.";
+          }
+        }
+        break;
+      }
+      case "document": {
+        const digits = value.replace(/\D/g, "");
+        if (!digits) {
+          errorMsg = "Documento é obrigatório.";
+        } else if (digits.length !== 11 && digits.length !== 14) {
+          errorMsg = "Documento inválido. Informe CPF (11 dígitos) ou CNPJ (14 dígitos).";
+        } else if (!validateDocument(value)) {
+          errorMsg = digits.length === 14 ? "CNPJ inválido. Verifique os dígitos informados." : "CPF inválido. Verifique os dígitos informados.";
+        }
+        break;
+      }
+      case "email": {
+        const trimmed = value.trim();
+        if (!trimmed) errorMsg = "E-mail é obrigatório.";
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) errorMsg = "E-mail inválido.";
+        break;
+      }
+      case "phone": {
+        const digits = value.replace(/\D/g, "");
+        if (!digits) errorMsg = "Telefone é obrigatório.";
+        else if (digits.length !== 10 && digits.length !== 11) errorMsg = "Telefone deve ter 10 ou 11 dígitos.";
+        break;
+      }
+      case "address": {
+        if (!value.trim()) errorMsg = "Endereço é obrigatório.";
+        else if (value.trim().length < 5) errorMsg = "Endereço deve ter pelo menos 5 caracteres.";
+        break;
+      }
+      case "city": {
+        if (!value.trim()) errorMsg = "Cidade é obrigatória.";
+        else if (value.trim().length < 2) errorMsg = "Cidade deve ter pelo menos 2 caracteres.";
+        break;
+      }
+      case "uf": {
+        if (!value) errorMsg = "Selecione o estado.";
+        break;
+      }
+      case "cep": {
+        const digits = value.replace(/\D/g, "");
+        if (!digits) errorMsg = "CEP é obrigatório.";
+        else if (digits.length !== 8) errorMsg = "CEP deve ter exatamente 8 dígitos.";
+        break;
+      }
+      case "password": {
+        if (!value) {
+          errorMsg = "Senha é obrigatória.";
+        } else if (!passwordPattern.regex.test(value)) {
+          errorMsg = passwordPattern.title;
+        }
+        break;
+      }
     }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
   };
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleDocumentBlur = () => {
+    validateField("document", document);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateDocument(document)) {
-      documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
-      documentRef.current?.reportValidity();
+    
+    const errorsList = {
+      name: validateField("name", name),
+      birthDate: validateField("birthDate", birthDate),
+      document: validateField("document", document),
+      email: validateField("email", email),
+      phone: validateField("phone", phone),
+      address: validateField("address", address),
+      city: validateField("city", city),
+      uf: validateField("uf", uf),
+      cep: validateField("cep", cep),
+      password: validateField("password", password),
+    };
+
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
       return;
     }
+
     setLoading(true);
     try {
       const payload: CreateUserRequest = {
@@ -97,11 +205,13 @@ const Signup = () => {
         const data = error.response.data;
         if (data.document) {
           toast.error("Este documento já está cadastrado.");
+          setErrors((prev) => ({ ...prev, document: "Este documento já está cadastrado." }));
           return;
         }
 
         if (data.email) {
           toast.error("Este e-mail já está em uso.");
+          setErrors((prev) => ({ ...prev, email: "Este e-mail já está em uso." }));
           return;
         }
       }
@@ -153,7 +263,7 @@ const Signup = () => {
               </button>
             </div>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nome Completo*
@@ -162,10 +272,15 @@ const Signup = () => {
                   type="text"
                   placeholder="João da Silva"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (errors.name) validateField("name", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("name", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.name ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.name && <p className="text-[11px] text-error font-medium mt-1">{errors.name}</p>}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -174,15 +289,23 @@ const Signup = () => {
                 <input
                   type="date"
                   value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setBirthDate(e.target.value);
+                    if (errors.birthDate) validateField("birthDate", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("birthDate", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                   min="1900-01-01"
                   max={calculateMaxBirthDate()}
                 />
-                <p className="text-[11px] text-outline font-medium">
-                  É necessário ter 18 anos ou mais para se cadastrar.
-                </p>
+                {errors.birthDate ? (
+                  <p className="text-[11px] text-error font-medium mt-1">{errors.birthDate}</p>
+                ) : (
+                  <p className="text-[11px] text-outline font-medium">
+                    É necessário ter 18 anos ou mais para se cadastrar.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -195,17 +318,19 @@ const Signup = () => {
                   ref={documentRef}
                   onChange={(e) => {
                     setDocument(maskDocument(e.target.value));
-                    documentRef.current?.setCustomValidity("");
+                    if (errors.document) validateField("document", e.target.value);
                   }}
                   onBlur={handleDocumentBlur}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.document ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
-                  pattern="\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}"
-                  title="Informe um CPF válido (000.000.000-00) ou CNPJ válido (00.000.000/0001-00)"
                 />
-                <p className="text-[11px] text-outline font-medium">
-                  Requisito para formalização do contrato na plataforma.
-                </p>
+                {errors.document ? (
+                  <p className="text-[11px] text-error font-medium mt-1">{errors.document}</p>
+                ) : (
+                  <p className="text-[11px] text-outline font-medium">
+                    Requisito para formalização do contrato na plataforma.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -215,10 +340,15 @@ const Signup = () => {
                   type="email"
                   placeholder="contato@email.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (errors.email) validateField("email", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("email", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.email ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.email && <p className="text-[11px] text-error font-medium mt-1">{errors.email}</p>}
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -228,12 +358,39 @@ const Signup = () => {
                   type="tel"
                   placeholder="(00) 90000-0000"
                   value={phone}
-                  onChange={(e) => setPhone(maskPhone(e.target.value))}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setPhone(maskPhone(e.target.value));
+                    if (errors.phone) validateField("phone", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("phone", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.phone ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
-                  pattern="\(\d{2}\) \d{4,5}-\d{4}"
-                  title="Informe um telefone válido no formato (00) 90000-0000"
                 />
+                {errors.phone && <p className="text-[11px] text-error font-medium mt-1">{errors.phone}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  CEP*
+                </label>
+                <input
+                  type="text"
+                  placeholder="00000-000"
+                  value={cep}
+                  onChange={(e) => {
+                    const masked = maskCEP(e.target.value);
+                    setCep(masked);
+                    if (errors.cep) validateField("cep", masked);
+                    handleCEPLookup(masked);
+                  }}
+                  onBlur={(e) => {
+                    validateField("cep", e.target.value);
+                    handleCEPLookup(e.target.value);
+                  }}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cep ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                  required
+                />
+                {errors.cep && <p className="text-[11px] text-error font-medium mt-1">{errors.cep}</p>}
               </div>
 
               <div className="space-y-2">
@@ -244,10 +401,15 @@ const Signup = () => {
                   type="text"
                   placeholder="Rua, número, complemento"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    if (errors.address) validateField("address", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("address", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.address ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.address && <p className="text-[11px] text-error font-medium mt-1">{errors.address}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -258,10 +420,15 @@ const Signup = () => {
                     type="text"
                     placeholder="Sorriso"
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setCity(e.target.value);
+                      if (errors.city) validateField("city", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("city", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.city ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     required
                   />
+                  {errors.city && <p className="text-[11px] text-error font-medium mt-1">{errors.city}</p>}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -269,8 +436,12 @@ const Signup = () => {
                   </label>
                   <select
                     value={uf}
-                    onChange={(e) => setUf(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setUf(e.target.value);
+                      if (errors.uf) validateField("uf", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("uf", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.uf ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     required
                   >
                     <option value="">Selecione</option>
@@ -302,38 +473,36 @@ const Signup = () => {
                     <option>SE</option>
                     <option>TO</option>
                   </select>
+                  {errors.uf && <p className="text-[11px] text-error font-medium mt-1">{errors.uf}</p>}
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                  CEP*
-                </label>
-                <input
-                  type="text"
-                  placeholder="00000-000"
-                  value={cep}
-                  onChange={(e) => setCep(maskCEP(e.target.value))}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                  pattern="\d{5}-\d{3}"
-                  title="Informe um CEP válido no formato 00000-000"
-                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha*
                 </label>
-                <input
-                  type="password"
-                  placeholder="Mínimo 8 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                  pattern={passwordPattern.regex.source}
-                  title={passwordPattern.title}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mínimo 8 caracteres"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (errors.password) validateField("password", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("password", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.password ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                  >
+                    <MaterialIcon icon={showPassword ? "visibility_off" : "visibility"} size={20} />
+                  </button>
+                </div>
+                {errors.password && <p className="text-[11px] text-error font-medium mt-1">{errors.password}</p>}
               </div>
               <button
                 type="submit"

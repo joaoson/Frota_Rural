@@ -218,3 +218,9 @@ __marimo__/
 # Local virtual environment
 .env
 .idea
+
+# ML Training
+ml/data/**
+
+# Local image cache
+/media

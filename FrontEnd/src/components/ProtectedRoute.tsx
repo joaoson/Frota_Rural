@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
+import { parseJwt, type JwtPayload } from "@/utils/jwt";
 
-const ProtectedRoute = () => {
-  const { isAuthenticated, login } = useAuth();
+type ProtectedRouteProps = {
+  allowedRoles?: string[];
+};
+
+const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
+  const { isAuthenticated, userRole, login } = useAuth();
   const [isVerifying, setIsVerifying] = useState(!isAuthenticated);
+  const location = useLocation();
 
-  // Checa validade do token e tenta fazer silent refresh com base no cookie salvo
-  // de refresh token. Enquanto isso, bloqueia acesso às rotas protegidas (retorna null).
   useEffect(() => {
     if (isAuthenticated) {
       setIsVerifying(false);
@@ -17,13 +21,31 @@ const ProtectedRoute = () => {
 
     userService
       .silentRefresh()
-      .then((response) => login(response))
+      .then(async (response) => {
+        const payload = parseJwt<JwtPayload>(response.access);
+        try {
+          const user = await userService.getById(payload.user_id);
+          login(response, user.role);
+        } catch {
+          login(response);
+        }
+      })
       .catch(() => {})
       .finally(() => setIsVerifying(false));
-  }, []);
+  }, [isAuthenticated, login]);
 
   if (isVerifying) return null;
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
+
+  if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
+    if (userRole === "locador") return <Navigate to="/dashboard" replace />;
+    if (userRole === "locatario") return <Navigate to="/dashboard-locatario" replace />;
+    if (userRole === "admin") return <Navigate to="/admin" replace />;
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

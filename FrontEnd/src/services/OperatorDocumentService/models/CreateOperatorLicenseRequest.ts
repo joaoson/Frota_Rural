@@ -1,0 +1,25 @@
+export type CreateOperatorLicenseRequest = {
+  user: string;
+  name: string;
+  birth_date: string;
+  cpf: string;
+  rg: string;
+  mother_name: string;
+  father_name?: string;
+  nationality: string;
+  birth_place: string;
+  cnh_number: string;
+  category: string;
+  first_license_date: string;
+  issue_date: string;
+  expiration_date: string;
+  issuing_state: string;
+  issuing_authority: string;
+  situation: string;
+  acc: boolean;
+  ear: boolean;
+  medical_restrictions?: string;
+  observations?: string;
+  points: number;
+  file_url?: string;
+};
