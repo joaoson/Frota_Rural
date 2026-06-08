@@ -1,10 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { reviewService, type Review } from "@/services/ReviewService/ReviewService";
+import { contractService } from "@/services/ContractService/ContractService";
+import { userService } from "@/services/UserService/UserService";
+import type { User } from "@/services/UserService/models/User";
+import { maskDocument } from "@/utils/masks/maskDocument";
+import { maskPhone } from "@/utils/masks/maskPhone";
+import { maskCEP } from "@/utils/masks/maskCEP";
+import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { clearSpecialChars } from "@/utils/clearSpecialChars";
+import { validateCPF } from "@/utils/validation/validateCPF";
+import { validateCNPJ } from "@/utils/validation/validateCNPJ";
+import { passwordPattern } from "@/utils/regexPatterns";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
 import NotificationPopover from "@/components/NotificationPopover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import machine1 from "@/assets/machine-1.jpg";
 import machine2 from "@/assets/machine-2.jpg";
 
@@ -35,22 +61,172 @@ const sidebarItems = [
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
   { icon: "person", label: "Minha Conta", tab: "conta" },
+  { icon: "logout", label: "Sair", tab: "sair" },
 ];
 
-const mockRentals = [
-  { id: 1, owner: "João Silva", machine: "Trator Valtra BH194", period: "02 – 10 Fev/2026", status: "active", total: "R$ 15.000,00", contract: "#CTR-8821", image: machine2 },
-  { id: 3, owner: "Pedro Souza", machine: "Pulverizador Jacto", period: "01 – 05 Dez/2025", status: "completed", total: "R$ 6.250,00", contract: "#CTR-8710", image: machine1 },
-  { id: 4, owner: "Carlos Lima", machine: "Trator Massey 7700", period: "20 – 28 Nov/2025", status: "cancelled", total: "R$ 12.000,00", contract: "#CTR-8690", image: machine2 },
-];
+type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta" | "sair";
 
-type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta";
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function validateDocument(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 11) return validateCPF(digits);
+  if (digits.length === 14) return validateCNPJ(digits);
+  return false;
+}
 
 const DashboardLocatario = () => {
+  const { userId, logout } = useAuth();
+  const [user, setUser] = useState<User | null>(null);
+
+  // Formulário dados pessoais
+  const [formName, setFormName] = useState("");
+  const [formDocument, setFormDocument] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formAddress, setFormAddress] = useState("");
+  const [formCep, setFormCep] = useState("");
+  const documentRef = useRef<HTMLInputElement>(null);
+
+  // Formulário alteração de senha
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
+
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showReagendar, setShowReagendar] = useState<number | null>(null);
-  const [showRecorrencia, setShowRecorrencia] = useState<number | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
+
+  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
+  const [givenReviews, setGivenReviews] = useState<Review[]>([]);
+  const [rentals, setRentals] = useState<any[]>([]);
+  
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    userService
+      .getById(userId)
+      .then(setUser)
+      .catch(console.error);
+
+    reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
+    reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
+
+    contractService.listByLessee(userId).then(data => {
+      const mapped = data.map(r => ({
+        id: r.id,
+        owner: r.lessorId === "lessor-joao" ? "João Silva" : r.lessorId === "lessor-pedro" ? "Pedro Souza" : r.lessorId === "lessor-carlos" ? "Carlos Lima" : "Locador",
+        machine: r.machineName,
+        period: r.period,
+        status: r.status,
+        total: r.total,
+        contract: r.contractNumber,
+        image: r.image || (r.id === "rental-3" ? machine1 : machine2)
+      }));
+      setRentals(mapped);
+    }).catch(console.error);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!user) return;
+    setFormName(user.name);
+    setFormDocument(maskDocument(user.document));
+    setFormEmail(user.email);
+    setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
+    setFormAddress(user.address);
+    setFormCep(maskCEP(user.cep ?? ""));
+  }, [user]);
+
+  const handleDocumentBlur = () => {
+    const input = documentRef.current;
+    if (!input) return;
+    const digits = formDocument.replace(/\D/g, "");
+    if (digits.length === 0) return;
+    if (!validateDocument(formDocument)) {
+      const msg =
+        digits.length === 14
+          ? "CNPJ inválido. Verifique os dígitos informados."
+          : "CPF inválido. Verifique os dígitos informados.";
+      input.setCustomValidity(msg);
+      input.reportValidity();
+    } else {
+      input.setCustomValidity("");
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!validateDocument(formDocument)) {
+      documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
+      documentRef.current?.reportValidity();
+      return;
+    }
+    try {
+      const updated = await userService.updateProfile(userId!, {
+        name: formName.trim(),
+        document: clearSpecialChars(formDocument),
+        email: formEmail.toLowerCase().trim(),
+        phone: `+55${clearSpecialChars(formPhone)}`,
+        address: formAddress.trim(),
+        cep: clearSpecialChars(formCep),
+      });
+      setUser(updated);
+      toast.success("Dados atualizados com sucesso.");
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.data) {
+        const data = error.response.data;
+        if (data.email) {
+          toast.error("Este e-mail já está em uso.");
+          return;
+        }
+        if (data.document) {
+          toast.error("Este documento já está cadastrado.");
+          return;
+        }
+      }
+      toast.error("Não foi possível salvar as alterações. Tente novamente.");
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      confirmPasswordRef.current?.setCustomValidity("As senhas não coincidem.");
+      confirmPasswordRef.current?.reportValidity();
+      return;
+    }
+    confirmPasswordRef.current?.setCustomValidity("");
+    try {
+      await userService.updatePassword({
+        id: userId!,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast.success("Senha alterada com sucesso.");
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 400) {
+        toast.error("Senha atual incorreta.");
+      } else {
+        toast.error("Não foi possível alterar a senha. Tente novamente.");
+      }
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -62,10 +238,10 @@ const DashboardLocatario = () => {
     }
   };
 
-  const activeRentals = mockRentals.filter(r => r.status === "pending" || r.status === "active");
-  const pastRentals = mockRentals.filter(r => r.status === "completed" || r.status === "cancelled");
+  const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "active");
+  const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled");
 
-  const renderRentalCard = (r: typeof mockRentals[0]) => {
+  const renderRentalCard = (r: any) => {
     const badge = getStatusBadge(r.status);
     return (
       <div key={r.id} className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
@@ -172,12 +348,59 @@ const DashboardLocatario = () => {
               <p className="text-sm text-on-surface-variant">Como foi sua experiência com {r.owner}?</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <MaterialIcon key={i} icon="star" filled={i <= 4} className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= 4 ? "text-secondary-container" : "text-outline/40"}`} />
+                  <MaterialIcon 
+                    key={i} 
+                    icon="star" 
+                    filled={i <= reviewRating} 
+                    onClick={() => setReviewRating(i)}
+                    className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= reviewRating ? "text-secondary-container" : "text-outline/40"}`} 
+                  />
                 ))}
               </div>
-              <textarea placeholder="Conte como foi a experiência..." rows={2} className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" />
-              <button className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm">
-                Enviar Avaliação
+              <textarea 
+                placeholder="Conte como foi a experiência..." 
+                rows={2} 
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" 
+              />
+              <button 
+                onClick={async () => {
+                  if (!userId) return;
+                  if (!reviewComment.trim()) {
+                    toast.error("Por favor, escreva um comentário.");
+                    return;
+                  }
+                  setIsSubmittingReview(true);
+                  try {
+                    await reviewService.createReview({
+                      reviewer: userId,
+                      reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80", // Valid Locador ID for testing
+                      rating: reviewRating,
+                      comment: reviewComment,
+                      rental: "fe6c805a-d5be-4dfe-970f-d2c3fae1cf00" // Valid Rental ID for testing
+                    });
+                    toast.success("Avaliação enviada com sucesso!");
+                    setShowAvaliar(null);
+                    setReviewRating(5);
+                    setReviewComment("");
+                    const updatedGiven = await reviewService.getReviewsByReviewer(userId);
+                    setGivenReviews(updatedGiven);
+                  } catch (error) {
+                    console.error("Erro ao enviar avaliação:", error);
+                    if (error instanceof AxiosError && error.response?.data?.error) {
+                      toast.error(error.response.data.error);
+                    } else {
+                      toast.error("Erro ao enviar avaliação.");
+                    }
+                  } finally {
+                    setIsSubmittingReview(false);
+                  }
+                }}
+                disabled={isSubmittingReview}
+                className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm disabled:opacity-50"
+              >
+                {isSubmittingReview ? "Enviando..." : "Enviar Avaliação"}
               </button>
             </div>
           )}
@@ -188,31 +411,76 @@ const DashboardLocatario = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className="w-64 shrink-0 border-r border-outline-variant/30 h-screen sticky top-0 bg-surface-container-low flex flex-col">
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`w-64 shrink-0 border-r border-outline-variant/30 h-screen fixed md:sticky top-0 bg-surface-container-low flex flex-col z-50 transform transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-6 pb-4">
           <Link to="/" className="font-headline font-black text-xl text-primary tracking-tighter">Frota Rural</Link>
         </div>
         <nav className="flex-1 px-3 space-y-1">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.tab}
-              onClick={() => setTab(item.tab as Tab)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                tab === item.tab
-                  ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
-                  : "text-on-surface-variant hover:bg-surface-container-high"
-              }`}
-            >
-              <MaterialIcon icon={item.icon} size={20} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {sidebarItems.map((item) => {
+            const buttonEl = (
+              <button
+                key={item.tab}
+                onClick={
+                  item.tab !== "sair" ? () => {
+                    setTab(item.tab as Tab);
+                    setIsSidebarOpen(false);
+                  } : undefined
+                }
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  tab === item.tab
+                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+              >
+                <MaterialIcon icon={item.icon} size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+
+            if (item.tab === "sair") {
+              return (
+                <AlertDialog key={item.tab}>
+                  <AlertDialogTrigger asChild>{buttonEl}</AlertDialogTrigger>
+                  <AlertDialogContent size="sm">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sair da conta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja sair?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel variant="outline">
+                        Cancelar
+                      </AlertDialogCancel>
+                      <AlertDialogAction onClick={logout}>
+                        Sair
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              );
+            }
+
+            return buttonEl;
+          })}
         </nav>
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-sm">MC</div>
+            <div className="w-10 h-10 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-sm">
+              {user ? getInitials(user.name) : "…"}
+            </div>
             <div>
-              <div className="font-bold text-sm text-on-surface">Maria Costa</div>
+              <div className="font-bold text-sm text-on-surface">
+                {user ? `${user.name.split(" ")[0]} ${user.name.split(" ").slice(-1)[0]}` : "…"}
+              </div>
               <div className="text-[11px] text-on-surface-variant">Locatário</div>
             </div>
           </div>
@@ -220,8 +488,15 @@ const DashboardLocatario = () => {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
-          <div />
+        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+            >
+              <MaterialIcon icon="menu" size={24} />
+            </button>
+          </div>
           <NotificationPopover
             notifications={[
               { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
@@ -236,7 +511,7 @@ const DashboardLocatario = () => {
           {tab === "dashboard" && (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Bom dia, Maria</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary">Bom dia, {user ? user.name.split(" ")[0] : "…"}</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Veja o resumo das suas locações</p>
               </div>
@@ -283,7 +558,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
+                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
                       <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#colorSpend)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -309,7 +584,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value: number) => [`${value.toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
+                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
                       <Bar dataKey="rating" fill="hsl(39, 99%, 60%)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -327,7 +602,7 @@ const DashboardLocatario = () => {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {mockRentals.map((r) => {
+                  {rentals.map((r) => {
                     const badge = getStatusBadge(r.status);
                     return (
                       <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -375,13 +650,13 @@ const DashboardLocatario = () => {
                     <input type="text" placeholder="Ex: Sorriso, MT" className="w-full bg-surface-container border-none rounded-lg p-3.5 text-on-surface focus:ring-2 focus:ring-primary transition-shadow" />
                   </div>
                   <div className="flex items-end">
-                    <Link to="/buscar" className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-lg font-bold text-center hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                    <Link to="/buscar-maquinario" className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-lg font-bold text-center hover:shadow-lg transition-all flex items-center justify-center gap-2">
                       <MaterialIcon icon="search" size={18} /> Buscar
                     </Link>
                   </div>
                 </div>
               </div>
-              <p className="text-on-surface-variant text-center py-12">Use os filtros acima ou <Link to="/buscar" className="text-primary font-bold hover:underline">acesse a busca completa</Link></p>
+              <p className="text-on-surface-variant text-center py-12">Use os filtros acima ou <Link to="/buscar-maquinario" className="text-primary font-bold hover:underline">acesse a busca completa</Link></p>
             </div>
           )}
 
@@ -423,8 +698,6 @@ const DashboardLocatario = () => {
                   </div>
                 </div>
               )}
-
-              <DashboardPagination currentPage={1} totalPages={3} onPageChange={() => {}} />
             </div>
           )}
 
@@ -450,11 +723,7 @@ const DashboardLocatario = () => {
                   </button>
                 ))}
               </div>
-              {[
-                { id: "#CTR-8821", owner: "João Silva", machine: "Trator Valtra BH194", period: "02 – 10 Fev/2026", total: "R$ 15.000,00", status: "pending", date: "28 Jan/2026" },
-                { id: "#CTR-8835", owner: "Ricardo Mendes", machine: "Colheitadeira JD S700", period: "01 – 30 Mar/2026", total: "R$ 38.400,00", status: "signed", date: "20 Fev/2026" },
-                { id: "#CTR-8710", owner: "Pedro Souza", machine: "Pulverizador Jacto", period: "01 – 05 Dez/2025", total: "R$ 6.250,00", status: "closed", date: "28 Nov/2025" },
-              ].map((c) => (
+              {rentals.map((c) => (
                 <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
@@ -462,17 +731,17 @@ const DashboardLocatario = () => {
                         <MaterialIcon icon="description" className="text-primary" size={24} />
                       </div>
                       <div>
-                        <h3 className="font-headline font-bold text-on-surface">{c.id} — {c.machine}</h3>
-                        <p className="text-sm text-on-surface-variant">{c.owner} · Criado em {c.date}</p>
+                        <h3 className="font-headline font-bold text-on-surface">{c.contract} — {c.machine}</h3>
+                        <p className="text-sm text-on-surface-variant">{c.owner} · Criado em 2026</p>
                       </div>
                     </div>
                     <span className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
                       c.status === "pending" ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
-                        : c.status === "signed" ? "bg-primary/10 text-primary border border-primary/20"
+                        : c.status === "active" || c.status === "signed" ? "bg-primary/10 text-primary border border-primary/20"
                         : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
                     }`}>
-                      <MaterialIcon icon={c.status === "pending" ? "description" : c.status === "signed" ? "verified" : "check_circle"} size={14} />
-                      {c.status === "pending" ? "Assinatura Pendente" : c.status === "signed" ? "Assinado" : "Encerrado"}
+                      <MaterialIcon icon={c.status === "pending" ? "description" : (c.status === "active" || c.status === "signed") ? "verified" : "check_circle"} size={14} />
+                      {c.status === "pending" ? "Assinatura Pendente" : (c.status === "active" || c.status === "signed") ? "Assinado" : "Encerrado"}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
@@ -494,13 +763,15 @@ const DashboardLocatario = () => {
                     </div>
                   </div>
                   <div className="flex gap-3">
+                    <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
+                      <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
+                    </Link>
                     <button className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
                       <MaterialIcon icon="download" size={16} /> Baixar PDF
                     </button>
                   </div>
                 </div>
               ))}
-              <DashboardPagination currentPage={1} totalPages={2} onPageChange={() => {}} />
             </div>
           )}
 
@@ -518,17 +789,14 @@ const DashboardLocatario = () => {
                   <MaterialIcon icon="inbox" size={22} className="text-primary" /> Avaliações Recebidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    { from: "João Silva", initials: "JS", machine: "Trator Valtra BH194", date: "11/02/2026", rating: 5, comment: "Locatária exemplar! Devolveu o trator em perfeito estado e cumpriu todos os prazos." },
-                    { from: "Pedro Souza", initials: "PS", machine: "Pulverizador Jacto", date: "06/12/2025", rating: 4, comment: "Boa locatária, apenas solicitou reagendamento mas tudo correu bem no final." },
-                  ].map((r, i) => (
-                    <div key={i} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
+                  {receivedReviews.length > 0 ? receivedReviews.map((r) => (
+                    <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.initials}</div>
+                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.reviewer_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.from}</div>
-                            <div className="text-xs text-on-surface-variant">{r.machine} · {r.date}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.reviewer_name}</div>
+                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>
                         <div className="flex gap-0.5">
@@ -539,7 +807,9 @@ const DashboardLocatario = () => {
                       </div>
                       <p className="text-sm text-on-surface leading-relaxed">"{r.comment}"</p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>
+                  )}
                 </div>
               </div>
 
@@ -548,18 +818,14 @@ const DashboardLocatario = () => {
                   <MaterialIcon icon="outbox" size={22} className="text-primary" /> Avaliações Fornecidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    { to: "João Silva", initials: "JS", machine: "Trator Valtra BH194", date: "11/02/2026", rating: 5, comment: "Equipamento impecável e operador com NR-31. Comunicação excelente durante toda a locação." },
-                    { to: "Pedro Souza", initials: "PS", machine: "Pulverizador Jacto", date: "06/12/2025", rating: 5, comment: "Pulverizador funcionou perfeitamente. Pedro foi muito prestativo." },
-                    { to: "Carlos Lima", initials: "CL", machine: "Trator Massey 7700", date: "29/11/2025", rating: 3, comment: "O trator apresentou problemas mecânicos durante a locação. Atendimento poderia ser melhor." },
-                  ].map((r, i) => (
-                    <div key={i} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
+                  {givenReviews.length > 0 ? givenReviews.map((r) => (
+                    <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.initials}</div>
+                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.to}</div>
-                            <div className="text-xs text-on-surface-variant">{r.machine} · {r.date}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.reviewee_name}</div>
+                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -568,17 +834,28 @@ const DashboardLocatario = () => {
                               <MaterialIcon key={j} icon="star" filled={j < r.rating} className={j < r.rating ? "text-secondary-container" : "text-outline/30"} size={16} />
                             ))}
                           </div>
-                          <button className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors" title="Excluir avaliação">
+                          <button
+                            onClick={() => {
+                              reviewService.deleteReview(r.id).then(() => {
+                                setGivenReviews(prev => prev.filter(review => review.id !== r.id));
+                                toast.success("Avaliação excluída com sucesso.");
+                              }).catch(() => toast.error("Erro ao excluir avaliação."));
+                            }}
+                            className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors" title="Excluir avaliação">
                             <MaterialIcon icon="close" size={16} />
                           </button>
                         </div>
                       </div>
                       <p className="text-sm text-on-surface leading-relaxed">"{r.comment}"</p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Você ainda não forneceu nenhuma avaliação.</p>
+                  )}
                 </div>
               </div>
-              <DashboardPagination currentPage={1} totalPages={2} onPageChange={() => {}} />
+              {(receivedReviews.length > 0 || givenReviews.length > 0) && (
+                <DashboardPagination currentPage={1} totalPages={Math.max(1, Math.ceil(Math.max(receivedReviews.length, givenReviews.length) / 5))} onPageChange={() => {}} />
+              )}
             </div>
           )}
 
@@ -721,7 +998,6 @@ const DashboardLocatario = () => {
                   </div>
                 ))}
               </div>
-              <DashboardPagination currentPage={1} totalPages={3} onPageChange={() => {}} />
             </div>
           )}
 
@@ -734,18 +1010,23 @@ const DashboardLocatario = () => {
                 <p className="text-on-surface-variant text-sm mt-3">Edite suas informações de cadastro</p>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-8 space-y-6 shadow-sm">
+                <form
+                  onSubmit={handleUpdateProfile}
+                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-8 space-y-6 shadow-sm"
+                >
                   <h2 className="font-headline text-xl font-bold text-tertiary">Dados Pessoais</h2>
                   <div className="flex items-center gap-6 pb-2">
                     <div className="relative group">
-                      <div className="w-20 h-20 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-2xl">MC</div>
+                      <div className="w-20 h-20 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-2xl">
+                        {user ? getInitials(user.name) : "…"}
+                      </div>
                       <label className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                         <MaterialIcon icon="photo_camera" className="text-white" size={24} />
                         <input type="file" accept="image/*" className="hidden" />
                       </label>
                     </div>
                     <div>
-                      <div className="font-bold text-on-surface">Maria Costa</div>
+                      <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
                       <div className="text-sm text-on-surface-variant mb-2">Locatário</div>
                       <label className="text-xs font-bold text-primary cursor-pointer hover:underline flex items-center gap-1">
                         <MaterialIcon icon="upload" size={14} /> Alterar foto
@@ -754,38 +1035,171 @@ const DashboardLocatario = () => {
                     </div>
                   </div>
                   <div className="space-y-4">
-                    {[
-                      { label: "Nome Completo", value: "Maria Costa", type: "text" },
-                      { label: "CPF / CNPJ", value: "111.111.111-11", type: "text" },
-                      { label: "E-mail", value: "maria.costa@email.com", type: "email" },
-                      { label: "Telefone", value: "(65) 98888-0000", type: "tel" },
-                      { label: "Endereço", value: "Fazenda Aurora, Lucas do Rio Verde – MT", type: "text" },
-                    ].map((field) => (
-                      <div key={field.label} className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">{field.label}</label>
-                        <input type={field.type} defaultValue={field.value} className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
-                      </div>
-                    ))}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Nome Completo</label>
+                      <input
+                        type="text"
+                        required
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">CPF / CNPJ</label>
+                      <input
+                        type="text"
+                        required
+                        ref={documentRef}
+                        value={formDocument}
+                        onChange={(e) => setFormDocument(maskDocument(e.target.value))}
+                        onBlur={handleDocumentBlur}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">E-mail</label>
+                      <input
+                        type="email"
+                        required
+                        value={formEmail}
+                        onChange={(e) => setFormEmail(e.target.value)}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Telefone</label>
+                      <input
+                        type="tel"
+                        required
+                        value={formPhone}
+                        onChange={(e) => setFormPhone(maskPhone(e.target.value))}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">CEP</label>
+                      <input
+                        type="text"
+                        placeholder="00000-000"
+                        value={formCep}
+                        onChange={async (e) => {
+                          const masked = maskCEP(e.target.value);
+                          setFormCep(masked);
+                          const digits = masked.replace(/\D/g, "");
+                          if (digits.length === 8) {
+                            try {
+                              const data = await fetchAddressByCEP(digits);
+                              if (data) {
+                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
+                                setFormAddress(newAddress);
+                              } else {
+                                toast.error("CEP não encontrado.");
+                              }
+                            } catch (error) {
+                              console.error("Erro ao buscar CEP", error);
+                            }
+                          }
+                        }}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Endereço</label>
+                      <input
+                        type="text"
+                        required
+                        value={formAddress}
+                        onChange={(e) => setFormAddress(e.target.value)}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
                   </div>
-                  <button className="w-full bg-primary text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all text-sm">
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all text-sm"
+                  >
                     Salvar Alterações
                   </button>
-                </div>
+                </form>
 
-                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-8 space-y-6 h-fit shadow-sm">
+                <form
+                  onSubmit={handleUpdatePassword}
+                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-8 space-y-6 h-fit shadow-sm"
+                >
                   <h2 className="font-headline text-xl font-bold text-tertiary">Alterar Senha</h2>
                   <div className="space-y-4">
-                    {["Senha Atual", "Nova Senha", "Confirmar Nova Senha"].map((label) => (
-                      <div key={label} className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">{label}</label>
-                        <input type="password" placeholder="••••••••" className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Senha Atual</label>
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          required
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showCurrentPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Nova Senha</label>
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          required
+                          pattern={passwordPattern.regex.source}
+                          title={passwordPattern.title}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showNewPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Confirmar Nova Senha</label>
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? "text" : "password"}
+                          required
+                          ref={confirmPasswordRef}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showConfirmPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <button className="w-full bg-secondary-container text-on-secondary-container font-bold py-3.5 rounded-lg hover:brightness-95 transition-all text-sm">
+                  <button
+                    type="submit"
+                    className="w-full bg-secondary-container text-on-secondary-container font-bold py-3.5 rounded-lg hover:brightness-95 transition-all text-sm"
+                  >
                     Alterar Senha
                   </button>
-                </div>
+                </form>
               </div>
             </div>
           )}

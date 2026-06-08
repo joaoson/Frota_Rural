@@ -6,13 +6,17 @@ import os
 import uuid
 import django
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 django.setup()
+
+from document_validation.models import OperatorLicense, Certification
+from machines.models import Machines
+from postings.models import Postings, PostingsPhotos
+from users.models import Users
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from api.models import (
-    Users, Credentials, Machines, Postings, PostingsPhotos,
     Rentals, Contracts, Messages, Reviews,
 )
 from django.contrib.auth.hashers import make_password
@@ -65,23 +69,33 @@ locadores = [u for u in users if u.role == "locador"]
 locatarios = [u for u in users if u.role == "locatario"]
 operadores = [u for u in users if u.role == "operador"]
 
+# ── Certification (5 — distribuídas entre usuários) ────────────────────────
+cert_data = [
+    ("SENAR",                          "Operação de Colheitadeiras",            "Curso completo de operação e manutenção de colheitadeiras automotrizes."),
+    ("SENAI",                          "Mecânica de Máquinas Agrícolas",        "Formação em manutenção preventiva e corretiva de tratores e implementos."),
+    ("Instituto Agronômico de Campinas", "Agricultura de Precisão",             "Capacitação em uso de GPS, drones e sensores para agricultura."),
+    ("SENAR",                          "Operação de Tratores e Implementos",    "Treinamento prático em operação segura de tratores de médio e grande porte."),
+    ("Fundação ABC",                   "Manejo Integrado de Pragas",            "Curso sobre técnicas de MIP aplicadas a culturas de soja e milho."),
+]
 
-# ── Credentials (20) ───────────────────────────────────────────────────────
-cred_statuses = ["pending", "approved", "rejected"]
-credentials = []
-for i in range(20):
-    c = Credentials.objects.create(
+validation_statuses = ["pending", "approved", "rejected"]
+certifications = []
+cert_users = operadores + locadores[:2]
+for i, (org, title, desc) in enumerate(cert_data):
+    c = Certification.objects.create(
         id=uuid.uuid4(),
-        user=users[i],
-        type="cnh" if i % 2 == 0 else "certificado",
-        document_number=f"DOC-{1000 + i}",
-        expiration_date=(now + timedelta(days=365 - i * 10)).date(),
-        file_url=f"https://storage.example.com/credentials/{i + 1}.pdf",
-        status=cred_statuses[i % 3],
-        created_at=now - timedelta(days=30 - i),
+        user=cert_users[i % len(cert_users)],
+        issuing_organization=org,
+        title=title,
+        issue_date=date(2022 + (i % 3), 3 + i, 15),
+        credential_code=f"CERT-{2024000 + i}" if i % 2 == 0 else None,
+        description=desc,
+        validation_status=validation_statuses[i % 3],
+        created_at=now - timedelta(days=25 - i),
+        updated_at=now - timedelta(days=i),
     )
-    credentials.append(c)
-print(f"[OK]{len(credentials)} Credentials created")
+    certifications.append(c)
+print(f"[OK]{len(certifications)} Certifications created")
 
 
 # ── Machines (20) ──────────────────────────────────────────────────────────

@@ -1,457 +1,63 @@
-import hashlib
-import secrets
-from datetime import timedelta
-
-from django.conf import settings
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
+import uuid
 from django.db import IntegrityError
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
 
-from .email import send_password_reset_email
-from .models import Contracts, Machines, PasswordResets, Postings, PostingsPhotos, Rentals, Users
-from .serializer import (
-    ChangePasswordSerializer,
-    LoginSerializer,
-    MachineSerializer,
-    PasswordResetConfirmSerializer,
-    PasswordResetRequestSerializer,
-    PostingDetailSerializer,
-    PostingListSerializer,
-    PostingSerializer,
-    UserSerializer,
-)
-
-@api_view(['POST'])
-def login(request):
-    serializer = LoginSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    email = serializer.validated_data['email']
-    request_password = serializer.validated_data['password']
-
-    try:
-        user = Users.objects.get(email=email)
-    except Users.DoesNotExist:
-        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if not user.check_password(request_password):
-        return Response({'detail': 'Invalid credentials.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if user.status in ('suspended', 'banned'):
-        return Response({'detail': 'Account is disabled.'}, status=status.HTTP_403_FORBIDDEN)
-
-    refresh = RefreshToken.for_user(user)
-    refresh['email'] = user.email
-    refresh['role'] = user.role
-
-    response = Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
-    response.set_cookie(
-        key='refresh_token',
-        value=str(refresh),
-        max_age=7 * 24 * 60 * 60,
-        httponly=True,
-        samesite='Lax',
-        secure=not settings.DEBUG,
-        path='/api/login',
-    )
-    return response
-
-## - AUTH
-@api_view(['POST'])
-def refresh_token(request):
-    raw = request.COOKIES.get('refresh_token')
-    if not raw:
-        return Response({'detail': 'No refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
-    try:
-        refresh = RefreshToken(raw)
-        return Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
-    except Exception:
-        return Response({'detail': 'Invalid or expired refresh token.'}, status=status.HTTP_401_UNAUTHORIZED)
+from api.models import Contracts, Rentals, Reviews
+from api.serializer import ContractSerializer, RentalSerializer, ReviewSerializer
 
 
-@api_view(['POST'])
-def logout_view(request):
-    response = Response(status=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie('refresh_token', path='/api/login')
-    return response
+# --- REVIEWS ---
 
-
-## - PASSWORD RESET
-@api_view(['POST'])
-def request_password_reset(request):
-    serializer = PasswordResetRequestSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    email = serializer.validated_data['email']
-    safe_response = {'message': 'If an account with that email exists, a reset link has been sent.'}
-
-    try:
-        user = Users.objects.get(email=email)
-    except Users.DoesNotExist:
-        return Response(safe_response, status=status.HTTP_200_OK)
-
-    PasswordResets.objects.filter(user=user, used=False).update(used=True)
-
-    raw_token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    PasswordResets.objects.create(
-        user=user,
-        token_hash=token_hash,
-        expires_at=timezone.now() + timedelta(seconds=settings.PASSWORD_RESET_TIMEOUT),
-    )
-
-    send_password_reset_email(user.email, raw_token)
-
-    if settings.DEBUG:
-        print(f'\n[PASSWORD RESET] Raw token: {raw_token}\n', flush=True)
-
-    return Response(safe_response, status=status.HTTP_200_OK)
-
-@api_view(['POST'])
-def confirm_password_reset(request):
-    serializer = PasswordResetConfirmSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    raw_token = serializer.validated_data['token']
-    new_password = serializer.validated_data['new_password']
-
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    try:
-        reset = PasswordResets.objects.get(
-            token_hash=token_hash,
-            used=False,
-            expires_at__gt=timezone.now(),
-        )
-    except PasswordResets.DoesNotExist:
-        return Response({'detail': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    user = reset.user
-    user.set_password(new_password)
-    user.save()
-
-    reset.used = True
-    reset.save()
-
-    return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
-
-@api_view(['GET'])
-def get_users(request):
-    users = Users.objects.all()
-    serializer = UserSerializer(users, many=True)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-def get_user_by_email(request, email):
-    try:
-        user = Users.objects.get(email=email)
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
-def user_detail(request, pk):
-    try:
-        user = Users.objects.get(pk=pk)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    elif request.method == 'PUT':
-        serializer = UserSerializer(user, data=request.data)
-        if serializer.is_valid():
-            try:
-                serializer.save()
-            except IntegrityError as e:
-                error_msg = str(e).lower()
-                if 'email' in error_msg:
-                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-                if 'document' in error_msg:
-                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'PATCH':
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            try:
-                serializer.save()
-            except IntegrityError as e:
-                error_msg = str(e).lower()
-                if 'email' in error_msg:
-                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-                if 'document' in error_msg:
-                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-def change_password(request, pk):
-    try:
-        user = Users.objects.get(pk=pk)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    serializer = ChangePasswordSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    if not user.check_password(serializer.validated_data['current_password']):
-        return Response(
-            {'error': 'Senha atual incorreta.'},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user.set_password(serializer.validated_data['new_password'])
-    user.save()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-# TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
-@api_view(['POST'])
-def create_user(request):
-    document = request.data.get('document')
-    if document and Users.objects.filter(document=document, status='banned').exists():
-        return Response({'error': 'Cadastro bloqueado: documento vinculado a conta banida.'}, status=status.HTTP_403_FORBIDDEN)
-
-    serializer = UserSerializer(data=request.data)
-    if serializer.is_valid():
-        try:
-            serializer.save()
-        except IntegrityError as e:
-            error_msg = str(e).lower()
-            if 'email' in error_msg:
-                return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-            if 'document' in error_msg:
-                return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-            return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['PUT'])
-def warn_user(request, pk):
-    try:
-        user = Users.objects.get(pk=pk)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if user.status in ('suspended', 'banned'):
-        return Response({'error': f'Usuário já está {user.status}.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    user.status = 'warned'
-    user.save()
-    return Response({'message': f'Advertência aplicada ao usuário {user.name}.'}, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT'])
-def suspend_user(request, pk):
-    try:
-        user = Users.objects.get(pk=pk)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if user.status == 'banned':
-        return Response({'error': 'Usuário já está banido.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    user.status = 'suspended'
-    user.save()
-
-    machine_ids = Machines.objects.filter(owner=user).values_list('id', flat=True)
-    Postings.objects.filter(machinery_id__in=machine_ids, status='active').update(status='suspended')
-    Rentals.objects.filter(lessee=user, status='pending').update(status='cancelled')
-
-    return Response({'message': f'Usuário {user.name} suspenso.'}, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT'])
-def ban_user(request, pk):
-    try:
-        user = Users.objects.get(pk=pk)
-    except Users.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    user.status = 'banned'
-    user.save()
-
-    machine_ids = Machines.objects.filter(owner=user).values_list('id', flat=True)
-    Postings.objects.filter(machinery_id__in=machine_ids).exclude(status='inactive').update(status='inactive')
-    rental_ids = Rentals.objects.filter(lessee=user, status__in=['pending', 'active']).values_list('id', flat=True)
-    Rentals.objects.filter(id__in=rental_ids).update(status='cancelled')
-    Contracts.objects.filter(rental_id__in=rental_ids, status='pending_signatures').update(status='cancelled')
-
-    return Response({'message': f'Usuário {user.name} banido permanentemente.'}, status=status.HTTP_200_OK)
-
-
-def _machines_queryset():
-    return Machines.objects.all()
+def _reviews_queryset():
+    return Reviews.objects.all().select_related("reviewer", "reviewee")
 
 
 @api_view(["GET", "POST"])
-def machines_list(request):
+def reviews_list(request):
     if request.method == "GET":
-        qs = _machines_queryset().order_by("-created_at", "-id")
-        owner_id = request.query_params.get("owner")
-        if owner_id:
-            qs = qs.filter(owner_id=owner_id)
-        status_filter = request.query_params.get("status")
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        brand = request.query_params.get("brand")
-        if brand:
-            qs = qs.filter(brand__iexact=brand)
-        model = request.query_params.get("model")
-        if model:
-            qs = qs.filter(model__iexact=model)
-        serializer = MachineSerializer(qs, many=True)
+        qs = _reviews_queryset().order_by("-created_at", "-id")
+        reviewee_id = request.query_params.get("reviewee")
+        if reviewee_id:
+            qs = qs.filter(reviewee_id=reviewee_id)
+        reviewer_id = request.query_params.get("reviewer")
+        if reviewer_id:
+            qs = qs.filter(reviewer_id=reviewer_id)
+        rental_id = request.query_params.get("rental")
+        if rental_id:
+            qs = qs.filter(rental_id=rental_id)
+            
+        serializer = ReviewSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = MachineSerializer(data=request.data)
+    serializer = ReviewSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
         serializer.save()
     except IntegrityError:
         return Response(
-            {"error": "Dados inválidos ou em conflito (ex.: renagro_number já cadastrado)."},
+            {"error": "Dados inválidos ou em conflito (ex.: avaliação já existe para este aluguel)."},
             status=status.HTTP_400_BAD_REQUEST,
         )
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
-def machine_detail(request, pk):
+def review_detail(request, pk):
     try:
-        machine = _machines_queryset().get(pk=pk)
-    except Machines.DoesNotExist:
+        review = _reviews_queryset().get(pk=pk)
+    except Reviews.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
-        return Response(MachineSerializer(machine).data, status=status.HTTP_200_OK)
+        return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = MachineSerializer(machine, data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            serializer.save()
-        except IntegrityError:
-            return Response(
-                {"error": "Dados inválidos ou em conflito (ex.: renagro_number já cadastrado)."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    if request.method == "PATCH":
-        serializer = MachineSerializer(machine, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            serializer.save()
-        except IntegrityError:
-            return Response(
-                {"error": "Dados inválidos ou em conflito (ex.: renagro_number já cadastrado)."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    try:
-        machine.delete()
-    except IntegrityError:
-        return Response(
-            {
-                "error": "Não é possível excluir esta máquina: existem registros dependentes (ex.: anúncios).",
-            },
-            status=status.HTTP_409_CONFLICT,
-        )
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-def _postings_queryset():
-    return (
-        Postings.objects.all()
-        .select_related("machinery")
-        .prefetch_related("postingsphotos_set")
-    )
-
-
-@api_view(["GET", "POST"])
-def postings_list(request):
-    if request.method == "GET":
-        qs = _postings_queryset().order_by("-created_at", "-id")
-        machinery_id = request.query_params.get("machinery")
-        if machinery_id:
-            qs = qs.filter(machinery_id=machinery_id)
-        status_filter = request.query_params.get("status")
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        # Filtro de data: sobreposição entre disponibilidade da máquina e o período solicitado.
-        # NULLs são tratados como "sem restrição" (máquina sem data definida aparece sempre).
-        available_from = request.query_params.get("available_from")
-        if available_from:
-            # Exclui máquinas cuja disponibilidade TERMINOU antes da data de início informada
-            qs = qs.filter(
-                Q(availability_end__isnull=True) |
-                Q(availability_end__date__gte=available_from)
-            )
-        available_until = request.query_params.get("available_until")
-        if available_until:
-            # Exclui máquinas que só COMEÇAM depois da data de fim informada
-            qs = qs.filter(
-                Q(availability_start__isnull=True) |
-                Q(availability_start__date__lte=available_until)
-            )
-        serializer = PostingListSerializer(qs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    serializer = PostingSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        serializer.save()
-    except IntegrityError:
-        return Response(
-            {"error": "Dados inválidos ou em conflito."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-@api_view(["GET", "PUT", "PATCH", "DELETE"])
-def posting_detail(request, pk):
-    try:
-        posting = _postings_queryset().get(pk=pk)
-    except Postings.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == "GET":
-        return Response(PostingDetailSerializer(posting).data, status=status.HTTP_200_OK)
-
-    if request.method == "PUT":
-        serializer = PostingSerializer(posting, data=request.data)
+        serializer = ReviewSerializer(review, data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -464,7 +70,7 @@ def posting_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = PostingSerializer(posting, data=request.data, partial=True)
+        serializer = ReviewSerializer(review, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -477,45 +83,195 @@ def posting_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     try:
-        posting.delete()
+        review.delete()
     except IntegrityError:
         return Response(
-            {
-                "error": "Não é possível excluir este anúncio: existem registros dependentes.",
-            },
+            {"error": "Não é possível excluir esta avaliação."},
             status=status.HTTP_409_CONFLICT,
         )
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- RENTALS ---
+
+@api_view(["GET", "POST"])
+def rentals_list(request):
+    if request.method == "GET":
+        qs = Rentals.objects.all().select_related("lessee", "postings__machinery__owner")
+        lessee_id = request.query_params.get("lessee")
+        if lessee_id:
+            qs = qs.filter(lessee_id=lessee_id)
+        lessor_id = request.query_params.get("lessor")
+        if lessor_id:
+            qs = qs.filter(postings__machinery__owner_id=lessor_id)
+        serializer = RentalSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    serializer = RentalSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    rental = serializer.save()
+    
+    # Automatically create matching Contract
+    Contracts.objects.create(
+        id=uuid.uuid4(),
+        rental=rental,
+        accepted_by_lessor=False,
+        accepted_by_lessee=False,
+        status="pending_signatures",
+        created_at=timezone.now()
+    )
+    
+    return Response(RentalSerializer(rental).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def rental_detail(request, pk):
+    try:
+        rental = Rentals.objects.get(pk=pk)
+    except Rentals.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        return Response(RentalSerializer(rental).data, status=status.HTTP_200_OK)
+
+    if request.method == "PUT":
+        serializer = RentalSerializer(rental, data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == "PATCH":
+        serializer = RentalSerializer(rental, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    rental.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- CONTRACTS ---
+
+@api_view(["GET"])
+def contracts_list(request):
+    qs = Contracts.objects.all().select_related("rental__lessee", "rental__postings__machinery__owner")
+    serializer = ContractSerializer(qs, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def contract_detail(request, pk):
+    try:
+        contract = Contracts.objects.filter(Q(pk=pk) | Q(rental_id=pk)).select_related("rental__lessee", "rental__postings__machinery__owner").first()
+        if not contract:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+    except (Contracts.DoesNotExist, ValueError):
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    rental = contract.rental
+    posting = rental.postings
+    machine = posting.machinery
+    lessor = machine.owner
+    lessee = rental.lessee
+
+    total_price_formatted = "{:,.2f}".format(rental.total_price).replace(",", "X").replace(".", ",").replace("X", ".") if rental.total_price else "0,00"
+    days = max(1, (rental.end_date.date() - rental.start_date.date()).days + 1) if rental.start_date and rental.end_date else 1
+
+    contrato_data = {
+        "contrato": {
+            "numero": f"#CTR-{str(rental.id)[:4].upper()}",
+            "data_geracao": contract.created_at.strftime("%d/%m/%Y") if contract.created_at else "01/06/2026",
+            "data_inicio": rental.start_date.strftime("%Y-%m-%d") if rental.start_date else "",
+            "data_fim": rental.end_date.strftime("%Y-%m-%d") if rental.end_date else "",
+            "prazo_dias": days,
+            "valor_unitario": "{:,.2f}".format(posting.hourly_rate).replace(",", "X").replace(".", ",").replace("X", ".") if posting.hourly_rate else "180,00",
+            "estimativa_horas": 8 * days,
+            "valor_total_estimado": total_price_formatted,
+        },
+        "operacao": {
+            "codigo": f"OP-{str(rental.id)[4:9].upper()}",
+        },
+        "locador": {
+            "razao_social": lessor.name,
+            "tipo_documento": "CNPJ" if len(lessor.document) > 11 else "CPF",
+            "documento": lessor.document,
+            "endereco_completo": lessor.address,
+            "representante_nome": lessor.name,
+            "representante_cpf": lessor.document if len(lessor.document) <= 11 else "123.456.789-00",
+            "representante_estado_civil": "Casado",
+            "endereco_equipamento": posting.location_address or lessor.address,
+        },
+        "locatario": {
+            "razao_social": lessee.name,
+            "tipo_documento": "CNPJ" if len(lessee.document) > 11 else "CPF",
+            "documento": lessee.document,
+            "endereco_completo": lessee.address,
+            "representante_nome": lessee.name,
+            "representante_cpf": lessee.document if len(lessee.document) <= 11 else "987.654.321-00",
+            "representante_estado_civil": "Solteiro",
+            "municipio": "Castro",
+            "uf": "PR",
+            "local_servico": lessee.address,
+        },
+        "equipamento": {
+            "tipo": machine.usage_purpose or "Trator agrícola",
+            "marca": machine.brand or "John Deere",
+            "modelo": machine.model or "6135J",
+            "ano": machine.year or 2021,
+            "renagro": machine.renagro_number or "RNG-123456",
+            "valor_estimado": "350.000,00",
+        },
+        "anuncio": {
+            "tipo_servico": "Locação de Maquinário",
+            "finalidade_uso": machine.usage_purpose or "Uso geral",
+        },
+        "assinatura": {
+            "data_locador": contract.created_at.strftime("%d/%m/%Y às 14:00") if contract.accepted_by_lessor else "—",
+            "data_locatario": contract.created_at.strftime("%d/%m/%Y às 10:00") if contract.accepted_by_lessee else "—",
+        },
+    }
+
+    return Response(contrato_data, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
-def posting_photos(request, pk):
+def sign_contract(request, pk):
     try:
-        posting = Postings.objects.get(pk=pk)
-    except Postings.DoesNotExist:
+        contract = Contracts.objects.filter(Q(pk=pk) | Q(rental_id=pk)).first()
+        if not contract:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+    except (Contracts.DoesNotExist, ValueError):
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    image_file = request.FILES.get("image")
-    if not image_file:
-        return Response({"error": "Nenhum arquivo enviado."}, status=status.HTTP_400_BAD_REQUEST)
+    role = request.data.get("role")
+    name = request.data.get("name", "")
 
-    ext = image_file.name.rsplit(".", 1)[-1].lower() if "." in image_file.name else "jpg"
-    filename = f"{uuid.uuid4()}.{ext}"
-    saved_path = default_storage.save(f"posting_photos/{filename}", ContentFile(image_file.read()))
-    image_url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+    if role == "locatario":
+        contract.accepted_by_lessee = True
+        if contract.accepted_by_lessor:
+            contract.status = "signed"
+            contract.rental.status = "signed"
+        else:
+            contract.status = "lessee_signed"
+            contract.rental.status = "active"
+    else:
+        contract.accepted_by_lessor = True
+        if contract.accepted_by_lessee:
+            contract.status = "signed"
+            contract.rental.status = "signed"
+        else:
+            contract.status = "lessor_signed"
+            contract.rental.status = "signed"
 
-    is_primary_raw = request.data.get("is_primary", "false")
-    is_primary = str(is_primary_raw).lower() in ("true", "1")
+    contract.rental.save()
+    contract.save()
 
-    photo = PostingsPhotos.objects.create(
-        id=uuid.uuid4(),
-        postings=posting,
-        image_url=image_url,
-        is_primary=is_primary,
-        created_at=timezone.now(),
-    )
+    return Response(ContractSerializer(contract).data, status=status.HTTP_200_OK)
 
-    return Response(
-        {"id": str(photo.id), "image_url": photo.image_url, "is_primary": photo.is_primary},
-        status=status.HTTP_201_CREATED,
-    )
+
+# Keep compatibility with previous new backend view naming:
+get_contracts = contracts_list

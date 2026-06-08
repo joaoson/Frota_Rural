@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -12,11 +13,19 @@ const tips = [
 ];
 
 const SelfieUpload = () => {
+  const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFile = (selected: File) => {
-    if (selected.type.startsWith("image/")) setFile(selected);
+    if (selected.type.startsWith("image/")) {
+      setFile(selected);
+      setError("");
+    } else {
+      setError("Por favor, envie um arquivo de imagem válido (JPG, PNG).");
+    }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -24,6 +33,27 @@ const SelfieUpload = () => {
     setDragging(false);
     const dropped = e.dataTransfer.files[0];
     if (dropped) handleFile(dropped);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!file) {
+      setError("A foto pessoal é obrigatória.");
+      toast.error("Por favor, selecione uma foto antes de enviar.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Simulate photo upload & verification process
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      toast.success("Foto pessoal enviada com sucesso!");
+      navigate("/dashboard");
+    } catch (err) {
+      toast.error("Erro ao enviar foto pessoal. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -42,7 +72,8 @@ const SelfieUpload = () => {
 
         <form
           className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={handleSubmit}
+          noValidate
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
@@ -98,9 +129,11 @@ const SelfieUpload = () => {
               className={`block border-2 border-dashed rounded-xl px-6 py-8 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                 dragging
                   ? "border-primary bg-primary/5"
-                  : file
-                    ? "border-primary/50 bg-primary/5"
-                    : "border-outline-variant/60 hover:border-primary/50 hover:bg-primary/5"
+                  : error
+                    ? "border-error bg-error/5"
+                    : file
+                      ? "border-primary/50 bg-primary/5"
+                      : "border-outline-variant/60 hover:border-primary/50 hover:bg-primary/5"
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -116,7 +149,6 @@ const SelfieUpload = () => {
                 onChange={(e) => {
                   if (e.target.files?.[0]) handleFile(e.target.files[0]);
                 }}
-                required={!file}
               />
               {file ? (
                 <>
@@ -148,13 +180,18 @@ const SelfieUpload = () => {
                 </>
               )}
             </label>
+            {error && (
+              <p className="text-[11px] text-error font-medium mt-1">{error}</p>
+            )}
           </div>
 
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <MaterialIcon icon="upload" size={20} /> Enviar Foto
+            <MaterialIcon icon="upload" size={20} />{" "}
+            {isSubmitting ? "Enviando..." : "Enviar Foto"}
           </button>
         </form>
       </div>

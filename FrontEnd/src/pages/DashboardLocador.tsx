@@ -5,10 +5,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/services/UserService/UserService";
 import { machineService } from "@/services/MachineService/MachineService";
 import { postingService } from "@/services/PostingService/PostingService";
+import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
+import type { OperatorLicense } from "@/services/OperatorDocumentService/models/OperatorLicense";
+import type { Certification } from "@/services/OperatorDocumentService/models/Certification";
+import { reviewService, type Review } from "@/services/ReviewService/ReviewService";
+import { contractService } from "@/services/ContractService/ContractService";
 import type { User } from "@/services/UserService/models/User";
 import { AxiosError } from "axios";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskPhone } from "@/utils/masks/maskPhone";
+import { maskCEP } from "@/utils/masks/maskCEP";
+import { fetchAddressByCEP } from "@/services/ViaCEPService";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { validateCPF } from "@/utils/validation/validateCPF";
 import { validateCNPJ } from "@/utils/validation/validateCNPJ";
@@ -67,146 +74,13 @@ const sidebarItems = [
   { icon: "campaign", label: "Anúncios", tab: "anuncios" },
   { icon: "event_available", label: "Locações", tab: "reservas" },
   { icon: "description", label: "Contratos", tab: "contratos" },
+  { icon: "badge", label: "Documentos", tab: "documentos" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
   { icon: "person", label: "Minha Conta", tab: "conta" },
   { icon: "logout", label: "Sair", tab: "sair" },
 ] as const;
-
-const mockMachines = [
-  {
-    id: 1,
-    renagro: "BR1029304899",
-    brand: "John Deere",
-    model: "S700",
-    year: 2022,
-    status: "active",
-    purpose: "Colheita",
-  },
-  {
-    id: 2,
-    renagro: "BR5048201734",
-    brand: "Valtra",
-    model: "BH194",
-    year: 2021,
-    status: "active",
-    purpose: "Preparo de Solo",
-  },
-  {
-    id: 3,
-    renagro: "BR7012345678",
-    brand: "Massey Ferguson",
-    model: "7700",
-    year: 2019,
-    status: "removed",
-    purpose: "Plantio",
-  },
-  {
-    id: 4,
-    renagro: "BR3098712345",
-    brand: "New Holland",
-    model: "CR7.90",
-    year: 2023,
-    status: "active",
-    purpose: "Colheita",
-  },
-  {
-    id: 5,
-    renagro: "BR6054389012",
-    brand: "Case IH",
-    model: "Magnum 380",
-    year: 2020,
-    status: "active",
-    purpose: "Preparo de Solo",
-  },
-  {
-    id: 6,
-    renagro: "BR4021567890",
-    brand: "Jacto",
-    model: "Uniport 4530",
-    year: 2022,
-    status: "active",
-    purpose: "Pulverização",
-  },
-];
-
-const mockPostings = [
-  {
-    id: 1,
-    machine: "JD S700",
-    price: 480,
-    location: "Sorriso, MT",
-    status: "active",
-  },
-  {
-    id: 2,
-    machine: "Valtra BH194",
-    price: 320,
-    location: "Lucas do Rio Verde, MT",
-    status: "active",
-  },
-  {
-    id: 3,
-    machine: "New Holland CR7.90",
-    price: 520,
-    location: "Sinop, MT",
-    status: "active",
-  },
-  {
-    id: 4,
-    machine: "Case IH Magnum",
-    price: 380,
-    location: "Rondonópolis, MT",
-    status: "active",
-  },
-  {
-    id: 5,
-    machine: "Jacto Uniport",
-    price: 290,
-    location: "Primavera do Leste, MT",
-    status: "active",
-  },
-];
-
-const mockRentals = [
-  {
-    id: 1,
-    lessee: "Fazenda Aurora",
-    machine: "Trator Valtra BH194",
-    period: "02 – 10 Fev/2026",
-    status: "pending",
-    total: "R$ 15.000,00",
-    contract: "#CTR-8821",
-  },
-  {
-    id: 2,
-    lessee: "Fazenda São João",
-    machine: "Colheitadeira JD S700",
-    period: "15 – 20 Jan/2026",
-    status: "active",
-    total: "R$ 38.400,00",
-    contract: "#CTR-8799",
-  },
-  {
-    id: 3,
-    lessee: "Fazenda Boa Vista",
-    machine: "Pulverizador Jacto",
-    period: "01 – 05 Dez/2025",
-    status: "completed",
-    total: "R$ 6.250,00",
-    contract: "#CTR-8745",
-  },
-  {
-    id: 4,
-    lessee: "Fazenda Esperança",
-    machine: "Trator Massey 7700",
-    period: "20 – 28 Nov/2025",
-    status: "cancelled",
-    total: "R$ 12.000,00",
-    contract: "#CTR-8710",
-  },
-];
 
 type Tab = (typeof sidebarItems)[number]["tab"];
 
@@ -233,20 +107,34 @@ const DashboardLocador = () => {
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formCep, setFormCep] = useState("");
   const documentRef = useRef<HTMLInputElement>(null);
 
   // Formulário alteração de senha
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
   const [tab, setTab] = useState<Tab>("dashboard");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
 
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
   const [machines, setMachines] = useState<any[]>([]);
   const [postings, setPostings] = useState<any[]>([]);
+  const [rentals, setRentals] = useState<any[]>([]);
+  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
+  const [givenReviews, setGivenReviews] = useState<Review[]>([]);
+  const [licenses, setLicenses] = useState<OperatorLicense[]>([]);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
   const [selectedEquipamento, setSelectedEquipamento] =
     useState<EquipamentoData>({
@@ -320,7 +208,23 @@ const DashboardLocador = () => {
     userService
       .getById(userId)
       .then(setUser)
-      .catch(() => {});
+      .catch(console.error);
+
+    reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
+    reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
+
+    contractService.listByLessor(userId).then(data => {
+      const mapped = data.map(r => ({
+        id: r.id,
+        lessee: r.lesseeId === "locatario-default" ? "Fazenda Aurora" : "Fazenda Parceira",
+        machine: r.machineName,
+        period: r.period,
+        status: r.status,
+        total: r.total,
+        contract: r.contractNumber
+      }));
+      setRentals(mapped);
+    }).catch(console.error);
 
     Promise.all([
       machineService.list({ owner: userId }),
@@ -347,6 +251,15 @@ const DashboardLocador = () => {
         status: p.status || "active"
       })));
     }).catch(console.error);
+
+    operatorDocumentService
+      .listLicenses({ user: userId })
+      .then(setLicenses)
+      .catch(console.error);
+    operatorDocumentService
+      .listCertifications({ user: userId })
+      .then(setCertifications)
+      .catch(console.error);
   }, [userId]);
 
   useEffect(() => {
@@ -356,6 +269,7 @@ const DashboardLocador = () => {
     setFormEmail(user.email);
     setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
     setFormAddress(user.address);
+    setFormCep(maskCEP(user.cep ?? ""));
   }, [user]);
 
   const handleDocumentBlur = () => {
@@ -375,7 +289,7 @@ const DashboardLocador = () => {
     }
   };
 
-  const handleUpdateProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
@@ -389,6 +303,7 @@ const DashboardLocador = () => {
         email: formEmail.toLowerCase().trim(),
         phone: `+55${clearSpecialChars(formPhone)}`,
         address: formAddress.trim(),
+        cep: clearSpecialChars(formCep),
       });
       setUser(updated);
       toast.success("Dados atualizados com sucesso.");
@@ -409,7 +324,7 @@ const DashboardLocador = () => {
   };
 
   const handleUpdatePassword = async (
-    e: React.SubmitEvent<HTMLFormElement>,
+    e: React.FormEvent<HTMLFormElement>,
   ) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -439,17 +354,17 @@ const DashboardLocador = () => {
 
   const activeRentals = useMemo(
     () =>
-      mockRentals.filter(
+      rentals.filter(
         (r) => r.status === "pending" || r.status === "active",
       ),
-    [],
+    [rentals],
   );
   const pastRentals = useMemo(
     () =>
-      mockRentals.filter(
+      rentals.filter(
         (r) => r.status === "completed" || r.status === "cancelled",
       ),
-    [],
+    [rentals],
   );
 
   const [frotaPage, setFrotaPage] = useState(1);
@@ -467,7 +382,7 @@ const DashboardLocador = () => {
     anunciosPage * anunciosPerPage,
   );
 
-  const renderRentalCard = (r: (typeof mockRentals)[number]) => {
+  const renderRentalCard = (r: any) => {
     const badge = getStatusBadge(r.status);
     return (
       <div
@@ -620,18 +535,52 @@ const DashboardLocador = () => {
                   <MaterialIcon
                     key={i}
                     icon="star"
-                    filled={i <= 4}
-                    className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= 4 ? "text-secondary-container" : "text-outline/40"}`}
+                    filled={i <= reviewRating}
+                    onClick={() => setReviewRating(i)}
+                    className={`text-3xl cursor-pointer hover:scale-110 transition-transform ${i <= reviewRating ? "text-secondary-container" : "text-outline/40"}`}
                   />
                 ))}
               </div>
               <textarea
                 placeholder="Conte como foi a experiência..."
                 rows={2}
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
                 className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none"
               />
-              <button className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm">
-                Enviar Avaliação
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  if (!reviewComment.trim()) {
+                    toast.error("Por favor, escreva um comentário.");
+                    return;
+                  }
+                  setIsSubmittingReview(true);
+                  try {
+                    await reviewService.createReview({
+                      reviewer: userId,
+                      reviewee: "029d15f3-a577-4238-9c59-42011ddcb5be", // Valid Locatario ID for testing
+                      rating: reviewRating,
+                      comment: reviewComment,
+                      rental: "08e8eaa6-467f-4c98-b5c0-93323829911d" // Valid Rental ID for testing
+                    });
+                    toast.success("Avaliação enviada com sucesso!");
+                    setShowAvaliar(null);
+                    setReviewRating(5);
+                    setReviewComment("");
+                    const updatedGiven = await reviewService.getReviewsByReviewer(userId);
+                    setGivenReviews(updatedGiven);
+                  } catch (error) {
+                    console.error("Erro ao enviar avaliação:", error);
+                    toast.error("Erro ao enviar avaliação.");
+                  } finally {
+                    setIsSubmittingReview(false);
+                  }
+                }}
+                disabled={isSubmittingReview}
+                className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all text-sm disabled:opacity-50"
+              >
+                {isSubmittingReview ? "Enviando..." : "Enviar Avaliação"}
               </button>
             </div>
           ) : null}
@@ -642,7 +591,15 @@ const DashboardLocador = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <aside className="w-64 shrink-0 border-r border-outline-variant/30 h-screen sticky top-0 bg-surface-container-low flex flex-col">
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside className={`w-64 shrink-0 border-r border-outline-variant/30 h-screen fixed md:sticky top-0 bg-surface-container-low flex flex-col z-50 transform transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-6 pb-4">
           <Link
             to="/"
@@ -657,13 +614,15 @@ const DashboardLocador = () => {
               <button
                 key={item.tab}
                 onClick={
-                  item.tab !== "sair" ? () => setTab(item.tab) : undefined
+                  item.tab !== "sair" ? () => {
+                    setTab(item.tab);
+                    setIsSidebarOpen(false);
+                  } : undefined
                 }
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  tab === item.tab
-                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
-                    : "text-on-surface-variant hover:bg-surface-container-high"
-                }`}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${tab === item.tab
+                  ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                  : "text-on-surface-variant hover:bg-surface-container-high"
+                  }`}
               >
                 <MaterialIcon icon={item.icon} size={20} />
                 <span>{item.label}</span>
@@ -715,8 +674,15 @@ const DashboardLocador = () => {
       </aside>
 
       <main className="flex-1 min-w-0">
-        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
-          <div />
+        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+            >
+              <MaterialIcon icon="menu" size={24} />
+            </button>
+          </div>
           <NotificationPopover
             notifications={[
               {
@@ -758,7 +724,9 @@ const DashboardLocador = () => {
                   renagro_number: data.registroRenagro,
                   brand: data.marca,
                   model: data.modelo,
-                  year: data.anoFabricacao ? Number(data.anoFabricacao) : undefined,
+                  year: data.anoFabricacao
+                    ? Number(data.anoFabricacao)
+                    : undefined,
                   usage_purpose: data.finalidade,
                 });
                 setSelectedEquipamento(data);
@@ -779,55 +747,55 @@ const DashboardLocador = () => {
                   ),
                 );
                 toast.success("Equipamento atualizado com sucesso!");
-              } catch (error) {
-                console.error("Erro ao atualizar equipamento:", error);
+                setIsEditEquipamentoOpen(false);
+              } catch {
                 toast.error("Não foi possível atualizar o equipamento.");
               }
             }}
           />
 
-          {tab === "dashboard" ? (
+          {/* Dashboard */}
+          {tab === "dashboard" && (
             <div className="space-y-8">
               <div>
                 <h1 className="font-headline text-3xl font-bold text-primary">
-                  Bom dia, {user?.name.split(" ")[0] ?? "…"}
+                  Bom dia, {user ? user.name.split(" ")[0] : "…"}
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">
-                  Veja o resumo das suas atividades
+                  Veja o resumo das suas locações e frota
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
                   {
-                    label: "EQUIPAMENTOS",
-                    value: String(machines.length),
-                    sub: "na frota ativa",
-                    icon: "agriculture",
-                  },
-                  {
-                    label: "ANÚNCIOS ATIVOS",
-                    value: String(postings.length),
-                    sub: "publicados",
-                    icon: "campaign",
-                    dotColor: "bg-primary",
-                  },
-                  {
                     label: "LOCAÇÕES ATIVAS",
-                    value: "1",
+                    value: String(activeRentals.length),
                     sub: "em andamento",
                     icon: "event_available",
                   },
                   {
+                    label: "CONTRATOS",
+                    value: String(rentals.length),
+                    sub: "assinados",
+                    icon: "description",
+                  },
+                  {
+                    label: "LOCAÇÕES TOTAIS",
+                    value: String(rentals.length),
+                    sub: "realizadas",
+                    icon: "inventory_2",
+                  },
+                  {
                     label: "RECEITA NO MÊS",
-                    value: "R$ 4.800",
+                    value: "R$ 38.400",
                     sub: "fevereiro 2026",
                     icon: "payments",
                   },
-                ].map((stat) => (
+                ].map((stat, i) => (
                   <div
-                    key={stat.label}
+                    key={i}
                     className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-all group"
                   >
                     <div className="flex items-center gap-2 mb-3">
@@ -843,23 +811,19 @@ const DashboardLocador = () => {
                     <div className="font-headline text-3xl font-black text-on-surface mb-1">
                       {stat.value}
                     </div>
-                    <div className="text-sm text-on-surface-variant flex items-center gap-1.5">
-                      {stat.dotColor ? (
-                        <span
-                          className={`w-2 h-2 rounded-full ${stat.dotColor} animate-pulse`}
-                        />
-                      ) : null}
+                    <div className="text-sm text-on-surface-variant">
                       {stat.sub}
                     </div>
                   </div>
                 ))}
               </div>
 
+              {/* Gráfico de Receita */}
               <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="font-headline text-lg font-bold text-on-surface">
-                      Evolução do Faturamento
+                      Evolução da Receita
                     </h2>
                     <p className="text-xs text-on-surface-variant mt-0.5">
                       Últimos 6 meses
@@ -867,7 +831,7 @@ const DashboardLocador = () => {
                   </div>
                   <div className="text-right">
                     <div className="text-2xl font-black text-primary">
-                      R$ 88.650
+                      R$ 86.650
                     </div>
                     <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
                       Total acumulado
@@ -921,16 +885,10 @@ const DashboardLocador = () => {
                         tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
                       />
                       <Tooltip
-                        formatter={(value) => {
-                          if (typeof value === "number")
-                            return [
-                              `R$ ${value.toLocaleString("pt-BR")}`,
-                              "Faturamento",
-                            ];
-                          if (typeof value === "string")
-                            return [`R$ ${value}`, "Faturamento"];
-                          return ["—", "Faturamento"];
-                        }}
+                        formatter={(value: any) => [
+                          `R$ ${Number(value).toLocaleString("pt-BR")}`,
+                          "Receita",
+                        ]}
                         contentStyle={{
                           borderRadius: 12,
                           border: "1px solid hsl(var(--outline-variant))",
@@ -949,14 +907,15 @@ const DashboardLocador = () => {
                 </div>
               </div>
 
+              {/* Gráfico de Avaliações */}
               <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="font-headline text-lg font-bold text-on-surface">
-                      Notas das Avaliações
+                      Satisfação dos Clientes
                     </h2>
                     <p className="text-xs text-on-surface-variant mt-0.5">
-                      Média mensal de satisfação
+                      Média mensal de avaliações recebidas
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 bg-secondary-container/10 px-3 py-1.5 rounded-lg">
@@ -967,7 +926,7 @@ const DashboardLocador = () => {
                       size={16}
                     />
                     <span className="font-black text-on-secondary-container text-sm">
-                      4.6
+                      4.7
                     </span>
                     <span className="text-[10px] font-bold text-on-surface-variant uppercase">
                       média
@@ -1002,13 +961,10 @@ const DashboardLocador = () => {
                         tickLine={false}
                       />
                       <Tooltip
-                        formatter={(value) => {
-                          if (typeof value === "number")
-                            return [`${value.toFixed(1)} ★`, "Nota média"];
-                          if (typeof value === "string")
-                            return [`${value} ★`, "Nota média"];
-                          return ["—", "Nota média"];
-                        }}
+                        formatter={(value: any) => [
+                          `${Number(value).toFixed(1)} ★`,
+                          "Nota média",
+                        ]}
                         contentStyle={{
                           borderRadius: 12,
                           border: "1px solid hsl(var(--outline-variant))",
@@ -1029,7 +985,7 @@ const DashboardLocador = () => {
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <h2 className="font-headline text-xl font-bold text-on-surface">
-                      Reservas recentes
+                      Minhas locações
                     </h2>
                     <div className="h-0.5 w-12 bg-secondary-container mt-1" />
                   </div>
@@ -1041,7 +997,7 @@ const DashboardLocador = () => {
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {mockRentals.map((r) => {
+                  {rentals.map((r) => {
                     const badge = getStatusBadge(r.status);
                     return (
                       <div
@@ -1049,19 +1005,19 @@ const DashboardLocador = () => {
                         className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 bg-surface-container-high rounded-xl flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center">
                             <MaterialIcon
-                              icon="precision_manufacturing"
+                              icon="agriculture"
                               className="text-primary"
-                              size={20}
+                              size={24}
                             />
                           </div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">
-                              {r.lessee} · {r.machine}
+                              {r.machine}
                             </div>
                             <div className="text-sm text-on-surface-variant">
-                              {r.period} · {r.contract}
+                              {r.lessee} · {r.period} · {r.contract}
                             </div>
                           </div>
                         </div>
@@ -1084,9 +1040,10 @@ const DashboardLocador = () => {
                 </div>
               </div>
             </div>
-          ) : null}
+          )}
 
-          {tab === "frota" ? (
+          {/* Minha Frota */}
+          {tab === "frota" && (
             <div className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
@@ -1095,112 +1052,350 @@ const DashboardLocador = () => {
                   </h1>
                   <div className="h-1 w-16 bg-secondary-container mt-2" />
                   <p className="text-on-surface-variant text-sm mt-3">
-                    Gerencie seus equipamentos cadastrados
+                    Gerencie os equipamentos cadastrados
                   </p>
                 </div>
                 <Link
                   to="/dashboard/novo-equipamento"
-                  className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                  className="bg-secondary-container text-on-secondary-container px-6 py-3 rounded-lg font-bold text-sm hover:brightness-95 transition-all flex items-center gap-2 shadow-sm"
                 >
                   <MaterialIcon icon="add" size={18} /> Novo Equipamento
                 </Link>
               </div>
+
               <DashboardSearchBar
                 searchValue=""
                 onSearchChange={() => {}}
                 yearValue="Todos"
                 onYearChange={() => {}}
-                searchPlaceholder="Buscar por marca, modelo ou Renagro..."
+                searchPlaceholder="Buscar por marca, modelo ou registro..."
               />
-              {paginatedFrota.map((m) => (
-                <div
-                  key={m.id}
-                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <MaterialIcon
-                        icon="agriculture"
-                        className="text-primary"
-                        size={28}
-                      />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {paginatedFrota.map((m) => (
+                  <div
+                    key={m.id}
+                    className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-start justify-between group hover:shadow-xl transition-all duration-300 shadow-sm"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <MaterialIcon
+                          icon="agriculture"
+                          className="text-primary"
+                          size={28}
+                        />
+                      </div>
+                      <div>
+                        <h3 className="font-headline font-bold text-on-surface text-lg">
+                          {m.brand} {m.model}
+                        </h3>
+                        <p className="text-sm text-on-surface-variant">
+                          Ano: {m.year} · Registro: {m.renagro}
+                        </p>
+                        <p className="text-xs text-outline font-medium tracking-wide uppercase mt-1">
+                          Finalidade: {m.purpose || "Não informada"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-headline font-bold text-on-surface text-lg">
-                        {m.brand} {m.model} ({m.year})
-                      </h3>
-                      <p className="text-sm text-on-surface-variant">
-                        Renagro: {m.renagro} · {m.purpose}
-                      </p>
+                    <div className="flex flex-col gap-2">
+                      <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5 self-end">
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                        Disponível
+                      </span>
+                      <button
+                        onClick={() => openEditModalForMachine(m)}
+                        className="text-sm font-bold text-primary hover:underline self-end flex items-center gap-1"
+                      >
+                        <MaterialIcon icon="edit" size={14} /> Editar
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    {m.status === "active" ? (
-                      <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />{" "}
-                        Ativo
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
-                        <MaterialIcon icon="cancel" size={14} /> Removido
-                      </span>
-                    )}
-                    <button
-                      onClick={() => openEditModalForMachine(m)}
-                      className="text-sm font-bold text-primary hover:underline"
-                    >
-                      Editar
-                    </button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button className="text-sm font-bold text-error hover:underline">
-                          Remover
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent size="sm">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Remover Equipamento</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja remover este equipamento? Esta ação não pode ser desfeita.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel variant="outline">
-                            Cancelar
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-error hover:bg-error/90 text-on-error"
-                            onClick={async () => {
-                              try {
-                                await machineService.remove(String(m.id));
-                                setMachines((prev) => prev.filter((machine) => String(machine.id) !== String(m.id)));
-                                toast.success("Equipamento removido com sucesso!");
-                              } catch (error) {
-                                console.error("Erro ao remover equipamento:", error);
-                                if (error instanceof AxiosError && error.response?.data?.error) {
-                                  toast.error(error.response.data.error);
-                                } else {
-                                  toast.error("Não foi possível remover o equipamento.");
-                                }
-                              }
-                            }}
-                          >
-                            Remover
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
               <DashboardPagination
                 currentPage={frotaPage}
                 totalPages={frotaTotalPages}
                 onPageChange={setFrotaPage}
               />
             </div>
+          )}
+
+          {/* Documentos */}
+          {tab === "documentos" ? (
+            <div className="space-y-10">
+              {/* ── Habilitação (CNH) ──────────────────────────────── */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="font-headline text-3xl font-bold text-primary">
+                      Habilitação (CNH)
+                    </h1>
+                    <div className="h-1 w-16 bg-secondary-container mt-2" />
+                    <p className="text-on-surface-variant text-sm mt-3">
+                      Carteira Nacional de Habilitação vinculada à sua conta
+                    </p>
+                  </div>
+                  <Link
+                    to="/document/cnh"
+                    className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <MaterialIcon
+                      icon={licenses.length > 0 ? "edit" : "add"}
+                      size={18}
+                    />{" "}
+                    {licenses.length > 0 ? "Editar CNH" : "Nova CNH"}
+                  </Link>
+                </div>
+
+                {licenses.length === 0 ? (
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center">
+                    <MaterialIcon
+                      icon="id_card"
+                      size={48}
+                      className="text-outline/40 mb-3"
+                    />
+                    <p className="text-on-surface-variant text-sm">
+                      Nenhuma CNH cadastrada
+                    </p>
+                  </div>
+                ) : (
+                  licenses.map((lic) => (
+                    <div
+                      key={lic.id}
+                      className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <MaterialIcon
+                            icon="id_card"
+                            className="text-primary"
+                            size={28}
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-headline font-bold text-on-surface text-lg">
+                            {lic.name}
+                          </h3>
+                          <p className="text-sm text-on-surface-variant">
+                            Categoria {lic.category} · Validade:{" "}
+                            {new Date(lic.expiration_date).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </p>
+                          {lic.validation_status === "rejected" && lic.review_note && (
+                            <p className="text-xs text-error mt-1">
+                              Motivo: {lic.review_note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {lic.validation_status === "approved" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                            Aprovado
+                          </span>
+                        ) : lic.validation_status === "rejected" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="cancel" size={14} /> Recusado
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="hourglass_bottom" size={14} />{" "}
+                            Pendente
+                          </span>
+                        )}
+                        <Link
+                          to="/document/cnh"
+                          className="text-sm font-bold text-primary hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button className="text-sm font-bold text-error hover:underline cursor-pointer">
+                              Remover
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent size="sm">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remover CNH</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover sua CNH? Esta
+                                ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel variant="outline">
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-error hover:bg-error/90 text-on-error"
+                                onClick={async () => {
+                                  try {
+                                    await operatorDocumentService.removeLicense(
+                                      lic.id,
+                                    );
+                                    setLicenses((prev) =>
+                                      prev.filter((l) => l.id !== lic.id),
+                                    );
+                                    toast.success("CNH removida com sucesso!");
+                                  } catch {
+                                    toast.error(
+                                      "Não foi possível remover a CNH.",
+                                    );
+                                  }
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* ── Certificações ──────────────────────────────────── */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="font-headline text-3xl font-bold text-primary">
+                      Certificações
+                    </h1>
+                    <div className="h-1 w-16 bg-secondary-container mt-2" />
+                    <p className="text-on-surface-variant text-sm mt-3">
+                      Cursos e certificações profissionalizantes
+                    </p>
+                  </div>
+                  <Link
+                    to="/document/certification"
+                    className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                  >
+                    <MaterialIcon icon="add" size={18} /> Nova Certificação
+                  </Link>
+                </div>
+
+                {certifications.length === 0 ? (
+                  <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center">
+                    <MaterialIcon
+                      icon="workspace_premium"
+                      size={48}
+                      className="text-outline/40 mb-3"
+                    />
+                    <p className="text-on-surface-variant text-sm">
+                      Nenhuma certificação cadastrada
+                    </p>
+                  </div>
+                ) : (
+                  certifications.map((cert) => (
+                    <div
+                      key={cert.id}
+                      className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <MaterialIcon
+                            icon="workspace_premium"
+                            className="text-primary"
+                            size={28}
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-headline font-bold text-on-surface text-lg">
+                            {cert.title}
+                          </h3>
+                          <p className="text-sm text-on-surface-variant">
+                            {cert.issuing_organization} ·{" "}
+                            {new Date(cert.issue_date).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </p>
+                          {cert.validation_status === "rejected" && cert.review_note && (
+                            <p className="text-xs text-error mt-1">
+                              Motivo: {cert.review_note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {cert.validation_status === "approved" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
+                            Aprovado
+                          </span>
+                        ) : cert.validation_status === "rejected" ? (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="cancel" size={14} /> Recusado
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-tertiary/10 text-tertiary border border-tertiary/20 flex items-center gap-1.5">
+                            <MaterialIcon icon="hourglass_bottom" size={14} />{" "}
+                            Pendente
+                          </span>
+                        )}
+                        <Link
+                          to={`/document/certification/${cert.id}`}
+                          className="text-sm font-bold text-primary hover:underline"
+                        >
+                          Editar
+                        </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button className="text-sm font-bold text-error hover:underline cursor-pointer">
+                              Remover
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent size="sm">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Remover Certificação
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover esta
+                                certificação? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel variant="outline">
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-error hover:bg-error/90 text-on-error"
+                                onClick={async () => {
+                                  try {
+                                    await operatorDocumentService.removeCertification(
+                                      cert.id,
+                                    );
+                                    setCertifications((prev) =>
+                                      prev.filter((c) => c.id !== cert.id),
+                                    );
+                                    toast.success(
+                                      "Certificação removida com sucesso!",
+                                    );
+                                  } catch {
+                                    toast.error(
+                                      "Não foi possível remover a certificação.",
+                                    );
+                                  }
+                                }}
+                              >
+                                Remover
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           ) : null}
 
+          {/* Anúncios */}
           {tab === "anuncios" ? (
             <div className="space-y-6">
               <div className="flex justify-between items-start">
@@ -1263,7 +1458,10 @@ const DashboardLocador = () => {
                             /h
                           </span>
                         </div>
-                        <Link to={`/dashboard/gerenciar-anuncio/${p.id}`} className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors">
+                        <Link
+                          to={`/dashboard/gerenciar-anuncio/${p.id}`}
+                          className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+                        >
                           Gerenciar
                         </Link>
                       </div>
@@ -1279,6 +1477,7 @@ const DashboardLocador = () => {
             </div>
           ) : null}
 
+          {/* Reservas/Locações */}
           {tab === "reservas" ? (
             <div className="space-y-6">
               <div>
@@ -1339,6 +1538,7 @@ const DashboardLocador = () => {
             </div>
           ) : null}
 
+          {/* Contratos */}
           {tab === "contratos" ? (
             <div className="space-y-6">
               <div>
@@ -1371,35 +1571,7 @@ const DashboardLocador = () => {
                   </button>
                 ))}
               </div>
-              {[
-                {
-                  id: "#CTR-8821",
-                  lessee: "Fazenda Aurora",
-                  machine: "Trator Valtra BH194",
-                  period: "02 – 10 Fev/2026",
-                  total: "R$ 15.000,00",
-                  status: "pending",
-                  date: "28 Jan/2026",
-                },
-                {
-                  id: "#CTR-8799",
-                  lessee: "Fazenda São João",
-                  machine: "Colheitadeira JD S700",
-                  period: "15 – 20 Jan/2026",
-                  total: "R$ 38.400,00",
-                  status: "signed",
-                  date: "12 Jan/2026",
-                },
-                {
-                  id: "#CTR-8745",
-                  lessee: "Fazenda Boa Vista",
-                  machine: "Pulverizador Jacto",
-                  period: "01 – 05 Dez/2025",
-                  total: "R$ 6.250,00",
-                  status: "closed",
-                  date: "28 Nov/2025",
-                },
-              ].map((c) => (
+              {rentals.map((c) => (
                 <div
                   key={c.id}
                   className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
@@ -1415,10 +1587,10 @@ const DashboardLocador = () => {
                       </div>
                       <div>
                         <h3 className="font-headline font-bold text-on-surface">
-                          {c.id} — {c.machine}
+                          {c.contract} — {c.machine}
                         </h3>
                         <p className="text-sm text-on-surface-variant">
-                          {c.lessee} · Criado em {c.date}
+                          {c.lessee} · Criado em 2026
                         </p>
                       </div>
                     </div>
@@ -1426,7 +1598,7 @@ const DashboardLocador = () => {
                       className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
                         c.status === "pending"
                           ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
-                          : c.status === "signed"
+                          : c.status === "active" || c.status === "signed"
                             ? "bg-primary/10 text-primary border border-primary/20"
                             : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
                       }`}
@@ -1435,7 +1607,7 @@ const DashboardLocador = () => {
                         icon={
                           c.status === "pending"
                             ? "description"
-                            : c.status === "signed"
+                            : (c.status === "active" || c.status === "signed")
                               ? "verified"
                               : "check_circle"
                         }
@@ -1443,7 +1615,7 @@ const DashboardLocador = () => {
                       />
                       {c.status === "pending"
                         ? "Assinatura Pendente"
-                        : c.status === "signed"
+                        : (c.status === "active" || c.status === "signed")
                           ? "Assinado"
                           : "Encerrado"}
                     </span>
@@ -1483,11 +1655,9 @@ const DashboardLocador = () => {
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    {c.status === "pending" ? (
-                      <button className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2">
-                        <MaterialIcon icon="draw" size={16} /> Assinar Contrato
-                      </button>
-                    ) : null}
+                    <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
+                      <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
+                    </Link>
                     <button className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
                       <MaterialIcon icon="download" size={16} /> Baixar PDF
                     </button>
@@ -1502,6 +1672,7 @@ const DashboardLocador = () => {
             </div>
           ) : null}
 
+          {/* Chat */}
           {tab === "chat" ? (
             <div className="space-y-6">
               <div>
@@ -1679,6 +1850,7 @@ const DashboardLocador = () => {
             </div>
           ) : null}
 
+          {/* Notificações */}
           {tab === "notificacoes" ? (
             <div className="space-y-6">
               <div className="flex justify-between items-start">
@@ -1785,6 +1957,7 @@ const DashboardLocador = () => {
             </div>
           ) : null}
 
+          {/* Avaliações */}
           {tab === "avaliacoes" ? (
             <div className="space-y-8">
               <div>
@@ -1807,50 +1980,22 @@ const DashboardLocador = () => {
                   Avaliações Recebidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    {
-                      from: "Fazenda Boa Vista",
-                      initials: "BV",
-                      machine: "Pulverizador Jacto",
-                      date: "06/12/2025",
-                      rating: 5,
-                      comment:
-                        "Equipamento em ótimo estado, operador muito competente. Recomendo!",
-                    },
-                    {
-                      from: "Fazenda São João",
-                      initials: "SJ",
-                      machine: "Colheitadeira JD S700",
-                      date: "21/01/2026",
-                      rating: 4,
-                      comment:
-                        "Colheitadeira funcionou perfeitamente. Apenas um pequeno atraso na entrega.",
-                    },
-                    {
-                      from: "Fazenda Aurora",
-                      initials: "FA",
-                      machine: "Trator Valtra BH194",
-                      date: "11/02/2026",
-                      rating: 5,
-                      comment:
-                        "Excelente trator, muito bem cuidado. João foi muito atencioso com tudo.",
-                    },
-                  ].map((r) => (
+                  {receivedReviews.length > 0 ? receivedReviews.map((r) => (
                     <div
-                      key={r.from + r.date}
+                      key={r.id}
                       className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">
-                            {r.initials}
+                            {r.reviewer_name?.slice(0, 2).toUpperCase() || 'NA'}
                           </div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">
-                              {r.from}
+                              {r.reviewer_name}
                             </div>
                             <div className="text-xs text-on-surface-variant">
-                              {r.machine} · {r.date}
+                              {new Date(r.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -1874,7 +2019,9 @@ const DashboardLocador = () => {
                         "{r.comment}"
                       </p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>
+                  )}
                 </div>
               </div>
 
@@ -1888,41 +2035,22 @@ const DashboardLocador = () => {
                   Avaliações Fornecidas
                 </h2>
                 <div className="space-y-4">
-                  {[
-                    {
-                      to: "Fazenda Boa Vista",
-                      initials: "BV",
-                      machine: "Pulverizador Jacto",
-                      date: "06/12/2025",
-                      rating: 5,
-                      comment:
-                        "Locatário muito cuidadoso com o equipamento. Devolveu tudo em perfeito estado.",
-                    },
-                    {
-                      to: "Fazenda São João",
-                      initials: "SJ",
-                      machine: "Colheitadeira JD S700",
-                      date: "21/01/2026",
-                      rating: 5,
-                      comment:
-                        "Excelente locatário, pagamento pontual e comunicação ótima.",
-                    },
-                  ].map((r) => (
+                  {givenReviews.length > 0 ? givenReviews.map((r) => (
                     <div
-                      key={r.to + r.date}
+                      key={r.id}
                       className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                            {r.initials}
+                            {r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}
                           </div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">
-                              {r.to}
+                              {r.reviewee_name}
                             </div>
                             <div className="text-xs text-on-surface-variant">
-                              {r.machine} · {r.date}
+                              {new Date(r.created_at).toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -1943,6 +2071,12 @@ const DashboardLocador = () => {
                             ))}
                           </div>
                           <button
+                            onClick={() => {
+                              reviewService.deleteReview(r.id).then(() => {
+                                setGivenReviews(prev => prev.filter(review => review.id !== r.id));
+                                toast.success("Avaliação excluída com sucesso.");
+                              }).catch(() => toast.error("Erro ao excluir avaliação."));
+                            }}
                             className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors"
                             title="Excluir avaliação"
                           >
@@ -1954,17 +2088,22 @@ const DashboardLocador = () => {
                         "{r.comment}"
                       </p>
                     </div>
-                  ))}
+                  )) : (
+                    <p className="text-sm text-on-surface-variant">Você ainda não forneceu nenhuma avaliação.</p>
+                  )}
                 </div>
               </div>
-              <DashboardPagination
-                currentPage={1}
-                totalPages={2}
-                onPageChange={() => {}}
-              />
+              {(receivedReviews.length > 0 || givenReviews.length > 0) && (
+                <DashboardPagination
+                  currentPage={1}
+                  totalPages={Math.max(1, Math.ceil(Math.max(receivedReviews.length, givenReviews.length) / 5))}
+                  onPageChange={() => { }}
+                />
+              )}
             </div>
           ) : null}
 
+          {/* Minha Conta */}
           {tab === "conta" ? (
             <div className="space-y-6">
               <div>
@@ -2078,6 +2217,35 @@ const DashboardLocador = () => {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                        CEP
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="00000-000"
+                        value={formCep}
+                        onChange={async (e) => {
+                          const masked = maskCEP(e.target.value);
+                          setFormCep(masked);
+                          const digits = masked.replace(/\D/g, "");
+                          if (digits.length === 8) {
+                            try {
+                              const data = await fetchAddressByCEP(digits);
+                              if (data) {
+                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
+                                setFormAddress(newAddress);
+                              } else {
+                                toast.error("CEP não encontrado.");
+                              }
+                            } catch (error) {
+                              console.error("Erro ao buscar CEP", error);
+                            }
+                          }
+                        }}
+                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
                         Endereço
                       </label>
                       <input
@@ -2106,50 +2274,77 @@ const DashboardLocador = () => {
                       <label className="text-xs font-bold uppercase tracking-wider text-outline">
                         Senha Atual
                       </label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
-                        required
-                        minLength={8}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showCurrentPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                          required
+                          minLength={8}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showCurrentPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-outline">
                         Nova Senha
                       </label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={newPassword}
-                        onChange={(e) => {
-                          setNewPassword(e.target.value);
-                          confirmPasswordRef.current?.setCustomValidity("");
-                        }}
-                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
-                        required
-                        pattern={passwordPattern.regex.source}
-                        title={passwordPattern.title}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={newPassword}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            confirmPasswordRef.current?.setCustomValidity("");
+                          }}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                          required
+                          pattern={passwordPattern.regex.source}
+                          title={passwordPattern.title}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showNewPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-outline">
                         Confirmar Nova Senha
                       </label>
-                      <input
-                        ref={confirmPasswordRef}
-                        type="password"
-                        placeholder="••••••••"
-                        value={confirmPassword}
-                        onChange={(e) => {
-                          setConfirmPassword(e.target.value);
-                          confirmPasswordRef.current?.setCustomValidity("");
-                        }}
-                        className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          ref={confirmPasswordRef}
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={confirmPassword}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            confirmPasswordRef.current?.setCustomValidity("");
+                          }}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                        >
+                          <MaterialIcon icon={showConfirmPassword ? "visibility_off" : "visibility"} size={20} />
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="submit"

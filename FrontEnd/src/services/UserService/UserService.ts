@@ -33,7 +33,7 @@ class UserService {
 
   async updateProfile(
     id: string,
-    data: Pick<User, "name" | "document" | "email" | "phone" | "address">,
+    data: Pick<User, "name" | "document" | "email" | "phone" | "address" | "cep">,
   ): Promise<User> {
     const response = await AxiosInstance.patch<User>(
       `${this.LIST_ENDPOINT}${id}`,

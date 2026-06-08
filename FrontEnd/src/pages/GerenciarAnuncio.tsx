@@ -5,6 +5,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
+import { maskCEP } from "@/utils/masks/maskCEP";
+import { fetchAddressByCEP } from "@/services/ViaCEPService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +25,8 @@ const GerenciarAnuncio = () => {
   const [posting, setPosting] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cep, setCep] = useState("");
+  const [location, setLocation] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -30,6 +34,7 @@ const GerenciarAnuncio = () => {
       .getById(id)
       .then((data) => {
         setPosting(data);
+        setLocation(data.location_address || "");
       })
       .catch(() => {
         toast.error("Não foi possível carregar o anúncio.");
@@ -176,17 +181,49 @@ const GerenciarAnuncio = () => {
                 />
               </div>
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                  Localização *
-                </label>
-                <input
-                  name="location_address"
-                  type="text"
-                  defaultValue={posting.location_address}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    CEP
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="00000-000"
+                    value={cep}
+                    onChange={async (e) => {
+                      const masked = maskCEP(e.target.value);
+                      setCep(masked);
+                      const digits = masked.replace(/\D/g, "");
+                      if (digits.length === 8) {
+                        try {
+                          const data = await fetchAddressByCEP(digits);
+                          if (data) {
+                            setLocation(`${data.localidade}, ${data.uf}`);
+                          } else {
+                            toast.error("CEP não encontrado.");
+                          }
+                        } catch (error) {
+                          console.error("Erro ao buscar CEP", error);
+                        }
+                      }
+                    }}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    Localização *
+                  </label>
+                  <input
+                    name="location_address"
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-5">
