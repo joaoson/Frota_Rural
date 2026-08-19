@@ -1,3 +1,4 @@
+import { AxiosError } from "axios";
 import { type FormEvent, useState } from "react";
 import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
@@ -138,7 +139,16 @@ const NovoEquipamento = () => {
       setInitialHorimeter("");
       setTechnicalSpecifications("");
       setErrors({});
-    } catch {
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.data) {
+        const data = error.response.data;
+        if (data.renagro_number) {
+          const message = "Este número Renagro já está cadastrado.";
+          toast.error(message);
+          setErrors((prev) => ({ ...prev, renagroNumber: message }));
+          return;
+        }
+      }
       toast.error("Erro ao cadastrar equipamento. Verifique os dados e tente novamente.");
     } finally {
       setIsSubmitting(false);
