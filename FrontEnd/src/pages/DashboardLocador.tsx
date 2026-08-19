@@ -50,6 +50,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Mesmo placeholder usado em BuscarMaquinario, para os cards ficarem coerentes.
+const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
+
 const revenueData = [
   { month: "Set", value: 8200 },
   { month: "Out", value: 12400 },
@@ -245,9 +248,12 @@ const DashboardLocador = () => {
 
       setPostings(userPostings.map((p: any) => ({
         id: p.id,
-        machine: p.machinery_details ? `${p.machinery_details.brand} ${p.machinery_details.model}` : p.machinery,
+        // A API devolve machine_brand/machine_model (não machinery_details);
+        // sem isso o card caía no fallback e exibia o UUID do maquinário.
+        machine: [p.machine_brand, p.machine_model].filter(Boolean).join(" ") || "Sem título",
         price: p.hourly_rate,
         location: p.location_address,
+        photo: p.primary_photo_url ?? null,
         status: p.status || "active"
       })));
     }).catch(console.error);
@@ -369,8 +375,8 @@ const DashboardLocador = () => {
 
   const [frotaPage, setFrotaPage] = useState(1);
   const [anunciosPage, setAnunciosPage] = useState(1);
-  const frotaPerPage = 2;
-  const anunciosPerPage = 2;
+  const frotaPerPage = 6;
+  const anunciosPerPage = 6;
   const frotaTotalPages = Math.ceil(machines.length / frotaPerPage);
   const anunciosTotalPages = Math.ceil(postings.length / anunciosPerPage);
   const paginatedFrota = machines.slice(
@@ -1071,7 +1077,7 @@ const DashboardLocador = () => {
                 searchPlaceholder="Buscar por marca, modelo ou registro..."
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {paginatedFrota.map((m) => (
                   <div
                     key={m.id}
@@ -1422,20 +1428,32 @@ const DashboardLocador = () => {
                 onYearChange={() => {}}
                 searchPlaceholder="Buscar por maquinário ou localização..."
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {paginatedAnuncios.map((p) => (
                   <div
                     key={p.id}
                     className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 shadow-sm"
                   >
                     <div className="h-40 bg-gradient-to-br from-primary/10 via-secondary-container/10 to-tertiary/10 overflow-hidden flex items-center justify-center">
-                      <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
-                        <MaterialIcon
-                          icon="precision_manufacturing"
-                          className="text-primary"
-                          size={28}
+                      {p.photo ? (
+                        <img
+                          src={p.photo}
+                          alt={p.machine}
+                          loading="lazy"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={(evento) => {
+                            evento.currentTarget.src = FALLBACK_IMG;
+                          }}
                         />
-                      </div>
+                      ) : (
+                        <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
+                          <MaterialIcon
+                            icon="precision_manufacturing"
+                            className="text-primary"
+                            size={28}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="p-5">
                       <div className="flex justify-between items-start mb-2">
