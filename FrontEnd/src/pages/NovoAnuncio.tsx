@@ -13,13 +13,20 @@ import { fetchAddressByCEP } from "@/services/ViaCEPService";
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT_TYPES = ["image/jpeg", "image/png"];
 
+type SelectedPhoto = {
+  id: string;
+  file: File;
+  /** Object URL usado só para o preview local; revogado ao remover/desmontar. */
+  previewUrl: string;
+};
+
 const NovoAnuncio = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [machines, setMachines] = useState<MachineListItem[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(true);
-  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<SelectedPhoto[]>([]);
   const [machinery, setMachinery] = useState("");
   const [hourlyRate, setHourlyRate] = useState("");
   const [cep, setCep] = useState("");
@@ -30,6 +37,19 @@ const NovoAnuncio = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // Mantém a lista atual acessível ao cleanup de desmontagem sem reexecutá-lo.
+  const photosRef = useRef<SelectedPhoto[]>([]);
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
+  useEffect(
+    () => () => {
+      photosRef.current.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -91,19 +111,48 @@ const NovoAnuncio = () => {
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
-    setPhotoFiles((prev) => {
-      const next = [...prev];
-      for (const file of Array.from(files)) {
-        if (!ACCEPT_TYPES.includes(file.type)) {
-          toast.error("Use apenas JPG ou PNG.");
-          continue;
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          toast.error(`"${file.name}" excede 5MB.`);
-          continue;
-        }
-        next.push(file);
+
+    // O FileList é vivo: o `input.value = ""` do onChange o esvazia. Por isso a
+    // cópia é feita agora, de forma síncrona, e não dentro do updater do estado
+    // (que só roda na renderização, quando a lista já estaria vazia).
+    const incoming = Array.from(files);
+
+    const accepted: SelectedPhoto[] = [];
+    for (const file of incoming) {
+      if (!ACCEPT_TYPES.includes(file.type)) {
+        toast.error("Use apenas JPG ou PNG.");
+        continue;
       }
+      if (file.size > MAX_FILE_BYTES) {
+        toast.error(`"${file.name}" excede 5MB.`);
+        continue;
+      }
+      accepted.push({
+        id: crypto.randomUUID(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+      });
+    }
+
+    if (accepted.length > 0) {
+      setPhotos((prev) => [...prev, ...accepted]);
+    }
+  }, []);
+
+  const removePhoto = useCallback((photoId: string) => {
+    const target = photosRef.current.find((photo) => photo.id === photoId);
+    if (target) URL.revokeObjectURL(target.previewUrl);
+    setPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+  }, []);
+
+  // A capa é sempre a primeira da lista — promover é só reordenar.
+  const makeCover = useCallback((photoId: string) => {
+    setPhotos((prev) => {
+      const index = prev.findIndex((photo) => photo.id === photoId);
+      if (index <= 0) return prev;
+      const next = [...prev];
+      const [chosen] = next.splice(index, 1);
+      next.unshift(chosen);
       return next;
     });
   }, []);
@@ -129,7 +178,7 @@ const NovoAnuncio = () => {
 
     setIsSubmitting(true);
     try {
-      await postingService.create({
+      const posting = await postingService.create({
         machinery: machinery,
         hourly_rate: rate,
         location_address: location,
@@ -138,20 +187,40 @@ const NovoAnuncio = () => {
         description: description || undefined,
       });
 
-      toast.success(
-        "Anúncio publicado. O envio das fotos à API ainda não está disponível — as imagens foram apenas validadas neste formulário.",
-      );
+      // O anúncio já existe neste ponto: uma falha no upload não o invalida,
+      // então as fotos são reportadas à parte e o fluxo segue.
+      if (photos.length > 0 && posting?.id) {
+        setUploadingPhotos(true);
+        const { failed } = await postingService.uploadPhotos(
+          posting.id,
+          photos.map((photo) => photo.file),
+        );
+        if (failed === 0) {
+          toast.success("Anúncio publicado com as fotos.");
+        } else if (failed < photos.length) {
+          toast.warning(
+            `Anúncio publicado, mas ${failed} de ${photos.length} fotos não foram enviadas.`,
+          );
+        } else {
+          toast.warning("Anúncio publicado, mas as fotos não puderam ser enviadas.");
+        }
+      } else {
+        toast.success("Anúncio publicado.");
+      }
+
       setMachinery("");
       setHourlyRate("");
       setLocation("");
       setAvailabilityStart("");
       setAvailabilityEnd("");
       setDescription("");
-      setPhotoFiles([]);
+      photos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+      setPhotos([]);
       navigate("/dashboard");
     } catch {
       toast.error("Erro ao publicar anúncio. Verifique os dados e tente novamente.");
     } finally {
+      setUploadingPhotos(false);
       setIsSubmitting(false);
     }
   };
@@ -360,24 +429,45 @@ const NovoAnuncio = () => {
               <div className="font-bold text-tertiary text-sm">Arraste fotos ou clique para selecionar</div>
               <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">JPG, PNG — Max 5MB por foto</div>
             </button>
-            {photoFiles.length > 0 ? (
-              <ul className="text-xs text-on-surface-variant space-y-1">
-                {photoFiles.map((f, index) => (
-                  <li key={`${f.name}-${f.size}-${index}`} className="flex items-center justify-between gap-2">
-                    <span className="truncate">{f.name}</span>
+            {photos.length > 0 ? (
+              <ul className="grid grid-cols-3 gap-3">
+                {photos.map((photo, index) => (
+                  <li
+                    key={photo.id}
+                    className="relative group rounded-xl overflow-hidden border border-outline-variant/30 bg-surface-container"
+                  >
+                    <img
+                      src={photo.previewUrl}
+                      alt={photo.file.name}
+                      className="w-full h-24 object-cover"
+                    />
+                    {index === 0 ? (
+                      <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-primary text-on-primary text-[9px] font-bold uppercase tracking-widest rounded">
+                        Capa
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => makeCover(photo.id)}
+                        className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-surface-container-lowest/90 text-primary text-[9px] font-bold uppercase tracking-widest rounded opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                      >
+                        Tornar capa
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="text-primary font-bold shrink-0"
-                      onClick={() => setPhotoFiles((prev) => prev.filter((_, i) => i !== index))}
+                      onClick={() => removePhoto(photo.id)}
+                      aria-label={`Remover ${photo.file.name}`}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-surface-container-lowest/90 text-error flex items-center justify-center shadow hover:bg-surface-container-lowest transition"
                     >
-                      remover
+                      <MaterialIcon icon="close" size={14} />
                     </button>
                   </li>
                 ))}
               </ul>
             ) : null}
             <p className="text-[10px] text-outline leading-relaxed">
-              O backend ainda não expõe endpoint para fotos; elas são validadas aqui e poderão ser enviadas quando a API estiver pronta.
+              A primeira foto é a capa exibida na busca — passe o mouse sobre outra para promovê-la.
             </p>
           </div>
 
@@ -386,7 +476,12 @@ const NovoAnuncio = () => {
             disabled={isSubmitting || loadingMachines || machines.length === 0}
             className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60"
           >
-            <MaterialIcon icon="publish" size={20} /> {isSubmitting ? "Publicando..." : "Publicar Anúncio"}
+            <MaterialIcon icon="publish" size={20} />{" "}
+            {uploadingPhotos
+              ? "Enviando fotos..."
+              : isSubmitting
+                ? "Publicando..."
+                : "Publicar Anúncio"}
           </button>
         </form>
       </div>

@@ -4,6 +4,25 @@ type MachineApi = {
   id: string;
 };
 
+export type PostingPhoto = {
+  id: string;
+  /** Caminho do objeto no bucket, ex.: "postings/<id>/<uuid>.jpg". */
+  path: string;
+  /** URL pública de download, montada pelo backend a partir do caminho. */
+  url: string;
+  is_primary: boolean;
+};
+
+/** Resposta de POST /postings/ — só o id é consumido hoje. */
+export type CreatedPosting = {
+  id: string;
+};
+
+export type UploadPhotosResult = {
+  uploaded: PostingPhoto[];
+  failed: number;
+};
+
 export type CreatePostingPayload = {
   machinery: string;
   hourly_rate: number;
@@ -29,8 +48,8 @@ class PostingService {
     return machines[randomIndex].id;
   }
 
-  async create(data: CreatePostingPayload) {
-    const response = await AxiosInstance.post(this.POSTINGS_ENDPOINT, data);
+  async create(data: CreatePostingPayload): Promise<CreatedPosting> {
+    const response = await AxiosInstance.post<CreatedPosting>(this.POSTINGS_ENDPOINT, data);
     return response.data;
   }
 
@@ -56,16 +75,47 @@ class PostingService {
     return response.data;
   }
 
-  async uploadPhoto(postingId: string, file: File, isPrimary: boolean) {
+  /**
+   * Envia uma foto para o anúncio. O arquivo vai para o Firebase Storage pelo
+   * backend; a API devolve o caminho salvo e a URL pública já montada.
+   *
+   * O Content-Type precisa ser anulado nesta requisição: a AxiosInstance define
+   * "application/json" como padrão e esse padrão vence sobre o FormData, fazendo
+   * o Django receber um corpo que não consegue parsear (request.FILES vazio →
+   * 400 "Nenhum arquivo enviado."). Com o header removido, o próprio navegador
+   * monta "multipart/form-data" com o boundary correto.
+   */
+  async uploadPhoto(
+    postingId: string,
+    file: File,
+    isPrimary: boolean,
+  ): Promise<PostingPhoto> {
     const formData = new FormData();
     formData.append("image", file);
     formData.append("is_primary", String(isPrimary));
-    const response = await AxiosInstance.post(
+    const response = await AxiosInstance.post<PostingPhoto>(
       `${this.POSTINGS_ENDPOINT}${postingId}/photos/`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      { headers: { "Content-Type": undefined } },
     );
     return response.data;
+  }
+
+  /** Envia várias fotos em sequência. A primeira da lista vira a capa. */
+  async uploadPhotos(postingId: string, files: File[]): Promise<UploadPhotosResult> {
+    const uploaded: PostingPhoto[] = [];
+    let failed = 0;
+
+    for (const [index, file] of files.entries()) {
+      try {
+        uploaded.push(await this.uploadPhoto(postingId, file, index === 0));
+      } catch (error) {
+        console.error(`Falha ao enviar a foto "${file.name}"`, error);
+        failed += 1;
+      }
+    }
+
+    return { uploaded, failed };
   }
 }
 

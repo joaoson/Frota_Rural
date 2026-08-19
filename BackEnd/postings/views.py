@@ -1,7 +1,4 @@
-from django.conf import settings
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
@@ -17,6 +14,10 @@ from .serializer import (
     PostingListSerializer,
     PostingSerializer,
 )
+from djangoapi import firebase_storage
+
+MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
+ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 # Create your views here.
 def _postings_queryset():
@@ -126,25 +127,79 @@ def posting_photos(request, pk):
 
     image_file = request.FILES.get("image")
     if not image_file:
-        return Response({"error": "Nenhum arquivo enviado."}, status=status.HTTP_400_BAD_REQUEST)
+        # Sem corpo multipart o Django nem chega a popular request.FILES. Vale
+        # distinguir os dois casos: o cliente que erra o Content-Type recebe uma
+        # mensagem que aponta a causa, em vez de "nenhum arquivo".
+        content_type = (request.content_type or "").split(";")[0].strip()
+        if content_type != "multipart/form-data":
+            return Response(
+                {
+                    "error": (
+                        "A requisição precisa ser multipart/form-data; foi recebido "
+                        f"'{content_type or 'nenhum Content-Type'}'."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {"error": "Nenhum arquivo enviado."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    ext = image_file.name.rsplit(".", 1)[-1].lower() if "." in image_file.name else "jpg"
-    filename = f"{uuid.uuid4()}.{ext}"
-    saved_path = default_storage.save(f"posting_photos/{filename}", ContentFile(image_file.read()))
-    image_url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+    if image_file.content_type not in ALLOWED_PHOTO_TYPES:
+        return Response(
+            {
+                "error": (
+                    "Tipo de arquivo não suportado. Envie JPG, PNG ou WEBP "
+                    f"(recebido: '{image_file.content_type}')."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if image_file.size > MAX_PHOTO_BYTES:
+        megabytes = image_file.size / (1024 * 1024)
+        return Response(
+            {
+                "error": (
+                    f"'{image_file.name}' tem {megabytes:.1f}MB e excede o "
+                    "máximo de 5MB."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        image_path = firebase_storage.upload_image(image_file, folder=f"postings/{posting.id}")
+    except firebase_storage.FirebaseStorageNotConfigured as error:
+        return Response({"error": str(error)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except Exception:
+        return Response(
+            {"error": "Erro ao enviar a imagem para o Firebase."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
     is_primary_raw = request.data.get("is_primary", "false")
     is_primary = str(is_primary_raw).lower() in ("true", "1")
 
-    photo = PostingsPhotos.objects.create(
-        id=uuid.uuid4(),
-        postings=posting,
-        image_url=image_url,
-        is_primary=is_primary,
-        created_at=timezone.now(),
-    )
+    # Só uma foto por anúncio pode ser a capa.
+    with transaction.atomic():
+        if is_primary:
+            PostingsPhotos.objects.filter(postings=posting, is_primary=True).update(is_primary=False)
+        photo = PostingsPhotos.objects.create(
+            id=uuid.uuid4(),
+            postings=posting,
+            image_url=image_path,
+            is_primary=is_primary,
+            created_at=timezone.now(),
+        )
 
     return Response(
-        {"id": str(photo.id), "image_url": photo.image_url, "is_primary": photo.is_primary},
+        {
+            "id": str(photo.id),
+            "path": photo.image_url,
+            "url": firebase_storage.public_url(photo.image_url),
+            "is_primary": photo.is_primary,
+        },
         status=status.HTTP_201_CREATED,
     )

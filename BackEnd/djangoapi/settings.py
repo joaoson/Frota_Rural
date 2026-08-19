@@ -183,3 +183,16 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 # Resend (transactional email)
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')
+
+# Firebase Storage (fotos de anúncios e demais mídias enviadas por usuários)
+# FIREBASE_STORAGE_BUCKET: ex. "frota-rural.firebasestorage.app"
+# FIREBASE_CREDENTIALS_FILE: caminho do JSON da service account (fora do git)
+FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET', '')
+
+# Caminho relativo é resolvido a partir de BackEnd/, não do diretório de execução.
+_firebase_credentials = os.getenv('FIREBASE_CREDENTIALS_FILE', 'firebase-service-account.json')
+FIREBASE_CREDENTIALS_FILE = str(
+    Path(_firebase_credentials)
+    if os.path.isabs(_firebase_credentials)
+    else BASE_DIR / _firebase_credentials
+)

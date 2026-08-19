@@ -1,10 +1,22 @@
 import uuid
+from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from rest_framework import serializers
 from .models import (
     Postings,
     PostingsPhotos
 )
+from djangoapi import firebase_storage
+
+
+# created_at é nullable no banco; usado como piso para manter a ordenação estável.
+_EPOCH = datetime.min.replace(tzinfo=dt_timezone.utc)
+
+
+def _sorted_photos(posting):
+    """Capa primeiro, depois as demais na ordem de envio."""
+    photos = list(posting.postingsphotos_set.all())
+    return sorted(photos, key=lambda p: (not p.is_primary, p.created_at or _EPOCH))
 
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,11 +78,10 @@ class PostingListSerializer(serializers.ModelSerializer):
         ]
 
     def get_primary_photo_url(self, obj):
-        photos = list(obj.postingsphotos_set.all())
+        photos = _sorted_photos(obj)
         if not photos:
             return None
-        primary = next((p for p in photos if p.is_primary), photos[0])
-        return primary.image_url
+        return firebase_storage.public_url(photos[0].image_url)
 
 class PostingDetailSerializer(serializers.ModelSerializer):
     machine_brand                    = serializers.CharField(source="machinery.brand",                    default=None, read_only=True)
@@ -94,5 +105,11 @@ class PostingDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_photos(self, obj):
-        photos = list(obj.postingsphotos_set.all())
-        return [{"url": p.image_url, "is_primary": p.is_primary} for p in photos]
+        return [
+            {
+                "id": str(p.id),
+                "url": firebase_storage.public_url(p.image_url),
+                "is_primary": bool(p.is_primary),
+            }
+            for p in _sorted_photos(obj)
+        ]
