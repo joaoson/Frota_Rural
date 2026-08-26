@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   Dialog,
   DialogContent,
@@ -71,7 +72,7 @@ const statusBadge = (status: string | null) => {
       return {
         icon: "hourglass_bottom",
         classes:
-          "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30",
+          "bg-secondary-container/20 text-secondary border border-secondary-container/30",
         label: "Em análise",
       };
     case "suspended":
@@ -233,13 +234,16 @@ const AdminAnuncios = () => {
         <h1 className="font-headline font-black text-lg text-on-surface tracking-tight">
           Moderação de Anúncios
         </h1>
-        <button
-          type="button"
-          onClick={loadPostings}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <MaterialIcon icon="refresh" size={16} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadPostings}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          >
+            <MaterialIcon icon="refresh" size={16} /> Atualizar
+          </button>
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="p-8 max-w-[1200px]">

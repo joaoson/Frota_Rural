@@ -19,6 +19,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import NotificationPopover from "@/components/NotificationPopover";
 import {
   AlertDialog,
@@ -230,7 +231,7 @@ const DashboardLocatario = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending": return { icon: "description", classes: "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30", label: "Assinatura Pendente" };
+      case "pending": return { icon: "description", classes: "bg-secondary-container/20 text-secondary border border-secondary-container/30", label: "Assinatura Pendente" };
       case "active": return { icon: "circle", classes: "bg-primary/10 text-primary border border-primary/20", label: "Em Operação (Ativo)" };
       case "completed": return { icon: "check_circle", classes: "bg-primary/10 text-primary border border-primary/20", label: "Concluída" };
       case "cancelled": return { icon: "warning", classes: "bg-error/10 text-error border border-error/20", label: "Locação Cancelada" };
@@ -285,7 +286,7 @@ const DashboardLocatario = () => {
               </button>
             )}
             {r.status === "completed" && (
-              <button onClick={() => setShowAvaliar(showAvaliar === r.id ? null : r.id)} className="px-4 bg-secondary-container/30 text-on-secondary-container py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1">
+              <button onClick={() => setShowAvaliar(showAvaliar === r.id ? null : r.id)} className="px-4 bg-secondary-container/30 text-secondary py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1">
                 <MaterialIcon icon="star" size={14} /> Avaliar
               </button>
             )}
@@ -318,7 +319,7 @@ const DashboardLocatario = () => {
           {showReagendar === r.id && (
             <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
               <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
-                <MaterialIcon icon="event_repeat" size={16} className="text-on-secondary-container" /> Solicitar Reagendamento
+                <MaterialIcon icon="event_repeat" size={16} className="text-secondary" /> Solicitar Reagendamento
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -343,7 +344,7 @@ const DashboardLocatario = () => {
           {showAvaliar === r.id && (
             <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
               <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
-                <MaterialIcon icon="star" size={16} className="text-on-secondary-container" /> Avaliar Serviço
+                <MaterialIcon icon="star" size={16} className="text-secondary" /> Avaliar Serviço
               </h4>
               <p className="text-sm text-on-surface-variant">Como foi sua experiência com {r.owner}?</p>
               <div className="flex gap-2">
@@ -497,13 +498,16 @@ const DashboardLocatario = () => {
               <MaterialIcon icon="menu" size={24} />
             </button>
           </div>
-          <NotificationPopover
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <NotificationPopover
             notifications={[
               { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
               { id: 2, icon: "description", title: "Contrato pronto para assinatura", desc: "Colheitadeira JD S700 · Fazenda São João", time: "3h atrás", unread: true },
               { id: 3, icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
             ]}
-          />
+            />
+          </div>
         </header>
 
         <div className="p-8 max-w-[1200px]">
@@ -551,15 +555,15 @@ const DashboardLocatario = () => {
                     <AreaChart data={spendData}>
                       <defs>
                         <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
-                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
-                      <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#colorSpend)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#colorSpend)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -574,18 +578,18 @@ const DashboardLocatario = () => {
                   </div>
                   <div className="flex items-center gap-1.5 bg-secondary-container/10 px-3 py-1.5 rounded-lg">
                     <MaterialIcon icon="star" filled className="text-secondary-container" size={16} />
-                    <span className="font-black text-on-secondary-container text-sm">4.3</span>
+                    <span className="font-black text-secondary text-sm">4.3</span>
                     <span className="text-[10px] font-bold text-on-surface-variant uppercase">média</span>
                   </div>
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ratingsData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
-                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
-                      <Bar dataKey="rating" fill="hsl(39, 99%, 60%)" radius={[6, 6, 0, 0]} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Bar dataKey="rating" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -736,7 +740,7 @@ const DashboardLocatario = () => {
                       </div>
                     </div>
                     <span className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
-                      c.status === "pending" ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
+                      c.status === "pending" ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
                         : c.status === "active" || c.status === "signed" ? "bg-primary/10 text-primary border border-primary/20"
                         : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
                     }`}>

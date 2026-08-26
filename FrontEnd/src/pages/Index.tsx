@@ -135,7 +135,7 @@ const Index = () => {
                   <div className="absolute top-4 right-4 bg-primary text-on-primary text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-widest shadow-lg">
                     Safra 2026
                   </div>
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20 shadow-sm">
+                  <div className="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20 shadow-sm">
                     <MaterialIcon icon="verified_user" className="text-primary" size={16} />
                     <span className="text-xs font-bold text-tertiary">Operador com NR-31</span>
                   </div>
@@ -146,7 +146,7 @@ const Index = () => {
                       <h4 className="font-headline text-xl font-bold text-primary leading-tight">{item.title}</h4>
                       <div className="flex items-center bg-secondary-container/10 px-2 py-0.5 rounded">
                         <MaterialIcon icon="star" filled className="text-secondary-container" size={14} />
-                        <span className="text-xs font-bold text-on-secondary-container ml-1">{item.rating}</span>
+                        <span className="text-xs font-bold text-secondary ml-1">{item.rating}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-on-surface-variant font-medium text-sm">

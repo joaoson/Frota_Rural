@@ -34,6 +34,7 @@ import {
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import NotificationPopover from "@/components/NotificationPopover";
 import EditEquipamentoModal, {
   type EquipamentoData,
@@ -170,7 +171,7 @@ const DashboardLocador = () => {
         return {
           icon: "description",
           classes:
-            "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30",
+            "bg-secondary-container/20 text-secondary border border-secondary-container/30",
           label: "Assinatura Pendente",
         };
       case "active":
@@ -445,7 +446,7 @@ const DashboardLocador = () => {
                 onClick={() =>
                   setShowAvaliar(showAvaliar === r.id ? null : r.id)
                 }
-                className="px-4 bg-secondary-container/30 text-on-secondary-container py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1"
+                className="px-4 bg-secondary-container/30 text-secondary py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1"
               >
                 <MaterialIcon icon="star" size={14} /> Avaliar Locatário
               </button>
@@ -523,7 +524,7 @@ const DashboardLocador = () => {
                 <MaterialIcon
                   icon="star"
                   size={16}
-                  className="text-on-secondary-container"
+                  className="text-secondary"
                 />{" "}
                 Avaliar Locatário
               </h4>
@@ -683,7 +684,9 @@ const DashboardLocador = () => {
               <MaterialIcon icon="menu" size={24} />
             </button>
           </div>
-          <NotificationPopover
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <NotificationPopover
             notifications={[
               {
                 id: 1,
@@ -710,7 +713,8 @@ const DashboardLocador = () => {
                 unread: false,
               },
             ]}
-          />
+            />
+          </div>
         </header>
 
         <div className="p-8 max-w-[1200px]">
@@ -851,26 +855,26 @@ const DashboardLocador = () => {
                         >
                           <stop
                             offset="5%"
-                            stopColor="hsl(var(--primary))"
+                            stopColor="var(--chart-1)"
                             stopOpacity={0.3}
                           />
                           <stop
                             offset="95%"
-                            stopColor="hsl(var(--primary))"
+                            stopColor="var(--chart-1)"
                             stopOpacity={0}
                           />
                         </linearGradient>
                       </defs>
                       <CartesianGrid
                         strokeDasharray="3 3"
-                        stroke="hsl(var(--outline-variant))"
+                        stroke="var(--outline-variant)"
                         opacity={0.3}
                       />
                       <XAxis
                         dataKey="month"
                         tick={{
                           fontSize: 12,
-                          fill: "hsl(var(--on-surface-variant))",
+                          fill: "var(--on-surface-variant)",
                         }}
                         axisLine={false}
                         tickLine={false}
@@ -878,7 +882,7 @@ const DashboardLocador = () => {
                       <YAxis
                         tick={{
                           fontSize: 12,
-                          fill: "hsl(var(--on-surface-variant))",
+                          fill: "var(--on-surface-variant)",
                         }}
                         axisLine={false}
                         tickLine={false}
@@ -891,14 +895,18 @@ const DashboardLocador = () => {
                         ]}
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid hsl(var(--outline-variant))",
+                          border: "1px solid var(--outline-variant)",
+                          background: "var(--popover)",
+                          color: "var(--popover-foreground)",
                           fontSize: 13,
                         }}
+                        labelStyle={{ color: "var(--popover-foreground)" }}
+                        itemStyle={{ color: "var(--popover-foreground)" }}
                       />
                       <Area
                         type="monotone"
                         dataKey="value"
-                        stroke="hsl(var(--primary))"
+                        stroke="var(--chart-1)"
                         strokeWidth={2.5}
                         fill="url(#colorRevenue)"
                       />
@@ -925,7 +933,7 @@ const DashboardLocador = () => {
                       className="text-secondary-container"
                       size={16}
                     />
-                    <span className="font-black text-on-secondary-container text-sm">
+                    <span className="font-black text-secondary text-sm">
                       4.7
                     </span>
                     <span className="text-[10px] font-bold text-on-surface-variant uppercase">
@@ -938,14 +946,14 @@ const DashboardLocador = () => {
                     <BarChart data={ratingsData}>
                       <CartesianGrid
                         strokeDasharray="3 3"
-                        stroke="hsl(var(--outline-variant))"
+                        stroke="var(--outline-variant)"
                         opacity={0.3}
                       />
                       <XAxis
                         dataKey="month"
                         tick={{
                           fontSize: 12,
-                          fill: "hsl(var(--on-surface-variant))",
+                          fill: "var(--on-surface-variant)",
                         }}
                         axisLine={false}
                         tickLine={false}
@@ -955,7 +963,7 @@ const DashboardLocador = () => {
                         ticks={[1, 2, 3, 4, 5]}
                         tick={{
                           fontSize: 12,
-                          fill: "hsl(var(--on-surface-variant))",
+                          fill: "var(--on-surface-variant)",
                         }}
                         axisLine={false}
                         tickLine={false}
@@ -967,13 +975,17 @@ const DashboardLocador = () => {
                         ]}
                         contentStyle={{
                           borderRadius: 12,
-                          border: "1px solid hsl(var(--outline-variant))",
+                          border: "1px solid var(--outline-variant)",
+                          background: "var(--popover)",
+                          color: "var(--popover-foreground)",
                           fontSize: 13,
                         }}
+                        labelStyle={{ color: "var(--popover-foreground)" }}
+                        itemStyle={{ color: "var(--popover-foreground)" }}
                       />
                       <Bar
                         dataKey="rating"
-                        fill="hsl(39, 99%, 60%)"
+                        fill="var(--chart-2)"
                         radius={[6, 6, 0, 0]}
                       />
                     </BarChart>
@@ -1597,7 +1609,7 @@ const DashboardLocador = () => {
                     <span
                       className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
                         c.status === "pending"
-                          ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
+                          ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
                           : c.status === "active" || c.status === "signed"
                             ? "bg-primary/10 text-primary border border-primary/20"
                             : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"

@@ -4,6 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <!--
+      Aplica o tema antes do primeiro paint para evitar o "flash" de tema
+      claro ao carregar a pagina com o tema escuro ativo. Precisa rodar
+      sincronamente no <head>, antes do React montar.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("frota-rural-theme");
+          var isDark =
+            stored === "dark" ||
+            ((!stored || stored === "system") &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (isDark) document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        } catch (e) {
+          /* localStorage indisponivel (modo privado): segue no tema claro */
+        }
+      })();
+    </script>
     <meta
       name="description"
       content="Plataforma de locação de máquinas e equipamentos agrícolas. Conecte-se com produtores rurais e proprietários de máquinas."

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ const statusBadge = (status: string) => {
       return {
         icon: "warning",
         classes:
-          "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30",
+          "bg-secondary-container/20 text-secondary border border-secondary-container/30",
         label: "Advertido",
       };
     case "suspended":
@@ -190,7 +191,7 @@ const AdminUsers = () => {
         ? "bg-error/10 text-error border border-error/20 hover:bg-error/20"
         : cfg.severity === "mid"
           ? "bg-surface-container-high text-on-surface-variant border border-outline-variant/40 hover:bg-outline-variant/30"
-          : "bg-secondary-container/30 text-on-secondary-container hover:bg-secondary-container/50";
+          : "bg-secondary-container/30 text-secondary hover:bg-secondary-container/50";
 
     return (
       <button
@@ -212,13 +213,16 @@ const AdminUsers = () => {
         <h1 className="font-headline font-black text-lg text-on-surface tracking-tight">
           Moderação de Usuários
         </h1>
-        <button
-          type="button"
-          onClick={loadUsers}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <MaterialIcon icon="refresh" size={16} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadUsers}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          >
+            <MaterialIcon icon="refresh" size={16} /> Atualizar
+          </button>
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="p-8 max-w-[1200px]">
@@ -360,7 +364,7 @@ const AdminUsers = () => {
                       ? "text-error"
                       : pendingCfg.severity === "mid"
                         ? "text-on-surface-variant"
-                        : "text-on-secondary-container"
+                        : "text-secondary"
                   }
                 />
               ) : null}

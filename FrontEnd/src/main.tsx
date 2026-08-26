@@ -17,6 +17,7 @@ import AdminAnuncios from "@/pages/Admin/Anuncios.tsx";
 import AdminDocumentos from "@/pages/Admin/Documentos.tsx";
 import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder.tsx";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "next-themes";
 
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
@@ -32,6 +33,12 @@ import CertificationUpload from "./pages/Documents/CertificationUpload.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey="frota-rural-theme"
+    >
     <BrowserRouter>
       <AuthProvider>
         <Toaster position="bottom-right" />
@@ -96,5 +103,6 @@ createRoot(document.getElementById("root")!).render(
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ThemeProvider>
   </StrictMode>,
 );

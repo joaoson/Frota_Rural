@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
   const { isAuthenticated, userRole, logout } = useAuth();
@@ -48,6 +49,8 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+
           {isAuthenticated ? (
             <div className="relative" ref={dropdownRef}>
               <button 

@@ -95,6 +95,8 @@
 }
 
 :root {
+    color-scheme: light;
+
     /* Frota Rural — Material Design 3 (aligned with doc-to-design-prototypes) */
     --background: hsl(45 100% 96%);
     --foreground: hsl(50 33% 9%);
@@ -169,76 +171,126 @@
     --sidebar-ring: hsl(110 95% 11%);
     --sidebar: var(--sidebar-background);
     --chart-1: hsl(110 55% 35%);
-    --chart-2: hsl(39 90% 45%);
+    /* Ambar exato que as barras e estrelas ja usavam no tema claro,
+       preservado ao trocar os valores fixos por este token. */
+    --chart-2: hsl(39 99% 60%);
     --chart-3: hsl(30 45% 40%);
     --chart-4: hsl(100 25% 45%);
     --chart-5: hsl(45 60% 50%);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Tema escuro — "Campo à Noite"
+   Neutros quentes com subtom verde-oliva, verde-sálvia luminoso
+   como primária e âmbar de colheita como secundária.
+   A escada de elevação é INVERTIDA em relação ao M3 puro para
+   preservar a intenção do tema claro, onde `surface-container-lowest`
+   é o branco dos cards (a superfície que mais se destaca do fundo).
+   ═══════════════════════════════════════════════════════════════ */
 .dark {
-    --background: hsl(46 21% 12%);
-    --foreground: hsl(44 38% 91%);
-    --card: hsl(46 18% 16%);
-    --card-foreground: hsl(44 38% 91%);
-    --popover: hsl(46 18% 16%);
-    --popover-foreground: hsl(44 38% 91%);
-    --primary: hsl(100 40% 68%);
-    --primary-foreground: hsl(110 100% 8%);
-    --primary-container: hsl(110 40% 22%);
-    --primary-container-foreground: hsl(100 36% 62%);
+    color-scheme: dark;
+
+    /* Base */
+    --background: hsl(96 15% 7%);
+    --foreground: hsl(60 22% 93%);
+    --card: hsl(95 12% 11%);
+    --card-foreground: hsl(60 22% 93%);
+    --popover: hsl(95 11% 14%);
+    --popover-foreground: hsl(60 22% 93%);
+
+    /* Primária — verde-sálvia luminoso */
+    --primary: hsl(96 52% 66%);
+    --primary-foreground: hsl(110 90% 8%);
+    --primary-container: hsl(100 45% 56%);
+    --primary-container-foreground: hsl(110 90% 8%);
     --primary-fixed: hsl(100 56% 79%);
     --primary-fixed-dim: hsl(100 40% 68%);
     --on-primary-fixed: hsl(110 100% 8%);
     --on-primary-fixed-variant: hsl(110 56% 19%);
-    --on-primary-container: hsl(100 36% 62%);
-    --secondary: hsl(36 80% 70%);
-    --secondary-foreground: hsl(36 100% 14%);
-    --secondary-container: hsl(36 50% 28%);
-    --secondary-container-foreground: hsl(39 99% 85%);
-    --muted: hsl(43 15% 22%);
-    --muted-foreground: hsl(44 20% 70%);
-    --accent: hsl(43 15% 22%);
-    --accent-foreground: hsl(44 38% 91%);
-    --destructive: hsl(0 65% 50%);
-    --destructive-foreground: hsl(0 0% 100%);
-    --border: hsl(44 10% 28%);
-    --input: hsl(44 10% 28%);
-    --ring: hsl(100 40% 68%);
-    --surface: hsl(46 21% 12%);
-    --surface-container: hsl(46 18% 18%);
-    --surface-container-low: hsl(46 18% 16%);
-    --surface-container-high: hsl(46 16% 22%);
-    --surface-container-highest: hsl(46 14% 26%);
-    --surface-container-lowest: hsl(46 22% 10%);
-    --surface-dim: hsl(46 20% 10%);
-    --surface-bright: hsl(46 18% 20%);
-    --surface-variant: hsl(46 12% 24%);
-    --surface-tint: hsl(100 30% 40%);
-    --on-surface: hsl(44 38% 91%);
-    --on-surface-variant: hsl(44 15% 75%);
-    --on-background: hsl(44 38% 91%);
-    --outline: hsl(44 12% 55%);
-    --outline-variant: hsl(44 10% 32%);
-    --inverse-surface: hsl(44 38% 91%);
-    --inverse-on-surface: hsl(46 21% 17%);
-    --inverse-primary: hsl(110 95% 11%);
-    --tertiary: hsl(30 35% 70%);
-    --tertiary-container: hsl(30 30% 28%);
-    --on-tertiary: hsl(25 82% 8%);
-    --on-tertiary-container: hsl(30 30% 68%);
-    --sidebar: hsl(46 18% 14%);
-    --sidebar-foreground: hsl(44 38% 91%);
-    --sidebar-primary: hsl(100 40% 68%);
-    --sidebar-primary-foreground: hsl(110 100% 8%);
-    --sidebar-accent: hsl(46 15% 20%);
-    --sidebar-accent-foreground: hsl(44 38% 91%);
-    --sidebar-border: hsl(44 10% 28%);
-    --sidebar-ring: hsl(100 40% 68%);
-    --chart-1: hsl(100 45% 55%);
-    --chart-2: hsl(39 80% 55%);
-    --chart-3: hsl(30 40% 55%);
-    --chart-4: hsl(100 20% 60%);
-    --chart-5: hsl(45 50% 55%);
+    --on-primary-container: hsl(100 42% 80%);
+
+    /* Secundária — âmbar de colheita */
+    --secondary: hsl(38 92% 62%);
+    --secondary-foreground: hsl(36 100% 10%);
+    --secondary-container: hsl(38 88% 58%);
+    --secondary-container-foreground: hsl(34 100% 11%);
+    --secondary-fixed: hsl(32 100% 85%);
+    --secondary-fixed-dim: hsl(36 100% 65%);
+    --on-secondary-fixed: hsl(30 100% 8%);
+    --on-secondary-fixed-variant: hsl(36 100% 19%);
+
+    /* Terciária — areia quente (texto de apoio) */
+    --tertiary: hsl(35 30% 74%);
+    /* `--tertiary-container` e usado como fundo de avatar em par com
+       `--on-tertiary` (quase preto). No escuro precisa ser CLARO, senao o
+       texto some — mesma inversao aplicada a `--primary-container`. */
+    --tertiary-container: hsl(33 42% 64%);
+    --tertiary-fixed: hsl(35 90% 86%);
+    --tertiary-fixed-dim: hsl(30 50% 75%);
+    --on-tertiary: hsl(25 70% 8%);
+    --on-tertiary-fixed: hsl(25 82% 8%);
+    --on-tertiary-fixed-variant: hsl(30 38% 24%);
+    --on-tertiary-container: hsl(33 32% 78%);
+
+    /* Neutros de apoio */
+    --muted: hsl(95 10% 15%);
+    --muted-foreground: hsl(80 9% 66%);
+    --accent: hsl(95 10% 16%);
+    --accent-foreground: hsl(60 22% 93%);
+
+    /* Erro */
+    --destructive: hsl(4 78% 68%);
+    --destructive-foreground: hsl(0 80% 10%);
+    --error: hsl(4 78% 68%);
+    --error-container: hsl(4 42% 22%);
+    --on-error: hsl(0 80% 10%);
+    --on-error-container: hsl(6 85% 84%);
+
+    /* Contornos */
+    --border: hsl(93 8% 26%);
+    /* `--input` desenha a borda de campos de formulario, que e o unico
+       indicador visual do controle: WCAG 1.4.11 exige 3:1 contra o fundo.
+       hsl(93 9% 40%) da 3.16:1 sobre `--card`. */
+    --input: hsl(93 9% 40%);
+    --ring: hsl(96 52% 66%);
+    --outline: hsl(90 7% 52%);
+    --outline-variant: hsl(93 9% 38%);
+
+    /* Superfícies — escada de elevação (fundo mais escuro → cards mais claros) */
+    --surface: hsl(96 15% 7%);
+    --surface-container-lowest: hsl(95 12% 11%);
+    --surface-container-low: hsl(95 12% 10%);
+    --surface-container: hsl(95 10% 14%);
+    --surface-container-high: hsl(94 9% 18%);
+    --surface-container-highest: hsl(94 9% 22%);
+    --surface-dim: hsl(96 16% 5%);
+    --surface-bright: hsl(94 9% 20%);
+    --surface-variant: hsl(94 9% 17%);
+    --surface-tint: hsl(96 52% 66%);
+    --on-surface: hsl(60 22% 93%);
+    --on-surface-variant: hsl(80 10% 72%);
+    --on-background: hsl(60 22% 93%);
+    --inverse-surface: hsl(60 22% 93%);
+    --inverse-on-surface: hsl(96 15% 10%);
+    --inverse-primary: hsl(110 60% 20%);
+
+    /* Sidebar */
+    --sidebar-background: hsl(95 12% 10%);
+    --sidebar-foreground: hsl(60 22% 93%);
+    --sidebar-primary: hsl(96 52% 66%);
+    --sidebar-primary-foreground: hsl(110 90% 8%);
+    --sidebar-accent: hsl(95 10% 15%);
+    --sidebar-accent-foreground: hsl(60 22% 93%);
+    --sidebar-border: hsl(93 8% 22%);
+    --sidebar-ring: hsl(96 52% 66%);
+    --sidebar: var(--sidebar-background);
+
+    /* Gráficos */
+    --chart-1: hsl(96 52% 62%);
+    --chart-2: hsl(38 92% 62%);
+    --chart-3: hsl(28 55% 62%);
+    --chart-4: hsl(160 35% 58%);
+    --chart-5: hsl(48 70% 66%);
 }
 
 @layer base {
@@ -253,5 +305,65 @@
   }
   .material-symbols-outlined {
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+
+  /* Transicao suave ao alternar tema. A classe `theme-switching` e
+     aplicada no <html> pelo ThemeToggle apenas durante a troca, para
+     nao penalizar animacoes de hover no uso normal. */
+  html.theme-switching,
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition:
+      background-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      fill 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      stroke 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 320ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition-delay: 0ms !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.theme-switching,
+    html.theme-switching *,
+    html.theme-switching *::before,
+    html.theme-switching *::after {
+      transition: none !important;
+    }
+  }
+
+  ::selection {
+    background-color: var(--secondary-container);
+    color: var(--secondary-container-foreground);
+  }
+
+  /* Barra de rolagem alinhada ao tema */
+  * {
+    scrollbar-color: var(--outline-variant) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--outline-variant);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--outline);
+  }
+}
+
+@layer utilities {
+  /* No tema escuro, imagens puras ficam agressivas contra superficies
+     escuras; um leve recuo de brilho/saturacao as integra a paleta. */
+  .dark .img-adaptive {
+    filter: brightness(0.86) saturate(0.92);
   }
 }

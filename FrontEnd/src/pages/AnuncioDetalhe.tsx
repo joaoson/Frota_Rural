@@ -31,8 +31,8 @@ interface PostingDetalheAPI {
 
 // Estrelas SVG com preenchimento parcial via linearGradient
 const CAMINHO_ESTRELA = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
-const COR_CHEIA = "hsl(39,99%,60%)";
-const COR_VAZIA = "hsl(100,8%,80%)";
+const COR_CHEIA = "var(--chart-2)";
+const COR_VAZIA = "var(--outline-variant)";
 
 function EstrelasPorNota({ nota, total }: { nota: number; total: number }) {
   return (
