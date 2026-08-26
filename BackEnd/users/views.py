@@ -9,7 +9,12 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExam
 
 # Create your views here.
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
+USER_NOT_FOUND = OpenApiResponse(description="Usuário não encontrado.")
+USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado em outra conta.")
+
+
 @extend_schema(
+    tags=['Usuários'],
     summary="Criar um novo usuário",
     description="Endpoint para cadastro de novos usuários na plataforma. O usuário pode ter diferentes papéis (locador, locatario, operador).",
     request=UserSerializer,
@@ -73,6 +78,7 @@ def create_user(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @extend_schema(
+    tags=['Usuários'],
     summary="Listar usuários",
     description="Retorna a lista completa de usuários cadastrados no sistema.",
     responses={200: UserSerializer(many=True)}
@@ -84,6 +90,7 @@ def get_users(request):
     return Response(serializer.data)
 
 @extend_schema(
+    tags=['Usuários'],
     summary="Buscar usuário por e-mail",
     description="Retorna os detalhes de um usuário específico utilizando o e-mail como chave de busca.",
     responses={
@@ -100,15 +107,40 @@ def get_user_by_email(request, email):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-@extend_schema(
-    summary="Obter/Atualizar/Deletar Usuário",
-    description="Operações CRUD para um usuário específico utilizando seu ID (UUID). Aceita GET, PUT, PATCH e DELETE.",
-    methods=['GET', 'PUT', 'PATCH', 'DELETE'],
-    responses={
-        200: UserSerializer,
-        204: OpenApiResponse(description="Deletado com sucesso"),
-        404: OpenApiResponse(description="Usuário não encontrado")
-    }
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Usuários'],
+        summary="Consultar usuário",
+        responses={200: UserSerializer, 404: USER_NOT_FOUND},
+    ),
+    put=extend_schema(
+        tags=['Usuários'],
+        summary="Substituir usuário",
+        request=UserSerializer,
+        responses={
+            200: UserSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            404: USER_NOT_FOUND,
+            409: USER_CONFLICT,
+        },
+    ),
+    patch=extend_schema(
+        tags=['Usuários'],
+        summary="Atualizar usuário parcialmente",
+        description="Atualiza apenas os campos enviados, como telefone ou endereço.",
+        request=UserSerializer,
+        responses={
+            200: UserSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            404: USER_NOT_FOUND,
+            409: USER_CONFLICT,
+        },
+    ),
+    delete=extend_schema(
+        tags=['Usuários'],
+        summary="Excluir usuário",
+        responses={204: OpenApiResponse(description="Usuário excluído."), 404: USER_NOT_FOUND},
+    ),
 )
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def user_detail(request, pk):
@@ -158,6 +190,7 @@ def user_detail(request, pk):
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @extend_schema(
+    tags=['Usuários'],
     summary="Alterar senha do usuário",
     description="Permite que o usuário autenticado atualize sua própria senha, fornecendo a senha atual e a nova.",
     request=ChangePasswordSerializer,

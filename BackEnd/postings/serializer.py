@@ -1,10 +1,18 @@
 import uuid
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     Postings,
     PostingsPhotos
 )
+
+class PostingPhotoUrlSerializer(serializers.Serializer):
+    """Foto do anúncio no formato embutido em `PostingDetailSerializer.photos`."""
+
+    url = serializers.CharField()
+    is_primary = serializers.BooleanField()
+
 
 class PostingSerializer(serializers.ModelSerializer):
     class Meta:
@@ -65,6 +73,7 @@ class PostingListSerializer(serializers.ModelSerializer):
             "primary_photo_url",
         ]
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_primary_photo_url(self, obj):
         photos = list(obj.postingsphotos_set.all())
         if not photos:
@@ -93,6 +102,15 @@ class PostingDetailSerializer(serializers.ModelSerializer):
             "photos",
         ]
 
+    @extend_schema_field(PostingPhotoUrlSerializer(many=True))
     def get_photos(self, obj):
         photos = list(obj.postingsphotos_set.all())
         return [{"url": p.image_url, "is_primary": p.is_primary} for p in photos]
+
+class PostingPhotoSerializer(serializers.ModelSerializer):
+    """Foto vinculada a um anúncio, no formato devolvido pelo endpoint de upload."""
+
+    class Meta:
+        model = PostingsPhotos
+        fields = ["id", "image_url", "is_primary"]
+        read_only_fields = ["id", "image_url", "is_primary"]

@@ -1,5 +1,6 @@
 import uuid
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from api.models import Contracts, Rentals, Reviews
 
@@ -61,6 +62,7 @@ class RentalSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    @extend_schema_field(serializers.CharField(help_text='Número legível do contrato, ex.: #CTR-08E8'))
     def get_contract_number(self, obj):
         try:
             return f"#CTR-{str(obj.id)[:4].upper()}"

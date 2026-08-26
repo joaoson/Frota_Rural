@@ -2,23 +2,67 @@ from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from api.schemas import ErrorResponseSerializer
 from .models import OperatorLicense, Certification
-from .serializer import OperatorLicenseSerializer, CertificationSerializer
+from .serializer import (
+    CertificationSerializer,
+    CnhValidationResultSerializer,
+    DocumentReviewSerializer,
+    DocumentUrlSerializer,
+    OperatorLicenseSerializer,
+)
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 
+INVALID_FILE = OpenApiResponse(
+    response=ErrorResponseSerializer,
+    description='Arquivo ausente, de tipo não suportado ou acima de 20 MB.',
+)
+USER_FILTER = OpenApiParameter('user', type=str, description='Filtra pelo ID do usuário dono do documento.')
+VALIDATION_STATUS_FILTER = OpenApiParameter(
+    'validation_status',
+    type=str,
+    enum=['pending', 'approved', 'rejected'],
+    description='Filtra pelo resultado da análise do documento.',
+)
+
 
 @extend_schema(
+    tags=['Documentos'],
     summary="Validar CNH via Inteligência Artificial",
-    description="Endpoint que recebe o upload de uma imagem e processa usando o modelo TensorFlow treinado (MobileNetV2) para identificar se o arquivo é uma CNH válida.",
+    description=(
+        "Recebe o upload de uma imagem ou PDF e o processa com o modelo TensorFlow treinado "
+        "(MobileNetV2) para identificar se o arquivo é uma CNH.\n\n"
+        "A inferência roda em um interpretador Python isolado, chamado por `subprocess`. "
+        "O endpoint apenas classifica o arquivo: não o armazena nem altera nenhum cadastro."
+    ),
     request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}},
     responses={
-        200: OpenApiResponse(description="Resultado da Validação (Ex: is_valid: true, score: 0.95)"),
-        400: OpenApiResponse(description="Arquivo inválido ou muito grande"),
-        500: OpenApiResponse(description="Erro no motor de classificação")
-    }
+        200: CnhValidationResultSerializer,
+        400: INVALID_FILE,
+        500: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='Erro no motor de classificação.',
+        ),
+        503: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='Ambiente de ML não configurado (venv ou modelo treinado ausente).',
+        ),
+    },
+    examples=[
+        OpenApiExample(
+            'CNH reconhecida',
+            value={'is_valid': True, 'confidence': 'high', 'score': 0.9721},
+            response_only=True,
+        ),
+        OpenApiExample(
+            'Documento recusado',
+            value={'is_valid': False, 'confidence': 'low', 'score': 0.1043},
+            response_only=True,
+        ),
+    ],
 )
 @api_view(["POST"])
 def validate_cnh_document(request):
@@ -58,6 +102,28 @@ def validate_cnh_document(request):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Documentos'],
+        summary='Listar CNHs cadastradas',
+        description='Retorna as CNHs de operadores, opcionalmente filtradas por usuário e por status de validação.',
+        parameters=[USER_FILTER, VALIDATION_STATUS_FILTER],
+        responses={200: OperatorLicenseSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=['Documentos'],
+        summary='Cadastrar CNH',
+        description=(
+            'Cadastra a CNH de um operador. O documento entra com `validation_status` igual a '
+            '`pending` até a análise de um administrador.'
+        ),
+        request=OperatorLicenseSerializer,
+        responses={
+            201: OperatorLicenseSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito com um registro existente.'),
+        },
+    ),
+)
 @api_view(["GET", "POST"])
 def operator_licenses_list(request):
     if request.method == "GET":
@@ -84,6 +150,40 @@ def operator_licenses_list(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Documentos'],
+        summary='Consultar CNH',
+        responses={200: OperatorLicenseSerializer, 404: OpenApiResponse(description='CNH não encontrada.')},
+    ),
+    put=extend_schema(
+        tags=['Documentos'],
+        summary='Substituir CNH',
+        description='Atualiza todos os campos da CNH. A validação volta para `pending` e a nota de análise é limpa.',
+        request=OperatorLicenseSerializer,
+        responses={
+            200: OperatorLicenseSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito.'),
+            404: OpenApiResponse(description='CNH não encontrada.'),
+        },
+    ),
+    patch=extend_schema(
+        tags=['Documentos'],
+        summary='Atualizar CNH parcialmente',
+        description='Atualiza apenas os campos enviados. A validação volta para `pending`.',
+        request=OperatorLicenseSerializer,
+        responses={
+            200: OperatorLicenseSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito.'),
+            404: OpenApiResponse(description='CNH não encontrada.'),
+        },
+    ),
+    delete=extend_schema(
+        tags=['Documentos'],
+        summary='Excluir CNH',
+        responses={204: OpenApiResponse(description='CNH excluída.'), 404: OpenApiResponse(description='CNH não encontrada.')},
+    ),
+)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def operator_license_detail(request, pk):
     try:
@@ -124,6 +224,25 @@ def operator_license_detail(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Documentos'],
+        summary='Listar certificações',
+        description='Retorna as certificações declaradas pelos usuários (ex.: NR-31), com filtros opcionais.',
+        parameters=[USER_FILTER, VALIDATION_STATUS_FILTER],
+        responses={200: CertificationSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=['Documentos'],
+        summary='Cadastrar certificação',
+        description='Cadastra uma certificação. Ela entra com `validation_status` igual a `pending`.',
+        request=CertificationSerializer,
+        responses={
+            201: CertificationSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito com um registro existente.'),
+        },
+    ),
+)
 @api_view(["GET", "POST"])
 def certifications_list(request):
     if request.method == "GET":
@@ -150,6 +269,43 @@ def certifications_list(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Documentos'],
+        summary='Consultar certificação',
+        responses={200: CertificationSerializer, 404: OpenApiResponse(description='Certificação não encontrada.')},
+    ),
+    put=extend_schema(
+        tags=['Documentos'],
+        summary='Substituir certificação',
+        description='Atualiza todos os campos. A validação volta para `pending` e a nota de análise é limpa.',
+        request=CertificationSerializer,
+        responses={
+            200: CertificationSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito.'),
+            404: OpenApiResponse(description='Certificação não encontrada.'),
+        },
+    ),
+    patch=extend_schema(
+        tags=['Documentos'],
+        summary='Atualizar certificação parcialmente',
+        description='Atualiza apenas os campos enviados. A validação volta para `pending`.',
+        request=CertificationSerializer,
+        responses={
+            200: CertificationSerializer,
+            400: OpenApiResponse(description='Dados inválidos ou em conflito.'),
+            404: OpenApiResponse(description='Certificação não encontrada.'),
+        },
+    ),
+    delete=extend_schema(
+        tags=['Documentos'],
+        summary='Excluir certificação',
+        responses={
+            204: OpenApiResponse(description='Certificação excluída.'),
+            404: OpenApiResponse(description='Certificação não encontrada.'),
+        },
+    ),
+)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def certification_detail(request, pk):
     try:
@@ -190,6 +346,23 @@ def certification_detail(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(
+    tags=['Documentos'],
+    summary='Enviar arquivo de documento',
+    description=(
+        'Persiste o arquivo em `MEDIA_ROOT/documents/` com um nome único e devolve a URL '
+        'pública. Use essa URL nos campos `file_url` (CNH) ou `media_url` (certificação).'
+    ),
+    request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}},
+    responses={201: DocumentUrlSerializer, 400: INVALID_FILE},
+    examples=[
+        OpenApiExample(
+            'Arquivo salvo',
+            value={'url': '/media/documents/6f1c9d0e-6d3b-4f6f-9f39-1f1a1b5c6d7e.jpg'},
+            response_only=True,
+        )
+    ],
+)
 @api_view(["POST"])
 def upload_document(request):
     file = request.FILES.get("file")
@@ -231,6 +404,30 @@ def upload_document(request):
 
 VALID_STATUSES = {"approved", "rejected"}
 
+@extend_schema(
+    tags=['Documentos'],
+    summary='Analisar CNH',
+    description=(
+        'Registra a análise manual de uma CNH. Ao rejeitar, `review_note` é obrigatório e a '
+        'justificativa fica visível para o dono do documento.'
+    ),
+    request=DocumentReviewSerializer,
+    responses={
+        200: OperatorLicenseSerializer,
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='`validation_status` ausente/inválido ou rejeição sem justificativa.',
+        ),
+        404: OpenApiResponse(description='CNH não encontrada.'),
+    },
+    examples=[
+        OpenApiExample(
+            'Rejeição com justificativa',
+            value={'validation_status': 'rejected', 'review_note': 'Imagem ilegível, reenvie a CNH aberta.'},
+            request_only=True,
+        )
+    ],
+)
 @api_view(["PATCH"])
 def review_license(request, pk):
     try:
@@ -265,6 +462,22 @@ def review_license(request, pk):
     )
 
 
+@extend_schema(
+    tags=['Documentos'],
+    summary='Analisar certificação',
+    description=(
+        'Registra a análise manual de uma certificação. Ao rejeitar, `review_note` é obrigatório.'
+    ),
+    request=DocumentReviewSerializer,
+    responses={
+        200: CertificationSerializer,
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='`validation_status` ausente/inválido ou rejeição sem justificativa.',
+        ),
+        404: OpenApiResponse(description='Certificação não encontrada.'),
+    },
+)
 @api_view(["PATCH"])
 def review_certification(request, pk):
     try:

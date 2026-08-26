@@ -3,6 +3,53 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import OperatorLicense, Certification
 
+# Situação de validação registrada no documento, incluindo a inicial (`pending`).
+VALIDATION_STATUS_CHOICES = OperatorLicense.ValidationStatus.choices
+
+# Decisões possíveis na análise manual de um documento. Diferente de
+# `VALIDATION_STATUS_CHOICES`, não inclui `pending`: o administrador sempre conclui a análise.
+REVIEW_DECISION_CHOICES = [
+    ('approved', 'Aprovado'),
+    ('rejected', 'Rejeitado'),
+]
+
+
+class DocumentReviewSerializer(serializers.Serializer):
+    """Corpo esperado na análise manual de uma CNH ou certificação."""
+
+    validation_status = serializers.ChoiceField(
+        choices=REVIEW_DECISION_CHOICES,
+        help_text='Resultado da análise feita pelo administrador.',
+    )
+    review_note = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text='Justificativa da análise. Obrigatória quando `validation_status` é `rejected`.',
+    )
+
+
+class DocumentUrlSerializer(serializers.Serializer):
+    """Endereço do arquivo persistido no servidor."""
+
+    url = serializers.CharField(help_text='Caminho público do arquivo salvo, relativo ao MEDIA_URL.')
+
+
+class CnhValidationResultSerializer(serializers.Serializer):
+    """Resultado devolvido pelo classificador de CNH."""
+
+    is_valid = serializers.BooleanField(
+        help_text='`true` quando o modelo reconhece o arquivo como uma CNH (score >= 0.5).'
+    )
+    confidence = serializers.ChoiceField(
+        choices=[('high', 'Alta'), ('medium', 'Média'), ('low', 'Baixa')],
+        help_text='Faixa de confiança: `high` (>= 0.85), `medium` (>= 0.5) ou `low`.',
+    )
+    score = serializers.FloatField(help_text='Probabilidade de o documento ser uma CNH, de 0 a 1.')
+    error = serializers.CharField(
+        required=False,
+        help_text='Presente apenas quando o classificador falhou ao processar o arquivo.',
+    )
+
 
 class OperatorLicenseSerializer(serializers.ModelSerializer):
     class Meta:
