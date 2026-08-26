@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'machines',
     'administration',
     'document_validation',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -105,7 +106,24 @@ REST_FRAMEWORK = {
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
         'rest_framework.authentication.SessionAuthentication',
         'authentication.extensions.authentication.AppJWTAuthentication',
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Frota Rural API',
+    'DESCRIPTION': 'Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SECURITY': [{'BearerAuth': []}],
+    'SECURITY_DEFINITIONS': {
+        'BearerAuth': {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+        }
+    },
 }
 
 SIMPLE_JWT = {

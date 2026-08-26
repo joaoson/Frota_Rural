@@ -17,6 +17,7 @@ from .serializer import (
     PostingListSerializer,
     PostingSerializer,
 )
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 # Create your views here.
 def _postings_queryset():
@@ -27,6 +28,38 @@ def _postings_queryset():
     )
 
 
+@extend_schema(
+    summary="Listar ou Criar Anúncios",
+    description="Retorna anúncios de locação ativos na plataforma. Aceita filtros de datas para verificar disponibilidade da máquina.",
+    parameters=[
+        OpenApiParameter('machinery', type=str, description='Filtrar pela máquina anunciada'),
+        OpenApiParameter('status', type=str, description='Status do anúncio (active, draft)'),
+        OpenApiParameter('available_from', type=str, description='Disponível a partir de (YYYY-MM-DD)'),
+        OpenApiParameter('available_until', type=str, description='Disponível até (YYYY-MM-DD)'),
+    ],
+    responses={
+        200: PostingListSerializer(many=True),
+        201: PostingSerializer,
+        400: OpenApiResponse(description="Dados inválidos")
+    },
+    examples=[
+        OpenApiExample(
+            'Novo Anúncio de Máquina',
+            summary='Colocar uma máquina disponível para locação',
+            value={
+                "machinery": "123e4567-e89b-12d3-a456-426614174000",
+                "hourly_rate": "180.50",
+                "location_latitude": -25.0945,
+                "location_longitude": -50.1633,
+                "location_address": "Fazenda São Jorge, Castro - PR",
+                "availability_start": "2026-09-01T00:00:00Z",
+                "availability_end": "2026-12-31T23:59:59Z",
+                "status": "active"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(["GET", "POST"])
 def postings_list(request):
     if request.method == "GET":
@@ -69,6 +102,11 @@ def postings_list(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    summary="Obter/Atualizar/Deletar Anúncio",
+    description="Retorna ou edita os dados de um anúncio específico.",
+    methods=['GET', 'PUT', 'PATCH', 'DELETE']
+)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def posting_detail(request, pk):
     try:
@@ -117,6 +155,16 @@ def posting_detail(request, pk):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(
+    summary="Fazer Upload de Fotos do Anúncio",
+    description="Envia uma foto para o anúncio de locação via multipart/form-data.",
+    request={"multipart/form-data": {"type": "object", "properties": {"image": {"type": "string", "format": "binary"}, "is_primary": {"type": "boolean"}}}},
+    responses={
+        201: OpenApiResponse(description="Foto enviada com sucesso"),
+        400: OpenApiResponse(description="Nenhum arquivo enviado"),
+        404: OpenApiResponse(description="Anúncio não encontrado")
+    }
+)
 @api_view(["POST"])
 def posting_photos(request, pk):
     try:

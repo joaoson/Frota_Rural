@@ -11,8 +11,31 @@ from authentication.emailing.email import send_password_reset_email
 from authentication.models import PasswordResets
 from authentication.serializer import LoginSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from users.models import Users
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 # Create your views here.
+@extend_schema(
+    summary="Realizar Login (Obter JWT)",
+    description="Recebe e-mail e senha. Retorna o Token JWT (access) no corpo da resposta e o Refresh Token via Cookie HttpOnly.",
+    request=LoginSerializer,
+    responses={
+        200: OpenApiResponse(description="Login efetuado com sucesso (Retorna o JWT Access Token)"),
+        400: OpenApiResponse(description="Dados inválidos"),
+        401: OpenApiResponse(description="Credenciais inválidas"),
+        403: OpenApiResponse(description="Conta suspensa ou banida")
+    },
+    examples=[
+        OpenApiExample(
+            'Exemplo de Login',
+            summary='Credenciais de acesso',
+            value={
+                "email": "contato@tratoresecia.com.br",
+                "password": "senha_forte_456"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 def login(request):
     serializer = LoginSerializer(data=request.data)
@@ -49,12 +72,25 @@ def login(request):
     )
     return response
 
+@extend_schema(
+    summary="Realizar Logout",
+    description="Remove o cookie do refresh_token para invalidar a sessão atual no lado do cliente.",
+    responses={204: OpenApiResponse(description="Logout efetuado com sucesso")}
+)
 @api_view(['POST'])
 def logout(request):
     response = Response(status=status.HTTP_204_NO_CONTENT)
     response.delete_cookie('refresh_token', path='/api/login')
     return response
 
+@extend_schema(
+    summary="Renovar Token JWT",
+    description="Lê o Refresh Token do Cookie HttpOnly e retorna um novo JWT Access Token válido.",
+    responses={
+        200: OpenApiResponse(description="Token renovado com sucesso"),
+        401: OpenApiResponse(description="Refresh token inválido ou ausente")
+    }
+)
 @api_view(['POST'])
 def refresh_token(request):
     raw = request.COOKIES.get('refresh_token')
@@ -68,6 +104,12 @@ def refresh_token(request):
 
 
 ## - PASSWORD RESET
+@extend_schema(
+    summary="Solicitar Redefinição de Senha",
+    description="Gera um token de recuperação e o envia para o e-mail do usuário (caso exista).",
+    request=PasswordResetRequestSerializer,
+    responses={200: OpenApiResponse(description="Se o e-mail existir, o link foi enviado.")}
+)
 @api_view(['POST'])
 def request_password_reset(request):
     serializer = PasswordResetRequestSerializer(data=request.data)
@@ -100,6 +142,15 @@ def request_password_reset(request):
 
     return Response(safe_response, status=status.HTTP_200_OK)
 
+@extend_schema(
+    summary="Confirmar Redefinição de Senha",
+    description="Recebe o token enviado por e-mail e a nova senha desejada para redefinir o acesso.",
+    request=PasswordResetConfirmSerializer,
+    responses={
+        200: OpenApiResponse(description="Senha atualizada com sucesso"),
+        400: OpenApiResponse(description="Token inválido ou expirado")
+    }
+)
 @api_view(['POST'])
 def confirm_password_reset(request):
     serializer = PasswordResetConfirmSerializer(data=request.data)

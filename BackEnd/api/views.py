@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from api.models import Contracts, Rentals, Reviews
 from api.serializer import ContractSerializer, RentalSerializer, ReviewSerializer
-
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 # --- REVIEWS ---
 
@@ -16,6 +16,34 @@ def _reviews_queryset():
     return Reviews.objects.all().select_related("reviewer", "reviewee")
 
 
+@extend_schema(
+    summary="Listar ou Criar Avaliação",
+    description="Retorna a lista de avaliações, permitindo filtrar por avaliador, avaliado ou locação. Permite criar uma nova avaliação.",
+    parameters=[
+        OpenApiParameter('reviewee', type=str, description='ID do usuário avaliado'),
+        OpenApiParameter('reviewer', type=str, description='ID do usuário que avaliou'),
+        OpenApiParameter('rental', type=str, description='ID da locação'),
+    ],
+    responses={
+        200: ReviewSerializer(many=True),
+        201: ReviewSerializer,
+        400: OpenApiResponse(description="Dados inválidos ou conflito")
+    },
+    examples=[
+        OpenApiExample(
+            'Avaliação 5 estrelas',
+            summary='Exemplo de uma avaliação excelente',
+            value={
+                "rental": "08e8eaa6-467f-4c98-b5c0-93323829911d",
+                "reviewer": "e6a2b8e5-3d71-4a9f-b98a-f4c78d0671f2",
+                "reviewee": "029d15f3-a577-4238-9c59-42011ddcb5be",
+                "rating": 5,
+                "comment": "Trator em perfeito estado e entrega pontual!"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(["GET", "POST"])
 def reviews_list(request):
     if request.method == "GET":
@@ -94,6 +122,33 @@ def review_detail(request, pk):
 
 # --- RENTALS ---
 
+@extend_schema(
+    summary="Listar ou Criar Locação (Reserva)",
+    description="Retorna a lista de locações (reservas). Permite criar uma nova reserva e gera automaticamente um Contrato associado com status 'pending_signatures'.",
+    parameters=[
+        OpenApiParameter('lessee', type=str, description='Filtrar pelo ID do locatário'),
+        OpenApiParameter('lessor', type=str, description='Filtrar pelo ID do locador'),
+    ],
+    responses={
+        200: RentalSerializer(many=True),
+        201: RentalSerializer,
+        400: OpenApiResponse(description="Dados inválidos")
+    },
+    examples=[
+        OpenApiExample(
+            'Nova Reserva de Trator',
+            summary='Exemplo de criação de uma locação',
+            value={
+                "postings": "f5e1c4a0-56d1-4b7c-9a1b-c1d4e6f8a9b2",
+                "lessee": "e6a2b8e5-3d71-4a9f-b98a-f4c78d0671f2",
+                "start_date": "2026-09-10T08:00:00Z",
+                "end_date": "2026-09-15T18:00:00Z",
+                "total_price": "8500.00"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(["GET", "POST"])
 def rentals_list(request):
     if request.method == "GET":
@@ -126,6 +181,11 @@ def rentals_list(request):
     return Response(RentalSerializer(rental).data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(
+    summary="Obter/Atualizar Locação",
+    description="Retorna ou edita detalhes de uma locação específica (via PUT ou PATCH).",
+    methods=['GET', 'PUT', 'PATCH', 'DELETE']
+)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def rental_detail(request, pk):
     try:
@@ -156,6 +216,11 @@ def rental_detail(request, pk):
 
 # --- CONTRACTS ---
 
+@extend_schema(
+    summary="Listar Contratos",
+    description="Retorna todos os contratos gerados no sistema.",
+    responses={200: ContractSerializer(many=True)}
+)
 @api_view(["GET"])
 def contracts_list(request):
     qs = Contracts.objects.all().select_related("rental__lessee", "rental__postings__machinery__owner")
@@ -163,6 +228,14 @@ def contracts_list(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    summary="Visualizar Documento do Contrato",
+    description="Retorna os dados formatados e agregados (mock-like payload) prontos para renderizar a interface de PDF do contrato de locação de maquinário agrícola com prestação de serviços.",
+    responses={
+        200: OpenApiResponse(description="Dados do Contrato Formatados"),
+        404: OpenApiResponse(description="Contrato não encontrado")
+    }
+)
 @api_view(["GET"])
 def contract_detail(request, pk):
     try:
@@ -238,6 +311,34 @@ def contract_detail(request, pk):
     return Response(contrato_data, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    summary="Assinar Contrato Digitalmente",
+    description="Recebe a assinatura (aceite) do locador ou locatário. Quando ambas as partes assinam, o status do contrato e da locação muda para 'signed'.",
+    responses={
+        200: ContractSerializer,
+        404: OpenApiResponse(description="Contrato não encontrado")
+    },
+    examples=[
+        OpenApiExample(
+            'Assinatura pelo Locatário',
+            summary='Exemplo de assinatura da parte que vai alugar',
+            value={
+                "role": "locatario",
+                "name": "João da Silva - CPF 123.456.789-00"
+            },
+            request_only=True
+        ),
+        OpenApiExample(
+            'Assinatura pelo Locador',
+            summary='Exemplo de assinatura do dono da máquina',
+            value={
+                "role": "locador",
+                "name": "Tratores & Cia - CNPJ 123.456.789/0001-99"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(["POST"])
 def sign_contract(request, pk):
     try:

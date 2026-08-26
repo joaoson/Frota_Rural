@@ -4,12 +4,22 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import OperatorLicense, Certification
 from .serializer import OperatorLicenseSerializer, CertificationSerializer
-
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 
 
+@extend_schema(
+    summary="Validar CNH via Inteligência Artificial",
+    description="Endpoint que recebe o upload de uma imagem e processa usando o modelo TensorFlow treinado (MobileNetV2) para identificar se o arquivo é uma CNH válida.",
+    request={"multipart/form-data": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}},
+    responses={
+        200: OpenApiResponse(description="Resultado da Validação (Ex: is_valid: true, score: 0.95)"),
+        400: OpenApiResponse(description="Arquivo inválido ou muito grande"),
+        500: OpenApiResponse(description="Erro no motor de classificação")
+    }
+)
 @api_view(["POST"])
 def validate_cnh_document(request):
     file = request.FILES.get("file")
