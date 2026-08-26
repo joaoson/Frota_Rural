@@ -1,11 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════
-   Contrato — documento com layout próprio (fora do shell da app).
-   Toda a paleta vive em variáveis `--ct-*` para que o documento
-   acompanhe o tema claro/escuro. A impressão sempre restaura a
-   paleta clara: o contrato é uma peça legal e deve sair em papel
-   branco independentemente do tema em que foi visualizado.
-   ═══════════════════════════════════════════════════════════════ */
-
 .contrato-root {
   --ct-backdrop: #ccc8b8;
   --ct-paper: #ffffff;
@@ -299,11 +291,10 @@
   .contrato-root .grid-2 { grid-template-columns: 1fr; }
 }
 
-/* ── Barra de ações (imprimir + alternar tema) ── */
+/* botão imprimir */
 .contrato-root .print-btn { display: flex; align-items: center; gap: 6px; background: var(--ct-brand); color: var(--ct-on-brand); font-family: "Inter", sans-serif; font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; }
 .contrato-root .print-btn-wrap { width: min(210mm, 100%); display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 
-/* ═══ Impressão: sempre em papel branco, com a paleta clara ═══ */
 @media print {
   .no-print { display: none !important; }
   body { background: white !important; }

@@ -6,18 +6,10 @@ import MaterialIcon from "@/components/MaterialIcon";
 type ThemeToggleVariant = "icon" | "segmented";
 
 interface ThemeToggleProps {
-  /**
-   * `icon`      — botão circular compacto (navbar, headers).
-   * `segmented` — controle segmentado Claro / Auto / Escuro (sidebars).
-   */
   variant?: ThemeToggleVariant;
   className?: string;
 }
 
-/**
- * Ativa a transição suave de cores apenas durante a troca de tema.
- * Sem isso, ou a troca é seca, ou todo hover da aplicação fica lento.
- */
 const runWithTransition = (apply: () => void) => {
   const root = document.documentElement;
   root.classList.add("theme-switching");
@@ -32,10 +24,6 @@ const segments = [
 ] as const;
 
 const ThemeToggle = ({ variant = "icon", className = "" }: ThemeToggleProps) => {
-  // App puramente client-side (Vite, sem SSR): o next-themes lê localStorage
-  // e matchMedia de forma síncrona no inicializador do próprio estado, então
-  // `theme` e `resolvedTheme` já chegam corretos na primeira renderização.
-  // O guard de montagem usado em apps com SSR seria desnecessário aqui.
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   const applyTheme = useCallback(
@@ -96,7 +84,6 @@ const ThemeToggle = ({ variant = "icon", className = "" }: ThemeToggleProps) => 
       title={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
       className={`group relative w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden text-on-surface-variant border border-outline-variant/40 bg-surface-container/60 hover:bg-surface-container-high hover:text-primary hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${className}`}
     >
-      {/* Brilho sutil que aparece no hover, remetendo ao nascer/pôr do sol */}
       <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-secondary-container/25 to-transparent" />
 
       <AnimatePresence mode="wait" initial={false}>

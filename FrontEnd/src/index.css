@@ -171,26 +171,15 @@
     --sidebar-ring: hsl(110 95% 11%);
     --sidebar: var(--sidebar-background);
     --chart-1: hsl(110 55% 35%);
-    /* Ambar exato que as barras e estrelas ja usavam no tema claro,
-       preservado ao trocar os valores fixos por este token. */
     --chart-2: hsl(39 99% 60%);
     --chart-3: hsl(30 45% 40%);
     --chart-4: hsl(100 25% 45%);
     --chart-5: hsl(45 60% 50%);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   Tema escuro — "Campo à Noite"
-   Neutros quentes com subtom verde-oliva, verde-sálvia luminoso
-   como primária e âmbar de colheita como secundária.
-   A escada de elevação é INVERTIDA em relação ao M3 puro para
-   preservar a intenção do tema claro, onde `surface-container-lowest`
-   é o branco dos cards (a superfície que mais se destaca do fundo).
-   ═══════════════════════════════════════════════════════════════ */
 .dark {
     color-scheme: dark;
 
-    /* Base */
     --background: hsl(96 15% 7%);
     --foreground: hsl(60 22% 93%);
     --card: hsl(95 12% 11%);
@@ -198,7 +187,6 @@
     --popover: hsl(95 11% 14%);
     --popover-foreground: hsl(60 22% 93%);
 
-    /* Primária — verde-sálvia luminoso */
     --primary: hsl(96 52% 66%);
     --primary-foreground: hsl(110 90% 8%);
     --primary-container: hsl(100 45% 56%);
@@ -209,7 +197,6 @@
     --on-primary-fixed-variant: hsl(110 56% 19%);
     --on-primary-container: hsl(100 42% 80%);
 
-    /* Secundária — âmbar de colheita */
     --secondary: hsl(38 92% 62%);
     --secondary-foreground: hsl(36 100% 10%);
     --secondary-container: hsl(38 88% 58%);
@@ -219,11 +206,7 @@
     --on-secondary-fixed: hsl(30 100% 8%);
     --on-secondary-fixed-variant: hsl(36 100% 19%);
 
-    /* Terciária — areia quente (texto de apoio) */
     --tertiary: hsl(35 30% 74%);
-    /* `--tertiary-container` e usado como fundo de avatar em par com
-       `--on-tertiary` (quase preto). No escuro precisa ser CLARO, senao o
-       texto some — mesma inversao aplicada a `--primary-container`. */
     --tertiary-container: hsl(33 42% 64%);
     --tertiary-fixed: hsl(35 90% 86%);
     --tertiary-fixed-dim: hsl(30 50% 75%);
@@ -232,13 +215,11 @@
     --on-tertiary-fixed-variant: hsl(30 38% 24%);
     --on-tertiary-container: hsl(33 32% 78%);
 
-    /* Neutros de apoio */
     --muted: hsl(95 10% 15%);
     --muted-foreground: hsl(80 9% 66%);
     --accent: hsl(95 10% 16%);
     --accent-foreground: hsl(60 22% 93%);
 
-    /* Erro */
     --destructive: hsl(4 78% 68%);
     --destructive-foreground: hsl(0 80% 10%);
     --error: hsl(4 78% 68%);
@@ -246,17 +227,12 @@
     --on-error: hsl(0 80% 10%);
     --on-error-container: hsl(6 85% 84%);
 
-    /* Contornos */
     --border: hsl(93 8% 26%);
-    /* `--input` desenha a borda de campos de formulario, que e o unico
-       indicador visual do controle: WCAG 1.4.11 exige 3:1 contra o fundo.
-       hsl(93 9% 40%) da 3.16:1 sobre `--card`. */
     --input: hsl(93 9% 40%);
     --ring: hsl(96 52% 66%);
     --outline: hsl(90 7% 52%);
     --outline-variant: hsl(93 9% 38%);
 
-    /* Superfícies — escada de elevação (fundo mais escuro → cards mais claros) */
     --surface: hsl(96 15% 7%);
     --surface-container-lowest: hsl(95 12% 11%);
     --surface-container-low: hsl(95 12% 10%);
@@ -274,7 +250,6 @@
     --inverse-on-surface: hsl(96 15% 10%);
     --inverse-primary: hsl(110 60% 20%);
 
-    /* Sidebar */
     --sidebar-background: hsl(95 12% 10%);
     --sidebar-foreground: hsl(60 22% 93%);
     --sidebar-primary: hsl(96 52% 66%);
@@ -285,7 +260,6 @@
     --sidebar-ring: hsl(96 52% 66%);
     --sidebar: var(--sidebar-background);
 
-    /* Gráficos */
     --chart-1: hsl(96 52% 62%);
     --chart-2: hsl(38 92% 62%);
     --chart-3: hsl(28 55% 62%);
@@ -307,9 +281,6 @@
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   }
 
-  /* Transicao suave ao alternar tema. A classe `theme-switching` e
-     aplicada no <html> pelo ThemeToggle apenas durante a troca, para
-     nao penalizar animacoes de hover no uso normal. */
   html.theme-switching,
   html.theme-switching *,
   html.theme-switching *::before,
@@ -338,7 +309,6 @@
     color: var(--secondary-container-foreground);
   }
 
-  /* Barra de rolagem alinhada ao tema */
   * {
     scrollbar-color: var(--outline-variant) transparent;
   }
@@ -361,8 +331,6 @@
 }
 
 @layer utilities {
-  /* No tema escuro, imagens puras ficam agressivas contra superficies
-     escuras; um leve recuo de brilho/saturacao as integra a paleta. */
   .dark .img-adaptive {
     filter: brightness(0.86) saturate(0.92);
   }
