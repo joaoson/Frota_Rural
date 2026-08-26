@@ -222,6 +222,9 @@ const DashboardLocador = () => {
         lessee: r.lesseeId === "locatario-default" ? "Fazenda Aurora" : "Fazenda Parceira",
         machine: r.machineName,
         period: r.period,
+        startDate: r.startDate,
+        endDate: r.endDate,
+        year: r.startDate?.slice(0, 4) ?? "",
         status: r.status,
         total: r.total,
         contract: r.contractNumber
@@ -233,8 +236,10 @@ const DashboardLocador = () => {
       machineService.list({ owner: userId }),
       postingService.list({})
     ]).then(([machinesData, postingsData]) => {
-      const userMachineIds = new Set(machinesData.map((m: any) => m.id));
-      const userPostings = postingsData.filter((p: any) => userMachineIds.has(p.machinery));
+      const machineById = new Map<string, { year?: unknown }>(
+        machinesData.map((m: any) => [m.id, m]),
+      );
+      const userPostings = postingsData.filter((p: any) => machineById.has(p.machinery));
       
       setMachines(machinesData.map((m: any) => ({
         id: m.id,
@@ -254,6 +259,8 @@ const DashboardLocador = () => {
         price: p.hourly_rate,
         location: p.location_address,
         photo: p.primary_photo_url ?? null,
+        // O ano vem do maquinário do anúncio; é o que alimenta o filtro por ano.
+        year: String(machineById.get(p.machinery)?.year ?? ""),
         status: p.status || "active"
       })));
     }).catch(console.error);
@@ -358,35 +365,181 @@ const DashboardLocador = () => {
     }
   };
 
-  const activeRentals = useMemo(
-    () =>
-      rentals.filter(
+  // ── Busca / filtros por aba
+  const [frotaSearch, setFrotaSearch] = useState("");
+  const [frotaYear, setFrotaYear] = useState("Todos");
+  const [anunciosSearch, setAnunciosSearch] = useState("");
+  const [anunciosYear, setAnunciosYear] = useState("Todos");
+  const [reservasSearch, setReservasSearch] = useState("");
+  const [reservasYear, setReservasYear] = useState("Todos");
+  const [contratosSearch, setContratosSearch] = useState("");
+  const [contratosYear, setContratosYear] = useState("Todos");
+  const [contratosStatus, setContratosStatus] = useState("Todos");
+
+  // ── Paginação por aba
+  const [frotaPage, setFrotaPage] = useState(1);
+  const [anunciosPage, setAnunciosPage] = useState(1);
+  const [reservasPage, setReservasPage] = useState(1);
+  const [contratosPage, setContratosPage] = useState(1);
+  const frotaPerPage = 6;
+  const anunciosPerPage = 6;
+  const reservasPerPage = 6;
+  const contratosPerPage = 5;
+
+  const matches = (value: unknown, term: string) =>
+    String(value ?? "")
+      .toLowerCase()
+      .includes(term);
+
+  const filteredMachines = useMemo(() => {
+    const term = frotaSearch.trim().toLowerCase();
+    return machines.filter(
+      (m) =>
+        (frotaYear === "Todos" || String(m.year) === frotaYear) &&
+        (term === "" ||
+          matches(m.brand, term) ||
+          matches(m.model, term) ||
+          matches(m.renagro, term)),
+    );
+  }, [machines, frotaSearch, frotaYear]);
+
+  const filteredPostings = useMemo(() => {
+    const term = anunciosSearch.trim().toLowerCase();
+    return postings.filter(
+      (p) =>
+        (anunciosYear === "Todos" || p.year === anunciosYear) &&
+        (term === "" || matches(p.machine, term) || matches(p.location, term)),
+    );
+  }, [postings, anunciosSearch, anunciosYear]);
+
+  const filteredRentals = useMemo(() => {
+    const term = reservasSearch.trim().toLowerCase();
+    return rentals.filter(
+      (r) =>
+        (reservasYear === "Todos" || r.year === reservasYear) &&
+        (term === "" ||
+          matches(r.lessee, term) ||
+          matches(r.machine, term) ||
+          matches(r.contract, term)),
+    );
+  }, [rentals, reservasSearch, reservasYear]);
+
+  const filteredContracts = useMemo(() => {
+    const term = contratosSearch.trim().toLowerCase();
+    return rentals.filter((c) => {
+      if (contratosYear !== "Todos" && c.year !== contratosYear) return false;
+      if (contratosStatus === "Pendentes" && c.status !== "pending") return false;
+      if (
+        contratosStatus === "Assinados" &&
+        c.status !== "active" &&
+        c.status !== "signed"
+      )
+        return false;
+      if (
+        contratosStatus === "Encerrados" &&
+        c.status !== "completed" &&
+        c.status !== "cancelled" &&
+        c.status !== "closed"
+      )
+        return false;
+      return (
+        term === "" ||
+        matches(c.contract, term) ||
+        matches(c.lessee, term) ||
+        matches(c.machine, term)
+      );
+    });
+  }, [rentals, contratosSearch, contratosYear, contratosStatus]);
+
+  const frotaTotalPages = Math.max(
+    1,
+    Math.ceil(filteredMachines.length / frotaPerPage),
+  );
+  const anunciosTotalPages = Math.max(
+    1,
+    Math.ceil(filteredPostings.length / anunciosPerPage),
+  );
+  const reservasTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRentals.length / reservasPerPage),
+  );
+  const contratosTotalPages = Math.max(
+    1,
+    Math.ceil(filteredContracts.length / contratosPerPage),
+  );
+
+  // Se a lista encolhe (filtro/busca/exclusão), a página atual pode ficar fora
+  // do intervalo e a aba renderizaria vazia. Fixamos no limite válido.
+  const safeFrotaPage = Math.min(frotaPage, frotaTotalPages);
+  const safeAnunciosPage = Math.min(anunciosPage, anunciosTotalPages);
+  const safeReservasPage = Math.min(reservasPage, reservasTotalPages);
+  const safeContratosPage = Math.min(contratosPage, contratosTotalPages);
+
+  const paginatedFrota = filteredMachines.slice(
+    (safeFrotaPage - 1) * frotaPerPage,
+    safeFrotaPage * frotaPerPage,
+  );
+  const paginatedAnuncios = filteredPostings.slice(
+    (safeAnunciosPage - 1) * anunciosPerPage,
+    safeAnunciosPage * anunciosPerPage,
+  );
+  // As locações são paginadas sobre a lista completa (em andamento primeiro) e
+  // depois reagrupadas, para que cada página some exatamente reservasPerPage
+  // cartões entre as duas seções.
+  const paginatedRentals = useMemo(() => {
+    const ordered = [
+      ...filteredRentals.filter(
         (r) => r.status === "pending" || r.status === "active",
       ),
-    [rentals],
+      ...filteredRentals.filter(
+        (r) => r.status !== "pending" && r.status !== "active",
+      ),
+    ];
+    return ordered.slice(
+      (safeReservasPage - 1) * reservasPerPage,
+      safeReservasPage * reservasPerPage,
+    );
+  }, [filteredRentals, safeReservasPage]);
+  const paginatedContracts = filteredContracts.slice(
+    (safeContratosPage - 1) * contratosPerPage,
+    safeContratosPage * contratosPerPage,
+  );
+
+  const activeRentals = useMemo(
+    () =>
+      paginatedRentals.filter(
+        (r) => r.status === "pending" || r.status === "active",
+      ),
+    [paginatedRentals],
   );
   const pastRentals = useMemo(
     () =>
-      rentals.filter(
-        (r) => r.status === "completed" || r.status === "cancelled",
+      paginatedRentals.filter(
+        (r) => r.status !== "pending" && r.status !== "active",
       ),
-    [rentals],
+    [paginatedRentals],
   );
 
-  const [frotaPage, setFrotaPage] = useState(1);
-  const [anunciosPage, setAnunciosPage] = useState(1);
-  const frotaPerPage = 6;
-  const anunciosPerPage = 6;
-  const frotaTotalPages = Math.ceil(machines.length / frotaPerPage);
-  const anunciosTotalPages = Math.ceil(postings.length / anunciosPerPage);
-  const paginatedFrota = machines.slice(
-    (frotaPage - 1) * frotaPerPage,
-    frotaPage * frotaPerPage,
-  );
-  const paginatedAnuncios = postings.slice(
-    (anunciosPage - 1) * anunciosPerPage,
-    anunciosPage * anunciosPerPage,
-  );
+  const rentalYears = useMemo(() => {
+    const years = [...new Set(rentals.map((r) => r.year).filter(Boolean))].sort(
+      (a, b) => Number(b) - Number(a),
+    );
+    return ["Todos", ...years];
+  }, [rentals]);
+
+  const postingYears = useMemo(() => {
+    const years = [...new Set(postings.map((p) => p.year).filter(Boolean))].sort(
+      (a, b) => Number(b) - Number(a),
+    );
+    return ["Todos", ...years];
+  }, [postings]);
+
+  const machineYears = useMemo(() => {
+    const years = [
+      ...new Set(machines.map((m) => String(m.year)).filter((y) => y && y !== "undefined")),
+    ].sort((a, b) => Number(b) - Number(a));
+    return ["Todos", ...years];
+  }, [machines]);
 
   const renderRentalCard = (r: any) => {
     const badge = getStatusBadge(r.status);
@@ -1070,10 +1223,17 @@ const DashboardLocador = () => {
               </div>
 
               <DashboardSearchBar
-                searchValue=""
-                onSearchChange={() => {}}
-                yearValue="Todos"
-                onYearChange={() => {}}
+                searchValue={frotaSearch}
+                onSearchChange={(v) => {
+                  setFrotaSearch(v);
+                  setFrotaPage(1);
+                }}
+                yearValue={frotaYear}
+                onYearChange={(v) => {
+                  setFrotaYear(v);
+                  setFrotaPage(1);
+                }}
+                years={machineYears}
                 searchPlaceholder="Buscar por marca, modelo ou registro..."
               />
 
@@ -1119,7 +1279,7 @@ const DashboardLocador = () => {
                 ))}
               </div>
               <DashboardPagination
-                currentPage={frotaPage}
+                currentPage={safeFrotaPage}
                 totalPages={frotaTotalPages}
                 onPageChange={setFrotaPage}
               />
@@ -1422,10 +1582,17 @@ const DashboardLocador = () => {
                 </Link>
               </div>
               <DashboardSearchBar
-                searchValue=""
-                onSearchChange={() => {}}
-                yearValue="Todos"
-                onYearChange={() => {}}
+                searchValue={anunciosSearch}
+                onSearchChange={(v) => {
+                  setAnunciosSearch(v);
+                  setAnunciosPage(1);
+                }}
+                yearValue={anunciosYear}
+                onYearChange={(v) => {
+                  setAnunciosYear(v);
+                  setAnunciosPage(1);
+                }}
+                years={postingYears}
                 searchPlaceholder="Buscar por maquinário ou localização..."
               />
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1488,7 +1655,7 @@ const DashboardLocador = () => {
                 ))}
               </div>
               <DashboardPagination
-                currentPage={anunciosPage}
+                currentPage={safeAnunciosPage}
                 totalPages={anunciosTotalPages}
                 onPageChange={setAnunciosPage}
               />
@@ -1509,10 +1676,17 @@ const DashboardLocador = () => {
               </div>
 
               <DashboardSearchBar
-                searchValue=""
-                onSearchChange={() => {}}
-                yearValue="Todos"
-                onYearChange={() => {}}
+                searchValue={reservasSearch}
+                onSearchChange={(v) => {
+                  setReservasSearch(v);
+                  setReservasPage(1);
+                }}
+                yearValue={reservasYear}
+                onYearChange={(v) => {
+                  setReservasYear(v);
+                  setReservasPage(1);
+                }}
+                years={rentalYears}
                 searchPlaceholder="Buscar por locatário, maquinário ou contrato..."
               />
 
@@ -1548,10 +1722,16 @@ const DashboardLocador = () => {
                 </div>
               ) : null}
 
+              {filteredRentals.length === 0 ? (
+                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center text-on-surface-variant text-sm">
+                  Nenhuma locação encontrada.
+                </div>
+              ) : null}
+
               <DashboardPagination
-                currentPage={1}
-                totalPages={3}
-                onPageChange={() => {}}
+                currentPage={safeReservasPage}
+                totalPages={reservasTotalPages}
+                onPageChange={setReservasPage}
               />
             </div>
           ) : null}
@@ -1569,18 +1749,30 @@ const DashboardLocador = () => {
                 </p>
               </div>
               <DashboardSearchBar
-                searchValue=""
-                onSearchChange={() => {}}
-                yearValue="Todos"
-                onYearChange={() => {}}
+                searchValue={contratosSearch}
+                onSearchChange={(v) => {
+                  setContratosSearch(v);
+                  setContratosPage(1);
+                }}
+                yearValue={contratosYear}
+                onYearChange={(v) => {
+                  setContratosYear(v);
+                  setContratosPage(1);
+                }}
+                years={rentalYears}
                 searchPlaceholder="Buscar por contrato, locatário ou maquinário..."
               />
               <div className="flex gap-2">
                 {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
                   <button
                     key={f}
+                    type="button"
+                    onClick={() => {
+                      setContratosStatus(f);
+                      setContratosPage(1);
+                    }}
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                      f === "Todos"
+                      f === contratosStatus
                         ? "bg-primary text-on-primary"
                         : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                     }`}
@@ -1589,7 +1781,7 @@ const DashboardLocador = () => {
                   </button>
                 ))}
               </div>
-              {rentals.map((c) => (
+              {paginatedContracts.map((c) => (
                 <div
                   key={c.id}
                   className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
@@ -1608,7 +1800,8 @@ const DashboardLocador = () => {
                           {c.contract} — {c.machine}
                         </h3>
                         <p className="text-sm text-on-surface-variant">
-                          {c.lessee} · Criado em 2026
+                          {c.lessee}
+                          {c.year ? ` · Criado em ${c.year}` : ""}
                         </p>
                       </div>
                     </div>
@@ -1682,10 +1875,16 @@ const DashboardLocador = () => {
                   </div>
                 </div>
               ))}
+              {filteredContracts.length === 0 ? (
+                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center text-on-surface-variant text-sm">
+                  Nenhum contrato encontrado.
+                </div>
+              ) : null}
+
               <DashboardPagination
-                currentPage={1}
-                totalPages={2}
-                onPageChange={() => {}}
+                currentPage={safeContratosPage}
+                totalPages={contratosTotalPages}
+                onPageChange={setContratosPage}
               />
             </div>
           ) : null}
@@ -1967,10 +2166,16 @@ const DashboardLocador = () => {
                   </div>
                 ))}
               </div>
+              {filteredRentals.length === 0 ? (
+                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center text-on-surface-variant text-sm">
+                  Nenhuma locação encontrada.
+                </div>
+              ) : null}
+
               <DashboardPagination
-                currentPage={1}
-                totalPages={3}
-                onPageChange={() => {}}
+                currentPage={safeReservasPage}
+                totalPages={reservasTotalPages}
+                onPageChange={setReservasPage}
               />
             </div>
           ) : null}

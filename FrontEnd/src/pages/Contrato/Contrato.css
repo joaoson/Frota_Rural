@@ -214,3 +214,13 @@
 /* botão imprimir */
 .contrato-root .print-btn { display: flex; align-items: center; gap: 6px; background: #173901; color: white; font-family: "Inter", sans-serif; font-weight: 700; font-size: 13px; padding: 8px 18px; border-radius: 6px; border: none; cursor: pointer; }
 .contrato-root .print-btn-wrap { width: min(210mm, 100%); display: flex; justify-content: flex-end; }
+
+/* ── Evidência da assinatura eletrônica ── */
+.contrato-root .evid-box { margin-top: 8px; background: #fbfcf7; border: 1px solid #e0e4d6; border-radius: 6px; padding: 9px 11px; }
+.contrato-root .evid-title { font-size: 8.5px; color: #73796c; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; margin-bottom: 6px; }
+.contrato-root .evid-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 9.5px; line-height: 1.65; }
+.contrato-root .evid-key { color: #73796c; white-space: nowrap; }
+.contrato-root .evid-val { color: #43493d; font-weight: 600; text-align: right; }
+/* O hash quebra em qualquer caractere: 64 dígitos não cabem na coluna. */
+.contrato-root .evid-hash { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 8.5px; color: #43493d; word-break: break-all; line-height: 1.5; margin-top: 2px; }
+.contrato-root .evid-otp { display: inline-flex; align-items: center; gap: 3px; color: #173901; font-weight: 700; }

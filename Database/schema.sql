@@ -103,6 +103,65 @@ CREATE TABLE contracts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Contract Signatures
+-- Evidencia da assinatura eletronica simples (MP 2.200-2/2001, art. 10, par. 2,
+-- e Lei 14.063/2020). Tabela append-only: as triggers abaixo impedem UPDATE e
+-- DELETE, e cada linha encadeia o hash da anterior (previous_hash/record_hash),
+-- de modo que qualquer adulteracao quebre a cadeia de forma detectavel.
+CREATE TABLE contract_signatures (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES contracts(id),
+    signer_id UUID REFERENCES users(id),
+    signer_name VARCHAR(255) NOT NULL DEFAULT '',
+    signer_email VARCHAR(255) NOT NULL DEFAULT '',
+    role VARCHAR(20) NOT NULL,
+    document_version VARCHAR(20) NOT NULL DEFAULT '',
+    document_hash VARCHAR(64) NOT NULL,
+    hash_algorithm VARCHAR(20) NOT NULL DEFAULT 'sha256',
+    signed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    ip_address VARCHAR(64) NOT NULL DEFAULT '',
+    user_agent VARCHAR(1024) NOT NULL DEFAULT '',
+    otp_verified BOOLEAN NOT NULL DEFAULT false,
+    previous_hash VARCHAR(64) NOT NULL,
+    record_hash VARCHAR(64) NOT NULL UNIQUE
+);
+
+CREATE INDEX idx_contract_signatures_contract ON contract_signatures(contract_id, signed_at);
+
+CREATE OR REPLACE FUNCTION contract_signatures_append_only()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION
+        'contract_signatures e append-only: registros de assinatura nao podem ser alterados ou removidos';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER contract_signatures_no_update
+    BEFORE UPDATE ON contract_signatures
+    FOR EACH ROW EXECUTE FUNCTION contract_signatures_append_only();
+
+CREATE TRIGGER contract_signatures_no_delete
+    BEFORE DELETE ON contract_signatures
+    FOR EACH ROW EXECUTE FUNCTION contract_signatures_append_only();
+
+-- Contract Signature OTPs
+-- Codigo de uso unico enviado por e-mail antes do aceite, para provar posse do
+-- endereco. Guardamos apenas o hash do codigo, salgado com o id do contrato.
+CREATE TABLE contract_signature_otps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES contracts(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    code_hash VARCHAR(64) NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    consumed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_contract_signature_otps_lookup
+    ON contract_signature_otps(contract_id, role, created_at DESC);
+
 -- Messages
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

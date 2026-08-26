@@ -187,8 +187,7 @@ const NovoAnuncio = () => {
         description: description || undefined,
       });
 
-      // O anúncio já existe neste ponto: uma falha no upload não o invalida,
-      // então as fotos são reportadas à parte e o fluxo segue.
+
       if (photos.length > 0 && posting?.id) {
         setUploadingPhotos(true);
         const { failed } = await postingService.uploadPhotos(

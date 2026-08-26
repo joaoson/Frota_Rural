@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import MaterialIcon from "@/components/MaterialIcon";
 
 const Navbar = () => {
-  const { isAuthenticated, userRole, logout } = useAuth();
+  const { isAuthenticated, isLoading, userRole, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +48,9 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          {isAuthenticated ? (
+          {isLoading ? (
+            <div className="w-10 h-10" aria-hidden />
+          ) : isAuthenticated ? (
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}

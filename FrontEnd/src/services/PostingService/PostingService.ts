@@ -6,14 +6,11 @@ type MachineApi = {
 
 export type PostingPhoto = {
   id: string;
-  /** Caminho do objeto no bucket, ex.: "postings/<id>/<uuid>.jpg". */
   path: string;
-  /** URL pública de download, montada pelo backend a partir do caminho. */
   url: string;
   is_primary: boolean;
 };
 
-/** Resposta de POST /postings/ — só o id é consumido hoje. */
 export type CreatedPosting = {
   id: string;
 };
@@ -75,16 +72,7 @@ class PostingService {
     return response.data;
   }
 
-  /**
-   * Envia uma foto para o anúncio. O arquivo vai para o Firebase Storage pelo
-   * backend; a API devolve o caminho salvo e a URL pública já montada.
-   *
-   * O Content-Type precisa ser anulado nesta requisição: a AxiosInstance define
-   * "application/json" como padrão e esse padrão vence sobre o FormData, fazendo
-   * o Django receber um corpo que não consegue parsear (request.FILES vazio →
-   * 400 "Nenhum arquivo enviado."). Com o header removido, o próprio navegador
-   * monta "multipart/form-data" com o boundary correto.
-   */
+
   async uploadPhoto(
     postingId: string,
     file: File,
@@ -101,7 +89,6 @@ class PostingService {
     return response.data;
   }
 
-  /** Envia várias fotos em sequência. A primeira da lista vira a capa. */
   async uploadPhotos(postingId: string, files: File[]): Promise<UploadPhotosResult> {
     const uploaded: PostingPhoto[] = [];
     let failed = 0;

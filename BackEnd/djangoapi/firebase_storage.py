@@ -1,10 +1,3 @@
-"""Cliente do Firebase Storage usado para armazenar mídia enviada pelos usuários.
-
-O banco guarda apenas o *caminho* do objeto (ex.: ``postings/<id>/<uuid>.jpg``).
-A URL pública é montada sob demanda por :func:`public_url`, de modo que trocar de
-bucket não exige reescrever nenhuma linha do banco.
-"""
-
 import os
 import threading
 import uuid

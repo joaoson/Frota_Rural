@@ -20,6 +20,42 @@ export interface Rental {
   finalHorimeter?: number;
 }
 
+/** Evidência gravada pelo servidor, no formato bruto da trilha de auditoria. */
+export interface SignatureEvidenceRecord {
+  id: string;
+  contract: string;
+  role: "locador" | "locatario";
+  signer: string | null;
+  signer_name: string;
+  signer_email: string;
+  document_version: string;
+  document_hash: string;
+  hash_algorithm: string;
+  signed_at: string;
+  ip_address: string;
+  user_agent: string;
+  otp_verified: boolean;
+  previous_hash: string;
+  record_hash: string;
+}
+
+export interface SignatureReceipt {
+  rental: Rental | null;
+  evidence: SignatureEvidenceRecord | null;
+}
+
+export interface ContractEvidence {
+  contrato_id: string;
+  aluguel_id: string;
+  status: string;
+  documento: { versao: string; hash: string; algoritmo: string };
+  /** false quando algum registro foi alterado ou o encadeamento não fecha. */
+  cadeia_integra: boolean;
+  inconsistencias: string[];
+  assinaturas: SignatureEvidenceRecord[];
+  fundamento_legal: string;
+}
+
 class ContractService {
   async createRental(payload: {
     postingId: string;
@@ -116,12 +152,40 @@ class ContractService {
     return response.data;
   }
 
-  async signContract(id: string, role: "locador" | "locatario", signatureName: string): Promise<Rental | null> {
-    await AxiosInstance.post(`contracts/${id}/sign`, {
+  async requestSignatureOtp(id: string, role: "locador" | "locatario"): Promise<{ sentTo: string; expiresInSeconds: number }> {
+    const response = await AxiosInstance.post(`contracts/${id}/otp`, { role });
+    return {
+      sentTo: response.data.sent_to,
+      expiresInSeconds: response.data.expires_in_seconds,
+    };
+  }
+
+  /**
+   * Registra o aceite. O servidor grava a evidência (hash SHA-256 do documento
+   * aceito, timestamp UTC, IP, User-Agent e signatário) em log imutável — nada
+   * disso é enviado pelo cliente, justamente para ter valor probatório.
+   */
+  async signContract(
+    id: string,
+    role: "locador" | "locatario",
+    signatureName: string,
+    otp?: string,
+  ): Promise<SignatureReceipt> {
+    const response = await AxiosInstance.post(`contracts/${id}/sign`, {
       role,
-      name: signatureName
+      name: signatureName,
+      ...(otp ? { otp } : {}),
     });
-    return this.getRentalById(id);
+    return {
+      rental: await this.getRentalById(id),
+      evidence: response.data?.signature_evidence ?? null,
+    };
+  }
+
+  /** Trilha de auditoria completa do aceite, com a conferência do encadeamento. */
+  async getContractEvidence(id: string): Promise<ContractEvidence> {
+    const response = await AxiosInstance.get<ContractEvidence>(`contracts/${id}/evidence`);
+    return response.data;
   }
 }
 

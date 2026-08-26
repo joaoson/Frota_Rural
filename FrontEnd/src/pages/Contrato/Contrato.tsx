@@ -1,8 +1,69 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
 import "./Contrato.css";
-import type { ContratoData } from "./types";
+import type { AssinaturaEvidencia, ContratoData } from "./types";
 import { contractService } from "@/services/ContractService/ContractService";
+
+/** Campos sem dado cadastrado voltam vazios do servidor — o contrato não inventa valores. */
+const ou = (valor: string | number | null | undefined, fallback = "Não informado") =>
+  valor === null || valor === undefined || valor === "" ? fallback : String(valor);
+
+/** Exibe o timestamp UTC do aceite sem convertê-lo: é ele que consta no registro. */
+const formatarUtc = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ` +
+    `às ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
+  );
+};
+
+/**
+ * Evidência do aceite eletrônico de uma das partes.
+ *
+ * É o que dá força probatória à assinatura eletrônica simples: o hash prova
+ * qual documento foi aceito, o timestamp e o IP provam quando e de onde, e o
+ * hash do registro encadeia tudo em um log em que uma alteração é detectável.
+ */
+function BlocoEvidencia({ evidencia }: { evidencia: AssinaturaEvidencia }) {
+  return (
+    <div className="evid-box">
+      <div className="evid-title">Evidência do aceite</div>
+      <div className="evid-row">
+        <span className="evid-key">Data e hora (UTC)</span>
+        <span className="evid-val">{formatarUtc(evidencia.assinado_em_utc)}</span>
+      </div>
+      <div className="evid-row">
+        <span className="evid-key">E-mail</span>
+        <span className="evid-val">{ou(evidencia.email, "—")}</span>
+      </div>
+      <div className="evid-row">
+        <span className="evid-key">IP de origem</span>
+        <span className="evid-val">{ou(evidencia.ip, "—")}</span>
+      </div>
+      <div className="evid-row">
+        <span className="evid-key">Versão do documento</span>
+        <span className="evid-val">{ou(evidencia.versao_documento, "—")}</span>
+      </div>
+      {evidencia.otp_verificado && (
+        <div className="evid-row">
+          <span className="evid-key">Posse do e-mail</span>
+          <span className="evid-val evid-otp">
+            <span className="material-symbols-outlined" style={{ fontSize: "11px" }}>mark_email_read</span>
+            Confirmada por código
+          </span>
+        </div>
+      )}
+      <div className="evid-row" style={{ display: "block", marginTop: "4px" }}>
+        <span className="evid-key">
+          Hash {evidencia.algoritmo_hash.toUpperCase()} do documento assinado
+        </span>
+        <div className="evid-hash">{evidencia.hash_documento}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function Contrato() {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +108,9 @@ export default function Contrato() {
     );
   }
 
-  const { contrato, operacao, locador, locatario, equipamento, anuncio, assinatura } = data;
+  const { contrato, operacao, locador, locatario, equipamento, anuncio, assinatura, evidencia } = data;
+  const evidenciaLocador = evidencia?.assinaturas.find((a) => a.papel === "locador");
+  const evidenciaLocatario = evidencia?.assinaturas.find((a) => a.papel === "locatario");
 
   return (
     <div className="contrato-root">
@@ -93,24 +156,42 @@ export default function Contrato() {
             <div className="parte-card">
               <div className="parte-label"><span className="dot" style={{ background: "#173901" }} />Locador</div>
               <div className="parte-nome">{locador.razao_social}</div>
-              <div className="parte-info">{locador.tipo_documento} nº {locador.documento}</div>
-              <div className="parte-info">{locador.endereco_completo}</div>
-              <div className="parte-sep" />
-              <div className="parte-info"><strong>{locador.representante_nome}</strong></div>
-              <div className="parte-info" style={{ color: "#73796c" }}>
-                CPF nº {locador.representante_cpf} · {locador.representante_estado_civil}
+              <div className="parte-info">
+                {ou(locador.tipo_documento, "Documento")} nº {ou(locador.documento, "—")}
               </div>
+              <div className="parte-info">{ou(locador.endereco_completo, "—")}</div>
+              <div className="parte-sep" />
+              <div className="parte-info"><strong>{ou(locador.representante_nome, "—")}</strong></div>
+              {(locador.representante_cpf || locador.representante_estado_civil) && (
+                <div className="parte-info" style={{ color: "#73796c" }}>
+                  {[
+                    locador.representante_cpf && `CPF nº ${locador.representante_cpf}`,
+                    locador.representante_estado_civil,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              )}
             </div>
             <div className="parte-card">
               <div className="parte-label"><span className="dot" style={{ background: "#feb234" }} />Locatário</div>
               <div className="parte-nome">{locatario.razao_social}</div>
-              <div className="parte-info">{locatario.tipo_documento} nº {locatario.documento}</div>
-              <div className="parte-info">{locatario.endereco_completo}</div>
-              <div className="parte-sep" />
-              <div className="parte-info"><strong>{locatario.representante_nome}</strong></div>
-              <div className="parte-info" style={{ color: "#73796c" }}>
-                CPF nº {locatario.representante_cpf} · {locatario.representante_estado_civil}
+              <div className="parte-info">
+                {ou(locatario.tipo_documento, "Documento")} nº {ou(locatario.documento, "—")}
               </div>
+              <div className="parte-info">{ou(locatario.endereco_completo, "—")}</div>
+              <div className="parte-sep" />
+              <div className="parte-info"><strong>{ou(locatario.representante_nome, "—")}</strong></div>
+              {(locatario.representante_cpf || locatario.representante_estado_civil) && (
+                <div className="parte-info" style={{ color: "#73796c" }}>
+                  {[
+                    locatario.representante_cpf && `CPF nº ${locatario.representante_cpf}`,
+                    locatario.representante_estado_civil,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              )}
             </div>
           </div>
 
@@ -126,13 +207,18 @@ export default function Contrato() {
             <div className="clausula-titulo">Objeto do Contrato</div>
             <table className="dados">
               <tbody>
-                <tr><td>Tipo de equipamento</td><td>{equipamento.tipo}</td></tr>
-                <tr><td>Marca e Modelo</td><td>{equipamento.marca} {equipamento.modelo}</td></tr>
-                <tr><td>Ano de fabricação</td><td>{equipamento.ano}</td></tr>
-                <tr><td>Nº Renagro</td><td>{equipamento.renagro}</td></tr>
-                <tr><td>Valor de referência do equipamento</td><td><strong>R$ {equipamento.valor_estimado}</strong></td></tr>
-                <tr><td>Tipo de serviço</td><td>{anuncio.tipo_servico} — {anuncio.finalidade_uso}</td></tr>
-                <tr><td>Local de execução</td><td>{locatario.local_servico}</td></tr>
+                <tr><td>Tipo de equipamento</td><td>{ou(equipamento.tipo)}</td></tr>
+                <tr><td>Marca e Modelo</td><td>{ou(`${equipamento.marca} ${equipamento.modelo}`.trim())}</td></tr>
+                <tr><td>Ano de fabricação</td><td>{ou(equipamento.ano)}</td></tr>
+                <tr><td>Nº Renagro</td><td>{ou(equipamento.renagro)}</td></tr>
+                {equipamento.valor_estimado && (
+                  <tr><td>Valor de referência do equipamento</td><td><strong>R$ {equipamento.valor_estimado}</strong></td></tr>
+                )}
+                <tr>
+                  <td>Tipo de serviço</td>
+                  <td>{[anuncio.tipo_servico, anuncio.finalidade_uso].filter(Boolean).join(" — ")}</td>
+                </tr>
+                <tr><td>Local de execução</td><td>{ou(locatario.local_servico)}</td></tr>
               </tbody>
             </table>
             <div className="clausula-body">
@@ -177,7 +263,7 @@ export default function Contrato() {
             <div className="clausula-num">Cláusula 3</div>
             <div className="clausula-titulo">Retirada e Devolução</div>
             <div className="clausula-body">
-              <div><span className="item-num">3.1</span> O equipamento estará disponível para retirada a partir de <strong>{contrato.data_inicio}</strong>, no endereço: <strong>{locador.endereco_equipamento}</strong>.</div>
+              <div><span className="item-num">3.1</span> O equipamento estará disponível para retirada a partir de <strong>{contrato.data_inicio}</strong>, no endereço: <strong>{ou(locador.endereco_equipamento)}</strong>.</div>
               <div><span className="item-num">3.2</span> No momento da retirada e da devolução, as partes realizarão vistoria do equipamento, com registro fotográfico de seu estado e leitura do horímetro.</div>
               <div><span className="item-num">3.3</span> Os custos de mobilização e desmobilização do equipamento são de responsabilidade do <strong>Locador</strong>.</div>
             </div>
@@ -220,7 +306,17 @@ export default function Contrato() {
             </div>
 
             <div className="clausula-body">
-              <div><span className="item-num">4.1</span> O pagamento é realizado pela plataforma FrotaRural no momento da confirmação da reserva. O comprovante é gerado automaticamente. O repasse ao Locador ocorre após a conclusão da locação.</div>
+              <div>
+                <span className="item-num">4.1</span> O pagamento é realizado pela plataforma FrotaRural no momento da confirmação da reserva. O comprovante é gerado automaticamente. O repasse ao Locador ocorre após a conclusão da locação.
+                {contrato.valor_locacao && contrato.valor_taxa_plataforma && (
+                  <>
+                    {" "}O valor estimado se compõe de <strong>R$ {contrato.valor_locacao}</strong> de locação
+                    {" "}(tarifa × horas estimadas) e <strong>R$ {contrato.valor_taxa_plataforma}</strong> de taxa
+                    da plataforma
+                    {contrato.percentual_taxa_plataforma && ` (${contrato.percentual_taxa_plataforma}%)`}.
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="horim-box">
@@ -342,7 +438,14 @@ export default function Contrato() {
             </table>
             <div className="clausula-body">
               <div><span className="item-num">7.2</span> Qualquer dano deve ser registrado com fotografia ou vídeo e comunicado pela plataforma. O valor do reparo será apurado com base em orçamento de oficina — cada parte pode indicar um, sendo adotada a média dos dois.</div>
-              <div><span className="item-num">7.3</span> O valor de referência do equipamento (<strong>R$ {equipamento.valor_estimado}</strong>) serve como limite de indenização em caso de dano total ou perda.</div>
+              <div>
+                <span className="item-num">7.3</span>{" "}
+                {equipamento.valor_estimado ? (
+                  <>O valor de referência do equipamento (<strong>R$ {equipamento.valor_estimado}</strong>) serve como limite de indenização em caso de dano total ou perda.</>
+                ) : (
+                  <>Em caso de dano total ou perda, a indenização terá como limite o valor de mercado do equipamento na data do evento, apurado por laudo ou por orçamento nos termos do item 7.2.</>
+                )}
+              </div>
             </div>
           </div>
 
@@ -409,7 +512,13 @@ export default function Contrato() {
               <div className="clausula-num">Cláusula 11</div>
               <div className="clausula-titulo" style={{ fontSize: "13px" }}>Foro</div>
               <div className="clausula-body" style={{ fontSize: "11.5px" }}>
-                <div><span className="item-num">11.1</span> Fica eleito o foro do domicílio do Locatário — <strong>{locatario.municipio}/{locatario.uf}</strong> — para dirimir quaisquer conflitos oriundos deste contrato, nos termos do art. 101, I, do Código de Defesa do Consumidor. As partes comprometem-se a buscar solução por mediação antes de recorrer ao Judiciário.</div>
+                <div>
+                  <span className="item-num">11.1</span> Fica eleito o foro do domicílio do Locatário
+                  {locatario.municipio && locatario.uf && (
+                    <> — <strong>{locatario.municipio}/{locatario.uf}</strong></>
+                  )}
+                  {" "}— para dirimir quaisquer conflitos oriundos deste contrato, nos termos do art. 101, I, do Código de Defesa do Consumidor. As partes comprometem-se a buscar solução por mediação antes de recorrer ao Judiciário.
+                </div>
               </div>
             </div>
           </div>
@@ -425,34 +534,54 @@ export default function Contrato() {
               </span>
             </div>
             <div className="info-block">
-              Assinado digitalmente por meio da plataforma integrada à FrotaRural, com validade jurídica conforme a MP nº 2.200-2/2001 e a Lei nº 14.063/2020. Ao assinar, cada parte declara que leu, compreendeu e concorda com as condições deste contrato.
+              Assinado eletronicamente por meio da plataforma FrotaRural. A assinatura eletrônica simples tem validade entre as partes nos termos da <strong style={{ color: "#43493d" }}>MP nº 2.200-2/2001, art. 10, §2º</strong>, e da <strong style={{ color: "#43493d" }}>Lei nº 14.063/2020, art. 4º, I</strong>. Ao assinar, cada parte declara que leu, compreendeu e concorda com as condições deste contrato.
             </div>
             <div className="assin-grid">
               <div className="assinatura-box">
                 <div className="assin-label">Locador</div>
-                <div className="assin-nome">{locador.razao_social}</div>
-                <div className="assin-rep">{locador.representante_nome}</div>
+                <div className="assin-nome">{ou(locador.razao_social, "—")}</div>
+                <div className="assin-rep">{ou(locador.representante_nome, "—")}</div>
                 <div className="assin-stamp">
                   <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "13px" }}>verified</span>
                   <div>
-                    <div className="assin-stamp-label">Assinado digitalmente em</div>
+                    <div className="assin-stamp-label">Assinado eletronicamente em</div>
                     <div className="assin-stamp-val">{assinatura.data_locador}</div>
                   </div>
                 </div>
+                {evidenciaLocador && <BlocoEvidencia evidencia={evidenciaLocador} />}
               </div>
               <div className="assinatura-box">
                 <div className="assin-label">Locatário</div>
-                <div className="assin-nome">{locatario.razao_social}</div>
-                <div className="assin-rep">{locatario.representante_nome}</div>
+                <div className="assin-nome">{ou(locatario.razao_social, "—")}</div>
+                <div className="assin-rep">{ou(locatario.representante_nome, "—")}</div>
                 <div className="assin-stamp">
                   <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "13px" }}>verified</span>
                   <div>
-                    <div className="assin-stamp-label">Assinado digitalmente em</div>
+                    <div className="assin-stamp-label">Assinado eletronicamente em</div>
                     <div className="assin-stamp-val">{assinatura.data_locatario}</div>
                   </div>
                 </div>
+                {evidenciaLocatario && <BlocoEvidencia evidencia={evidenciaLocatario} />}
               </div>
             </div>
+
+            {evidencia && (
+              <div className="info-block" style={{ marginTop: "10px" }}>
+                <strong style={{ color: "#43493d" }}>
+                  Verificação de integridade — versão {ou(contrato.versao_documento, "—")}
+                </strong>
+                <div style={{ marginTop: "3px" }}>
+                  Hash {evidencia.algoritmo_hash.toUpperCase()} deste documento:
+                </div>
+                <div className="evid-hash">{evidencia.hash_documento_atual}</div>
+                <div style={{ marginTop: "3px" }}>
+                  O hash acima deve coincidir com o registrado em cada aceite. Se divergir, o documento
+                  foi alterado depois de assinado. Os registros de assinatura são gravados em log
+                  imutável e encadeado, e a trilha completa — com IP, User-Agent e conferência da
+                  cadeia — está disponível na plataforma.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
