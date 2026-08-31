@@ -8,6 +8,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
 
+/**
+ * Campos editáveis de uma máquina. Não há horímetro aqui: ele é medido por
+ * locação (`initial_hour_meter`/`final_hour_meter` em Rentals), não é atributo
+ * do maquinário.
+ */
 export interface EquipamentoData {
   id: string;
   registroRenagro: string;
@@ -15,8 +20,6 @@ export interface EquipamentoData {
   modelo: string;
   anoFabricacao: string;
   finalidade: string;
-  horimetroInicial: string;
-  horimetroFinal: string;
   especificacoes: string;
 }
 
@@ -77,26 +80,6 @@ const EditEquipamentoModal = ({
         }
         break;
       }
-      case "horimetroInicial": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro inicial deve ser positivo.";
-          }
-        }
-        break;
-      }
-      case "horimetroFinal": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro final deve ser positivo.";
-          } else if (form.horimetroInicial && h <= Number(form.horimetroInicial)) {
-            errorMsg = "O horímetro final deve ser maior que o horímetro inicial.";
-          }
-        }
-        break;
-      }
     }
     setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
     return errorMsg;
@@ -117,15 +100,15 @@ const EditEquipamentoModal = ({
       marca: validateField("marca", form.marca),
       modelo: validateField("modelo", form.modelo),
       anoFabricacao: validateField("anoFabricacao", form.anoFabricacao),
-      horimetroInicial: validateField("horimetroInicial", form.horimetroInicial),
-      horimetroFinal: validateField("horimetroFinal", form.horimetroFinal),
     };
 
     if (Object.values(errorsList).some((err) => err !== "")) {
       return;
     }
 
-    onSave(form);
+    // O Renagro é UNIQUE no banco: sem normalizar, "br..." e "BR..." viram
+    // dois registros distintos para a mesma máquina.
+    onSave({ ...form, registroRenagro: form.registroRenagro.trim().toUpperCase() });
     onOpenChange(false);
   };
 
@@ -224,38 +207,6 @@ const EditEquipamentoModal = ({
                 <option>Colheita</option>
                 <option>Preparo de Solo</option>
               </select>
-            </div>
-          </div>
-
-          {/* Horímetros */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className={`${labelClass} flex items-center gap-1`}>
-                <MaterialIcon icon="speed" size={14} /> Horím. Inicial
-              </label>
-              <input
-                type="number"
-                value={form.horimetroInicial}
-                onChange={(e) => handleChange("horimetroInicial", e.target.value)}
-                onBlur={(e) => validateField("horimetroInicial", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.horimetroInicial ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                placeholder="1250 h"
-              />
-              {errors.horimetroInicial && <p className="text-[11px] text-error font-medium mt-1">{errors.horimetroInicial}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className={`${labelClass} flex items-center gap-1`}>
-                <MaterialIcon icon="speed" size={14} /> Horím. Final
-              </label>
-              <input
-                type="number"
-                value={form.horimetroFinal}
-                onChange={(e) => handleChange("horimetroFinal", e.target.value)}
-                onBlur={(e) => validateField("horimetroFinal", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.horimetroFinal ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                placeholder="1300 h"
-              />
-              {errors.horimetroFinal && <p className="text-[11px] text-error font-medium mt-1">{errors.horimetroFinal}</p>}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,10 +15,11 @@ import { AxiosError } from "axios";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPService";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
+import { UFS } from "@/utils/ufs";
+import { validateDocument } from "@/utils/validation/validateDocument";
+import { mensagemErroCEP } from "@/utils/validation/validateCEP";
 import { passwordPattern } from "@/utils/regexPatterns";
 import {
   Area,
@@ -38,6 +39,7 @@ import NotificationPopover from "@/components/NotificationPopover";
 import EditEquipamentoModal, {
   type EquipamentoData,
 } from "@/components/EditEquipamentoModal";
+import AssinaturaContratoModal from "@/components/AssinaturaContratoModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,11 +95,34 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function validateDocument(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 11) return validateCPF(digits);
-  if (digits.length === 14) return validateCNPJ(digits);
-  return false;
+const ENCERRADOS = ["completed", "cancelled", "closed"];
+
+/**
+ * Situação do contrato do ponto de vista das assinaturas.
+ *
+ * `rentals.status` não basta: ele vira `active` assim que **qualquer** uma das
+ * partes assina, então é o par accepted_by_* que diz de quem ainda se espera o
+ * aceite — e é isso que decide se o locador vê o botão de assinar.
+ */
+function situacaoAssinatura(c: {
+  status: string;
+  acceptedByLessor?: boolean;
+  acceptedByLessee?: boolean;
+}) {
+  const encerrado = ENCERRADOS.includes(c.status);
+  const assinadoPeloLocador = Boolean(c.acceptedByLessor);
+  const assinadoPeloLocatario = Boolean(c.acceptedByLessee);
+  const completo = assinadoPeloLocador && assinadoPeloLocatario;
+
+  return {
+    encerrado,
+    assinadoPeloLocador,
+    assinadoPeloLocatario,
+    completo,
+    /** O locador pode assinar enquanto o contrato não estiver encerrado. */
+    podeAssinar: !encerrado && !assinadoPeloLocador,
+    grupo: encerrado ? "Encerrados" : completo ? "Assinados" : "Pendentes",
+  };
 }
 
 const DashboardLocador = () => {
@@ -110,8 +135,11 @@ const DashboardLocador = () => {
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formCity, setFormCity] = useState("");
+  const [formState, setFormState] = useState("");
   const [formCep, setFormCep] = useState("");
   const documentRef = useRef<HTMLInputElement>(null);
+  const cepRef = useRef<HTMLInputElement>(null);
 
   // Formulário alteração de senha
   const [currentPassword, setCurrentPassword] = useState("");
@@ -139,6 +167,8 @@ const DashboardLocador = () => {
   const [licenses, setLicenses] = useState<OperatorLicense[]>([]);
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
+  // Contrato aberto para assinatura do locador (null = modal fechado).
+  const [contratoParaAssinar, setContratoParaAssinar] = useState<string | null>(null);
   const [selectedEquipamento, setSelectedEquipamento] =
     useState<EquipamentoData>({
       id: "",
@@ -147,8 +177,6 @@ const DashboardLocador = () => {
       modelo: "",
       anoFabricacao: "",
       finalidade: "Plantio",
-      horimetroInicial: "",
-      horimetroFinal: "",
       especificacoes: "",
     });
 
@@ -160,9 +188,7 @@ const DashboardLocador = () => {
       modelo: m.model,
       anoFabricacao: String(m.year),
       finalidade: m.purpose,
-      horimetroInicial: "",
-      horimetroFinal: "",
-      especificacoes: "",
+      especificacoes: m.specifications ?? "",
     });
     setIsEditEquipamentoOpen(true);
   };
@@ -206,6 +232,34 @@ const DashboardLocador = () => {
     }
   };
 
+  // Recarregável: depois de um aceite, a lista precisa refletir o novo estado
+  // do contrato (quem já assinou) sem exigir um refresh da página.
+  const carregarLocacoes = useCallback(() => {
+    if (!userId) return;
+    contractService
+      .listByLessor(userId)
+      .then((data) => {
+        setRentals(
+          data.map((r) => ({
+            id: r.id,
+            lessee: r.lesseeId === "locatario-default" ? "Fazenda Aurora" : "Fazenda Parceira",
+            machine: r.machineName,
+            period: r.period,
+            startDate: r.startDate,
+            endDate: r.endDate,
+            year: r.startDate?.slice(0, 4) ?? "",
+            status: r.status,
+            total: r.total,
+            contract: r.contractNumber,
+            acceptedByLessor: r.acceptedByLessor,
+            acceptedByLessee: r.acceptedByLessee,
+            contractStatus: r.contractStatus,
+          })),
+        );
+      })
+      .catch(console.error);
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) return;
     userService
@@ -216,21 +270,7 @@ const DashboardLocador = () => {
     reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
     reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
 
-    contractService.listByLessor(userId).then(data => {
-      const mapped = data.map(r => ({
-        id: r.id,
-        lessee: r.lesseeId === "locatario-default" ? "Fazenda Aurora" : "Fazenda Parceira",
-        machine: r.machineName,
-        period: r.period,
-        startDate: r.startDate,
-        endDate: r.endDate,
-        year: r.startDate?.slice(0, 4) ?? "",
-        status: r.status,
-        total: r.total,
-        contract: r.contractNumber
-      }));
-      setRentals(mapped);
-    }).catch(console.error);
+    carregarLocacoes();
 
     Promise.all([
       machineService.list({ owner: userId }),
@@ -248,7 +288,8 @@ const DashboardLocador = () => {
         model: m.model,
         year: m.year,
         status: m.status || "active",
-        purpose: m.usage_purpose || ""
+        purpose: m.usage_purpose || "",
+        specifications: m.technical_specifications ?? ""
       })));
 
       setPostings(userPostings.map((p: any) => ({
@@ -273,7 +314,7 @@ const DashboardLocador = () => {
       .listCertifications({ user: userId })
       .then(setCertifications)
       .catch(console.error);
-  }, [userId]);
+  }, [userId, carregarLocacoes]);
 
   useEffect(() => {
     if (!user) return;
@@ -282,6 +323,8 @@ const DashboardLocador = () => {
     setFormEmail(user.email);
     setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
     setFormAddress(user.address);
+    setFormCity(user.city ?? "");
+    setFormState((user.state ?? "").toUpperCase());
     setFormCep(maskCEP(user.cep ?? ""));
   }, [user]);
 
@@ -302,11 +345,26 @@ const DashboardLocador = () => {
     }
   };
 
+  const handleCepBlur = () => {
+    const input = cepRef.current;
+    if (!input) return;
+    const erro = mensagemErroCEP(formCep);
+    input.setCustomValidity(erro);
+    if (erro) input.reportValidity();
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
       documentRef.current?.reportValidity();
+      return;
+    }
+    // CEP é opcional aqui, mas pela metade a API recusa o cadastro inteiro.
+    const erroCep = mensagemErroCEP(formCep);
+    if (erroCep) {
+      cepRef.current?.setCustomValidity(erroCep);
+      cepRef.current?.reportValidity();
       return;
     }
     try {
@@ -316,6 +374,8 @@ const DashboardLocador = () => {
         email: formEmail.toLowerCase().trim(),
         phone: `+55${clearSpecialChars(formPhone)}`,
         address: formAddress.trim(),
+        city: formCity.trim(),
+        state: formState.toUpperCase(),
         cep: clearSpecialChars(formCep),
       });
       setUser(updated);
@@ -428,18 +488,9 @@ const DashboardLocador = () => {
     const term = contratosSearch.trim().toLowerCase();
     return rentals.filter((c) => {
       if (contratosYear !== "Todos" && c.year !== contratosYear) return false;
-      if (contratosStatus === "Pendentes" && c.status !== "pending") return false;
       if (
-        contratosStatus === "Assinados" &&
-        c.status !== "active" &&
-        c.status !== "signed"
-      )
-        return false;
-      if (
-        contratosStatus === "Encerrados" &&
-        c.status !== "completed" &&
-        c.status !== "cancelled" &&
-        c.status !== "closed"
+        contratosStatus !== "Todos" &&
+        situacaoAssinatura(c).grupo !== contratosStatus
       )
         return false;
       return (
@@ -542,7 +593,17 @@ const DashboardLocador = () => {
   }, [machines]);
 
   const renderRentalCard = (r: any) => {
-    const badge = getStatusBadge(r.status);
+    const situacao = situacaoAssinatura(r);
+    // Enquanto falta o aceite do locador, o estado da assinatura é a informação
+    // relevante: `active` já aparece assim que só o locatário assinou, e o
+    // rótulo "Em Operação" esconderia que o contrato ainda depende dele.
+    const badge = situacao.podeAssinar
+      ? {
+          icon: "edit_document",
+          classes: "bg-error/10 text-error border border-error/20",
+          label: "Aguardando sua assinatura",
+        }
+      : getStatusBadge(r.status);
     return (
       <div
         key={r.id}
@@ -589,6 +650,17 @@ const DashboardLocador = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Atalho para o aceite: é aqui que o locador vê a reserva chegar,
+                então o contrato pode ser assinado sem passar pela aba Contratos. */}
+            {situacao.podeAssinar ? (
+              <button
+                type="button"
+                onClick={() => setContratoParaAssinar(r.id)}
+                className="px-4 bg-gradient-to-r from-primary to-primary-container text-on-primary py-2 rounded-lg font-bold text-xs hover:shadow-lg transition-all flex items-center gap-1"
+              >
+                <MaterialIcon icon="draw" size={14} /> Assinar Contrato
+              </button>
+            ) : null}
             {r.status === "pending" ? (
               <button className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors">
                 Recusar
@@ -873,6 +945,21 @@ const DashboardLocador = () => {
         </header>
 
         <div className="p-8 max-w-[1200px]">
+          {/* Aceite eletrônico do locador. O `key` remonta o modal a cada
+              contrato, para o formulário nunca herdar o estado do anterior. */}
+          {contratoParaAssinar ? (
+            <AssinaturaContratoModal
+              key={contratoParaAssinar}
+              open
+              onOpenChange={(aberto) => {
+                if (!aberto) setContratoParaAssinar(null);
+              }}
+              contratoId={contratoParaAssinar}
+              papel="locador"
+              onAssinado={carregarLocacoes}
+            />
+          ) : null}
+
           <EditEquipamentoModal
             open={isEditEquipamentoOpen}
             onOpenChange={setIsEditEquipamentoOpen}
@@ -887,6 +974,7 @@ const DashboardLocador = () => {
                     ? Number(data.anoFabricacao)
                     : undefined,
                   usage_purpose: data.finalidade,
+                  technical_specifications: data.especificacoes.trim(),
                 });
                 setSelectedEquipamento(data);
                 setMachines((prev) =>
@@ -901,6 +989,7 @@ const DashboardLocador = () => {
                             ? Number(data.anoFabricacao)
                             : m.year,
                           purpose: data.finalidade,
+                          specifications: data.especificacoes,
                         }
                       : m,
                   ),
@@ -1781,7 +1870,9 @@ const DashboardLocador = () => {
                   </button>
                 ))}
               </div>
-              {paginatedContracts.map((c) => (
+              {paginatedContracts.map((c) => {
+                const situacao = situacaoAssinatura(c);
+                return (
                 <div
                   key={c.id}
                   className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
@@ -1807,28 +1898,34 @@ const DashboardLocador = () => {
                     </div>
                     <span
                       className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
-                        c.status === "pending"
-                          ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
-                          : c.status === "active" || c.status === "signed"
+                        situacao.encerrado
+                          ? "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
+                          : situacao.completo
                             ? "bg-primary/10 text-primary border border-primary/20"
-                            : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
+                            : situacao.podeAssinar
+                              ? "bg-error/10 text-error border border-error/20"
+                              : "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
                       }`}
                     >
                       <MaterialIcon
                         icon={
-                          c.status === "pending"
-                            ? "description"
-                            : (c.status === "active" || c.status === "signed")
+                          situacao.encerrado
+                            ? "check_circle"
+                            : situacao.completo
                               ? "verified"
-                              : "check_circle"
+                              : situacao.podeAssinar
+                                ? "edit_document"
+                                : "hourglass_bottom"
                         }
                         size={14}
                       />
-                      {c.status === "pending"
-                        ? "Assinatura Pendente"
-                        : (c.status === "active" || c.status === "signed")
+                      {situacao.encerrado
+                        ? "Encerrado"
+                        : situacao.completo
                           ? "Assinado"
-                          : "Encerrado"}
+                          : situacao.podeAssinar
+                            ? "Aguardando sua assinatura"
+                            : "Aguardando o locatário"}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
@@ -1865,8 +1962,24 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
+                  <div className="flex gap-3 flex-wrap">
+                    {situacao.podeAssinar ? (
+                      <button
+                        type="button"
+                        onClick={() => setContratoParaAssinar(c.id)}
+                        className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2"
+                      >
+                        <MaterialIcon icon="draw" size={16} /> Assinar Contrato
+                      </button>
+                    ) : null}
+                    <Link
+                      to={`/contrato/${c.id}`}
+                      className={`px-5 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 text-center decoration-transparent ${
+                        situacao.podeAssinar
+                          ? "bg-surface-container-high text-on-surface-variant hover:bg-outline-variant/30"
+                          : "bg-gradient-to-r from-primary to-primary-container text-on-primary hover:shadow-lg"
+                      }`}
+                    >
                       <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                     </Link>
                     <button className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
@@ -1874,7 +1987,8 @@ const DashboardLocador = () => {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {filteredContracts.length === 0 ? (
                 <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-10 text-center text-on-surface-variant text-sm">
                   Nenhum contrato encontrado.
@@ -2443,19 +2557,23 @@ const DashboardLocador = () => {
                         CEP
                       </label>
                       <input
+                        ref={cepRef}
                         type="text"
                         placeholder="00000-000"
                         value={formCep}
+                        onBlur={handleCepBlur}
                         onChange={async (e) => {
                           const masked = maskCEP(e.target.value);
                           setFormCep(masked);
+                          cepRef.current?.setCustomValidity("");
                           const digits = masked.replace(/\D/g, "");
                           if (digits.length === 8) {
                             try {
                               const data = await fetchAddressByCEP(digits);
                               if (data) {
-                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
-                                setFormAddress(newAddress);
+                                setFormAddress(formatAddressFromCEP(data, "logradouro"));
+                                setFormCity(data.localidade);
+                                setFormState(data.uf.toUpperCase());
                               } else {
                                 toast.error("CEP não encontrado.");
                               }
@@ -2478,6 +2596,39 @@ const DashboardLocador = () => {
                         className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
                         required
                       />
+                    </div>
+                    {/* Município e UF em campo próprio: é este par que o
+                        contrato usa como foro, e deixá-lo só no texto do
+                        endereço obrigava a adivinhá-lo por regex. */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                          Cidade
+                        </label>
+                        <input
+                          type="text"
+                          value={formCity}
+                          onChange={(e) => setFormCity(e.target.value)}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                          Estado
+                        </label>
+                        <select
+                          value={formState}
+                          onChange={(e) => setFormState(e.target.value)}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        >
+                          <option value="">—</option>
+                          {UFS.map((uf) => (
+                            <option key={uf} value={uf}>
+                              {uf}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <button
                       type="submit"

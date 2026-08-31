@@ -1,12 +1,14 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
+import MapaLocalizacao from "@/components/MapaLocalizacao";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { postingService } from "@/services/PostingService/PostingService";
+import { coordenadasDoAnuncio, postingService } from "@/services/PostingService/PostingService";
+import type { Coordenadas } from "@/services/GeocodingService";
 import { toast } from "sonner";
 import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +27,17 @@ const GerenciarAnuncio = () => {
   const [posting, setPosting] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState("active");
+  const [hourlyRate, setHourlyRate] = useState("");
   const [cep, setCep] = useState("");
   const [location, setLocation] = useState("");
+  const [availabilityStart, setAvailabilityStart] = useState("");
+  const [availabilityEnd, setAvailabilityEnd] = useState("");
+  const [maxReservationDays, setMaxReservationDays] = useState("");
+  const [description, setDescription] = useState("");
+  // Coordenadas já gravadas: poupam o mapa de geocodificar o mesmo endereço.
+  const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -34,7 +45,23 @@ const GerenciarAnuncio = () => {
       .getById(id)
       .then((data) => {
         setPosting(data);
+        setStatus(data.status || "active");
+        setHourlyRate(data.hourly_rate ?? "");
         setLocation(data.location_address || "");
+        // A API guarda só os dígitos; a máscara é aplicada na exibição.
+        setCep(maskCEP(data.location_cep || ""));
+        // As datas chegam como ISO completo; o input só aceita a parte da data.
+        setAvailabilityStart(data.availability_start?.split("T")[0] || "");
+        setAvailabilityEnd(data.availability_end?.split("T")[0] || "");
+        setMaxReservationDays(data.max_reservation_days?.toString() || "");
+        setDescription(data.description || "");
+        if (data.location_lat != null && data.location_lng != null) {
+          setCoordenadas({
+            lat: Number(data.location_lat),
+            lon: Number(data.location_lng),
+            nomeExibicao: data.location_address || "",
+          });
+        }
       })
       .catch(() => {
         toast.error("Não foi possível carregar o anúncio.");
@@ -45,41 +72,99 @@ const GerenciarAnuncio = () => {
       });
   }, [id, navigate]);
 
+  const hoje = new Date().toISOString().split("T")[0];
+  const inicioGravado: string = posting?.availability_start?.split("T")[0] ?? "";
+  const fimGravado: string = posting?.availability_end?.split("T")[0] ?? "";
+
+  /**
+   * Data mínima aceita para um campo de disponibilidade.
+   *
+   * Em regra é hoje, como no Novo Anúncio. A exceção é a data que já estava
+   * gravada: a maioria dos anúncios existentes tem período vencido, e exigir
+   * data futura trancaria a edição deles — nem pausar o anúncio seria possível.
+   */
+  const piso = (gravada: string) => (gravada && gravada < hoje ? gravada : hoje);
+  const minFim = availabilityStart > piso(fimGravado) ? availabilityStart : piso(fimGravado);
+
+  const validateField = (fieldName: string, value: string) => {
+    let errorMsg = "";
+    switch (fieldName) {
+      case "hourlyRate": {
+        const rate = Number(value.replace(",", "."));
+        if (!value) {
+          errorMsg = "Valor por hora é obrigatório.";
+        } else if (Number.isNaN(rate) || rate <= 0) {
+          errorMsg = "Informe um valor por hora maior que zero.";
+        }
+        break;
+      }
+      case "cep": {
+        // CEP é opcional, mas pela metade a API recusa a atualização inteira.
+        const digits = value.replace(/\D/g, "");
+        if (digits.length > 0 && digits.length !== 8) {
+          errorMsg = "CEP deve ter exatamente 8 dígitos.";
+        }
+        break;
+      }
+      case "location":
+        if (!value.trim()) errorMsg = "Informe a localização.";
+        break;
+      case "availabilityStart":
+        if (value && value < piso(inicioGravado)) {
+          errorMsg = "A data de início não pode ser no passado.";
+        }
+        break;
+      case "availabilityEnd":
+        if (value) {
+          if (value < piso(fimGravado)) {
+            errorMsg = "A data final não pode ser no passado.";
+          } else if (availabilityStart && value < availabilityStart) {
+            errorMsg = "A data final deve ser igual ou posterior à data de início.";
+          }
+        }
+        break;
+      case "maxReservationDays":
+        if (value && (!Number.isInteger(Number(value)) || Number(value) < 1)) {
+          errorMsg = "Informe um número inteiro de pelo menos 1 dia.";
+        }
+        break;
+    }
+    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
+    return errorMsg;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || !id) return;
-    setIsSubmitting(true);
 
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const hourlyRaw = String(formData.get("hourly_rate") ?? "").trim();
-    const location = String(formData.get("location_address") ?? "").trim();
-    const availabilityStart = String(
-      formData.get("availability_start") ?? ""
-    ).trim();
-    const availabilityEnd = String(
-      formData.get("availability_end") ?? ""
-    ).trim();
-    const description = String(formData.get("description") ?? "").trim();
-    const status = String(formData.get("status") ?? "").trim();
+    const errorsList = {
+      hourlyRate: validateField("hourlyRate", hourlyRate),
+      cep: validateField("cep", cep),
+      location: validateField("location", location),
+      availabilityStart: validateField("availabilityStart", availabilityStart),
+      availabilityEnd: validateField("availabilityEnd", availabilityEnd),
+      maxReservationDays: validateField("maxReservationDays", maxReservationDays),
+    };
 
-    const hourlyRate = Number(hourlyRaw.replace(",", "."));
-    if (!hourlyRaw || Number.isNaN(hourlyRate) || hourlyRate <= 0) {
-      toast.error("Informe um valor por hora válido.");
-      setIsSubmitting(false);
+    if (Object.values(errorsList).some((err) => err !== "")) {
+      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await postingService.update(id, {
-        hourly_rate: hourlyRate,
+        hourly_rate: Number(hourlyRate.replace(",", ".")),
+        location_cep: cep || undefined,
         location_address: location,
+        ...coordenadasDoAnuncio(coordenadas),
         availability_start: availabilityStart
-          ? `${availabilityStart}T00:00:00`
+          ? `${availabilityStart}T00:00:00Z`
           : undefined,
         availability_end: availabilityEnd
-          ? `${availabilityEnd}T23:59:59`
+          ? `${availabilityEnd}T23:59:59Z`
           : undefined,
+        max_reservation_days: maxReservationDays ? Number(maxReservationDays) : null,
         description: description || undefined,
         status: status || undefined,
       });
@@ -118,10 +203,12 @@ const GerenciarAnuncio = () => {
 
   const getMachineName = () => {
     if (!posting) return "";
-    if (posting.machinery_details) {
-      return `${posting.machinery_details.brand} ${posting.machinery_details.model}`;
-    }
-    return posting.machinery;
+    // A API devolve machine_brand/machine_model (PostingDetailSerializer);
+    // não existe machinery_details, e o subtítulo saía vazio.
+    return (
+      [posting.machine_brand, posting.machine_model].filter(Boolean).join(" ") ||
+      "Maquinário"
+    );
   };
 
   return (
@@ -151,6 +238,7 @@ const GerenciarAnuncio = () => {
             <form
               className="space-y-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-8 shadow-sm"
               onSubmit={handleSubmit}
+              noValidate
             >
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -158,8 +246,9 @@ const GerenciarAnuncio = () => {
                 </label>
                 <select
                   name="status"
-                  defaultValue={posting.status || "active"}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-surface-container border border-transparent rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none text-on-surface transition-shadow"
                 >
                   <option value="active">Ativo (Visível para busca)</option>
                   <option value="inactive">Pausado (Oculto)</option>
@@ -175,10 +264,18 @@ const GerenciarAnuncio = () => {
                   type="number"
                   min={0}
                   step="0.01"
-                  defaultValue={posting.hourly_rate}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  value={hourlyRate}
+                  onChange={(e) => {
+                    setHourlyRate(e.target.value);
+                    if (errors.hourlyRate) validateField("hourlyRate", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("hourlyRate", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.hourlyRate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                 />
+                {errors.hourlyRate && (
+                  <p className="text-[11px] text-error font-medium mt-1">{errors.hourlyRate}</p>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -193,12 +290,15 @@ const GerenciarAnuncio = () => {
                     onChange={async (e) => {
                       const masked = maskCEP(e.target.value);
                       setCep(masked);
+                      setCoordenadas(null);
+                      if (errors.cep) validateField("cep", masked);
                       const digits = masked.replace(/\D/g, "");
                       if (digits.length === 8) {
                         try {
                           const data = await fetchAddressByCEP(digits);
                           if (data) {
-                            setLocation(`${data.localidade}, ${data.uf}`);
+                            setLocation(formatAddressFromCEP(data, "municipio"));
+                            if (errors.location) setErrors((prev) => ({ ...prev, location: "" }));
                           } else {
                             toast.error("CEP não encontrado.");
                           }
@@ -207,8 +307,12 @@ const GerenciarAnuncio = () => {
                         }
                       }
                     }}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onBlur={(e) => validateField("cep", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cep ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   />
+                  {errors.cep && (
+                    <p className="text-[11px] text-error font-medium mt-1">{errors.cep}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -219,12 +323,27 @@ const GerenciarAnuncio = () => {
                     name="location_address"
                     type="text"
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    onChange={(e) => {
+                      setLocation(e.target.value);
+                      setCoordenadas(null);
+                      if (errors.location) validateField("location", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("location", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.location ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                     required
                   />
+                  {errors.location && (
+                    <p className="text-[11px] text-error font-medium mt-1">{errors.location}</p>
+                  )}
                 </div>
               </div>
+
+              <MapaLocalizacao
+                endereco={location}
+                cep={cep}
+                coordenadas={coordenadas}
+                onCoordenadas={setCoordenadas}
+              />
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
@@ -234,13 +353,21 @@ const GerenciarAnuncio = () => {
                   <input
                     name="availability_start"
                     type="date"
-                    defaultValue={
-                      posting.availability_start
-                        ? posting.availability_start.split("T")[0]
-                        : ""
-                    }
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    min={piso(inicioGravado)}
+                    value={availabilityStart}
+                    onChange={(e) => {
+                      setAvailabilityStart(e.target.value);
+                      if (errors.availabilityStart)
+                        validateField("availabilityStart", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("availabilityStart", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.availabilityStart ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   />
+                  {errors.availabilityStart && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.availabilityStart}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -249,14 +376,44 @@ const GerenciarAnuncio = () => {
                   <input
                     name="availability_end"
                     type="date"
-                    defaultValue={
-                      posting.availability_end
-                        ? posting.availability_end.split("T")[0]
-                        : ""
-                    }
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    min={minFim}
+                    value={availabilityEnd}
+                    onChange={(e) => {
+                      setAvailabilityEnd(e.target.value);
+                      if (errors.availabilityEnd)
+                        validateField("availabilityEnd", e.target.value);
+                    }}
+                    onBlur={(e) => validateField("availabilityEnd", e.target.value)}
+                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.availabilityEnd ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   />
+                  {errors.availabilityEnd && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.availabilityEnd}
+                    </p>
+                  )}
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  Máximo de dias por reserva
+                </label>
+                <input
+                  name="max_reservation_days"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="Sem limite"
+                  value={maxReservationDays}
+                  onChange={(e) => {
+                    setMaxReservationDays(e.target.value);
+                    if (errors.maxReservationDays) validateField("maxReservationDays", e.target.value);
+                  }}
+                  onBlur={(e) => validateField("maxReservationDays", e.target.value)}
+                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.maxReservationDays ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                />
+                <p className="text-[11px] text-outline">Opcional. Deixe vazio para não limitar a duração das reservas.</p>
+                {errors.maxReservationDays && <p className="text-[11px] text-error font-medium mt-1">{errors.maxReservationDays}</p>}
               </div>
 
               <div className="space-y-2">
@@ -266,7 +423,8 @@ const GerenciarAnuncio = () => {
                 <textarea
                   name="description"
                   rows={4}
-                  defaultValue={posting.description}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                 />
               </div>

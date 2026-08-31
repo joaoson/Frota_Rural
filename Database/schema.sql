@@ -17,6 +17,8 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     phone VARCHAR(20),
     role role_type NOT NULL,
+    city VARCHAR(100),
+    state VARCHAR(2),
     status VARCHAR(50) DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -57,6 +59,7 @@ CREATE TABLE postings (
     hourly_rate DECIMAL(10, 2) NOT NULL,
     location_lat DECIMAL(10, 8),
     location_lng DECIMAL(11, 8),
+    location_cep VARCHAR(8),
     location_address TEXT,
     availability_start TIMESTAMP WITH TIME ZONE,
     availability_end TIMESTAMP WITH TIME ZONE,
@@ -64,6 +67,16 @@ CREATE TABLE postings (
     status ad_status DEFAULT 'active',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Moderação de anúncios (RF17): histórico de aprovações e reprovações.
+CREATE TABLE posting_moderations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    posting_id UUID NOT NULL REFERENCES postings(id) ON DELETE CASCADE,
+    moderator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(20) NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Postings Photos

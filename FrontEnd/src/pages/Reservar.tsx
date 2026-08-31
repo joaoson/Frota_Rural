@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -7,13 +7,14 @@ import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { contractService } from "@/services/ContractService/ContractService";
-import type { SignatureEvidenceRecord } from "@/services/ContractService/ContractService";
+import type { Rental, SignatureEvidenceRecord } from "@/services/ContractService/ContractService";
 import type { ContratoData } from "@/pages/Contrato/types";
 
 
 const HORAS_POR_DIARIA = 8;
 // Taxa cobrada pela plataforma (5%)
 const TAXA_PLATAFORMA = 0.05;
+const STATUS_RESERVA_ATIVA = new Set<Rental["status"]>(["pending", "active", "signed"]);
 
 
 interface PostingReservaAPI {
@@ -24,6 +25,7 @@ interface PostingReservaAPI {
   machine_model: string | null;
   machine_usage_purpose: string | null;
   machine_renagro_number: string | null;
+  max_reservation_days: number | null;
 }
 
 type Etapa = 1 | 2 | 3;
@@ -55,6 +57,168 @@ function calcularDiarias(inicio: string, fim: string): number {
   const ms = dataFim.getTime() - dataInicio.getTime();
   if (Number.isNaN(ms) || ms < 0) return 0;
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
+}
+
+function dataLocal(iso: string): Date {
+  const [ano, mes, dia] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function isoData(data: Date): string {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function adicionarDias(iso: string, dias: number): string {
+  const data = dataLocal(iso);
+  data.setDate(data.getDate() + dias);
+  return isoData(data);
+}
+
+function CalendarioDisponibilidade({
+  datasBloqueadas,
+  dataInicio,
+  dataFim,
+  minStartDate,
+  maxReservationDays,
+  onSelecionarData,
+  onLimparInicio,
+  onLimparFim,
+}: {
+  datasBloqueadas: Set<string>;
+  dataInicio: string;
+  dataFim: string;
+  minStartDate: string;
+  maxReservationDays: number | null;
+  onSelecionarData: (data: string) => void;
+  onLimparInicio: () => void;
+  onLimparFim: () => void;
+}) {
+  const [mesInicial, setMesInicial] = useState(() => {
+    const hoje = new Date();
+    return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  });
+  const meses = [0, 1].map((deslocamento) => new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1));
+  const podeVoltar = mesInicial > new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const moverMeses = (deslocamento: number) => {
+    const proximo = new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1);
+    const mesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    if (proximo >= mesAtual) setMesInicial(proximo);
+  };
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+      <div className="border-b border-outline-variant/20 p-4 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-2xl font-black text-tertiary">
+              {dataInicio && dataFim ? `${calcularDiarias(dataInicio, dataFim)} diárias` : "Escolha o período"}
+            </p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {dataInicio ? formatarData(dataInicio) : "Check-in"} – {dataFim ? formatarData(dataFim) : "Check-out"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-low">
+            {[
+              { titulo: "CHECK-IN", data: dataInicio, limpar: onLimparInicio, ativo: !dataInicio || Boolean(dataInicio && !dataFim) },
+              { titulo: "CHECK-OUT", data: dataFim, limpar: onLimparFim, ativo: Boolean(dataInicio && dataFim) },
+            ].map(({ titulo, data, limpar, ativo }) => (
+              <div key={titulo} className={`min-w-36 border-r border-outline-variant/40 p-3 last:border-r-0 ${ativo ? "bg-surface-container-lowest ring-2 ring-inset ring-tertiary" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black tracking-wide text-tertiary">{titulo}</span>
+                  {data && (
+                    <button type="button" onClick={limpar} aria-label={`Limpar ${titulo.toLowerCase()}`} className="text-outline hover:text-tertiary">
+                      <MaterialIcon icon="close" size={17} />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-sm font-bold text-tertiary">{data ? formatarData(data) : "Selecionar"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-4 flex items-center gap-2 text-xs text-on-surface-variant">
+          <MaterialIcon icon="info" size={15} className="text-primary" />
+          Datas riscadas estão indisponíveis. Reservas incluem um dia antes e depois para limpeza e preparação.
+        </p>
+        {maxReservationDays && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-bold text-primary">
+            <MaterialIcon icon="event" size={15} /> Máximo de {maxReservationDays} dias por reserva.
+          </p>
+        )}
+      </div>
+      <div className="p-4 sm:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <button type="button" onClick={() => moverMeses(-1)} disabled={!podeVoltar} aria-label="Mês anterior" className="rounded-full p-2 text-tertiary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-25">
+            <MaterialIcon icon="chevron_left" size={25} />
+          </button>
+          <button type="button" onClick={() => moverMeses(1)} aria-label="Próximo mês" className="rounded-full p-2 text-tertiary hover:bg-surface-container">
+            <MaterialIcon icon="chevron_right" size={25} />
+          </button>
+        </div>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
+        {meses.map((mes) => {
+          const primeiroDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+          const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+          const espacos = Array.from({ length: primeiroDia.getDay() });
+          return (
+            <div key={isoData(mes)}>
+              <p className="mb-5 text-center text-lg font-black capitalize text-tertiary">
+                {mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </p>
+              <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-outline">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((dia, indice) => <span key={`${dia}-${indice}`}>{dia}</span>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {espacos.map((_, indice) => <span key={`vazio-${indice}`} />)}
+                {Array.from({ length: totalDias }, (_, indice) => {
+                  const data = new Date(mes.getFullYear(), mes.getMonth(), indice + 1);
+                  const iso = isoData(data);
+                  const bloqueada = datasBloqueadas.has(iso);
+                  const antesDoPrazo = iso < minStartDate;
+                  const selecionada = iso === dataInicio || iso === dataFim;
+                  const noIntervalo = Boolean(dataInicio && dataFim && iso > dataInicio && iso < dataFim);
+                  const excedeMaximo = Boolean(
+                    dataInicio && !dataFim && iso >= dataInicio && maxReservationDays && calcularDiarias(dataInicio, iso) > maxReservationDays,
+                  );
+                  const indisponivel = bloqueada || antesDoPrazo || excedeMaximo;
+                  return (
+                    <button
+                      type="button"
+                      key={iso}
+                      disabled={indisponivel}
+                      title={bloqueada ? "Indisponível: reserva ou limpeza" : antesDoPrazo ? "Data não disponível" : excedeMaximo ? `Máximo de ${maxReservationDays} dias por reserva` : "Selecionar data"}
+                      onClick={() => onSelecionarData(iso)}
+                      className={`flex aspect-square items-center justify-center rounded-full text-sm font-bold transition ${
+                        selecionada
+                          ? "bg-tertiary text-on-primary shadow-sm"
+                          : noIntervalo
+                            ? "rounded-none bg-primary/10 text-tertiary"
+                            : indisponivel
+                              ? "cursor-not-allowed text-outline/50 line-through"
+                              : "text-tertiary hover:bg-primary/10 hover:text-primary"
+                      }`}
+                    >
+                      {indice + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+      <div className="flex justify-end border-t border-outline-variant/20 px-4 py-4 sm:px-6">
+        <button type="button" onClick={() => { onLimparInicio(); onLimparFim(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-tertiary hover:bg-surface-container">
+          Limpar datas
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Stepper({ etapaAtual }: { etapaAtual: Etapa }) {
@@ -211,11 +375,14 @@ function formatarUtcCompleto(iso: string): string {
 
 const Reservar = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { userId } = useAuth();
   const [createdRental, setCreatedRental] = useState<any>(null);
 
   const [anuncio, setAnuncio] = useState<PostingReservaAPI | null>(null);
+  const [reservasExistentes, setReservasExistentes] = useState<Rental[]>([]);
+  const [carregandoDisponibilidade, setCarregandoDisponibilidade] = useState(true);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -225,6 +392,12 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+
+  useEffect(() => {
+    const requestedStart = searchParams.get("inicio");
+    if (requestedStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedStart)) setDataInicio(requestedStart);
+    if (searchParams.get("extensao") === "1") setObservacoes("Solicitação de extensão da locação anterior.");
+  }, [searchParams]);
 
   const minStartDate = useMemo(() => {
     const d = new Date();
@@ -264,8 +437,22 @@ const Reservar = () => {
       });
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    setCarregandoDisponibilidade(true);
+    contractService
+      .listByPosting(id)
+      .then((reservas) => setReservasExistentes(reservas.filter((reserva) => STATUS_RESERVA_ATIVA.has(reserva.status))))
+      .catch((erro: unknown) => {
+        console.error("Erro ao carregar disponibilidade:", erro);
+        toast.error("Não foi possível carregar as datas indisponíveis.");
+      })
+      .finally(() => setCarregandoDisponibilidade(false));
+  }, [id]);
+
   const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Maquinário";
   const valorDiaria = anuncio ? parseFloat(anuncio.hourly_rate) * HORAS_POR_DIARIA : 0;
+  const maxReservationDays = anuncio?.max_reservation_days ?? null;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
     const dias = calcularDiarias(dataInicio, dataFim);
@@ -273,6 +460,43 @@ const Reservar = () => {
     const tax = sub * TAXA_PLATAFORMA;
     return { diarias: dias, subtotal: sub, taxa: tax, total: sub + tax };
   }, [dataInicio, dataFim, valorDiaria]);
+
+  const datasBloqueadas = useMemo(() => {
+    const bloqueadas = new Set<string>();
+    reservasExistentes.forEach((reserva) => {
+      const inicio = adicionarDias(reserva.startDate, -1);
+      const fim = adicionarDias(reserva.endDate, 1);
+      for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+        bloqueadas.add(isoData(data));
+      }
+    });
+    return bloqueadas;
+  }, [reservasExistentes]);
+
+  const periodoEstaBloqueado = (inicio: string, fim: string) => {
+    if (!inicio || !fim) return false;
+    for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+      if (datasBloqueadas.has(isoData(data))) return true;
+    }
+    return false;
+  };
+
+  const selecionarData = (data: string) => {
+    if (!dataInicio || dataFim) {
+      setDataInicio(data);
+      setDataFim("");
+      return;
+    }
+    if (data < dataInicio) {
+      setDataInicio(data);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, data)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
+      return;
+    }
+    setDataFim(data);
+  };
 
   const numeroContrato = `#CTR-${(id ?? "0000").slice(0, 4).toUpperCase()}`;
   const periodoTexto =
@@ -289,6 +513,14 @@ const Reservar = () => {
     }
     if (diarias <= 0) {
       toast.error("A data de fim deve ser igual ou posterior à data de início.");
+      return;
+    }
+    if (maxReservationDays && diarias > maxReservationDays) {
+      toast.error(`Este anúncio permite reservas de no máximo ${maxReservationDays} dias.`);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, dataFim)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
       return;
     }
     setEtapa(2);
@@ -488,32 +720,20 @@ const Reservar = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                        Data Início <span className="text-error">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={dataInicio}
-                        min={minStartDate}
-                        onChange={(e) => setDataInicio(e.target.value)}
-                        className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                        Data Fim <span className="text-error">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={dataFim}
-                        min={dataInicio || undefined}
-                        onChange={(e) => setDataFim(e.target.value)}
-                        className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                      />
-                    </div>
-                  </div>
+                  {carregandoDisponibilidade ? (
+                    <div className="mb-5 text-xs text-on-surface-variant">Carregando disponibilidade...</div>
+                  ) : (
+                    <CalendarioDisponibilidade
+                      datasBloqueadas={datasBloqueadas}
+                      dataInicio={dataInicio}
+                      dataFim={dataFim}
+                      minStartDate={minStartDate}
+                      maxReservationDays={maxReservationDays}
+                      onSelecionarData={selecionarData}
+                      onLimparInicio={() => { setDataInicio(""); setDataFim(""); }}
+                      onLimparFim={() => setDataFim("")}
+                    />
+                  )}
 
                   <div className="mb-7">
                     <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">

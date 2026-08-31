@@ -13,6 +13,10 @@ export interface Rental {
   total: string;
   contractNumber: string;
   status: "pending" | "active" | "completed" | "cancelled" | "signed" | "closed";
+  /** Estado do aceite de cada parte — `status` sozinho não distingue quem assinou. */
+  acceptedByLessor: boolean;
+  acceptedByLessee: boolean;
+  contractStatus: string | null;
   image?: string;
   observacoes?: string;
   hoursUsed?: number;
@@ -56,6 +60,22 @@ export interface ContractEvidence {
   fundamento_legal: string;
 }
 
+/** Campos do aceite que a API devolve junto de qualquer leitura de aluguel. */
+interface RentalSignatureFields {
+  accepted_by_lessor?: boolean | null;
+  accepted_by_lessee?: boolean | null;
+  contract_status?: string | null;
+}
+
+/** Normaliza o estado do aceite, comum a todas as leituras de aluguel. */
+function estadoAssinatura(r: RentalSignatureFields) {
+  return {
+    acceptedByLessor: Boolean(r.accepted_by_lessor),
+    acceptedByLessee: Boolean(r.accepted_by_lessee),
+    contractStatus: r.contract_status ?? null,
+  };
+}
+
 class ContractService {
   async createRental(payload: {
     postingId: string;
@@ -88,6 +108,7 @@ class ContractService {
       total: payload.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     };
   }
 
@@ -107,6 +128,7 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     }));
   }
 
@@ -126,6 +148,27 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
+    }));
+  }
+
+  async listByPosting(postingId: string): Promise<Rental[]> {
+    const response = await AxiosInstance.get<any[]>("rentals/", {
+      params: { postings: postingId },
+    });
+    return response.data.map(r => ({
+      id: r.id,
+      postingId: r.postings,
+      lesseeId: r.lessee,
+      lessorId: "lessor-default",
+      machineName: `${r.machine_brand || ""} ${r.machine_model || ""}`.trim() || "Maquinário",
+      period: `${r.start_date.split("T")[0]} a ${r.end_date.split("T")[0]}`,
+      startDate: r.start_date.split("T")[0],
+      endDate: r.end_date.split("T")[0],
+      total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+      contractNumber: r.contract_number,
+      status: r.status,
+      ...estadoAssinatura(r),
     }));
   }
 
@@ -144,6 +187,7 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     };
   }
 

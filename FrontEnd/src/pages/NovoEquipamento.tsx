@@ -39,7 +39,6 @@ const NovoEquipamento = () => {
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [usagePurpose, setUsagePurpose] = useState("Plantio");
-  const [initialHorimeter, setInitialHorimeter] = useState("");
   const [technicalSpecifications, setTechnicalSpecifications] = useState("");
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -61,10 +60,10 @@ const NovoEquipamento = () => {
         }
         break;
       }
+      // Recebe a marca efetiva (rótulo do select ou o texto de "Outra"),
+      // para a regra ser a mesma do modal de edição.
       case "brand":
-        if (selectedBrand === "outra" && !value.trim()) {
-          errorMsg = "Marca é obrigatória.";
-        }
+        if (!value.trim()) errorMsg = "Marca é obrigatória.";
         break;
       case "model":
         if (!value.trim()) errorMsg = "Modelo é obrigatório.";
@@ -75,15 +74,6 @@ const NovoEquipamento = () => {
           const currentYear = new Date().getFullYear();
           if (Number.isNaN(y) || y < 1980 || y > currentYear + 1) {
             errorMsg = `O ano deve ser entre 1980 e ${currentYear + 1}.`;
-          }
-        }
-        break;
-      }
-      case "initialHorimeter": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro inicial deve ser um valor positivo.";
           }
         }
         break;
@@ -101,10 +91,9 @@ const NovoEquipamento = () => {
 
     const errorsList = {
       renagroNumber: validateField("renagroNumber", renagroNumber),
-      brand: validateField("brand", otherBrand),
+      brand: validateField("brand", brandToSend),
       model: validateField("model", model),
       year: validateField("year", year),
-      initialHorimeter: validateField("initialHorimeter", initialHorimeter),
     };
 
     if (Object.values(errorsList).some((err) => err !== "")) {
@@ -136,7 +125,6 @@ const NovoEquipamento = () => {
       setModel("");
       setYear("");
       setUsagePurpose("Plantio");
-      setInitialHorimeter("");
       setTechnicalSpecifications("");
       setErrors({});
     } catch (error) {
@@ -304,24 +292,6 @@ const NovoEquipamento = () => {
                 <option>Preparo de Solo</option>
               </select>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline flex items-center gap-1">
-              <MaterialIcon icon="speed" size={14} /> Horím. Inicial
-            </label>
-            <input
-              type="number"
-              placeholder="1250 h"
-              value={initialHorimeter}
-              onChange={(e) => {
-                setInitialHorimeter(e.target.value);
-                if (errors.initialHorimeter) validateField("initialHorimeter", e.target.value);
-              }}
-              onBlur={(e) => validateField("initialHorimeter", e.target.value)}
-              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.initialHorimeter ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-            />
-            {errors.initialHorimeter && <p className="text-[11px] text-error font-medium mt-1">{errors.initialHorimeter}</p>}
           </div>
 
           <div className="space-y-2">

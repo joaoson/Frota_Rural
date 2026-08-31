@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
@@ -19,6 +20,14 @@ def _sorted_photos(posting):
     return sorted(photos, key=lambda p: (not p.is_primary, p.created_at or _EPOCH))
 
 class PostingSerializer(serializers.ModelSerializer):
+    # Declarado à mão porque o modelo guarda 8 dígitos, mas o formulário envia
+    # com máscara ("80010-010", 9 caracteres). Sem isto, o `max_length` do
+    # modelo recusaria o valor mascarado antes da normalização abaixo.
+    location_cep = serializers.CharField(
+        max_length=9, required=False, allow_blank=True, allow_null=True
+    )
+    max_reservation_days = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
     class Meta:
         model = Postings
         fields = [
@@ -27,15 +36,30 @@ class PostingSerializer(serializers.ModelSerializer):
             "hourly_rate",
             "location_lat",
             "location_lng",
+            "location_cep",
             "location_address",
             "availability_start",
             "availability_end",
+            "max_reservation_days",
             "description",
             "status",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_location_cep(self, value):
+        """Normaliza o CEP para 8 dígitos.
+
+        O formulário envia com máscara ("80000-000"); guardar só os dígitos
+        evita que o mesmo CEP fique gravado de duas formas e quebre a busca.
+        """
+        if value in (None, ""):
+            return None
+        digits = re.sub(r"\D", "", value)
+        if len(digits) != 8:
+            raise serializers.ValidationError("O CEP deve ter 8 dígitos.")
+        return digits
 
     def create(self, validated_data):
         now = timezone.now()
@@ -69,9 +93,11 @@ class PostingListSerializer(serializers.ModelSerializer):
             "machine_usage_purpose",
             "machine_year",
             "hourly_rate",
+            "location_cep",
             "location_address",
             "availability_start",
             "availability_end",
+            "max_reservation_days",
             "description",
             "status",
             "primary_photo_url",
@@ -96,8 +122,8 @@ class PostingDetailSerializer(serializers.ModelSerializer):
         model = Postings
         fields = [
             "id", "hourly_rate",
-            "location_address", "location_lat", "location_lng",
-            "availability_start", "availability_end",
+            "location_cep", "location_address", "location_lat", "location_lng",
+            "availability_start", "availability_end", "max_reservation_days",
             "description", "status",
             "machine_brand", "machine_model", "machine_year",
             "machine_usage_purpose", "machine_technical_specifications", "machine_renagro_number",

@@ -11,6 +11,7 @@ import NovoAnuncio from "@/pages/NovoAnuncio.tsx";
 import GerenciarAnuncio from "@/pages/GerenciarAnuncio.tsx";
 import DashboardLocador from "@/pages/DashboardLocador.tsx";
 import DashboardLocatario from "@/pages/DashboardLocatario.tsx";
+import AnaliseLocacao from "@/pages/AnaliseLocacao.tsx";
 import AdminLayout from "@/components/AdminLayout.tsx";
 import AdminUsers from "@/pages/Admin/Users.tsx";
 import AdminAnuncios from "@/pages/Admin/Anuncios.tsx";
@@ -53,6 +54,7 @@ createRoot(document.getElementById("root")!).render(
               path="/dashboard-locatario"
               element={<DashboardLocatario />}
             />
+            <Route path="/dashboard-locatario/locacoes/:rentalId" element={<AnaliseLocacao />} />
             <Route element={<ProtectedRoute allowedRoles={["locador", "admin"]} />}>
               <Route
                 path="/dashboard/novo-equipamento"

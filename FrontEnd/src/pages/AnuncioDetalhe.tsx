@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
+import MapaLocalizacao from "@/components/MapaLocalizacao";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { postingService } from "@/services/PostingService/PostingService";
+import { contractService, type Rental } from "@/services/ContractService/ContractService";
 
 const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
 
@@ -15,7 +17,11 @@ interface FotoAPI {
 interface PostingDetalheAPI {
   id: string;
   hourly_rate: string;
+  location_cep: string | null;
   location_address: string | null;
+  /** A API devolve decimais como string; o mapa precisa deles como número. */
+  location_lat: string | null;
+  location_lng: string | null;
   availability_start: string | null;
   availability_end: string | null;
   description: string | null;
@@ -70,6 +76,121 @@ function ordenarFotos(fotos: FotoAPI[]): FotoAPI[] {
   });
 }
 
+function dataLocal(iso: string): Date {
+  const [ano, mes, dia] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function isoData(data: Date): string {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+function adicionarDias(iso: string, dias: number): string {
+  const data = dataLocal(iso);
+  data.setDate(data.getDate() + dias);
+  return isoData(data);
+}
+
+function CalendarioDisponibilidade({
+  reservas,
+  availabilityStart,
+  availabilityEnd,
+}: {
+  reservas: Rental[];
+  availabilityStart: string | null;
+  availabilityEnd: string | null;
+}) {
+  const [mesInicial, setMesInicial] = useState(() => {
+    const hoje = new Date();
+    return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  });
+  const hoje = useMemo(() => isoData(new Date()), []);
+  const bloqueadas = useMemo(() => {
+    const datas = new Set<string>();
+    reservas.forEach((reserva) => {
+      const inicio = adicionarDias(reserva.startDate, -1);
+      const fim = adicionarDias(reserva.endDate, 1);
+      for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+        datas.add(isoData(data));
+      }
+    });
+    return datas;
+  }, [reservas]);
+  const meses = [0, 1].map((deslocamento) => new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1));
+  const mesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+      <div className="border-b border-outline-variant/20 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <MaterialIcon icon="calendar_month" size={20} className="text-primary" />
+          <h2 className="font-headline text-lg font-bold text-tertiary">Disponibilidade</h2>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-on-surface-variant">
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-primary" /> Disponível</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-outline/40" /> Indisponível</span>
+          <span className="text-outline">Inclui intervalo de limpeza antes e depois das reservas.</span>
+        </div>
+      </div>
+      <div className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            aria-label="Mês anterior"
+            disabled={mesInicial <= mesAtual}
+            onClick={() => setMesInicial(new Date(mesInicial.getFullYear(), mesInicial.getMonth() - 1, 1))}
+            className="rounded-full p-1.5 text-tertiary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-25"
+          >
+            <MaterialIcon icon="chevron_left" size={22} />
+          </button>
+          <button
+            type="button"
+            aria-label="Próximo mês"
+            onClick={() => setMesInicial(new Date(mesInicial.getFullYear(), mesInicial.getMonth() + 1, 1))}
+            className="rounded-full p-1.5 text-tertiary hover:bg-surface-container"
+          >
+            <MaterialIcon icon="chevron_right" size={22} />
+          </button>
+        </div>
+        <div className="grid gap-7 sm:grid-cols-2">
+          {meses.map((mes) => {
+            const primeiroDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+            const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+            return (
+              <div key={isoData(mes)}>
+                <p className="mb-3 text-center text-sm font-black capitalize text-tertiary">
+                  {mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                </p>
+                <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-outline">
+                  {["D", "S", "T", "Q", "Q", "S", "S"].map((dia, indice) => <span key={`${dia}-${indice}`}>{dia}</span>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: primeiroDia.getDay() }, (_, indice) => <span key={`vazio-${indice}`} />)}
+                  {Array.from({ length: totalDias }, (_, indice) => {
+                    const iso = isoData(new Date(mes.getFullYear(), mes.getMonth(), indice + 1));
+                    const indisponivel = iso < hoje || bloqueadas.has(iso) || (availabilityStart && iso < availabilityStart.slice(0, 10)) || (availabilityEnd && iso > availabilityEnd.slice(0, 10));
+                    return (
+                      <span
+                        key={iso}
+                        title={indisponivel ? "Indisponível" : "Disponível"}
+                        className={`flex aspect-square items-center justify-center rounded-full text-[11px] font-bold ${
+                          indisponivel ? "text-outline/50 line-through" : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        {indice + 1}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 const AnuncioDetalhe = () => {
   const { id } = useParams<{ id: string }>();
 
@@ -77,6 +198,7 @@ const AnuncioDetalhe = () => {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [fotoSelecionada, setFotoSelecionada] = useState(0);
+  const [reservas, setReservas] = useState<Rental[]>([]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -95,9 +217,29 @@ const AnuncioDetalhe = () => {
       });
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    contractService
+      .listByPosting(id)
+      .then((dados) => setReservas(dados.filter((reserva) => ["pending", "active", "signed"].includes(reserva.status))))
+      .catch((erro: unknown) => console.error("Erro ao carregar disponibilidade:", erro));
+  }, [id]);
+
   const fotos = anuncio ? ordenarFotos(anuncio.photos) : [];
   const urlFotoAtual = fotos[fotoSelecionada]?.url ?? FALLBACK_IMG;
   const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Sem título";
+
+  // Coordenadas gravadas no anúncio dispensam a geocodificação a cada abertura
+  // da página. Anúncios antigos não as têm, e aí o mapa volta a resolver o
+  // endereço sozinho.
+  const coordenadasDoAnuncio =
+    anuncio?.location_lat && anuncio?.location_lng
+      ? {
+          lat: Number(anuncio.location_lat),
+          lon: Number(anuncio.location_lng),
+          nomeExibicao: anuncio.location_address ?? "",
+        }
+      : null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -184,6 +326,12 @@ const AnuncioDetalhe = () => {
                 </div>
               )}
 
+              <CalendarioDisponibilidade
+                reservas={reservas}
+                availabilityStart={anuncio.availability_start}
+                availabilityEnd={anuncio.availability_end}
+              />
+
               {/* Descrição */}
               {anuncio.description && (
                 <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
@@ -233,6 +381,21 @@ const AnuncioDetalhe = () => {
                   )}
                 </div>
               </div>
+
+              {/* Localização no mapa — a distância pesa na decisão de alugar */}
+              {anuncio.location_address && (
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">
+                    Localização
+                  </div>
+                  <MapaLocalizacao
+                    endereco={anuncio.location_address}
+                    cep={anuncio.location_cep}
+                    coordenadas={coordenadasDoAnuncio}
+                    altura="h-64"
+                  />
+                </div>
+              )}
 
               {/* Especificações técnicas */}
               {anuncio.machine_technical_specifications && (

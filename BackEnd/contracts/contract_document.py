@@ -84,6 +84,23 @@ def _split_municipio_uf(address):
     return "", ""
 
 
+def _municipio_uf(user):
+    """Município/UF da parte, do cadastro quando houver.
+
+    `city`/`state` só passaram a ser gravados depois que o cadastro ganhou
+    colunas próprias; para quem se cadastrou antes, a única fonte continua
+    sendo o parser sobre o texto livre de `address`.
+
+    Exigimos os dois campos preenchidos: município de uma fonte e UF de outra
+    poderiam se contradizer, e o par identifica o foro no contrato.
+    """
+    municipio = (getattr(user, "city", "") or "").strip()
+    uf = (getattr(user, "state", "") or "").strip().upper()
+    if municipio and uf:
+        return municipio, uf
+    return _split_municipio_uf(getattr(user, "address", ""))
+
+
 def _prazo_em_dias(start_date, end_date):
     if not start_date or not end_date:
         return 0
@@ -146,7 +163,7 @@ def build_contract_document(contract):
     valor_locacao, valor_taxa, percentual_taxa = _composicao_valores(
         rental.total_price, posting.hourly_rate, horas
     )
-    municipio, uf = _split_municipio_uf(getattr(lessee, "address", ""))
+    municipio, uf = _municipio_uf(lessee)
 
     return {
         "contrato": {

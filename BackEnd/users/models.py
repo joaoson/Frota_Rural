@@ -22,6 +22,10 @@ class Users(AbstractBaseUser):
     phone = models.CharField(max_length=20, blank=True, null=True)
     role = models.TextField()
     address = models.TextField()
+    # Município e UF chegam do cadastro em campos próprios; o contrato depende
+    # deles e antes só conseguia adivinhá-los relendo o texto livre de address.
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=2, blank=True, null=True)
     cep = models.CharField(max_length=9, blank=True, null=True)
     birth_date = models.DateField()
     status = models.CharField(max_length=50, blank=True, null=True)

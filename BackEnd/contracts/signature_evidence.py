@@ -80,7 +80,7 @@ def record_fingerprint(*, contract_id, role, signer_id, signer_email, signer_nam
 def record_signature(*, contract, document, role, signer=None, signer_name="",
                      signer_email="", request=None, otp_verified=False):
 
-    from api.models import ContractSignatures
+    from contracts.models import ContractSignatures
 
     signed_at = timezone.now()
     doc_hash = document_hash(document)
@@ -135,7 +135,7 @@ def record_signature(*, contract, document, role, signer=None, signer_name="",
 
 def verify_chain(contract, document=None):
 
-    from api.models import ContractSignatures
+    from contracts.models import ContractSignatures
 
     problems = []
     expected_previous = GENESIS_HASH

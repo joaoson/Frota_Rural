@@ -8,6 +8,9 @@ export interface User {
   phone?: string | null;
   role: string;
   address: string;
+  /** Município e UF do cadastro. O contrato usa este par como foro. */
+  city?: string | null;
+  state?: string | null;
   birth_date: string;
   status: UserStatus | string;
   created_at?: string;

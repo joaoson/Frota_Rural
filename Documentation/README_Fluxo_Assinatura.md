@@ -14,16 +14,18 @@ Aqui o foco é o mapa de chamadas.
 
 | Camada | Arquivo | Papel no fluxo |
 | --- | --- | --- |
-| Tela de reserva | `FrontEnd/src/pages/Reservar.tsx` | Etapas de pagamento, OTP, aceite e recibo |
+| Tela de reserva | `FrontEnd/src/pages/Reservar.tsx` | Etapas de pagamento, OTP, aceite e recibo (locatário) |
+| Painel do locador | `FrontEnd/src/pages/DashboardLocador.tsx` | Abre o aceite do locador nas abas Locações e Contratos |
+| Modal de assinatura | `FrontEnd/src/components/AssinaturaContratoModal.tsx` | Documento, aceite, OTP e recibo — o mesmo para os dois papéis |
 | Tela do contrato | `FrontEnd/src/pages/Contrato/Contrato.tsx` | Leitura do contrato + evidência dos aceites |
 | Cliente HTTP | `FrontEnd/src/services/ContractService/ContractService.ts` | Único ponto que fala com a API de contratos |
-| Rotas | `BackEnd/api/urls.py` | Mapeia as 4 rotas de contrato |
-| Views | `BackEnd/api/views.py` | `contract_detail`, `request_signature_otp`, `sign_contract`, `contract_evidence` |
-| Documento | `BackEnd/api/contract_document.py` | Monta o dicionário do contrato a partir dos dados reais |
-| Evidência | `BackEnd/api/signature_evidence.py` | Hash, encadeamento, verificação e OTP |
-| Modelos | `BackEnd/api/models.py` | `Contracts`, `ContractSignatures`, `ContractSignatureOtps` |
+| Rotas | `BackEnd/contracts/urls.py` | Mapeia as 4 rotas de contrato |
+| Views | `BackEnd/contracts/views.py` | `contract_detail`, `request_signature_otp`, `sign_contract`, `contract_evidence` |
+| Documento | `BackEnd/contracts/contract_document.py` | Monta o dicionário do contrato a partir dos dados reais |
+| Evidência | `BackEnd/contracts/signature_evidence.py` | Hash, encadeamento, verificação e OTP |
+| Modelos | `BackEnd/contracts/models.py` | `Contracts`, `ContractSignatures`, `ContractSignatureOtps` |
 | E-mail | `BackEnd/authentication/emailing/email.py` | `send_contract_signature_otp_email` via Resend |
-| Banco | `Database/schema.sql` + migração `0002` | Tabelas e triggers append-only |
+| Banco | `Database/schema.sql` + `api/migrations/0002` | Tabelas e triggers append-only |
 
 ### Rotas
 
@@ -69,7 +71,7 @@ sequenceDiagram
     actor U as Locatário
     participant R as Reservar.tsx
     participant S as ContractService.ts
-    participant V as api/views.py
+    participant V as contracts/views.py
     participant D as contract_document.py
     participant E as signature_evidence.py
     participant M as email.py / Resend
@@ -133,14 +135,18 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     subgraph FE["FrontEnd"]
-        RES["Reservar.tsx"]
+        RES["Reservar.tsx<br/>locatário"]
+        DSH["DashboardLocador.tsx<br/>locador"]
+        MOD["AssinaturaContratoModal.tsx"]
         CTR["Contrato.tsx"]
         SVC["ContractService.ts"]
         RES --> SVC
+        DSH --> MOD
+        MOD --> SVC
         CTR --> SVC
     end
 
-    subgraph API["BackEnd — api/views.py"]
+    subgraph API["BackEnd — contracts/views.py"]
         DET["contract_detail"]
         OTP["request_signature_otp"]
         SGN["sign_contract"]
@@ -237,13 +243,15 @@ flowchart TD
     C2 -- não --> E400["400"]
     C2 -- sim --> C3{"esta parte<br/>já assinou?"}
     C3 -- sim --> E409["409 conflito"]
-    C3 -- não --> C4{"OTP obrigatório<br/>ou código informado?"}
+    C3 -- não --> PRT["_party_for_role<br/>parte esperada no papel"]
+    PRT --> C7{"requisição autenticada<br/>por outro usuário?"}
+    C7 -- sim --> E403["403 não é a parte"]
+    C7 -- não --> C4{"OTP obrigatório<br/>ou código informado?"}
     C4 -- sim --> CO["_consume_otp"]
     CO --> C5{"código válido?"}
     C5 -- não --> E400B["400 com o motivo"]
-    C5 -- sim --> SIGNER
-    C4 -- não --> SIGNER["define o signatário<br/>request.user tem precedência<br/>sobre _party_for_role"]
-    SIGNER --> BUILD["build_contract_document"]
+    C5 -- sim --> BUILD
+    C4 -- não --> BUILD["build_contract_document"]
     BUILD --> REC["record_signature<br/>transaction.atomic"]
     REC --> LOCK["SELECT FOR UPDATE<br/>última assinatura do contrato"]
     LOCK --> PREV["previous_hash =<br/>record_hash anterior ou GENESIS"]
@@ -259,8 +267,11 @@ flowchart TD
     style INS fill:#143d0e,color:#ffffff
 ```
 
-Três pontos que só aparecem lendo o código:
+Quatro pontos que só aparecem lendo o código:
 
+- **A parte é conferida antes do OTP.** Se a ordem fosse a inversa, um usuário
+  autenticado no papel errado consumiria — e invalidaria — o código enviado a quem de
+  fato deve assinar.
 - **O `select_for_update` serializa aceites concorrentes.** Se as duas partes assinarem
   no mesmo instante, a segunda espera a primeira gravar antes de ler o `previous_hash` —
   sem isso, as duas encadeariam a partir do mesmo registro e a cadeia bifurcaria.
@@ -407,10 +418,21 @@ parte assinaria um hash diferente do mesmo contrato.
 
 ## 11. Estado atual da implementação
 
-- **Só o locatário assina pela interface.** A API aceita `role: "locador"` e exige OTP
-  também para ele, mas não existe tela — nenhum componente do frontend chama
-  `signContract` com `"locador"`. O `_party_for_role` já resolve o locador como
+- **As duas partes assinam pela interface.** O locatário assina na etapa 3 de
+  `Reservar.tsx`; o locador assina pelo `AssinaturaContratoModal`, aberto do painel
+  (`DashboardLocador.tsx`) nas abas **Locações** e **Contratos**. O modal é o mesmo
+  componente nos dois papéis: só o `papel` muda para quem o OTP é enviado e como o
+  aceite é gravado. O `_party_for_role` resolve o locador como
   `contract.rental.postings.machinery.owner`.
+- **Quem assina é conferido no servidor.** Estando a requisição autenticada,
+  `sign_contract` e `request_signature_otp` recusam com **403** um usuário que não
+  seja a parte esperada naquele papel. A conferência vem antes do `_consume_otp`,
+  para que uma parte errada não queime o código enviado à parte certa — e nem
+  invalide, pedindo um novo, o código que a outra já recebeu.
+- **A tela sabe quem falta assinar por `accepted_by_lessor`/`accepted_by_lessee`**,
+  campos que `RentalSerializer` passou a devolver (junto de `contract_id` e
+  `contract_status`). O `rentals.status` sozinho não serve: ele vira `active` assim
+  que **qualquer** uma das partes assina.
 - **`GET /contracts/<id>/evidence`** existe no backend e em `getContractEvidence`, mas
   nenhuma tela o consome ainda.
 - **`ContractService.signContract` faz uma segunda chamada** (`getRentalById`) logo após

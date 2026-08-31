@@ -1,14 +1,16 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
+import MapaLocalizacao from "@/components/MapaLocalizacao";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { machineService, type MachineListItem } from "@/services/MachineService/MachineService";
-import { postingService } from "@/services/PostingService/PostingService";
+import { coordenadasDoAnuncio, postingService } from "@/services/PostingService/PostingService";
+import type { Coordenadas } from "@/services/GeocodingService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPService";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT_TYPES = ["image/jpeg", "image/png"];
@@ -33,7 +35,10 @@ const NovoAnuncio = () => {
   const [location, setLocation] = useState("");
   const [availabilityStart, setAvailabilityStart] = useState("");
   const [availabilityEnd, setAvailabilityEnd] = useState("");
+  const [maxReservationDays, setMaxReservationDays] = useState("");
   const [description, setDescription] = useState("");
+  // Guardadas no anúncio para o mapa não ter de geocodificar a cada exibição.
+  const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +77,8 @@ const NovoAnuncio = () => {
     };
   }, []);
 
+  const hoje = new Date().toISOString().split("T")[0];
+
   const validateField = (fieldName: string, value: string) => {
     let errorMsg = "";
     switch (fieldName) {
@@ -87,21 +94,35 @@ const NovoAnuncio = () => {
         }
         break;
       }
+      case "cep": {
+        // O CEP é opcional no anúncio, mas pela metade a API recusa o anúncio
+        // inteiro — melhor barrar aqui, ao lado do campo.
+        const digits = value.replace(/\D/g, "");
+        if (digits.length > 0 && digits.length !== 8) {
+          errorMsg = "CEP deve ter exatamente 8 dígitos.";
+        }
+        break;
+      }
       case "location":
         if (!value.trim()) errorMsg = "Informe a localização.";
         break;
       case "availabilityStart":
-        if (value && value < new Date().toISOString().split("T")[0]) {
+        if (value && value < hoje) {
           errorMsg = "A data de início não pode ser no passado.";
         }
         break;
       case "availabilityEnd":
         if (value) {
-          if (value < new Date().toISOString().split("T")[0]) {
+          if (value < hoje) {
             errorMsg = "A data final não pode ser no passado.";
           } else if (availabilityStart && value < availabilityStart) {
             errorMsg = "A data final deve ser igual ou posterior à data de início.";
           }
+        }
+        break;
+      case "maxReservationDays":
+        if (value && (!Number.isInteger(Number(value)) || Number(value) < 1)) {
+          errorMsg = "Informe um número inteiro de pelo menos 1 dia.";
         }
         break;
     }
@@ -164,9 +185,11 @@ const NovoAnuncio = () => {
     const errorsList = {
       machinery: validateField("machinery", machinery),
       hourlyRate: validateField("hourlyRate", hourlyRate),
+      cep: validateField("cep", cep),
       location: validateField("location", location),
       availabilityStart: validateField("availabilityStart", availabilityStart),
       availabilityEnd: validateField("availabilityEnd", availabilityEnd),
+      maxReservationDays: validateField("maxReservationDays", maxReservationDays),
     };
 
     if (Object.values(errorsList).some((err) => err !== "")) {
@@ -181,9 +204,12 @@ const NovoAnuncio = () => {
       const posting = await postingService.create({
         machinery: machinery,
         hourly_rate: rate,
+        location_cep: cep || undefined,
         location_address: location,
-        availability_start: availabilityStart ? `${availabilityStart}T00:00:00` : undefined,
-        availability_end: availabilityEnd ? `${availabilityEnd}T23:59:59` : undefined,
+        ...coordenadasDoAnuncio(coordenadas),
+        availability_start: availabilityStart ? `${availabilityStart}T00:00:00Z` : undefined,
+        availability_end: availabilityEnd ? `${availabilityEnd}T23:59:59Z` : undefined,
+        max_reservation_days: maxReservationDays ? Number(maxReservationDays) : null,
         description: description || undefined,
       });
 
@@ -209,9 +235,12 @@ const NovoAnuncio = () => {
 
       setMachinery("");
       setHourlyRate("");
+      setCep("");
       setLocation("");
+      setCoordenadas(null);
       setAvailabilityStart("");
       setAvailabilityEnd("");
+      setMaxReservationDays("");
       setDescription("");
       photos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
       setPhotos([]);
@@ -310,12 +339,14 @@ const NovoAnuncio = () => {
                 onChange={async (e) => {
                   const masked = maskCEP(e.target.value);
                   setCep(masked);
+                  setCoordenadas(null);
+                  if (errors.cep) validateField("cep", masked);
                   const digits = masked.replace(/\D/g, "");
                   if (digits.length === 8) {
                     try {
                       const data = await fetchAddressByCEP(digits);
                       if (data) {
-                        const newLoc = `${data.localidade}, ${data.uf}`;
+                        const newLoc = formatAddressFromCEP(data, "municipio");
                         setLocation(newLoc);
                         if (errors.location) setErrors((prev) => ({ ...prev, location: "" }));
                       } else {
@@ -326,8 +357,10 @@ const NovoAnuncio = () => {
                     }
                   }
                 }}
-                className="w-full bg-surface-container border border-transparent rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary focus:outline-none text-on-surface transition-shadow"
+                onBlur={(e) => validateField("cep", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cep ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
               />
+              {errors.cep && <p className="text-[11px] text-error font-medium mt-1">{errors.cep}</p>}
             </div>
 
             <div className="space-y-2">
@@ -339,6 +372,7 @@ const NovoAnuncio = () => {
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value);
+                  setCoordenadas(null);
                   if (errors.location) validateField("location", e.target.value);
                 }}
                 onBlur={(e) => validateField("location", e.target.value)}
@@ -347,9 +381,12 @@ const NovoAnuncio = () => {
               />
               {errors.location && <p className="text-[11px] text-error font-medium mt-1">{errors.location}</p>}
             </div>
-            <div className="bg-surface-container-high rounded-xl h-48 flex items-center justify-center text-on-surface-variant text-sm border border-outline-variant/20">
-              <MaterialIcon icon="map" size={24} className="mr-2 text-outline" /> Mapa de seleção de localização
-            </div>
+            <MapaLocalizacao
+              endereco={location}
+              cep={cep}
+              coordenadas={coordenadas}
+              onCoordenadas={setCoordenadas}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-5">
@@ -358,6 +395,7 @@ const NovoAnuncio = () => {
               <input
                 name="availability_start"
                 type="date"
+                min={hoje}
                 value={availabilityStart}
                 onChange={(e) => {
                   setAvailabilityStart(e.target.value);
@@ -373,6 +411,7 @@ const NovoAnuncio = () => {
               <input
                 name="availability_end"
                 type="date"
+                min={availabilityStart || hoje}
                 value={availabilityEnd}
                 onChange={(e) => {
                   setAvailabilityEnd(e.target.value);
@@ -383,6 +422,28 @@ const NovoAnuncio = () => {
               />
               {errors.availabilityEnd && <p className="text-[11px] text-error font-medium mt-1">{errors.availabilityEnd}</p>}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Máximo de dias por reserva
+            </label>
+            <input
+              name="max_reservation_days"
+              type="number"
+              min={1}
+              step={1}
+              placeholder="Sem limite"
+              value={maxReservationDays}
+              onChange={(e) => {
+                setMaxReservationDays(e.target.value);
+                if (errors.maxReservationDays) validateField("maxReservationDays", e.target.value);
+              }}
+              onBlur={(e) => validateField("maxReservationDays", e.target.value)}
+              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.maxReservationDays ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+            />
+            <p className="text-[11px] text-outline">Opcional. Ex.: informe 7 para permitir reservas de até 7 dias. Deixe vazio para não limitar.</p>
+            {errors.maxReservationDays && <p className="text-[11px] text-error font-medium mt-1">{errors.maxReservationDays}</p>}
           </div>
 
           <div className="space-y-2">

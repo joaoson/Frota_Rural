@@ -261,11 +261,12 @@ na tela. Isso prova **posse do endereço**, não apenas posse de uma sessão abe
 
 | Componente | Arquivo | Responsabilidade |
 | --- | --- | --- |
-| Documento do contrato | `BackEnd/api/contract_document.py` | Montar o documento a partir dos dados reais |
-| Evidência | `BackEnd/api/signature_evidence.py` | Canonicalizar, hashear, encadear, verificar, OTP |
-| Modelos | `BackEnd/api/models.py` | `ContractSignatures`, `ContractSignatureOtps` |
+| Documento do contrato | `BackEnd/contracts/contract_document.py` | Montar o documento a partir dos dados reais |
+| Evidência | `BackEnd/contracts/signature_evidence.py` | Canonicalizar, hashear, encadear, verificar, OTP |
+| Modelos | `BackEnd/contracts/models.py` | `ContractSignatures`, `ContractSignatureOtps` |
 | Migração | `BackEnd/api/migrations/0002_…py` | Tabelas + triggers append-only |
-| Endpoints | `BackEnd/api/views.py` | Documento, aceite, auditoria, OTP |
+| Troca de app | `contracts/migrations/0001` + `api/migrations/0003` | Move o estado sem tocar no banco |
+| Endpoints | `BackEnd/contracts/views.py` | Documento, aceite, auditoria, OTP |
 | E-mail do código | `BackEnd/authentication/emailing/email.py` | Template do OTP (via Resend) |
 | Contrato (tela) | `FrontEnd/src/pages/Contrato/Contrato.tsx` | Exibir o contrato e a evidência |
 | Fluxo de assinatura | `FrontEnd/src/pages/Reservar.tsx` | OTP, aceite e recibo |
