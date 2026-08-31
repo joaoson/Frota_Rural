@@ -1,14 +1,18 @@
 import json
 import logging
+import os
 import subprocess
 import tempfile
+from pathlib import Path
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 ML_DIR = settings.BASE_DIR / "ml"
-ML_PYTHON = ML_DIR / "venv" / "bin" / "python"
+# A imagem Docker fornece este interpretador em /opt/ml-venv; o caminho local
+# continua sendo o padrão para quem executa o projeto sem containers.
+ML_PYTHON = Path(os.getenv("ML_PYTHON", ML_DIR / "venv" / "bin" / "python"))
 CLASSIFY_SCRIPT = ML_DIR / "classify.py"
 MODEL_PATH = ML_DIR / "models" / "cnh_classifier.keras"
 
@@ -80,5 +84,4 @@ class CnhClassifier:
                 "error": "Erro ao processar o documento.",
             }
         finally:
-            import os
             os.unlink(tmp_path)
