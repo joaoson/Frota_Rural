@@ -216,8 +216,8 @@ const BuscarMaquinario = () => {
         {/* Filtros */}
         <div className="bg-surface-container-lowest rounded-[24px] border border-outline-variant/30 p-8 mb-10 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
-            <SlidersHorizontal className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold text-primary uppercase tracking-widest">Filtros</span>
+            <SlidersHorizontal className="w-4 h-4 text-primary dark:text-primary-bright" />
+            <span className="text-xs font-bold text-primary dark:text-primary-bright uppercase tracking-widest">Filtros</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -294,7 +294,7 @@ const BuscarMaquinario = () => {
         {!loading && !erro && (
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <p className="text-sm text-on-surface-variant">
-              <span className="font-bold text-primary">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} disponíve{resultados.length !== 1 ? "is" : "l"}
+              <span className="font-bold text-primary dark:text-primary-bright">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} disponíve{resultados.length !== 1 ? "is" : "l"}
             </p>
 
             <div className="flex items-center gap-3">
@@ -318,7 +318,7 @@ const BuscarMaquinario = () => {
                     onClick={() => setColunas(n)}
                     title={`${n} por linha`}
                     className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                      colunas === n ? "bg-primary-container text-on-primary" : "text-outline hover:text-primary hover:bg-surface-container"
+                      colunas === n ? "bg-primary-container text-on-primary" : "text-outline hover:text-primary dark:hover:text-primary-bright hover:bg-surface-container"
                     }`}
                   >
                     <IconeGrade n={n} />
@@ -333,7 +333,7 @@ const BuscarMaquinario = () => {
         {!loading && !erro && temFiltro && resultados.length === 0 && (
           <div className="text-center py-20 bg-surface-container-lowest rounded-[24px] border border-outline-variant/30">
             <div className="bg-surface-container w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <SearchX className="w-8 h-8 text-primary" />
+              <SearchX className="w-8 h-8 text-primary dark:text-primary-bright" />
             </div>
             <h3 className="text-xl font-bold text-on-surface mb-2">Nenhum equipamento encontrado</h3>
             <p className="text-on-surface-variant text-sm max-w-sm mx-auto">
@@ -367,7 +367,7 @@ const BuscarMaquinario = () => {
                   <div className="border-t border-outline-variant/30 pt-3 flex flex-col gap-1.5 text-xs">
                     <div className="flex gap-2 flex-wrap">
                       {anuncio.atividade && (
-                        <span className="bg-surface-container text-primary font-bold px-2.5 py-1 rounded-lg">{anuncio.atividade}</span>
+                        <span className="bg-surface-container text-primary dark:text-primary-bright font-bold px-2.5 py-1 rounded-lg">{anuncio.atividade}</span>
                       )}
                       {anuncio.ano !== "—" && (
                         <span className="bg-surface-container text-on-surface-variant font-medium px-2.5 py-1 rounded-lg">Ano: {anuncio.ano}</span>
@@ -377,7 +377,7 @@ const BuscarMaquinario = () => {
                   </div>
 
                   <div className="flex justify-between items-center pt-1">
-                    <div className="text-2xl font-black text-primary">
+                    <div className="text-2xl font-black text-primary dark:text-primary-bright">
                       R$ {anuncio.preco.toFixed(2)}<span className="text-sm font-bold text-outline">/h</span>
                     </div>
                     <Link to={`/anuncio/${anuncio.id}`} className="bg-primary-container text-on-primary px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-primary transition-colors">
@@ -394,19 +394,19 @@ const BuscarMaquinario = () => {
         {!loading && !erro && lista.length > 0 && (
           <div className="flex items-center justify-center gap-2 mt-12">
             <button onClick={() => irParaPagina(Math.max(1, pagina - 1))} disabled={pagina === 1}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
 
             {Array.from({ length: totalPgs }, (_, i) => i + 1).map((numeroPagina) => (
               <button key={numeroPagina} onClick={() => irParaPagina(numeroPagina)}
-                className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${numeroPagina === pagina ? "bg-primary-container text-on-primary shadow-sm" : "border border-outline-variant/40 bg-surface-container-lowest text-primary hover:bg-surface-container"}`}>
+                className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${numeroPagina === pagina ? "bg-primary-container text-on-primary shadow-sm" : "border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container"}`}>
                 {numeroPagina}
               </button>
             ))}
 
             <button onClick={() => irParaPagina(Math.min(totalPgs, pagina + 1))} disabled={pagina === totalPgs}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

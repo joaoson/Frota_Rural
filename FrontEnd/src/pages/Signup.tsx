@@ -230,10 +230,10 @@ const Signup = () => {
         <div className="w-full max-w-lg">
           <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-xl p-10">
             <div className="text-center mb-10">
-              <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <div className="w-16 h-16 bg-primary/10 text-primary dark:text-primary-bright rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <MaterialIcon icon="person_add" size={32} />
               </div>
-              <h1 className="font-headline text-3xl font-bold text-primary">
+              <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                 Criar Conta
               </h1>
               <div className="h-1 w-16 bg-secondary-container mx-auto mt-3 mb-2" />
@@ -497,7 +497,7 @@ const Signup = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                   >
                     <MaterialIcon icon={showPassword ? "visibility_off" : "visibility"} size={20} />
                   </button>
@@ -523,7 +523,7 @@ const Signup = () => {
               Já tem conta?{" "}
               <Link
                 to="/login"
-                className="font-bold text-primary hover:underline"
+                className="font-bold text-primary dark:text-primary-bright hover:underline"
               >
                 Faça login
               </Link>

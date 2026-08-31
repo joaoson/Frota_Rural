@@ -108,7 +108,7 @@ const GerenciarAnuncio = () => {
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
         <MaterialIcon
           icon="sync"
-          className="animate-spin text-primary mb-4"
+          className="animate-spin text-primary dark:text-primary-bright mb-4"
           size={32}
         />
         <p className="text-on-surface-variant font-medium">Carregando anúncio...</p>
@@ -130,7 +130,7 @@ const GerenciarAnuncio = () => {
       <div className="flex-1 pt-32 pb-20 max-w-[1000px] mx-auto px-6 w-full">
         <Link
           to="/dashboard"
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
         >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
@@ -138,7 +138,7 @@ const GerenciarAnuncio = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-2/3">
             <div className="mb-8">
-              <h1 className="font-headline text-3xl font-bold text-primary mb-1">
+              <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright mb-1">
                 Gerenciar Anúncio
               </h1>
               <div className="h-1 w-16 bg-secondary-container mb-3" />
@@ -317,7 +317,7 @@ const GerenciarAnuncio = () => {
           <div className="lg:w-1/3">
             <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 shadow-sm sticky top-32">
               <h3 className="font-headline font-bold text-lg text-on-surface mb-6 flex items-center gap-2">
-                <MaterialIcon icon="analytics" className="text-primary" />
+                <MaterialIcon icon="analytics" className="text-primary dark:text-primary-bright" />
                 Estatísticas (Últimos 30 dias)
               </h3>
               <div className="space-y-5">
@@ -374,15 +374,15 @@ const GerenciarAnuncio = () => {
                     <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                       <MaterialIcon
                         icon="payments"
-                        className="text-primary"
+                        className="text-primary dark:text-primary-bright"
                         size={20}
                       />
                     </div>
-                    <span className="text-sm text-primary font-bold">
+                    <span className="text-sm text-primary dark:text-primary-bright font-bold">
                       Receita Gerada
                     </span>
                   </div>
-                  <span className="font-black text-primary text-xl">
+                  <span className="font-black text-primary dark:text-primary-bright text-xl">
                     R$ 18.400
                   </span>
                 </div>

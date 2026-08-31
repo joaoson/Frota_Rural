@@ -43,47 +43,47 @@
 }
 
 .dark .contrato-root {
-  --ct-backdrop: hsl(96 16% 5%);
-  --ct-paper: hsl(95 12% 11%);
-  --ct-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+  --ct-backdrop: hsl(45 8% 7%);
+  --ct-paper: hsl(45 7% 11%);
+  --ct-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
 
-  --ct-ink: hsl(60 22% 93%);
-  --ct-ink-2: hsl(80 10% 74%);
-  --ct-muted: hsl(90 8% 60%);
+  --ct-ink: hsl(45 20% 92%);
+  --ct-ink-2: hsl(45 8% 65%);
+  --ct-muted: hsl(45 8% 65%);
 
-  --ct-brand: hsl(104 40% 16%);
-  --ct-brand-text: hsl(96 48% 70%);
-  --ct-brand-2: hsl(102 36% 22%);
-  --ct-brand-2-text: hsl(96 45% 66%);
-  --ct-brand-soft: hsl(96 50% 72%);
-  --ct-brand-soft-dim: hsl(96 40% 68% / 0.85);
+  --ct-brand: hsl(45 6% 15%);
+  --ct-brand-text: hsl(95 30% 62%);
+  --ct-brand-2: hsl(45 6% 26%);
+  --ct-brand-2-text: hsl(95 30% 62%);
+  --ct-brand-soft: hsl(45 8% 65%);
+  --ct-brand-soft-dim: hsl(45 8% 65%);
 
-  --ct-on-brand: hsl(60 25% 95%);
-  --ct-on-brand-dim: hsl(60 15% 88% / 0.62);
-  --ct-on-brand-faint: hsl(60 15% 88% / 0.38);
-  --ct-brand-overlay: hsl(96 40% 80% / 0.09);
-  --ct-brand-overlay-line: hsl(96 40% 80% / 0.16);
+  --ct-on-brand: hsl(45 20% 92%);
+  --ct-on-brand-dim: hsl(45 8% 65%);
+  --ct-on-brand-faint: hsl(45 8% 65% / 0.5);
+  --ct-brand-overlay: hsl(45 20% 92% / 0.06);
+  --ct-brand-overlay-line: hsl(45 8% 65% / 0.22);
 
-  --ct-gold: hsl(38 92% 60%);
-  --ct-gold-on: hsl(36 100% 10%);
-  --ct-gold-text: hsl(40 85% 64%);
+  --ct-gold: hsl(40 70% 52%);
+  --ct-gold-on: hsl(45 8% 7%);
+  --ct-gold-text: hsl(40 70% 52%);
 
-  --ct-line: hsl(93 8% 22%);
-  --ct-line-soft: hsl(93 8% 19%);
-  --ct-line-strong: hsl(93 8% 32%);
+  --ct-line: hsl(45 6% 26%);
+  --ct-line-soft: hsl(45 6% 26%);
+  --ct-line-strong: hsl(45 6% 26%);
 
-  --ct-fill: hsl(95 10% 14%);
-  --ct-fill-warm: hsl(60 9% 16%);
-  --ct-fill-warm-2: hsl(50 10% 15%);
+  --ct-fill: hsl(45 6% 15%);
+  --ct-fill-warm: hsl(45 6% 15%);
+  --ct-fill-warm-2: hsl(45 7% 11%);
 
-  --ct-error: hsl(4 78% 68%);
-  --ct-ok-bg: hsl(104 30% 15%);
-  --ct-ok-line: hsl(102 30% 28%);
-  --ct-ok-label: hsl(96 48% 70%);
-  --ct-ok-text: hsl(96 40% 80%);
-  --ct-warn-bg: hsl(36 32% 15%);
-  --ct-warn-line: hsl(36 40% 30%);
-  --ct-warn-text: hsl(38 80% 72%);
+  --ct-error: hsl(4 52% 70%);
+  --ct-ok-bg: hsl(45 6% 15%);
+  --ct-ok-line: hsl(45 6% 26%);
+  --ct-ok-label: hsl(95 30% 62%);
+  --ct-ok-text: hsl(45 20% 92%);
+  --ct-warn-bg: hsl(45 6% 15%);
+  --ct-warn-line: hsl(45 6% 26%);
+  --ct-warn-text: hsl(40 70% 52%);
 }
 
 .contrato-root *,

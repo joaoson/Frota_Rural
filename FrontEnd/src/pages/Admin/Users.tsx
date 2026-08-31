@@ -32,7 +32,7 @@ const statusBadge = (status: string) => {
     case "active":
       return {
         icon: "check_circle",
-        classes: "bg-primary/10 text-primary border border-primary/20",
+        classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20",
         label: "Ativo",
       };
     case "warned":

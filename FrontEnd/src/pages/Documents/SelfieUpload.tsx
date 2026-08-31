@@ -61,7 +61,7 @@ const SelfieUpload = () => {
       <Navbar />
       <div className="flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full">
         <div className="mb-8 sm:mb-10">
-          <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+          <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary dark:text-primary-bright mb-1">
             Foto Pessoal
           </h1>
           <div className="h-1 w-16 bg-secondary-container mb-3" />
@@ -98,9 +98,9 @@ const SelfieUpload = () => {
                 <MaterialIcon
                   icon="tips_and_updates"
                   size={18}
-                  className="text-primary"
+                  className="text-primary dark:text-primary-bright"
                 />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright">
                   Dicas para uma boa foto
                 </span>
               </div>
@@ -110,7 +110,7 @@ const SelfieUpload = () => {
                     key={i}
                     className="flex items-start gap-3 text-sm text-on-surface"
                   >
-                    <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                    <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary dark:text-primary-bright flex items-center justify-center text-[10px] font-bold">
                       {i + 1}
                     </span>
                     {item}
@@ -155,9 +155,9 @@ const SelfieUpload = () => {
                   <MaterialIcon
                     icon="check_circle"
                     size={40}
-                    className="text-primary mb-2"
+                    className="text-primary dark:text-primary-bright mb-2"
                   />
-                  <div className="font-bold text-primary text-sm">
+                  <div className="font-bold text-primary dark:text-primary-bright text-sm">
                     {file.name}
                   </div>
                   <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">

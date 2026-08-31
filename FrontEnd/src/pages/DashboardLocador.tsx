@@ -177,13 +177,13 @@ const DashboardLocador = () => {
       case "active":
         return {
           icon: "circle",
-          classes: "bg-primary/10 text-primary border border-primary/20",
+          classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20",
           label: "Em Operação (Ativo)",
         };
       case "completed":
         return {
           icon: "check_circle",
-          classes: "bg-primary/10 text-primary border border-primary/20",
+          classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20",
           label: "Concluída",
         };
       case "cancelled":
@@ -421,13 +421,13 @@ const DashboardLocador = () => {
               <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                 Período
               </div>
-              <div className="font-bold text-primary text-sm">{r.period}</div>
+              <div className="font-bold text-primary dark:text-primary-bright text-sm">{r.period}</div>
             </div>
             <div>
               <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                 Valor
               </div>
-              <div className="font-black text-primary text-lg">{r.total}</div>
+              <div className="font-black text-primary dark:text-primary-bright text-lg">{r.total}</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -452,7 +452,7 @@ const DashboardLocador = () => {
               </button>
             ) : null}
             {r.status === "pending" || r.status === "active" ? (
-              <button className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
+              <button className="px-4 bg-primary/10 text-primary dark:text-primary-bright py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
                 <MaterialIcon icon="analytics" size={14} /> Analisar
               </button>
             ) : null}
@@ -504,7 +504,7 @@ const DashboardLocador = () => {
                   <span className="text-outline text-xs font-bold uppercase">
                     Valor Total:
                   </span>{" "}
-                  <span className="text-primary font-black">{r.total}</span>
+                  <span className="text-primary dark:text-primary-bright font-black">{r.total}</span>
                 </div>
                 <div>
                   <span className="text-outline text-xs font-bold uppercase">
@@ -604,7 +604,7 @@ const DashboardLocador = () => {
         <div className="p-6 pb-4">
           <Link
             to="/"
-            className="font-headline font-black text-xl text-primary tracking-tighter"
+            className="font-headline font-black text-xl text-primary dark:text-primary-bright tracking-tighter"
           >
             Frota Rural
           </Link>
@@ -621,7 +621,7 @@ const DashboardLocador = () => {
                   } : undefined
                 }
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${tab === item.tab
-                  ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                  ? "bg-primary/10 text-primary dark:text-primary-bright font-bold border-l-2 border-primary"
                   : "text-on-surface-variant hover:bg-surface-container-high"
                   }`}
               >
@@ -762,7 +762,7 @@ const DashboardLocador = () => {
           {tab === "dashboard" && (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Bom dia, {user ? user.name.split(" ")[0] : "…"}
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -806,9 +806,9 @@ const DashboardLocador = () => {
                       <MaterialIcon
                         icon={stat.icon}
                         size={16}
-                        className="text-primary"
+                        className="text-primary dark:text-primary-bright"
                       />
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                      <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-widest">
                         {stat.label}
                       </div>
                     </div>
@@ -834,10 +834,10 @@ const DashboardLocador = () => {
                     </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-black text-primary">
+                    <div className="text-2xl font-black text-primary dark:text-primary-bright">
                       R$ 86.650
                     </div>
-                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                    <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-wider">
                       Total acumulado
                     </div>
                   </div>
@@ -1003,7 +1003,7 @@ const DashboardLocador = () => {
                   </div>
                   <button
                     onClick={() => setTab("reservas")}
-                    className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
+                    className="text-sm font-bold text-primary dark:text-primary-bright hover:underline flex items-center gap-1"
                   >
                     Ver todas <MaterialIcon icon="arrow_forward" size={14} />
                   </button>
@@ -1020,7 +1020,7 @@ const DashboardLocador = () => {
                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center">
                             <MaterialIcon
                               icon="agriculture"
-                              className="text-primary"
+                              className="text-primary dark:text-primary-bright"
                               size={24}
                             />
                           </div>
@@ -1059,7 +1059,7 @@ const DashboardLocador = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="font-headline text-3xl font-bold text-primary">
+                  <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                     Minha Frota
                   </h1>
                   <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1093,7 +1093,7 @@ const DashboardLocador = () => {
                       <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                         <MaterialIcon
                           icon="agriculture"
-                          className="text-primary"
+                          className="text-primary dark:text-primary-bright"
                           size={28}
                         />
                       </div>
@@ -1110,13 +1110,13 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5 self-end">
+                      <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary dark:text-primary-bright border border-primary/20 flex items-center gap-1.5 self-end">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
                         Disponível
                       </span>
                       <button
                         onClick={() => openEditModalForMachine(m)}
-                        className="text-sm font-bold text-primary hover:underline self-end flex items-center gap-1"
+                        className="text-sm font-bold text-primary dark:text-primary-bright hover:underline self-end flex items-center gap-1"
                       >
                         <MaterialIcon icon="edit" size={14} /> Editar
                       </button>
@@ -1139,7 +1139,7 @@ const DashboardLocador = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h1 className="font-headline text-3xl font-bold text-primary">
+                    <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                       Habilitação (CNH)
                     </h1>
                     <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1180,7 +1180,7 @@ const DashboardLocador = () => {
                         <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
                           <MaterialIcon
                             icon="id_card"
-                            className="text-primary"
+                            className="text-primary dark:text-primary-bright"
                             size={28}
                           />
                         </div>
@@ -1203,7 +1203,7 @@ const DashboardLocador = () => {
                       </div>
                       <div className="flex items-center gap-4">
                         {lic.validation_status === "approved" ? (
-                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary dark:text-primary-bright border border-primary/20 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
                             Aprovado
                           </span>
@@ -1219,7 +1219,7 @@ const DashboardLocador = () => {
                         )}
                         <Link
                           to="/document/cnh"
-                          className="text-sm font-bold text-primary hover:underline"
+                          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline"
                         >
                           Editar
                         </Link>
@@ -1274,7 +1274,7 @@ const DashboardLocador = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h1 className="font-headline text-3xl font-bold text-primary">
+                    <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                       Certificações
                     </h1>
                     <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1311,7 +1311,7 @@ const DashboardLocador = () => {
                         <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
                           <MaterialIcon
                             icon="workspace_premium"
-                            className="text-primary"
+                            className="text-primary dark:text-primary-bright"
                             size={28}
                           />
                         </div>
@@ -1334,7 +1334,7 @@ const DashboardLocador = () => {
                       </div>
                       <div className="flex items-center gap-4">
                         {cert.validation_status === "approved" ? (
-                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                          <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary dark:text-primary-bright border border-primary/20 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
                             Aprovado
                           </span>
@@ -1350,7 +1350,7 @@ const DashboardLocador = () => {
                         )}
                         <Link
                           to={`/document/certification/${cert.id}`}
-                          className="text-sm font-bold text-primary hover:underline"
+                          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline"
                         >
                           Editar
                         </Link>
@@ -1412,7 +1412,7 @@ const DashboardLocador = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="font-headline text-3xl font-bold text-primary">
+                  <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                     Anúncios
                   </h1>
                   <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1444,7 +1444,7 @@ const DashboardLocador = () => {
                       <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
                         <MaterialIcon
                           icon="precision_manufacturing"
-                          className="text-primary"
+                          className="text-primary dark:text-primary-bright"
                           size={28}
                         />
                       </div>
@@ -1454,7 +1454,7 @@ const DashboardLocador = () => {
                         <h4 className="font-headline font-bold text-on-surface">
                           {p.machine}
                         </h4>
-                        <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded uppercase tracking-wider border border-primary/20 flex items-center gap-1">
+                        <span className="px-2 py-1 bg-primary/10 text-primary dark:text-primary-bright text-[10px] font-bold rounded uppercase tracking-wider border border-primary/20 flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />{" "}
                           Ativo
                         </span>
@@ -1464,7 +1464,7 @@ const DashboardLocador = () => {
                         {p.location}
                       </p>
                       <div className="flex justify-between items-center">
-                        <div className="text-xl font-black text-primary">
+                        <div className="text-xl font-black text-primary dark:text-primary-bright">
                           R$ {p.price}
                           <span className="text-sm font-bold text-tertiary">
                             /h
@@ -1472,7 +1472,7 @@ const DashboardLocador = () => {
                         </div>
                         <Link
                           to={`/dashboard/gerenciar-anuncio/${p.id}`}
-                          className="text-sm font-bold text-primary border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+                          className="text-sm font-bold text-primary dark:text-primary-bright border border-primary/30 px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
                         >
                           Gerenciar
                         </Link>
@@ -1493,7 +1493,7 @@ const DashboardLocador = () => {
           {tab === "reservas" ? (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Locações
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1516,7 +1516,7 @@ const DashboardLocador = () => {
                     <MaterialIcon
                       icon="play_circle"
                       size={20}
-                      className="text-primary"
+                      className="text-primary dark:text-primary-bright"
                     />{" "}
                     Locações em Andamento
                   </h2>
@@ -1554,7 +1554,7 @@ const DashboardLocador = () => {
           {tab === "contratos" ? (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Contratos
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1593,7 +1593,7 @@ const DashboardLocador = () => {
                       <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
                         <MaterialIcon
                           icon="description"
-                          className="text-primary"
+                          className="text-primary dark:text-primary-bright"
                           size={24}
                         />
                       </div>
@@ -1611,7 +1611,7 @@ const DashboardLocador = () => {
                         c.status === "pending"
                           ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
                           : c.status === "active" || c.status === "signed"
-                            ? "bg-primary/10 text-primary border border-primary/20"
+                            ? "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20"
                             : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
                       }`}
                     >
@@ -1645,7 +1645,7 @@ const DashboardLocador = () => {
                       <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                         Período
                       </div>
-                      <div className="font-bold text-primary text-sm">
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">
                         {c.period}
                       </div>
                     </div>
@@ -1653,7 +1653,7 @@ const DashboardLocador = () => {
                       <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                         Valor Total
                       </div>
-                      <div className="font-black text-primary text-lg">
+                      <div className="font-black text-primary dark:text-primary-bright text-lg">
                         {c.total}
                       </div>
                     </div>
@@ -1688,7 +1688,7 @@ const DashboardLocador = () => {
           {tab === "chat" ? (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Mensagens
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1774,7 +1774,7 @@ const DashboardLocador = () => {
                           ) : null}
                           <button
                             onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100"
+                            className="p-1.5 rounded-lg text-outline hover:text-primary dark:hover:text-primary-bright hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100"
                             title="Arquivar conversa"
                           >
                             <MaterialIcon icon="archive" size={16} />
@@ -1804,7 +1804,7 @@ const DashboardLocador = () => {
                         <div className="font-bold text-on-surface text-sm">
                           Fazenda Aurora
                         </div>
-                        <div className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+                        <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-wider flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-primary rounded-full" />{" "}
                           Online
                         </div>
@@ -1845,7 +1845,7 @@ const DashboardLocador = () => {
                     </div>
                   </div>
                   <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
-                    <button className="text-outline hover:text-primary transition-colors p-2 rounded-lg hover:bg-surface-container">
+                    <button className="text-outline hover:text-primary dark:hover:text-primary-bright transition-colors p-2 rounded-lg hover:bg-surface-container">
                       <MaterialIcon icon="attach_file" size={20} />
                     </button>
                     <input
@@ -1867,7 +1867,7 @@ const DashboardLocador = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="font-headline text-3xl font-bold text-primary">
+                  <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                     Notificações
                   </h1>
                   <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1931,7 +1931,7 @@ const DashboardLocador = () => {
                       <MaterialIcon
                         icon={n.icon}
                         className={
-                          n.unread ? "text-primary" : "text-on-surface-variant"
+                          n.unread ? "text-primary dark:text-primary-bright" : "text-on-surface-variant"
                         }
                         size={22}
                       />
@@ -1973,7 +1973,7 @@ const DashboardLocador = () => {
           {tab === "avaliacoes" ? (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Avaliações
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -1987,7 +1987,7 @@ const DashboardLocador = () => {
                   <MaterialIcon
                     icon="inbox"
                     size={22}
-                    className="text-primary"
+                    className="text-primary dark:text-primary-bright"
                   />{" "}
                   Avaliações Recebidas
                 </h2>
@@ -2042,7 +2042,7 @@ const DashboardLocador = () => {
                   <MaterialIcon
                     icon="outbox"
                     size={22}
-                    className="text-primary"
+                    className="text-primary dark:text-primary-bright"
                   />{" "}
                   Avaliações Fornecidas
                 </h2>
@@ -2054,7 +2054,7 @@ const DashboardLocador = () => {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
+                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary dark:text-primary-bright">
                             {r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}
                           </div>
                           <div>
@@ -2119,7 +2119,7 @@ const DashboardLocador = () => {
           {tab === "conta" ? (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
                   Minha Conta
                 </h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
@@ -2157,7 +2157,7 @@ const DashboardLocador = () => {
                       <div className="text-sm text-on-surface-variant mb-2 capitalize">
                         {user?.role ?? "…"}
                       </div>
-                      <label className="text-xs font-bold text-primary cursor-pointer hover:underline flex items-center gap-1">
+                      <label className="text-xs font-bold text-primary dark:text-primary-bright cursor-pointer hover:underline flex items-center gap-1">
                         <MaterialIcon icon="upload" size={14} /> Alterar foto
                         <input
                           type="file"
@@ -2299,7 +2299,7 @@ const DashboardLocador = () => {
                         <button
                           type="button"
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showCurrentPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>
@@ -2326,7 +2326,7 @@ const DashboardLocador = () => {
                         <button
                           type="button"
                           onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showNewPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>
@@ -2352,7 +2352,7 @@ const DashboardLocador = () => {
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showConfirmPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>

@@ -423,7 +423,7 @@ const CNHUpload = () => {
       <div className="flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full">
         <Link
           to="/dashboard"
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
         >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
@@ -435,7 +435,7 @@ const CNHUpload = () => {
         ) : (
           <>
             <div className="mb-8 sm:mb-10">
-              <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+              <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary dark:text-primary-bright mb-1">
                 {isEditing ? "Editar CNH" : "Cadastro de CNH"}
               </h1>
               <div className="h-1 w-16 bg-secondary-container mb-3" />
@@ -449,7 +449,7 @@ const CNHUpload = () => {
             {/* Upload de doc */}
             <div className="mb-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm space-y-6 sm:space-y-8">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                   Foto do Documento
                 </p>
                 <p className="text-[11px] text-outline font-medium mt-2">
@@ -479,9 +479,9 @@ const CNHUpload = () => {
                     <MaterialIcon
                       icon="info"
                       size={18}
-                      className="text-primary"
+                      className="text-primary dark:text-primary-bright"
                     />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright">
                       O que fazer
                     </span>
                   </div>
@@ -491,7 +491,7 @@ const CNHUpload = () => {
                         key={i}
                         className="flex items-start gap-3 text-sm text-on-surface"
                       >
-                        <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                        <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary dark:text-primary-bright flex items-center justify-center text-[10px] font-bold">
                           {i + 1}
                         </span>
                         {item}
@@ -533,9 +533,9 @@ const CNHUpload = () => {
                       <MaterialIcon
                         icon="check_circle"
                         size={40}
-                        className="text-primary mb-2"
+                        className="text-primary dark:text-primary-bright mb-2"
                       />
-                      <div className="font-bold text-primary text-sm">
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">
                         {file.name}
                       </div>
                       <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
@@ -547,9 +547,9 @@ const CNHUpload = () => {
                       <MaterialIcon
                         icon="insert_drive_file"
                         size={40}
-                        className="text-primary mb-2"
+                        className="text-primary dark:text-primary-bright mb-2"
                       />
-                      <div className="font-bold text-primary text-sm">
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">
                         Documento enviado anteriormente
                       </div>
                       <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
@@ -593,7 +593,7 @@ const CNHUpload = () => {
                     <div
                       className={`flex items-center gap-2 mt-3 px-3 py-2 rounded-lg text-sm font-medium ${
                         validationResult.confidence === "high"
-                          ? "bg-primary/10 text-primary"
+                          ? "bg-primary/10 text-primary dark:text-primary-bright"
                           : validationResult.confidence === "medium"
                             ? "bg-tertiary/10 text-tertiary"
                             : "bg-error/10 text-error"
@@ -660,7 +660,7 @@ const CNHUpload = () => {
                 onSubmit={handleSubmit}
                 noValidate
               >
-                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                   Dados de Identificação
                 </p>
 
@@ -845,7 +845,7 @@ const CNHUpload = () => {
                   </div>
                 </div>
 
-                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                   Dados da Habilitação
                 </p>
 
@@ -994,7 +994,7 @@ const CNHUpload = () => {
                   </div>
                 </div>
 
-                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                   Situação do Documento
                 </p>
 
@@ -1053,7 +1053,7 @@ const CNHUpload = () => {
                       type="checkbox"
                       checked={ear}
                       onChange={(e) => setEar(e.target.checked)}
-                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-outline-variant text-primary dark:text-primary-bright focus:ring-primary"
                     />
                     <span className="text-sm text-on-surface">
                       EAR — Exerce Atividade Remunerada
@@ -1064,7 +1064,7 @@ const CNHUpload = () => {
                       type="checkbox"
                       checked={acc}
                       onChange={(e) => setAcc(e.target.checked)}
-                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      className="w-4 h-4 rounded border-outline-variant text-primary dark:text-primary-bright focus:ring-primary"
                     />
                     <span className="text-sm text-on-surface">
                       ACC — Autorização p/ Ciclomotor
@@ -1072,7 +1072,7 @@ const CNHUpload = () => {
                   </label>
                 </div>
 
-                <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                   Restrições e Observações
                 </p>
 

@@ -59,7 +59,7 @@ const statusBadge = (status: string | null) => {
     case "active":
       return {
         icon: "check_circle",
-        classes: "bg-primary/10 text-primary border border-primary/20",
+        classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20",
         label: "Ativo",
       };
     case "rejected":
@@ -209,7 +209,7 @@ const AdminAnuncios = () => {
     const palette =
       cfg.severity === "high"
         ? "bg-error/10 text-error border border-error/20 hover:bg-error/20"
-        : "bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20";
+        : "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20 hover:bg-primary/20";
 
     return (
       <button
@@ -407,7 +407,7 @@ const AdminAnuncios = () => {
                   className={
                     pendingCfg.severity === "high"
                       ? "text-error"
-                      : "text-primary"
+                      : "text-primary dark:text-primary-bright"
                   }
                 />
               ) : null}

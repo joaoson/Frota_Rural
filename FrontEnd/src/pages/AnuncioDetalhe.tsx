@@ -29,7 +29,7 @@ interface PostingDetalheAPI {
   photos: FotoAPI[];
 }
 
-// Estrelas SVG com preenchimento parcial via linearGradient
+
 const CAMINHO_ESTRELA = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
 const COR_CHEIA = "var(--chart-2)";
 const COR_VAZIA = "var(--outline-variant)";
@@ -107,7 +107,7 @@ const AnuncioDetalhe = () => {
 
         <Link
           to="/buscar-maquinario"
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
         >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar à busca
         </Link>
@@ -148,13 +148,13 @@ const AnuncioDetalhe = () => {
                       onClick={() => setFotoSelecionada((prev) => (prev === 0 ? fotos.length - 1 : prev - 1))}
                       className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-container-lowest/80 rounded-full flex items-center justify-center shadow hover:bg-surface-container-lowest transition opacity-0 group-hover:opacity-100"
                     >
-                      <MaterialIcon icon="chevron_left" size={20} className="text-primary" />
+                      <MaterialIcon icon="chevron_left" size={20} className="text-primary dark:text-primary-bright" />
                     </button>
                     <button
                       onClick={() => setFotoSelecionada((prev) => (prev === fotos.length - 1 ? 0 : prev + 1))}
                       className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-container-lowest/80 rounded-full flex items-center justify-center shadow hover:bg-surface-container-lowest transition opacity-0 group-hover:opacity-100"
                     >
-                      <MaterialIcon icon="chevron_right" size={20} className="text-primary" />
+                      <MaterialIcon icon="chevron_right" size={20} className="text-primary dark:text-primary-bright" />
                     </button>
                   </>
                 )}
@@ -199,12 +199,12 @@ const AnuncioDetalhe = () => {
               {/* Cabeçalho */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="px-3 py-1 bg-primary/10 text-primary font-bold text-[10px] rounded uppercase tracking-widest border border-primary/20 flex items-center gap-1.5">
+                  <span className="px-3 py-1 bg-primary/10 text-primary dark:text-primary-bright font-bold text-[10px] rounded uppercase tracking-widest border border-primary/20 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     Disponível
                   </span>
                 </div>
-                <h1 className="font-headline text-3xl font-bold text-primary mb-2">{titulo}</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright mb-2">{titulo}</h1>
                 <div className="h-1 w-16 bg-secondary-container mb-3" />
                 {anuncio.location_address && (
                   <p className="text-on-surface-variant flex items-center gap-1 text-sm">
@@ -247,10 +247,10 @@ const AnuncioDetalhe = () => {
               {/* Selo: Operador verificado */}
               <div className="bg-primary/5 border border-primary/20 p-5 rounded-xl flex items-center gap-4">
                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-                  <MaterialIcon icon="verified_user" className="text-primary" size={22} />
+                  <MaterialIcon icon="verified_user" className="text-primary dark:text-primary-bright" size={22} />
                 </div>
                 <div>
-                  <div className="font-bold text-primary text-sm">Operador com NR-31 Verificado</div>
+                  <div className="font-bold text-primary dark:text-primary-bright text-sm">Operador com NR-31 Verificado</div>
                   <div className="text-[11px] text-on-surface-variant">Credencial validada pelo sistema Confia Rural</div>
                 </div>
               </div>
@@ -265,10 +265,10 @@ const AnuncioDetalhe = () => {
               </div>
 
               {/* CTA — Preço + botões */}
-              <div className="bg-[hsl(45,40%,93%)] p-6 rounded-xl border border-outline-variant/20">
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
                 <div className="mb-5">
                   <span className="text-[10px] text-outline font-bold uppercase tracking-widest block mb-1">Custo por Hora</span>
-                  <div className="text-4xl font-black text-primary">
+                  <div className="text-4xl font-black text-primary dark:text-primary-bright">
                     R$ {parseFloat(anuncio.hourly_rate).toFixed(2)}
                     <span className="text-sm font-bold text-tertiary">/hora</span>
                   </div>
@@ -285,7 +285,7 @@ const AnuncioDetalhe = () => {
                 {/* Botão: Conversar com Locador */}
                 <Link
                   to={`/chat/${anuncio.id}`}
-                  className="flex items-center justify-center gap-2 w-full border-2 border-primary text-primary py-3.5 rounded-lg font-bold text-base hover:bg-primary/5 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full border-2 border-primary text-primary dark:text-primary-bright py-3.5 rounded-lg font-bold text-base hover:bg-primary/5 transition-colors"
                 >
                   <MaterialIcon icon="chat" size={20} />
                   Conversar com o Locador

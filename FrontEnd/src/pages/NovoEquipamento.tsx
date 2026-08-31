@@ -149,12 +149,12 @@ const NovoEquipamento = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <div className="flex-1 pt-32 pb-20 max-w-2xl mx-auto px-6 w-full">
-        <Link to="/dashboard" className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1">
+        <Link to="/dashboard" className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1">
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
 
         <div className="mb-10">
-          <h1 className="font-headline text-3xl font-bold text-primary mb-1">Novo Equipamento</h1>
+          <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright mb-1">Novo Equipamento</h1>
           <div className="h-1 w-16 bg-secondary-container mb-3" />
           <p className="text-on-surface-variant text-sm">Cadastre uma nova máquina na sua frota</p>
         </div>
