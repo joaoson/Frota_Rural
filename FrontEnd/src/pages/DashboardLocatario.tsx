@@ -20,6 +20,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import NotificationPopover from "@/components/NotificationPopover";
 import DashboardMachineSearch from "@/components/DashboardMachineSearch";
 import {
@@ -250,9 +251,9 @@ const DashboardLocatario = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "pending": return { icon: "description", classes: "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30", label: "Assinatura Pendente" };
-      case "active": return { icon: "circle", classes: "bg-primary/10 text-primary border border-primary/20", label: "Em Operação (Ativo)" };
-      case "completed": return { icon: "check_circle", classes: "bg-primary/10 text-primary border border-primary/20", label: "Concluída" };
+      case "pending": return { icon: "description", classes: "bg-secondary-container/20 text-secondary border border-secondary-container/30", label: "Assinatura Pendente" };
+      case "active": return { icon: "circle", classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20", label: "Em Operação (Ativo)" };
+      case "completed": return { icon: "check_circle", classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20", label: "Concluída" };
       case "cancelled": return { icon: "warning", classes: "bg-error/10 text-error border border-error/20", label: "Locação Cancelada" };
       default: return { icon: "", classes: "", label: "" };
     }
@@ -276,7 +277,7 @@ const DashboardLocatario = () => {
           <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 mb-4">
             <div>
               <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Locador</div>
-              <div className="font-bold text-primary text-sm flex items-center gap-1">
+              <div className="font-bold text-primary dark:text-primary-bright text-sm flex items-center gap-1">
                 <MaterialIcon icon="person" size={14} /> {r.owner}
               </div>
             </div>
@@ -286,11 +287,11 @@ const DashboardLocatario = () => {
             </div>
             <div>
               <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Período</div>
-              <div className="font-bold text-primary text-sm">{r.period}</div>
+              <div className="font-bold text-primary dark:text-primary-bright text-sm">{r.period}</div>
             </div>
             <div>
               <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Valor</div>
-              <div className="font-black text-primary text-lg">{r.total}</div>
+              <div className="font-black text-primary dark:text-primary-bright text-lg">{r.total}</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -305,7 +306,7 @@ const DashboardLocatario = () => {
               </button>
             )}
             {r.status === "completed" && (
-              <button onClick={() => setShowAvaliar(showAvaliar === r.id ? null : r.id)} className="px-4 bg-secondary-container/30 text-on-secondary-container py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1">
+              <button onClick={() => setShowAvaliar(showAvaliar === r.id ? null : r.id)} className="px-4 bg-secondary-container/30 text-secondary py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1">
                 <MaterialIcon icon="star" size={14} /> Avaliar
               </button>
             )}
@@ -329,7 +330,7 @@ const DashboardLocatario = () => {
                 <div><span className="text-outline text-xs font-bold uppercase">Locador:</span> <span className="text-on-surface font-bold">{r.owner}</span></div>
                 <div><span className="text-outline text-xs font-bold uppercase">Maquinário:</span> <span className="text-on-surface font-bold">{r.machine}</span></div>
                 <div><span className="text-outline text-xs font-bold uppercase">Período:</span> <span className="text-on-surface font-bold">{r.period}</span></div>
-                <div><span className="text-outline text-xs font-bold uppercase">Valor Total:</span> <span className="text-primary font-black">{r.total}</span></div>
+                <div><span className="text-outline text-xs font-bold uppercase">Valor Total:</span> <span className="text-primary dark:text-primary-bright font-black">{r.total}</span></div>
                 <div><span className="text-outline text-xs font-bold uppercase">Status:</span> <span className="text-on-surface font-bold">{badge.label}</span></div>
               </div>
             </div>
@@ -338,7 +339,7 @@ const DashboardLocatario = () => {
           {showReagendar === r.id && (
             <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
               <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
-                <MaterialIcon icon="event_repeat" size={16} className="text-on-secondary-container" /> Solicitar Reagendamento
+                <MaterialIcon icon="event_repeat" size={16} className="text-secondary" /> Solicitar Reagendamento
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -363,7 +364,7 @@ const DashboardLocatario = () => {
           {showAvaliar === r.id && (
             <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
               <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
-                <MaterialIcon icon="star" size={16} className="text-on-secondary-container" /> Avaliar Serviço
+                <MaterialIcon icon="star" size={16} className="text-secondary" /> Avaliar Serviço
               </h4>
               <p className="text-sm text-on-surface-variant">Como foi sua experiência com {r.owner}?</p>
               <div className="flex gap-2">
@@ -441,7 +442,7 @@ const DashboardLocatario = () => {
 
       <aside className={`w-64 shrink-0 border-r border-outline-variant/30 h-screen fixed md:sticky top-0 bg-surface-container-low flex flex-col z-50 transform transition-transform duration-300 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="p-6 pb-4">
-          <Link to="/" className="font-headline font-black text-xl text-primary tracking-tighter">Frota Rural</Link>
+          <Link to="/" className="font-headline font-black text-xl text-primary dark:text-primary-bright tracking-tighter">Frota Rural</Link>
         </div>
         <nav className="flex-1 px-3 space-y-1">
           {sidebarItems.map((item) => {
@@ -456,7 +457,7 @@ const DashboardLocatario = () => {
                 }
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   tab === item.tab
-                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    ? "bg-primary/10 text-primary dark:text-primary-bright font-bold border-l-2 border-primary"
                     : "text-on-surface-variant hover:bg-surface-container-high"
                 }`}
               >
@@ -517,13 +518,16 @@ const DashboardLocatario = () => {
               <MaterialIcon icon="menu" size={24} />
             </button>
           </div>
-          <NotificationPopover
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <NotificationPopover
             notifications={[
               { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
               { id: 2, icon: "description", title: "Contrato pronto para assinatura", desc: "Colheitadeira JD S700 · Fazenda São João", time: "3h atrás", unread: true },
               { id: 3, icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
             ]}
-          />
+            />
+          </div>
         </header>
 
         <div className="p-8 max-w-[1200px]">
@@ -531,7 +535,7 @@ const DashboardLocatario = () => {
           {tab === "dashboard" && (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Bom dia, {user ? user.name.split(" ")[0] : "…"}</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Bom dia, {user ? user.name.split(" ")[0] : "…"}</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Veja o resumo das suas locações</p>
               </div>
@@ -545,8 +549,8 @@ const DashboardLocatario = () => {
                 ].map((stat, i) => (
                   <div key={i} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-all group">
                     <div className="flex items-center gap-2 mb-3">
-                      <MaterialIcon icon={stat.icon} size={16} className="text-primary" />
-                      <div className="text-[10px] font-bold text-primary uppercase tracking-widest">{stat.label}</div>
+                      <MaterialIcon icon={stat.icon} size={16} className="text-primary dark:text-primary-bright" />
+                      <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-widest">{stat.label}</div>
                     </div>
                     <div className="font-headline text-3xl font-black text-on-surface mb-1">{stat.value}</div>
                     <div className="text-sm text-on-surface-variant">{stat.sub}</div>
@@ -562,8 +566,8 @@ const DashboardLocatario = () => {
                     <p className="text-xs text-on-surface-variant mt-0.5">Últimos 6 meses</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-black text-primary">R$ 46.850</div>
-                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider">Total acumulado</div>
+                    <div className="text-2xl font-black text-primary dark:text-primary-bright">R$ 46.850</div>
+                    <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-wider">Total acumulado</div>
                   </div>
                 </div>
                 <div className="h-64">
@@ -571,15 +575,15 @@ const DashboardLocatario = () => {
                     <AreaChart data={spendData}>
                       <defs>
                         <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
-                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
-                      <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} fill="url(#colorSpend)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#colorSpend)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -594,18 +598,18 @@ const DashboardLocatario = () => {
                   </div>
                   <div className="flex items-center gap-1.5 bg-secondary-container/10 px-3 py-1.5 rounded-lg">
                     <MaterialIcon icon="star" filled className="text-secondary-container" size={16} />
-                    <span className="font-black text-on-secondary-container text-sm">4.3</span>
+                    <span className="font-black text-secondary text-sm">4.3</span>
                     <span className="text-[10px] font-bold text-on-surface-variant uppercase">média</span>
                   </div>
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={ratingsData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--outline-variant))" opacity={0.3} />
-                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'hsl(var(--on-surface-variant))' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid hsl(var(--outline-variant))', fontSize: 13 }} />
-                      <Bar dataKey="rating" fill="hsl(39, 99%, 60%)" radius={[6, 6, 0, 0]} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Bar dataKey="rating" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -617,7 +621,7 @@ const DashboardLocatario = () => {
                     <h2 className="font-headline text-xl font-bold text-on-surface">Minhas locações</h2>
                     <div className="h-0.5 w-12 bg-secondary-container mt-1" />
                   </div>
-                  <button onClick={() => setTab("locacoes")} className="text-sm font-bold text-primary hover:underline flex items-center gap-1">
+                  <button onClick={() => setTab("locacoes")} className="text-sm font-bold text-primary dark:text-primary-bright hover:underline flex items-center gap-1">
                     Ver todas <MaterialIcon icon="arrow_forward" size={14} />
                   </button>
                 </div>
@@ -658,7 +662,7 @@ const DashboardLocatario = () => {
           {tab === "locacoes" && (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Minhas Locações</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Minhas Locações</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Gerencie suas locações</p>
               </div>
@@ -674,7 +678,7 @@ const DashboardLocatario = () => {
               {activeRentals.length > 0 && (
                 <div className="space-y-4">
                   <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                    <MaterialIcon icon="play_circle" size={20} className="text-primary" /> Locações em Andamento
+                    <MaterialIcon icon="play_circle" size={20} className="text-primary dark:text-primary-bright" /> Locações em Andamento
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {activeRentals.map(renderRentalCard)}
@@ -699,7 +703,7 @@ const DashboardLocatario = () => {
           {tab === "contratos" && (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Contratos</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Contratos</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Seus contratos assinados e pendentes</p>
               </div>
@@ -722,7 +726,7 @@ const DashboardLocatario = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
-                        <MaterialIcon icon="description" className="text-primary" size={24} />
+                        <MaterialIcon icon="description" className="text-primary dark:text-primary-bright" size={24} />
                       </div>
                       <div>
                         <h3 className="font-headline font-bold text-on-surface">{c.contract} — {c.machine}</h3>
@@ -730,8 +734,8 @@ const DashboardLocatario = () => {
                       </div>
                     </div>
                     <span className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
-                      c.status === "pending" ? "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30"
-                        : c.status === "active" || c.status === "signed" ? "bg-primary/10 text-primary border border-primary/20"
+                      c.status === "pending" ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
+                        : c.status === "active" || c.status === "signed" ? "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20"
                         : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
                     }`}>
                       <MaterialIcon icon={c.status === "pending" ? "description" : (c.status === "active" || c.status === "signed") ? "verified" : "check_circle"} size={14} />
@@ -745,11 +749,11 @@ const DashboardLocatario = () => {
                     </div>
                     <div>
                       <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Período</div>
-                      <div className="font-bold text-primary text-sm">{c.period}</div>
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">{c.period}</div>
                     </div>
                     <div>
                       <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Valor Total</div>
-                      <div className="font-black text-primary text-lg">{c.total}</div>
+                      <div className="font-black text-primary dark:text-primary-bright text-lg">{c.total}</div>
                     </div>
                     <div>
                       <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Maquinário</div>
@@ -773,14 +777,14 @@ const DashboardLocatario = () => {
           {tab === "avaliacoes" && (
             <div className="space-y-8">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Avaliações</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Avaliações</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Veja as avaliações recebidas e fornecidas</p>
               </div>
 
               <div>
                 <h2 className="font-headline text-xl font-bold text-tertiary mb-4 flex items-center gap-2">
-                  <MaterialIcon icon="inbox" size={22} className="text-primary" /> Avaliações Recebidas
+                  <MaterialIcon icon="inbox" size={22} className="text-primary dark:text-primary-bright" /> Avaliações Recebidas
                 </h2>
                 <div className="space-y-4">
                   {receivedReviews.length > 0 ? receivedReviews.map((r) => (
@@ -809,14 +813,14 @@ const DashboardLocatario = () => {
 
               <div>
                 <h2 className="font-headline text-xl font-bold text-tertiary mb-4 flex items-center gap-2">
-                  <MaterialIcon icon="outbox" size={22} className="text-primary" /> Avaliações Fornecidas
+                  <MaterialIcon icon="outbox" size={22} className="text-primary dark:text-primary-bright" /> Avaliações Fornecidas
                 </h2>
                 <div className="space-y-4">
                   {givenReviews.length > 0 ? givenReviews.map((r) => (
                     <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
+                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary dark:text-primary-bright">{r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">{r.reviewee_name}</div>
                             <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
@@ -857,7 +861,7 @@ const DashboardLocatario = () => {
           {tab === "chat" && (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Mensagens</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Mensagens</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Converse com seus locadores</p>
               </div>
@@ -891,7 +895,7 @@ const DashboardLocatario = () => {
                           {contact.unread > 0 && (
                             <span className="w-5 h-5 bg-primary text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center">{contact.unread}</span>
                           )}
-                          <button onClick={(e) => { e.stopPropagation(); }} className="p-1.5 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100" title="Arquivar conversa">
+                          <button onClick={(e) => { e.stopPropagation(); }} className="p-1.5 rounded-lg text-outline hover:text-primary dark:hover:text-primary-bright hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100" title="Arquivar conversa">
                             <MaterialIcon icon="archive" size={16} />
                           </button>
                           <button onClick={(e) => { e.stopPropagation(); }} className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100" title="Excluir conversa">
@@ -911,7 +915,7 @@ const DashboardLocatario = () => {
                       </div>
                       <div>
                         <div className="font-bold text-on-surface text-sm">João Silva</div>
-                        <div className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
+                        <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-wider flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-primary rounded-full" /> Locador · Online
                         </div>
                       </div>
@@ -941,7 +945,7 @@ const DashboardLocatario = () => {
                     </div>
                   </div>
                   <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
-                    <button className="text-outline hover:text-primary transition-colors p-2 rounded-lg hover:bg-surface-container">
+                    <button className="text-outline hover:text-primary dark:hover:text-primary-bright transition-colors p-2 rounded-lg hover:bg-surface-container">
                       <MaterialIcon icon="attach_file" size={20} />
                     </button>
                     <input type="text" placeholder="Digite sua mensagem..." className="flex-1 bg-surface-container border-none rounded-full px-5 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface" />
@@ -959,7 +963,7 @@ const DashboardLocatario = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="font-headline text-3xl font-bold text-primary">Notificações</h1>
+                  <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Notificações</h1>
                   <div className="h-1 w-16 bg-secondary-container mt-2" />
                   <p className="text-on-surface-variant text-sm mt-3">Acompanhe todas as atualizações</p>
                 </div>
@@ -976,7 +980,7 @@ const DashboardLocatario = () => {
                 ].map((n, i) => (
                   <div key={i} className={`flex items-start gap-4 p-5 rounded-2xl border transition-all hover:shadow-md ${n.unread ? "bg-primary/5 border-primary/20" : "bg-surface-container-lowest border-outline-variant/30"}`}>
                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${n.unread ? "bg-primary/10" : "bg-surface-container-high"}`}>
-                      <MaterialIcon icon={n.icon} className={n.unread ? "text-primary" : "text-on-surface-variant"} size={22} />
+                      <MaterialIcon icon={n.icon} className={n.unread ? "text-primary dark:text-primary-bright" : "text-on-surface-variant"} size={22} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
@@ -999,7 +1003,7 @@ const DashboardLocatario = () => {
           {tab === "conta" && (
             <div className="space-y-6">
               <div>
-                <h1 className="font-headline text-3xl font-bold text-primary">Minha Conta</h1>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Minha Conta</h1>
                 <div className="h-1 w-16 bg-secondary-container mt-2" />
                 <p className="text-on-surface-variant text-sm mt-3">Edite suas informações de cadastro</p>
               </div>
@@ -1022,7 +1026,7 @@ const DashboardLocatario = () => {
                     <div>
                       <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
                       <div className="text-sm text-on-surface-variant mb-2">Locatário</div>
-                      <label className="text-xs font-bold text-primary cursor-pointer hover:underline flex items-center gap-1">
+                      <label className="text-xs font-bold text-primary dark:text-primary-bright cursor-pointer hover:underline flex items-center gap-1">
                         <MaterialIcon icon="upload" size={14} /> Alterar foto
                         <input type="file" accept="image/*" className="hidden" />
                       </label>
@@ -1178,7 +1182,7 @@ const DashboardLocatario = () => {
                         <button
                           type="button"
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showCurrentPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>
@@ -1203,7 +1207,7 @@ const DashboardLocatario = () => {
                         <button
                           type="button"
                           onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showNewPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>
@@ -1227,7 +1231,7 @@ const DashboardLocatario = () => {
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors flex items-center justify-center p-1"
                         >
                           <MaterialIcon icon={showConfirmPassword ? "visibility_off" : "visibility"} size={20} />
                         </button>

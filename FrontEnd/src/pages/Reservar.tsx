@@ -235,7 +235,7 @@ function Stepper({ etapaAtual }: { etapaAtual: Etapa }) {
                 ativa
                   ? "bg-primary text-on-primary"
                   : concluida
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-primary/15 text-primary dark:text-primary-bright"
                     : "bg-surface-container text-outline"
               }`}
             >
@@ -631,7 +631,7 @@ const Reservar = () => {
       </div>
       <div className="border-t border-outline-variant/30 mt-4 pt-4 flex justify-between items-end">
         <span className="text-[10px] uppercase font-bold text-outline tracking-widest">Total Apurado</span>
-        <span className="text-2xl font-black text-primary">{formatarReais(total)}</span>
+        <span className="text-2xl font-black text-primary dark:text-primary-bright">{formatarReais(total)}</span>
       </div>
     </div>
   );
@@ -643,12 +643,12 @@ const Reservar = () => {
       <div className="flex-1 pt-32 pb-20 max-w-[1100px] mx-auto px-6 w-full">
         <Link
           to={`/anuncio/${id}`}
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
         >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar à busca
         </Link>
 
-        <h1 className="font-headline text-4xl font-black text-primary mb-2">Solicitar Reserva</h1>
+        <h1 className="font-headline text-4xl font-black text-primary dark:text-primary-bright mb-2">Solicitar Reserva</h1>
         <div className="h-1.5 w-20 bg-secondary-container mb-10 rounded-full" />
 
         {loading && (
@@ -681,7 +681,7 @@ const Reservar = () => {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                        <MaterialIcon icon="agriculture" className="text-primary" size={26} />
+                        <MaterialIcon icon="agriculture" className="text-primary dark:text-primary-bright" size={26} />
                       </div>
                       <div>
                         <div className="font-bold text-tertiary">{titulo}</div>
@@ -708,10 +708,10 @@ const Reservar = () => {
 
                   <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/20 mb-6 flex items-center gap-3">
                     <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                      <MaterialIcon icon="agriculture" className="text-primary" size={24} />
+                      <MaterialIcon icon="agriculture" className="text-primary dark:text-primary-bright" size={24} />
                     </div>
                     <div>
-                      <div className="font-bold text-primary">{titulo}</div>
+                      <div className="font-bold text-primary dark:text-primary-bright">{titulo}</div>
                       <div className="text-xs text-on-surface-variant">
                         {[anuncio.location_address, anuncio.machine_renagro_number && `Renagro ${anuncio.machine_renagro_number}`]
                           .filter(Boolean)
@@ -854,7 +854,7 @@ const Reservar = () => {
                     ))}
                     <div className="flex justify-between items-center py-4">
                       <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">Valor Total</dt>
-                      <dd className="font-black text-primary text-lg">{formatarReais(total)}</dd>
+                      <dd className="font-black text-primary dark:text-primary-bright text-lg">{formatarReais(total)}</dd>
                     </div>
                   </dl>
                 </CartaoPainel>
@@ -870,7 +870,7 @@ const Reservar = () => {
                   <>
                   <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
                     <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <MaterialIcon icon="check_circle" className="text-primary" size={24} filled />
+                      <MaterialIcon icon="check_circle" className="text-primary dark:text-primary-bright" size={24} filled />
                     </div>
                     <div>
                       <div className="font-bold text-tertiary text-sm">Pagamento confirmado com sucesso!</div>

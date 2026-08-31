@@ -1,14 +1,20 @@
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from api.models import Rentals
 from contracts.models import Contracts
+from api.schemas import ErrorResponseSerializer, MessageResponseSerializer
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users
 from .models import PostingModeration
+from .serializer import PostingRejectionSerializer
+
+USER_NOT_FOUND = OpenApiResponse(description='Usuário não encontrado.')
+POSTING_NOT_FOUND = OpenApiResponse(description='Anúncio não encontrado.')
 
 
 def _moderator(request):
@@ -16,7 +22,31 @@ def _moderator(request):
     user = getattr(request, "user", None)
     return user if getattr(user, "is_authenticated", False) else None
 
-# Create your views here.
+
+@extend_schema(
+    tags=['Administração'],
+    summary='Advertir usuário',
+    description=(
+        'Marca o usuário com o status `warned`. Serve como aviso formal antes de medidas '
+        'mais severas e não altera anúncios ou locações em andamento.'
+    ),
+    request=None,
+    responses={
+        200: MessageResponseSerializer,
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='Usuário já está suspenso ou banido.',
+        ),
+        404: USER_NOT_FOUND,
+    },
+    examples=[
+        OpenApiExample(
+            'Advertência aplicada',
+            value={'message': 'Advertência aplicada ao usuário João Silva.'},
+            response_only=True,
+        )
+    ],
+)
 @api_view(['PUT'])
 def warn_user(request, pk):
     try:
@@ -32,6 +62,23 @@ def warn_user(request, pk):
     return Response({'message': f'Advertência aplicada ao usuário {user.name}.'}, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=['Administração'],
+    summary='Suspender usuário',
+    description=(
+        'Suspende a conta e propaga o efeito na operação: os anúncios ativos do usuário passam '
+        'a `suspended` e as locações em que ele é locatário com status `pending` são canceladas.'
+    ),
+    request=None,
+    responses={
+        200: MessageResponseSerializer,
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='Usuário já está banido.',
+        ),
+        404: USER_NOT_FOUND,
+    },
+)
 @api_view(['PUT'])
 def suspend_user(request, pk):
     try:
@@ -52,6 +99,20 @@ def suspend_user(request, pk):
     return Response({'message': f'Usuário {user.name} suspenso.'}, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=['Administração'],
+    summary='Banir usuário',
+    description=(
+        'Bane a conta permanentemente. Todos os anúncios do usuário são inativados, as locações '
+        '`pending` e `active` são canceladas e os contratos ainda pendentes de assinatura '
+        'também passam a `cancelled`.'
+    ),
+    request=None,
+    responses={
+        200: MessageResponseSerializer,
+        404: USER_NOT_FOUND,
+    },
+)
 @api_view(['PUT'])
 def ban_user(request, pk):
     try:
@@ -72,6 +133,19 @@ def ban_user(request, pk):
 
 
 # ── Moderação de Anúncios (RF17) ────────────────────────────────────────────
+@extend_schema(
+    tags=['Administração'],
+    summary='Aprovar anúncio',
+    description=(
+        'Aprova o anúncio na moderação (RF17), deixando-o com status `active`, e registra a '
+        'decisão no histórico de moderação junto com o administrador responsável.'
+    ),
+    request=None,
+    responses={
+        200: MessageResponseSerializer,
+        404: POSTING_NOT_FOUND,
+    },
+)
 @api_view(['PUT'])
 def approve_posting(request, pk):
     try:
@@ -91,6 +165,30 @@ def approve_posting(request, pk):
     return Response({'message': 'Anúncio aprovado e mantido ativo.'}, status=status.HTTP_200_OK)
 
 
+@extend_schema(
+    tags=['Administração'],
+    summary='Reprovar anúncio',
+    description=(
+        'Reprova o anúncio na moderação (RF17). O motivo é obrigatório, fica gravado no '
+        'histórico de moderação e o anúncio passa a ter status `rejected`.'
+    ),
+    request=PostingRejectionSerializer,
+    responses={
+        200: MessageResponseSerializer,
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer,
+            description='Motivo da reprovação não informado.',
+        ),
+        404: POSTING_NOT_FOUND,
+    },
+    examples=[
+        OpenApiExample(
+            'Reprovação por foto inválida',
+            value={'reason': 'As fotos enviadas não mostram o maquinário anunciado.'},
+            request_only=True,
+        )
+    ],
+)
 @api_view(['PUT'])
 def reject_posting(request, pk):
     reason = (request.data.get('reason') or '').strip()

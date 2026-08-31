@@ -118,10 +118,10 @@ const EditEquipamentoModal = ({
         <DialogHeader className="px-8 pt-8 pb-0">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <MaterialIcon icon="edit" size={20} className="text-primary" />
+              <MaterialIcon icon="edit" size={20} className="text-primary dark:text-primary-bright" />
             </div>
             <div>
-              <DialogTitle className="font-headline text-xl font-bold text-primary">
+              <DialogTitle className="font-headline text-xl font-bold text-primary dark:text-primary-bright">
                 Editar Equipamento
               </DialogTitle>
               <DialogDescription className="text-on-surface-variant text-xs mt-0.5">

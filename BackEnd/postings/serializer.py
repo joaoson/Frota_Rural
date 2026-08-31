@@ -2,6 +2,7 @@ import re
 import uuid
 from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     Postings,
@@ -18,6 +19,13 @@ def _sorted_photos(posting):
     """Capa primeiro, depois as demais na ordem de envio."""
     photos = list(posting.postingsphotos_set.all())
     return sorted(photos, key=lambda p: (not p.is_primary, p.created_at or _EPOCH))
+
+class PostingPhotoUrlSerializer(serializers.Serializer):
+    """Foto do anúncio no formato embutido em `PostingDetailSerializer.photos`."""
+
+    url = serializers.CharField()
+    is_primary = serializers.BooleanField()
+
 
 class PostingSerializer(serializers.ModelSerializer):
     # Declarado à mão porque o modelo guarda 8 dígitos, mas o formulário envia
@@ -103,6 +111,7 @@ class PostingListSerializer(serializers.ModelSerializer):
             "primary_photo_url",
         ]
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_primary_photo_url(self, obj):
         photos = _sorted_photos(obj)
         if not photos:
@@ -130,12 +139,20 @@ class PostingDetailSerializer(serializers.ModelSerializer):
             "photos",
         ]
 
+    @extend_schema_field(PostingPhotoUrlSerializer(many=True))
     def get_photos(self, obj):
         return [
             {
-                "id": str(p.id),
                 "url": firebase_storage.public_url(p.image_url),
                 "is_primary": bool(p.is_primary),
             }
             for p in _sorted_photos(obj)
         ]
+
+class PostingPhotoSerializer(serializers.ModelSerializer):
+    """Foto vinculada a um anúncio, no formato devolvido pelo endpoint de upload."""
+
+    class Meta:
+        model = PostingsPhotos
+        fields = ["id", "image_url", "is_primary"]
+        read_only_fields = ["id", "image_url", "is_primary"]

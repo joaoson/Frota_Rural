@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +45,7 @@ const statusBadge = (status: string) => {
     case "approved":
       return {
         icon: "check_circle",
-        classes: "bg-primary/10 text-primary border border-primary/20",
+        classes: "bg-primary/10 text-primary dark:text-primary-bright border border-primary/20",
         label: "Aprovado",
       };
     case "rejected":
@@ -57,7 +58,7 @@ const statusBadge = (status: string) => {
       return {
         icon: "hourglass_bottom",
         classes:
-          "bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30",
+          "bg-secondary-container/20 text-secondary border border-secondary-container/30",
         label: "Pendente",
       };
   }
@@ -394,13 +395,16 @@ const Documentos = () => {
         <h1 className="font-headline font-black text-lg text-on-surface tracking-tight">
           Revisão de Documentos de Operadores
         </h1>
-        <button
-          type="button"
-          onClick={loadItems}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
-        >
-          <MaterialIcon icon="refresh" size={16} /> Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadItems}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
+          >
+            <MaterialIcon icon="refresh" size={16} /> Atualizar
+          </button>
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="p-8 max-w-[1200px]">
@@ -545,7 +549,7 @@ const Documentos = () => {
                     : "workspace_premium"
                 }
                 size={20}
-                className="text-primary"
+                className="text-primary dark:text-primary-bright"
               />
               Revisar{" "}
               {selectedItem?.type === "license" ? "CNH" : "Certificação"}
@@ -592,7 +596,7 @@ const Documentos = () => {
                         <MaterialIcon
                           icon={isImage ? "image" : "picture_as_pdf"}
                           size={16}
-                          className="text-primary"
+                          className="text-primary dark:text-primary-bright"
                         />
                         <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
                           Documento Anexado
@@ -602,7 +606,7 @@ const Documentos = () => {
                         href={fullUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary dark:text-primary-bright hover:underline"
                       >
                         <MaterialIcon icon="open_in_new" size={14} />
                         Abrir
@@ -638,7 +642,7 @@ const Documentos = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           download
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-primary dark:text-primary-bright bg-primary/10 hover:bg-primary/20 transition-colors"
                         >
                           <MaterialIcon icon="download" size={14} />
                           Baixar

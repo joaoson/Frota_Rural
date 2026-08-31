@@ -259,12 +259,12 @@ const NovoAnuncio = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <div className="flex-1 pt-32 pb-20 max-w-2xl mx-auto px-6 w-full">
-        <Link to="/dashboard" className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1">
+        <Link to="/dashboard" className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1">
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
 
         <div className="mb-10">
-          <h1 className="font-headline text-3xl font-bold text-primary mb-1">Novo Anúncio</h1>
+          <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright mb-1">Novo Anúncio</h1>
           <div className="h-1 w-16 bg-secondary-container mb-3" />
           <p className="text-on-surface-variant text-sm">Publique seu equipamento para locação</p>
         </div>
@@ -301,7 +301,7 @@ const NovoAnuncio = () => {
             {!loadingMachines && machines.length === 0 ? (
               <p className="text-[11px] text-outline font-medium">
                 Nenhum equipamento ativo.{" "}
-                <Link to="/dashboard/novo-equipamento" className="text-primary font-bold hover:underline">
+                <Link to="/dashboard/novo-equipamento" className="text-primary dark:text-primary-bright font-bold hover:underline">
                   Cadastre um equipamento
                 </Link>{" "}
                 primeiro.
@@ -485,7 +485,7 @@ const NovoAnuncio = () => {
               }}
               className="w-full border-2 border-dashed border-outline-variant/60 rounded-xl p-10 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
             >
-              <MaterialIcon icon="upload_file" className="text-outline group-hover:text-primary transition-colors mb-2" size={40} />
+              <MaterialIcon icon="upload_file" className="text-outline group-hover:text-primary dark:group-hover:text-primary-bright transition-colors mb-2" size={40} />
               <div className="font-bold text-tertiary text-sm">Arraste fotos ou clique para selecionar</div>
               <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">JPG, PNG — Max 5MB por foto</div>
             </button>

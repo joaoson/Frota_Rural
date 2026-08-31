@@ -201,33 +201,33 @@ const BuscarMaquinario = () => {
   const alturaImagem = { 2: "h-64", 3: "h-52" }[colunas];
 
   return (
-    <div className="min-h-screen bg-[#FFFBEB] flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
       <div className="flex-1 pt-32 pb-20 max-w-[1200px] mx-auto px-6 w-full">
 
         {/* Cabeçalho */}
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-[#1A2414] mb-1">Buscar Maquinário</h1>
-          <div className="h-1 w-20 bg-[#F59E0B] mb-3 rounded-full" />
-          <p className="text-gray-500 text-sm">Encontre o equipamento ideal para sua safra</p>
+          <h1 className="text-4xl font-bold text-on-surface mb-1">Buscar Maquinário</h1>
+          <div className="h-1 w-20 bg-secondary-container mb-3 rounded-full" />
+          <p className="text-on-surface-variant text-sm">Encontre o equipamento ideal para sua safra</p>
         </div>
 
         {/* Filtros */}
-        <div className="bg-white rounded-[24px] border border-gray-100 p-8 mb-10 shadow-sm">
+        <div className="bg-surface-container-lowest rounded-[24px] border border-outline-variant/30 p-8 mb-10 shadow-sm">
           <div className="flex items-center gap-2 mb-6">
-            <SlidersHorizontal className="w-4 h-4 text-[#2D3F1E]" />
-            <span className="text-xs font-bold text-[#2D3F1E] uppercase tracking-widest">Filtros</span>
+            <SlidersHorizontal className="w-4 h-4 text-primary dark:text-primary-bright" />
+            <span className="text-xs font-bold text-primary dark:text-primary-bright uppercase tracking-widest">Filtros</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="md:col-span-3 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Busca Livre</label>
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest">Busca Livre</label>
               <Input placeholder="Ex: Trator, Colheitadeira..." value={busca} onChange={(evento) => setBusca(evento.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Atividade Agrícola</label>
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest">Atividade Agrícola</label>
               <Select value={atividade} onValueChange={(v) => setAtividade(v === "todas" ? "" : v)}>
                 <SelectTrigger className="w-full"><SelectValue placeholder="Todas" /></SelectTrigger>
                 <SelectContent>
@@ -241,24 +241,24 @@ const BuscarMaquinario = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Localização</label>
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest">Localização</label>
               <Input placeholder="Ex: Sorriso, MT" value={cidade} onChange={(evento) => setCidade(evento.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preço máx. (R$/h)</label>
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest">Preço máx. (R$/h)</label>
               <Input type="number" placeholder="Ex: 400" min={0} value={precoMaxInput} onChange={(evento) => setPrecoMaxInput(evento.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest flex items-center gap-1">
                 <CalendarDays className="w-3 h-3" /> Data Início
               </label>
               <Input type="date" value={dataInicio} onChange={(evento) => setDataInicio(evento.target.value)} />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+              <label className="text-[10px] font-bold text-outline uppercase tracking-widest flex items-center gap-1">
                 <CalendarDays className="w-3 h-3" /> Data Fim
               </label>
               <Input type="date" value={dataFim} onChange={(evento) => setDataFim(evento.target.value)} />
@@ -266,8 +266,8 @@ const BuscarMaquinario = () => {
           </div>
 
           {temFiltro && (
-            <div className="flex justify-end mt-6 pt-6 border-t border-gray-100">
-              <Button variant="outline" onClick={handleLimpar} className="gap-2 text-gray-500">
+            <div className="flex justify-end mt-6 pt-6 border-t border-outline-variant/30">
+              <Button variant="outline" onClick={handleLimpar} className="gap-2 text-on-surface-variant">
                 <X className="w-4 h-4" /> Limpar filtros
               </Button>
             </div>
@@ -277,15 +277,15 @@ const BuscarMaquinario = () => {
         {/* Loading */}
         {loading && (
           <div className="text-center py-20">
-            <p className="text-gray-500 text-sm">Carregando anúncios...</p>
+            <p className="text-on-surface-variant text-sm">Carregando anúncios...</p>
           </div>
         )}
 
         {/* Erro de conexão */}
         {!loading && erro && (
-          <div className="text-center py-20 bg-white rounded-[24px] border border-red-100">
-            <p className="text-red-500 font-bold mb-2">Erro ao carregar</p>
-            <p className="text-gray-500 text-sm max-w-sm mx-auto">{erro}</p>
+          <div className="text-center py-20 bg-surface-container-lowest rounded-[24px] border border-error/30">
+            <p className="text-error font-bold mb-2">Erro ao carregar</p>
+            <p className="text-on-surface-variant text-sm max-w-sm mx-auto">{erro}</p>
           </div>
         )}
 
@@ -293,13 +293,13 @@ const BuscarMaquinario = () => {
         <div ref={refAnuncios} />
         {!loading && !erro && (
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <p className="text-sm text-gray-500">
-              <span className="font-bold text-[#2D3F1E]">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} disponíve{resultados.length !== 1 ? "is" : "l"}
+            <p className="text-sm text-on-surface-variant">
+              <span className="font-bold text-primary dark:text-primary-bright">{resultados.length}</span> equipamento{resultados.length !== 1 ? "s" : ""} disponíve{resultados.length !== 1 ? "is" : "l"}
             </p>
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 whitespace-nowrap">Ordenar por</span>
+                <span className="text-xs text-outline whitespace-nowrap">Ordenar por</span>
                 <Select value={ordenacao} onValueChange={(v) => { setOrdenacao(v as typeof ordenacao); setPagina(1); }}>
                   <SelectTrigger className="w-44 h-9 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -311,14 +311,14 @@ const BuscarMaquinario = () => {
                 </Select>
               </div>
 
-              <div className="flex gap-1 border border-gray-200 rounded-xl p-1 bg-white">
+              <div className="flex gap-1 border border-outline-variant/40 rounded-xl p-1 bg-surface-container-lowest">
                 {([2, 3] as const).map((n) => (
                   <button
                     key={n}
                     onClick={() => setColunas(n)}
                     title={`${n} por linha`}
                     className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                      colunas === n ? "bg-[#2D3F1E] text-white" : "text-gray-400 hover:text-[#2D3F1E] hover:bg-[#F3F0E6]"
+                      colunas === n ? "bg-primary-container text-on-primary" : "text-outline hover:text-primary dark:hover:text-primary-bright hover:bg-surface-container"
                     }`}
                   >
                     <IconeGrade n={n} />
@@ -331,12 +331,12 @@ const BuscarMaquinario = () => {
 
         {/* Sem resultados */}
         {!loading && !erro && temFiltro && resultados.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-[24px] border border-gray-100">
-            <div className="bg-[#F3F0E6] w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <SearchX className="w-8 h-8 text-[#2D3F1E]" />
+          <div className="text-center py-20 bg-surface-container-lowest rounded-[24px] border border-outline-variant/30">
+            <div className="bg-surface-container w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <SearchX className="w-8 h-8 text-primary dark:text-primary-bright" />
             </div>
-            <h3 className="text-xl font-bold text-[#1A2414] mb-2">Nenhum equipamento encontrado</h3>
-            <p className="text-gray-500 text-sm max-w-sm mx-auto">
+            <h3 className="text-xl font-bold text-on-surface mb-2">Nenhum equipamento encontrado</h3>
+            <p className="text-on-surface-variant text-sm max-w-sm mx-auto">
               Não encontramos anúncios para os filtros selecionados. Tente ajustar a localização, o período ou o tipo de atividade.
             </p>
             <Button variant="outline" onClick={handleLimpar} className="mt-6 gap-2">
@@ -349,38 +349,38 @@ const BuscarMaquinario = () => {
         {!loading && !erro && itensPaginados.length > 0 && (
           <div className={`grid ${gridCols} gap-8`}>
             {itensPaginados.map((anuncio) => (
-              <div key={anuncio.id} className="bg-white border border-gray-100 rounded-[20px] overflow-hidden group shadow-sm hover:shadow-xl transition-all duration-300">
-                <div className={`${alturaImagem} relative overflow-hidden bg-gray-100`}>
+              <div key={anuncio.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-[20px] overflow-hidden group shadow-sm hover:shadow-xl transition-all duration-300">
+                <div className={`${alturaImagem} relative overflow-hidden bg-surface-container-high`}>
                   <img src={anuncio.imagem} alt={anuncio.titulo} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(evento) => { evento.currentTarget.src = FALLBACK_IMG; }} />
-                  <div className="absolute top-3 right-3 bg-[#2D3F1E] text-white text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-widest shadow">
+                  <div className="absolute top-3 right-3 bg-primary-container text-on-primary text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-widest shadow">
                     Disponível
                   </div>
                 </div>
 
                 <div className="p-6 flex flex-col gap-3">
-                  <h4 className="font-bold text-[#1A2414] text-base leading-tight">{anuncio.titulo}</h4>
+                  <h4 className="font-bold text-on-surface text-base leading-tight">{anuncio.titulo}</h4>
 
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                  <p className="text-sm text-on-surface-variant flex items-center gap-1">
                     <MapPin className="w-4 h-4 shrink-0" /> {anuncio.cidade}
                   </p>
 
-                  <div className="border-t border-gray-100 pt-3 flex flex-col gap-1.5 text-xs">
+                  <div className="border-t border-outline-variant/30 pt-3 flex flex-col gap-1.5 text-xs">
                     <div className="flex gap-2 flex-wrap">
                       {anuncio.atividade && (
-                        <span className="bg-[#F3F0E6] text-[#2D3F1E] font-bold px-2.5 py-1 rounded-lg">{anuncio.atividade}</span>
+                        <span className="bg-surface-container text-primary dark:text-primary-bright font-bold px-2.5 py-1 rounded-lg">{anuncio.atividade}</span>
                       )}
                       {anuncio.ano !== "—" && (
-                        <span className="bg-gray-50 text-gray-500 font-medium px-2.5 py-1 rounded-lg">Ano: {anuncio.ano}</span>
+                        <span className="bg-surface-container text-on-surface-variant font-medium px-2.5 py-1 rounded-lg">Ano: {anuncio.ano}</span>
                       )}
                     </div>
-                    <span className="bg-gray-50 text-gray-500 font-medium px-2.5 py-1 rounded-lg w-fit">{anuncio.de} – {anuncio.ate}</span>
+                    <span className="bg-surface-container text-on-surface-variant font-medium px-2.5 py-1 rounded-lg w-fit">{anuncio.de} – {anuncio.ate}</span>
                   </div>
 
                   <div className="flex justify-between items-center pt-1">
-                    <div className="text-2xl font-black text-[#2D3F1E]">
-                      R$ {anuncio.preco.toFixed(2)}<span className="text-sm font-bold text-gray-400">/h</span>
+                    <div className="text-2xl font-black text-primary dark:text-primary-bright">
+                      R$ {anuncio.preco.toFixed(2)}<span className="text-sm font-bold text-outline">/h</span>
                     </div>
-                    <Link to={`/anuncio/${anuncio.id}`} className="bg-[#2D3F1E] text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-[#1A2414] transition-colors">
+                    <Link to={`/anuncio/${anuncio.id}`} className="bg-primary-container text-on-primary px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-primary transition-colors">
                       Ver Detalhes
                     </Link>
                   </div>
@@ -394,19 +394,19 @@ const BuscarMaquinario = () => {
         {!loading && !erro && lista.length > 0 && (
           <div className="flex items-center justify-center gap-2 mt-12">
             <button onClick={() => irParaPagina(Math.max(1, pagina - 1))} disabled={pagina === 1}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-[#2D3F1E] hover:bg-[#F3F0E6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
 
             {Array.from({ length: totalPgs }, (_, i) => i + 1).map((numeroPagina) => (
               <button key={numeroPagina} onClick={() => irParaPagina(numeroPagina)}
-                className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${numeroPagina === pagina ? "bg-[#2D3F1E] text-white shadow-sm" : "border border-gray-200 bg-white text-[#2D3F1E] hover:bg-[#F3F0E6]"}`}>
+                className={`w-9 h-9 rounded-xl text-sm font-bold transition-colors ${numeroPagina === pagina ? "bg-primary-container text-on-primary shadow-sm" : "border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container"}`}>
                 {numeroPagina}
               </button>
             ))}
 
             <button onClick={() => irParaPagina(Math.min(totalPgs, pagina + 1))} disabled={pagina === totalPgs}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white text-[#2D3F1E] hover:bg-[#F3F0E6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-outline-variant/40 bg-surface-container-lowest text-primary dark:text-primary-bright hover:bg-surface-container disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

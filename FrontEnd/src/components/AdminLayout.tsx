@@ -16,7 +16,7 @@ const AdminLayout = () => {
         <div className="p-6 pb-4">
           <Link
             to="/"
-            className="font-headline font-black text-xl text-primary tracking-tighter"
+            className="font-headline font-black text-xl text-primary dark:text-primary-bright tracking-tighter"
           >
             Frota Rural
           </Link>
@@ -32,7 +32,7 @@ const AdminLayout = () => {
               className={({ isActive }) =>
                 `w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    ? "bg-primary/10 text-primary dark:text-primary-bright font-bold border-l-2 border-primary"
                     : "text-on-surface-variant hover:bg-surface-container-high"
                 }`
               }

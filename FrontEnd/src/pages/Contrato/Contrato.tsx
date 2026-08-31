@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router";
 import "./Contrato.css";
 import type { AssinaturaEvidencia, ContratoData } from "./types";
 import { contractService } from "@/services/ContractService/ContractService";
+import ThemeToggle from "@/components/ThemeToggle";
 
 /** Campos sem dado cadastrado voltam vazios do servidor — o contrato não inventa valores. */
 const ou = (valor: string | number | null | undefined, fallback = "Não informado") =>
@@ -87,8 +88,8 @@ export default function Contrato() {
 
   if (loading) {
     return (
-      <div className="contrato-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fcfdf7" }}>
-        <p style={{ color: "#73796c", fontFamily: "'Epilogue', sans-serif", fontSize: "14px" }}>
+      <div className="contrato-root" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--ct-backdrop)" }}>
+        <p style={{ color: "var(--ct-muted)", fontFamily: "'Epilogue', sans-serif", fontSize: "14px" }}>
           Carregando documento do contrato...
         </p>
       </div>
@@ -97,11 +98,11 @@ export default function Contrato() {
 
   if (!data) {
     return (
-      <div className="contrato-root" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fcfdf7", gap: "16px" }}>
-        <p style={{ color: "#ba1a1a", fontFamily: "'Epilogue', sans-serif", fontWeight: "bold", fontSize: "16px" }}>
+      <div className="contrato-root" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--ct-backdrop)", gap: "16px" }}>
+        <p style={{ color: "var(--ct-error)", fontFamily: "'Epilogue', sans-serif", fontWeight: "bold", fontSize: "16px" }}>
           Contrato não encontrado.
         </p>
-        <Link to="/" style={{ padding: "10px 20px", background: "#386a20", color: "white", textDecoration: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "14px" }}>
+        <Link to="/" style={{ padding: "10px 20px", background: "var(--ct-brand-2)", color: "var(--ct-on-brand)", textDecoration: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "14px" }}>
           Voltar ao Início
         </Link>
       </div>
@@ -115,6 +116,7 @@ export default function Contrato() {
   return (
     <div className="contrato-root">
       <div className="print-btn-wrap no-print">
+        <ThemeToggle />
         <button className="print-btn" onClick={() => window.print()}>
           <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>print</span>
           Imprimir / Salvar PDF
@@ -154,7 +156,7 @@ export default function Contrato() {
           {/* Partes */}
           <div className="partes-grid">
             <div className="parte-card">
-              <div className="parte-label"><span className="dot" style={{ background: "#173901" }} />Locador</div>
+              <div className="parte-label"><span className="dot" style={{ background: "var(--ct-brand-text)" }} />Locador</div>
               <div className="parte-nome">{locador.razao_social}</div>
               <div className="parte-info">
                 {ou(locador.tipo_documento, "Documento")} nº {ou(locador.documento, "—")}
@@ -174,7 +176,7 @@ export default function Contrato() {
               )}
             </div>
             <div className="parte-card">
-              <div className="parte-label"><span className="dot" style={{ background: "#feb234" }} />Locatário</div>
+              <div className="parte-label"><span className="dot" style={{ background: "var(--ct-gold)" }} />Locatário</div>
               <div className="parte-nome">{locatario.razao_social}</div>
               <div className="parte-info">
                 {ou(locatario.tipo_documento, "Documento")} nº {ou(locatario.documento, "—")}
@@ -195,8 +197,8 @@ export default function Contrato() {
             </div>
           </div>
 
-          <div style={{ fontSize: "11px", color: "#73796c", lineHeight: 1.6 }}>
-            Este contrato é regido pelo <strong style={{ color: "#43493d" }}>Código de Defesa do Consumidor (Lei nº 8.078/1990)</strong> e, no que não estiver por ele previsto, pelo <strong style={{ color: "#43493d" }}>Código Civil Brasileiro (Lei nº 10.406/2002)</strong>.
+          <div style={{ fontSize: "11px", color: "var(--ct-muted)", lineHeight: 1.6 }}>
+            Este contrato é regido pelo <strong style={{ color: "var(--ct-ink-2)" }}>Código de Defesa do Consumidor (Lei nº 8.078/1990)</strong> e, no que não estiver por ele previsto, pelo <strong style={{ color: "var(--ct-ink-2)" }}>Código Civil Brasileiro (Lei nº 10.406/2002)</strong>.
           </div>
 
           <hr className="clausula-divider" />
@@ -272,7 +274,7 @@ export default function Contrato() {
 
         <div className="page-footer">
           <span className="footer-site">frotarural.app</span>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "9.5px" }}>{contrato.numero}</span>
+          <span style={{ color: "var(--ct-on-brand-faint)", fontSize: "9.5px" }}>{contrato.numero}</span>
           <span className="footer-num">01</span>
         </div>
       </div>
@@ -321,7 +323,7 @@ export default function Contrato() {
 
             <div className="horim-box">
               <div className="horim-head">
-                <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "14px" }}>speed</span>
+                <span className="material-symbols-outlined" style={{ color: "var(--ct-brand-text)", fontSize: "14px" }}>speed</span>
                 <span className="horim-head-label">Horímetro — Check-in e Check-out</span>
               </div>
               <div className="horim-nota">
@@ -332,25 +334,25 @@ export default function Contrato() {
                   <tr>
                     <th>Momento</th>
                     <th>Como registrar</th>
-                    <th style={{ color: "rgba(168,211,138,0.8)", fontSize: "8.5px" }}>Responsável</th>
+                    <th style={{ color: "var(--ct-brand-soft)", fontSize: "8.5px" }}>Responsável</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td><strong>Check-in</strong> — início do serviço</td>
                     <td>Foto do horímetro anexada na plataforma</td>
-                    <td style={{ color: "#73796c", fontSize: "10.5px" }}>Operador / Locador</td>
+                    <td style={{ color: "var(--ct-muted)", fontSize: "10.5px" }}>Operador / Locador</td>
                   </tr>
                   <tr>
                     <td><strong>Check-out</strong> — fim do serviço</td>
                     <td>Foto do horímetro anexada na plataforma</td>
-                    <td style={{ color: "#73796c", fontSize: "10.5px" }}>Operador / Locador</td>
+                    <td style={{ color: "var(--ct-muted)", fontSize: "10.5px" }}>Operador / Locador</td>
                   </tr>
                   <tr className="total-row">
                     <td>Horas efetivamente utilizadas</td>
                     <td colSpan={2}>
                       Informadas pelo operador no check-out &nbsp;·&nbsp;{" "}
-                      <span style={{ color: "#815500", fontSize: "10.5px" }}>Confirmadas pelo Locador na plataforma</span>
+                      <span style={{ color: "var(--ct-gold-text)", fontSize: "10.5px" }}>Confirmadas pelo Locador na plataforma</span>
                     </td>
                   </tr>
                   <tr className="final-row">
@@ -407,7 +409,7 @@ export default function Contrato() {
 
         <div className="page-footer">
           <span className="footer-site">frotarural.app</span>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "9.5px" }}>{contrato.numero}</span>
+          <span style={{ color: "var(--ct-on-brand-faint)", fontSize: "9.5px" }}>{contrato.numero}</span>
           <span className="footer-num">02</span>
         </div>
       </div>
@@ -429,11 +431,11 @@ export default function Contrato() {
                 <tr><th>Situação</th><th>Responsável</th></tr>
               </thead>
               <tbody>
-                <tr><td>Defeito mecânico preexistente à entrega</td><td style={{ color: "#173901" }}>Locador</td></tr>
-                <tr><td>Dano causado por obstáculo não informado pelo Locatário</td><td style={{ color: "#815500" }}>Locatário</td></tr>
-                <tr><td>Erro do operador indicado pelo Locador</td><td style={{ color: "#173901" }}>Locador</td></tr>
-                <tr><td>Furto ou roubo enquanto o equipamento estiver com o Locatário</td><td style={{ color: "#815500" }}>Locatário</td></tr>
-                <tr><td>Dano por evento imprevisível (raio, enchente, granizo)</td><td style={{ color: "#73796c" }}>Nenhuma das partes</td></tr>
+                <tr><td>Defeito mecânico preexistente à entrega</td><td style={{ color: "var(--ct-brand-text)" }}>Locador</td></tr>
+                <tr><td>Dano causado por obstáculo não informado pelo Locatário</td><td style={{ color: "var(--ct-gold-text)" }}>Locatário</td></tr>
+                <tr><td>Erro do operador indicado pelo Locador</td><td style={{ color: "var(--ct-brand-text)" }}>Locador</td></tr>
+                <tr><td>Furto ou roubo enquanto o equipamento estiver com o Locatário</td><td style={{ color: "var(--ct-gold-text)" }}>Locatário</td></tr>
+                <tr><td>Dano por evento imprevisível (raio, enchente, granizo)</td><td style={{ color: "var(--ct-muted)" }}>Nenhuma das partes</td></tr>
               </tbody>
             </table>
             <div className="clausula-body">
@@ -458,7 +460,7 @@ export default function Contrato() {
             <div className="aviso-legal">
               <span className="material-symbols-outlined aviso-icon">info</span>
               <div>
-                <div style={{ fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.11em", color: "#73796c", marginBottom: "4px" }}>
+                <div style={{ fontSize: "9.5px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.11em", color: "var(--ct-muted)", marginBottom: "4px" }}>
                   Intermediação tecnológica
                 </div>
                 <span>
@@ -482,13 +484,13 @@ export default function Contrato() {
               <div><span className="item-num">9.2</span> Se o contrato não for assinado por ambas as partes dentro do prazo estipulado, a reserva é cancelada automaticamente e o pagamento é estornado.</div>
             </div>
             <div className="multa-grid">
-              <div className="multa-card" style={{ background: "#f0fae8", border: "1px solid #c4efa3" }}>
-                <div className="multa-label" style={{ color: "#2d5016" }}>Rescisão por culpa do Locatário</div>
-                <div style={{ color: "#173901" }}>Multa de <strong>10%</strong> sobre o valor total estimado, acrescida de indenização por danos ao equipamento.</div>
+              <div className="multa-card" style={{ background: "var(--ct-ok-bg)", border: "1px solid var(--ct-ok-line)" }}>
+                <div className="multa-label" style={{ color: "var(--ct-ok-label)" }}>Rescisão por culpa do Locatário</div>
+                <div style={{ color: "var(--ct-brand-text)" }}>Multa de <strong>10%</strong> sobre o valor total estimado, acrescida de indenização por danos ao equipamento.</div>
               </div>
-              <div className="multa-card" style={{ background: "#fff8ee", border: "1px solid #ffddb2" }}>
-                <div className="multa-label" style={{ color: "#6d4700" }}>Rescisão por culpa do Locador</div>
-                <div style={{ color: "#6d4700" }}>Multa de <strong>10%</strong> sobre o valor total estimado e restituição integral dos valores pagos.</div>
+              <div className="multa-card" style={{ background: "var(--ct-warn-bg)", border: "1px solid var(--ct-warn-line)" }}>
+                <div className="multa-label" style={{ color: "var(--ct-warn-text)" }}>Rescisão por culpa do Locador</div>
+                <div style={{ color: "var(--ct-warn-text)" }}>Multa de <strong>10%</strong> sobre o valor total estimado e restituição integral dos valores pagos.</div>
               </div>
             </div>
             <div className="clausula-body">
@@ -528,8 +530,8 @@ export default function Contrato() {
           {/* Assinaturas */}
           <div className="clausula">
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "14px" }}>draw</span>
-              <span style={{ fontFamily: "'Epilogue',sans-serif", fontSize: "11px", fontWeight: 800, color: "#173901", textTransform: "uppercase", letterSpacing: "0.09em" }}>
+              <span className="material-symbols-outlined" style={{ color: "var(--ct-brand-text)", fontSize: "14px" }}>draw</span>
+              <span style={{ fontFamily: "'Epilogue',sans-serif", fontSize: "11px", fontWeight: 800, color: "var(--ct-brand-text)", textTransform: "uppercase", letterSpacing: "0.09em" }}>
                 Assinatura Digital
               </span>
             </div>
@@ -542,7 +544,7 @@ export default function Contrato() {
                 <div className="assin-nome">{ou(locador.razao_social, "—")}</div>
                 <div className="assin-rep">{ou(locador.representante_nome, "—")}</div>
                 <div className="assin-stamp">
-                  <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "13px" }}>verified</span>
+                  <span className="material-symbols-outlined" style={{ color: "var(--ct-brand-text)", fontSize: "13px" }}>verified</span>
                   <div>
                     <div className="assin-stamp-label">Assinado eletronicamente em</div>
                     <div className="assin-stamp-val">{assinatura.data_locador}</div>
@@ -555,7 +557,7 @@ export default function Contrato() {
                 <div className="assin-nome">{ou(locatario.razao_social, "—")}</div>
                 <div className="assin-rep">{ou(locatario.representante_nome, "—")}</div>
                 <div className="assin-stamp">
-                  <span className="material-symbols-outlined" style={{ color: "#173901", fontSize: "13px" }}>verified</span>
+                  <span className="material-symbols-outlined" style={{ color: "var(--ct-brand-text)", fontSize: "13px" }}>verified</span>
                   <div>
                     <div className="assin-stamp-label">Assinado eletronicamente em</div>
                     <div className="assin-stamp-val">{assinatura.data_locatario}</div>
@@ -587,7 +589,7 @@ export default function Contrato() {
 
         <div className="page-footer">
           <span className="footer-site">frotarural.app</span>
-          <span style={{ color: "rgba(255,255,255,0.3)", fontSize: "9.5px" }}>{contrato.numero}</span>
+          <span style={{ color: "var(--ct-on-brand-faint)", fontSize: "9.5px" }}>{contrato.numero}</span>
           <span className="footer-num">03</span>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const AdminPlaceholder = ({ title }: { title: string }) => (
   <>
@@ -6,6 +7,7 @@ const AdminPlaceholder = ({ title }: { title: string }) => (
       <h1 className="font-headline font-black text-lg text-on-surface tracking-tight">
         {title}
       </h1>
+      <ThemeToggle className="ml-auto" />
     </header>
     <div className="p-8 max-w-[1200px]">
       <div className="bg-surface-container-low rounded-2xl border border-outline-variant/30 p-10 text-center">

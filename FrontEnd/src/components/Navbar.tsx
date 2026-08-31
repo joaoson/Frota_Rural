@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import MaterialIcon from "@/components/MaterialIcon";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
   const { isAuthenticated, isLoading, userRole, logout } = useAuth();
@@ -27,13 +28,13 @@ const Navbar = () => {
   return (
     <nav className="fixed top-0 w-full z-50 bg-surface-container-lowest/70 backdrop-blur-md shadow-sm">
       <div className="flex justify-between items-center max-w-[1200px] mx-auto px-6 h-20">
-        <Link to="/" className="text-2xl font-black text-primary tracking-tighter font-headline">
+        <Link to="/" className="text-2xl font-black text-primary dark:text-primary-bright tracking-tighter font-headline">
           Frota Rural
         </Link>
         <div className="hidden md:flex items-center gap-8 font-headline font-bold text-sm tracking-tight">
           <Link
             to="/buscar-maquinario"
-            className="text-primary border-b-2 border-primary pb-1 hover:text-primary-container transition-colors duration-200"
+            className="text-primary dark:text-primary-bright border-b-2 border-primary pb-1 hover:text-primary-container transition-colors duration-200"
           >
             Explorar Máquinas
           </Link>
@@ -48,13 +49,15 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+
           {isLoading ? (
             <div className="w-10 h-10" aria-hidden />
           ) : isAuthenticated ? (
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+                className="w-10 h-10 rounded-full bg-primary/10 text-primary dark:text-primary-bright flex items-center justify-center hover:bg-primary/20 transition-colors"
               >
                 <MaterialIcon icon="person" size={24} />
               </button>
@@ -96,7 +99,7 @@ const Navbar = () => {
             </div>
           ) : (
             <>
-              <Link to="/login" className="px-5 py-2.5 text-sm font-bold text-primary hover:text-primary-container transition-colors">
+              <Link to="/login" className="px-5 py-2.5 text-sm font-bold text-primary dark:text-primary-bright hover:text-primary-container transition-colors">
                 Entrar
               </Link>
               <Link

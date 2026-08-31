@@ -79,6 +79,7 @@
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
     --color-primary: var(--primary);
+    --color-primary-bright: var(--primary-bright);
     --color-popover-foreground: var(--popover-foreground);
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
@@ -95,6 +96,8 @@
 }
 
 :root {
+    color-scheme: light;
+
     /* Frota Rural — Material Design 3 (aligned with doc-to-design-prototypes) */
     --background: hsl(45 100% 96%);
     --foreground: hsl(50 33% 9%);
@@ -105,6 +108,7 @@
     --primary: hsl(110 95% 11%);
     --primary-foreground: hsl(0 0% 100%);
     --primary-container: hsl(110 55% 20%);
+    --primary-bright: hsl(100 36% 62%);
     --primary-container-foreground: hsl(0 0% 100%);
     --primary-fixed: hsl(100 56% 79%);
     --primary-fixed-dim: hsl(100 40% 68%);
@@ -169,76 +173,117 @@
     --sidebar-ring: hsl(110 95% 11%);
     --sidebar: var(--sidebar-background);
     --chart-1: hsl(110 55% 35%);
-    --chart-2: hsl(39 90% 45%);
+    --chart-2: hsl(39 99% 60%);
     --chart-3: hsl(30 45% 40%);
     --chart-4: hsl(100 25% 45%);
     --chart-5: hsl(45 60% 50%);
 }
 
 .dark {
-    --background: hsl(46 21% 12%);
-    --foreground: hsl(44 38% 91%);
-    --card: hsl(46 18% 16%);
-    --card-foreground: hsl(44 38% 91%);
-    --popover: hsl(46 18% 16%);
-    --popover-foreground: hsl(44 38% 91%);
-    --primary: hsl(100 40% 68%);
-    --primary-foreground: hsl(110 100% 8%);
-    --primary-container: hsl(110 40% 22%);
-    --primary-container-foreground: hsl(100 36% 62%);
-    --primary-fixed: hsl(100 56% 79%);
-    --primary-fixed-dim: hsl(100 40% 68%);
-    --on-primary-fixed: hsl(110 100% 8%);
-    --on-primary-fixed-variant: hsl(110 56% 19%);
-    --on-primary-container: hsl(100 36% 62%);
-    --secondary: hsl(36 80% 70%);
-    --secondary-foreground: hsl(36 100% 14%);
-    --secondary-container: hsl(36 50% 28%);
-    --secondary-container-foreground: hsl(39 99% 85%);
-    --muted: hsl(43 15% 22%);
-    --muted-foreground: hsl(44 20% 70%);
-    --accent: hsl(43 15% 22%);
-    --accent-foreground: hsl(44 38% 91%);
-    --destructive: hsl(0 65% 50%);
-    --destructive-foreground: hsl(0 0% 100%);
-    --border: hsl(44 10% 28%);
-    --input: hsl(44 10% 28%);
-    --ring: hsl(100 40% 68%);
-    --surface: hsl(46 21% 12%);
-    --surface-container: hsl(46 18% 18%);
-    --surface-container-low: hsl(46 18% 16%);
-    --surface-container-high: hsl(46 16% 22%);
-    --surface-container-highest: hsl(46 14% 26%);
-    --surface-container-lowest: hsl(46 22% 10%);
-    --surface-dim: hsl(46 20% 10%);
-    --surface-bright: hsl(46 18% 20%);
-    --surface-variant: hsl(46 12% 24%);
-    --surface-tint: hsl(100 30% 40%);
-    --on-surface: hsl(44 38% 91%);
-    --on-surface-variant: hsl(44 15% 75%);
-    --on-background: hsl(44 38% 91%);
-    --outline: hsl(44 12% 55%);
-    --outline-variant: hsl(44 10% 32%);
-    --inverse-surface: hsl(44 38% 91%);
-    --inverse-on-surface: hsl(46 21% 17%);
-    --inverse-primary: hsl(110 95% 11%);
-    --tertiary: hsl(30 35% 70%);
-    --tertiary-container: hsl(30 30% 28%);
-    --on-tertiary: hsl(25 82% 8%);
-    --on-tertiary-container: hsl(30 30% 68%);
-    --sidebar: hsl(46 18% 14%);
-    --sidebar-foreground: hsl(44 38% 91%);
-    --sidebar-primary: hsl(100 40% 68%);
-    --sidebar-primary-foreground: hsl(110 100% 8%);
-    --sidebar-accent: hsl(46 15% 20%);
-    --sidebar-accent-foreground: hsl(44 38% 91%);
-    --sidebar-border: hsl(44 10% 28%);
-    --sidebar-ring: hsl(100 40% 68%);
-    --chart-1: hsl(100 45% 55%);
-    --chart-2: hsl(39 80% 55%);
-    --chart-3: hsl(30 40% 55%);
-    --chart-4: hsl(100 20% 60%);
-    --chart-5: hsl(45 50% 55%);
+    color-scheme: dark;
+
+    --tone-bg: hsl(45 8% 7%);
+    --tone-surface: hsl(45 7% 11%);
+    --tone-raised: hsl(45 6% 15%);
+    --tone-line: hsl(45 6% 26%);
+    --tone-green: hsl(95 25% 38%);
+    --tone-green-text: hsl(95 30% 62%);
+    --tone-on-green: hsl(0 0% 100%);
+    --tone-gold: hsl(40 70% 52%);
+    --tone-on-gold: hsl(45 12% 8%);
+    --tone-ink: hsl(45 20% 92%);
+    --tone-ink-dim: hsl(45 8% 65%);
+    --tone-red: hsl(4 52% 70%);
+
+    --background: var(--tone-bg);
+    --surface: var(--tone-bg);
+    --surface-dim: var(--tone-bg);
+    --inverse-on-surface: var(--tone-bg);
+    --on-tertiary-fixed: var(--tone-bg);
+    --on-tertiary-fixed-variant: var(--tone-bg);
+    --destructive-foreground: var(--tone-bg);
+    --on-error: var(--tone-bg);
+
+    --card: var(--tone-surface);
+    --surface-container-lowest: var(--tone-surface);
+    --surface-container-low: var(--tone-surface);
+    --muted: var(--tone-surface);
+    --sidebar-background: var(--tone-surface);
+
+    --popover: var(--tone-raised);
+    --surface-container: var(--tone-raised);
+    --surface-container-high: var(--tone-raised);
+    --surface-variant: var(--tone-raised);
+    --accent: var(--tone-raised);
+    --sidebar-accent: var(--tone-raised);
+    --tertiary-container: var(--tone-raised);
+    --error-container: var(--tone-raised);
+    --chart-5: var(--tone-raised);
+
+    --border: var(--tone-line);
+    --input: var(--tone-line);
+    --outline-variant: var(--tone-line);
+    --sidebar-border: var(--tone-line);
+    --surface-container-highest: var(--tone-line);
+    --surface-bright: var(--tone-line);
+    --chart-4: var(--tone-line);
+
+    --primary: var(--tone-green);
+    --primary-bright: var(--tone-green-text);
+    --primary-container: var(--tone-green);
+    --primary-fixed: var(--tone-green);
+    --primary-fixed-dim: var(--tone-green);
+    --inverse-primary: var(--tone-green);
+    --ring: var(--tone-green);
+    --surface-tint: var(--tone-green);
+    --sidebar-primary: var(--tone-green);
+    --sidebar-ring: var(--tone-green);
+    --chart-1: var(--tone-green);
+
+    --primary-foreground: var(--tone-on-green);
+    --primary-container-foreground: var(--tone-on-green);
+    --on-primary-container: var(--tone-on-green);
+    --on-primary-fixed: var(--tone-on-green);
+    --on-primary-fixed-variant: var(--tone-on-green);
+    --sidebar-primary-foreground: var(--tone-on-green);
+
+    --secondary: var(--tone-gold);
+    --secondary-container: var(--tone-gold);
+    --secondary-fixed: var(--tone-gold);
+    --secondary-fixed-dim: var(--tone-gold);
+    --chart-2: var(--tone-gold);
+
+    --secondary-foreground: var(--tone-on-gold);
+    --secondary-container-foreground: var(--tone-on-gold);
+    --on-secondary-fixed: var(--tone-on-gold);
+    --on-secondary-fixed-variant: var(--tone-on-gold);
+
+    --foreground: var(--tone-ink);
+    --card-foreground: var(--tone-ink);
+    --popover-foreground: var(--tone-ink);
+    --accent-foreground: var(--tone-ink);
+    --on-surface: var(--tone-ink);
+    --on-background: var(--tone-ink);
+    --sidebar-foreground: var(--tone-ink);
+    --sidebar-accent-foreground: var(--tone-ink);
+    --inverse-surface: var(--tone-ink);
+    --on-tertiary: var(--tone-ink);
+    --on-tertiary-container: var(--tone-ink);
+
+    --muted-foreground: var(--tone-ink-dim);
+    --on-surface-variant: var(--tone-ink-dim);
+    --outline: var(--tone-ink-dim);
+    --tertiary: var(--tone-ink-dim);
+    --tertiary-fixed: var(--tone-ink-dim);
+    --tertiary-fixed-dim: var(--tone-ink-dim);
+    --chart-3: var(--tone-ink-dim);
+
+    --destructive: var(--tone-red);
+    --error: var(--tone-red);
+    --on-error-container: var(--tone-red);
+
+    --radius: 0.5rem;
+    --sidebar: var(--sidebar-background);
 }
 
 @layer base {
@@ -253,5 +298,59 @@
   }
   .material-symbols-outlined {
     font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  }
+
+  html.theme-switching,
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition:
+      background-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      color 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      fill 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      stroke 320ms cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 320ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transition-delay: 0ms !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.theme-switching,
+    html.theme-switching *,
+    html.theme-switching *::before,
+    html.theme-switching *::after {
+      transition: none !important;
+    }
+  }
+
+  ::selection {
+    background-color: var(--secondary-container);
+    color: var(--secondary-container-foreground);
+  }
+
+  * {
+    scrollbar-color: var(--outline-variant) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--outline-variant);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--outline);
+  }
+}
+
+@layer utilities {
+  .dark .img-adaptive {
+    filter: brightness(0.86) saturate(0.92);
   }
 }

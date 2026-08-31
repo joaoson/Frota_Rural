@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'machines',
     'administration',
     'document_validation',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -106,7 +107,57 @@ REST_FRAMEWORK = {
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
         'rest_framework.authentication.SessionAuthentication',
         'authentication.extensions.authentication.AppJWTAuthentication',
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Frota Rural API',
+    'DESCRIPTION': (
+        'Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na '
+        'conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).\n\n'
+        '## Autenticação\n\n'
+        'A API usa **JWT (Bearer token)**. Para testar os endpoints protegidos por aqui:\n\n'
+        '1. Chame `POST /api/login` com e-mail e senha.\n'
+        '2. Copie o valor de `access` da resposta.\n'
+        '3. Clique em **Authorize** (canto superior direito) e cole o token.\n\n'
+        'O token de acesso expira em 15 minutos; use `POST /api/login/refresh` para renová-lo.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'CONTACT': {'name': 'Equipe Frota Rural', 'url': 'https://github.com/joaoson/Frota_Rural'},
+    'SERVERS': [
+        {'url': 'http://127.0.0.1:8000', 'description': 'Ambiente local de desenvolvimento'},
+    ],
+    'SORT_OPERATIONS': False,
+    # `validation_status` aparece com dois conjuntos de opções: o do model (inclui
+    # `pending`) e o da decisão do administrador. Sem os nomes explícitos o
+    # drf-spectacular gera componentes com sufixo aleatório (ValidationStatusDe3Enum).
+    'ENUM_NAME_OVERRIDES': {
+        'ValidationStatusEnum': 'document_validation.serializer.VALIDATION_STATUS_CHOICES',
+        'ReviewDecisionEnum': 'document_validation.serializer.REVIEW_DECISION_CHOICES',
+    },
+    'SWAGGER_UI_SETTINGS': {
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
+        'docExpansion': 'none',
+        'filter': True,
+    },
+    # Ordem em que os grupos aparecem no Swagger UI. Cada view declara sua tag
+    # via `@extend_schema(tags=[...])`; sem isso o drf-spectacular agruparia
+    # tudo sob o primeiro segmento do path ('api').
+    'TAGS': [
+        {'name': 'Autenticação', 'description': 'Login, refresh, logout e recuperação de senha.'},
+        {'name': 'Usuários', 'description': 'Cadastro, consulta e manutenção de contas.'},
+        {'name': 'Maquinário', 'description': 'Equipamentos cadastrados pelos locadores.'},
+        {'name': 'Anúncios', 'description': 'Publicação de maquinário disponível para locação.'},
+        {'name': 'Locações', 'description': 'Reservas e ciclo de vida das locações.'},
+        {'name': 'Contratos', 'description': 'Geração e assinatura dos contratos de locação.'},
+        {'name': 'Avaliações', 'description': 'Reputação de locadores e locatários.'},
+        {'name': 'Documentos', 'description': 'CNHs, certificações e validação por Machine Learning.'},
+        {'name': 'Administração', 'description': 'Moderação de usuários e anúncios.'},
+    ],
 }
 
 SIMPLE_JWT = {

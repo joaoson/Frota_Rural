@@ -5,9 +5,58 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from users.models import Users
 from users.serializer import UserSerializer, ChangePasswordSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 
 # Create your views here.
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
+USER_NOT_FOUND = OpenApiResponse(description="Usuário não encontrado.")
+USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado em outra conta.")
+
+
+@extend_schema(
+    tags=['Usuários'],
+    summary="Criar um novo usuário",
+    description="Endpoint para cadastro de novos usuários na plataforma. O usuário pode ter diferentes papéis (locador, locatario, operador).",
+    request=UserSerializer,
+    responses={
+        201: OpenApiResponse(description="Usuário criado com sucesso", response=UserSerializer),
+        400: OpenApiResponse(description="Dados de entrada inválidos"),
+        403: OpenApiResponse(description="Cadastro bloqueado (usuário banido)"),
+        409: OpenApiResponse(description="Conflito (E-mail ou Documento já em uso)"),
+    },
+    examples=[
+        OpenApiExample(
+            'Perfil: Locatário (Produtor Rural)',
+            summary='Exemplo de cadastro de um produtor que alugará máquinas',
+            description='Um agricultor se cadastrando com CPF para locar colheitadeiras.',
+            value={
+                "name": "José Almeida",
+                "document": "12345678909",
+                "email": "jose.almeida@fazenda.com.br",
+                "password_hash": "senha_segura_123",
+                "phone": "+5541999999999",
+                "role": "locatario",
+                "status": "active"
+            },
+            request_only=True
+        ),
+        OpenApiExample(
+            'Perfil: Locador (Empresa de Frota)',
+            summary='Exemplo de cadastro de um dono de frota agrícola',
+            description='Uma empresa de maquinário se cadastrando com CNPJ.',
+            value={
+                "name": "Tratores & Cia LTDA",
+                "document": "12345678000199",
+                "email": "contato@tratoresecia.com.br",
+                "password_hash": "senha_forte_456",
+                "phone": "+5511988888888",
+                "role": "locador",
+                "status": "active"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 def create_user(request):
     document = request.data.get('document')
@@ -28,12 +77,27 @@ def create_user(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema(
+    tags=['Usuários'],
+    summary="Listar usuários",
+    description="Retorna a lista completa de usuários cadastrados no sistema.",
+    responses={200: UserSerializer(many=True)}
+)
 @api_view(['GET'])
 def get_users(request):
     users = Users.objects.all()
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data)
 
+@extend_schema(
+    tags=['Usuários'],
+    summary="Buscar usuário por e-mail",
+    description="Retorna os detalhes de um usuário específico utilizando o e-mail como chave de busca.",
+    responses={
+        200: UserSerializer,
+        404: OpenApiResponse(description="Usuário não encontrado")
+    }
+)
 @api_view(['GET'])
 def get_user_by_email(request, email):
     try:
@@ -43,6 +107,41 @@ def get_user_by_email(request, email):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Usuários'],
+        summary="Consultar usuário",
+        responses={200: UserSerializer, 404: USER_NOT_FOUND},
+    ),
+    put=extend_schema(
+        tags=['Usuários'],
+        summary="Substituir usuário",
+        request=UserSerializer,
+        responses={
+            200: UserSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            404: USER_NOT_FOUND,
+            409: USER_CONFLICT,
+        },
+    ),
+    patch=extend_schema(
+        tags=['Usuários'],
+        summary="Atualizar usuário parcialmente",
+        description="Atualiza apenas os campos enviados, como telefone ou endereço.",
+        request=UserSerializer,
+        responses={
+            200: UserSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            404: USER_NOT_FOUND,
+            409: USER_CONFLICT,
+        },
+    ),
+    delete=extend_schema(
+        tags=['Usuários'],
+        summary="Excluir usuário",
+        responses={204: OpenApiResponse(description="Usuário excluído."), 404: USER_NOT_FOUND},
+    ),
+)
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
 def user_detail(request, pk):
     try:
@@ -90,6 +189,28 @@ def user_detail(request, pk):
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema(
+    tags=['Usuários'],
+    summary="Alterar senha do usuário",
+    description="Permite que o usuário autenticado atualize sua própria senha, fornecendo a senha atual e a nova.",
+    request=ChangePasswordSerializer,
+    responses={
+        204: OpenApiResponse(description="Senha alterada com sucesso"),
+        400: OpenApiResponse(description="Senha atual incorreta ou dados inválidos"),
+        404: OpenApiResponse(description="Usuário não encontrado")
+    },
+    examples=[
+        OpenApiExample(
+            'Troca de Senha Padrão',
+            summary='Exemplo de payload para troca de senha',
+            value={
+                "current_password": "senha_antiga_123",
+                "new_password": "nova_senha_segura_456"
+            },
+            request_only=True
+        )
+    ]
+)
 @api_view(['POST'])
 def change_password(request, pk):
     try:

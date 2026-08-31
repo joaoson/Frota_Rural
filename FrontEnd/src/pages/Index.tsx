@@ -49,7 +49,7 @@ const Index = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
-            className="font-headline text-[clamp(36px,5vw,64px)] font-black text-primary leading-[1.1] tracking-tighter mb-6 max-w-3xl"
+            className="font-headline text-[clamp(36px,5vw,64px)] font-black text-primary dark:text-primary-bright leading-[1.1] tracking-tighter mb-6 max-w-3xl"
           >
             Alugue maquinário agrícola perto de você
           </motion.h1>
@@ -82,7 +82,7 @@ const Index = () => {
         {/* Busca rápida */}
         <section className="-mt-16 relative z-20">
           <div className="bg-surface-container-lowest rounded-2xl shadow-xl px-10 py-10 border border-outline-variant/50">
-            <h2 className="font-headline text-lg font-bold text-primary mb-8">Encontre o equipamento ideal para a sua safra</h2>
+            <h2 className="font-headline text-lg font-bold text-primary dark:text-primary-bright mb-8">Encontre o equipamento ideal para a sua safra</h2>
             <div className="flex flex-col md:flex-row gap-4 mb-6">
               <div className="flex-[3] space-y-1.5">
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Busca</label>
@@ -118,7 +118,7 @@ const Index = () => {
         {/* Anúncios em destaque */}
         <section>
           <p className="text-xs font-bold text-tertiary uppercase tracking-widest mb-3">Em destaque esta semana</p>
-          <h2 className="font-headline text-4xl font-bold text-primary mb-2">Maquinário disponível agora</h2>
+          <h2 className="font-headline text-4xl font-bold text-primary dark:text-primary-bright mb-2">Maquinário disponível agora</h2>
           <div className="h-1 w-24 bg-secondary-container mb-10" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {featuredListings.map((item, i) => (
@@ -135,18 +135,18 @@ const Index = () => {
                   <div className="absolute top-4 right-4 bg-primary text-on-primary text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-widest shadow-lg">
                     Safra 2026
                   </div>
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20 shadow-sm">
-                    <MaterialIcon icon="verified_user" className="text-primary" size={16} />
+                  <div className="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur px-3 py-1.5 rounded-lg flex items-center gap-2 border border-outline-variant/20 shadow-sm">
+                    <MaterialIcon icon="verified_user" className="text-primary dark:text-primary-bright" size={16} />
                     <span className="text-xs font-bold text-tertiary">Operador com NR-31</span>
                   </div>
                 </div>
                 <div className="p-6 space-y-4">
                   <div>
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className="font-headline text-xl font-bold text-primary leading-tight">{item.title}</h4>
+                      <h4 className="font-headline text-xl font-bold text-primary dark:text-primary-bright leading-tight">{item.title}</h4>
                       <div className="flex items-center bg-secondary-container/10 px-2 py-0.5 rounded">
                         <MaterialIcon icon="star" filled className="text-secondary-container" size={14} />
-                        <span className="text-xs font-bold text-on-secondary-container ml-1">{item.rating}</span>
+                        <span className="text-xs font-bold text-secondary ml-1">{item.rating}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-on-surface-variant font-medium text-sm">
@@ -166,7 +166,7 @@ const Index = () => {
                   <div className="flex justify-between items-end">
                     <div>
                       <span className="text-xs text-on-surface-variant font-bold uppercase tracking-wider block mb-1">Custo</span>
-                      <div className="text-2xl font-black text-primary leading-none">{item.price}<span className="text-sm font-bold text-tertiary">/hora</span></div>
+                      <div className="text-2xl font-black text-primary dark:text-primary-bright leading-none">{item.price}<span className="text-sm font-bold text-tertiary">/hora</span></div>
                     </div>
                     <Link to="/buscar-maquinario" className="bg-primary text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm shadow hover:bg-primary/90 transition-colors">
                       Reservar
@@ -180,7 +180,7 @@ const Index = () => {
 
         {/* Como funciona */}
         <section>
-          <h2 className="font-headline text-4xl font-bold text-primary mb-2">Como Funciona</h2>
+          <h2 className="font-headline text-4xl font-bold text-primary dark:text-primary-bright mb-2">Como Funciona</h2>
           <div className="h-1 w-24 bg-secondary-container mb-10" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {(["locatario", "locador"] as const).map((role) => (
@@ -192,10 +192,10 @@ const Index = () => {
                   {steps[role].map((s, i) => (
                     <motion.div key={i} initial={{ opacity: 0, x: role === "locatario" ? -20 : 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }} className="flex items-start gap-4">
                       <div className={`w-12 h-12 ${role === "locatario" ? "bg-primary/10" : "bg-secondary-container/20"} rounded-xl flex items-center justify-center shrink-0`}>
-                        <MaterialIcon icon={s.icon} className="text-primary" size={24} />
+                        <MaterialIcon icon={s.icon} className="text-primary dark:text-primary-bright" size={24} />
                       </div>
                       <div>
-                        <h4 className="font-headline font-bold text-primary text-lg">{s.title}</h4>
+                        <h4 className="font-headline font-bold text-primary dark:text-primary-bright text-lg">{s.title}</h4>
                         <p className="text-on-surface-variant text-sm">{s.desc}</p>
                       </div>
                     </motion.div>
@@ -208,7 +208,7 @@ const Index = () => {
 
         {/* Por que formalizar */}
         <section className="bg-surface-container-low rounded-3xl p-12">
-          <h2 className="font-headline text-4xl font-bold text-primary mb-2">Por que utilizar a Frota Rural?</h2>
+          <h2 className="font-headline text-4xl font-bold text-primary dark:text-primary-bright mb-2">Por que utilizar a Frota Rural?</h2>
           <div className="h-1 w-24 bg-secondary-container mb-10" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
@@ -220,8 +220,8 @@ const Index = () => {
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}
                 className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/20"
               >
-                <div className="mb-4"><MaterialIcon icon={item.icon} className="text-primary" size={32} /></div>
-                <h4 className="font-headline font-bold text-primary text-lg mb-2">{item.title}</h4>
+                <div className="mb-4"><MaterialIcon icon={item.icon} className="text-primary dark:text-primary-bright" size={32} /></div>
+                <h4 className="font-headline font-bold text-primary dark:text-primary-bright text-lg mb-2">{item.title}</h4>
                 <p className="text-on-surface-variant text-sm">{item.desc}</p>
               </motion.div>
             ))}
@@ -231,7 +231,7 @@ const Index = () => {
         {/* Avaliações */}
         <section className="bg-surface-container-low rounded-3xl p-12">
           <p className="text-xs font-bold text-tertiary uppercase tracking-widest text-center mb-3">Quem já usa, recomenda</p>
-          <h2 className="font-headline text-4xl font-bold text-primary mb-10 text-center">O campo já está colhendo resultados</h2>
+          <h2 className="font-headline text-4xl font-bold text-primary dark:text-primary-bright mb-10 text-center">O campo já está colhendo resultados</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {reviews.map((r, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }}

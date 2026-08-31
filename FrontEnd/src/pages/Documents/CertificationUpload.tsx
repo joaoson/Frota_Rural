@@ -178,7 +178,7 @@ const CertificationUpload = () => {
       <div className="flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full">
         <Link
           to="/dashboard"
-          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
         >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
@@ -190,7 +190,7 @@ const CertificationUpload = () => {
         ) : (
           <>
             <div className="mb-8 sm:mb-10">
-              <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+              <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary dark:text-primary-bright mb-1">
                 {isEditing ? "Editar Certificação" : "Nova Certificação"}
               </h1>
               <div className="h-1 w-16 bg-secondary-container mb-3" />
@@ -206,7 +206,7 @@ const CertificationUpload = () => {
               onSubmit={handleSubmit}
               noValidate
             >
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                 Dados da Certificação
               </p>
 
@@ -318,7 +318,7 @@ const CertificationUpload = () => {
                 {errors.description && <p className="text-[11px] text-error font-medium mt-1">{errors.description}</p>}
               </div>
 
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright border-b border-outline-variant/30 pb-2">
                 Mídia (opcional)
               </p>
 
@@ -354,9 +354,9 @@ const CertificationUpload = () => {
                       <MaterialIcon
                         icon="check_circle"
                         size={40}
-                        className="text-primary mb-2"
+                        className="text-primary dark:text-primary-bright mb-2"
                       />
-                      <div className="font-bold text-primary text-sm">
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">
                         {file.name}
                       </div>
                       <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">
@@ -368,9 +368,9 @@ const CertificationUpload = () => {
                       <MaterialIcon
                         icon="insert_drive_file"
                         size={40}
-                        className="text-primary mb-2"
+                        className="text-primary dark:text-primary-bright mb-2"
                       />
-                      <div className="font-bold text-primary text-sm">
+                      <div className="font-bold text-primary dark:text-primary-bright text-sm">
                         Arquivo enviado anteriormente
                       </div>
                       <div className="text-[10px] font-bold text-outline mt-1 uppercase tracking-widest">

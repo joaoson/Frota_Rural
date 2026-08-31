@@ -3,13 +3,76 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Machines
+from api.schemas import ErrorResponseSerializer
 from .serializer import MachineSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 # Create your views here.
 def _machines_queryset():
     return Machines.objects.all()
 
 
+MACHINE_NOT_FOUND = OpenApiResponse(description="Máquina não encontrada.")
+MACHINE_CONFLICT = OpenApiResponse(
+    response=ErrorResponseSerializer,
+    description="Dados inválidos ou em conflito (ex.: `renagro_number` já cadastrado).",
+)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Maquinário'],
+        summary="Listar máquinas",
+        description="Retorna as máquinas cadastradas, com filtros opcionais por proprietário, status, marca ou modelo.",
+        parameters=[
+            OpenApiParameter('owner', type=str, description='ID do proprietário'),
+            OpenApiParameter('status', type=str, description='Status da máquina (active, maintenance)'),
+            OpenApiParameter('brand', type=str, description='Marca da máquina'),
+            OpenApiParameter('model', type=str, description='Modelo da máquina'),
+        ],
+        responses={200: MachineSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=['Maquinário'],
+        summary="Cadastrar máquina",
+        description=(
+            "Cadastra uma máquina no inventário do locador. A máquina existe independentemente "
+            "de anúncio: publicá-la para locação é um passo separado, em `/api/postings/`."
+        ),
+        request=MachineSerializer,
+        responses={201: MachineSerializer, 400: MACHINE_CONFLICT},
+        examples=[
+            OpenApiExample(
+                'Trator John Deere',
+                summary='Exemplo de cadastro de Trator',
+                value={
+                    "owner": "123e4567-e89b-12d3-a456-426614174000",
+                    "renagro_number": "RNG-123456789",
+                    "brand": "John Deere",
+                    "model": "6135J",
+                    "year": 2021,
+                    "usage_purpose": "Preparo de solo",
+                    "status": "active"
+                },
+                request_only=True
+            ),
+            OpenApiExample(
+                'Colheitadeira Valtra',
+                summary='Exemplo de cadastro de Colheitadeira',
+                value={
+                    "owner": "123e4567-e89b-12d3-a456-426614174000",
+                    "renagro_number": "RNG-987654321",
+                    "brand": "Valtra",
+                    "model": "BC6500",
+                    "year": 2019,
+                    "usage_purpose": "Colheita de Grãos",
+                    "status": "active"
+                },
+                request_only=True
+            )
+        ],
+    ),
+)
 @api_view(["GET", "POST"])
 def machines_list(request):
     if request.method == "GET":
@@ -42,6 +105,39 @@ def machines_list(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Maquinário'],
+        summary="Consultar máquina",
+        responses={200: MachineSerializer, 404: MACHINE_NOT_FOUND},
+    ),
+    put=extend_schema(
+        tags=['Maquinário'],
+        summary="Substituir máquina",
+        request=MachineSerializer,
+        responses={200: MachineSerializer, 400: MACHINE_CONFLICT, 404: MACHINE_NOT_FOUND},
+    ),
+    patch=extend_schema(
+        tags=['Maquinário'],
+        summary="Atualizar máquina parcialmente",
+        description="Usado, por exemplo, para mover a máquina para `maintenance` sem reenviar o cadastro inteiro.",
+        request=MachineSerializer,
+        responses={200: MachineSerializer, 400: MACHINE_CONFLICT, 404: MACHINE_NOT_FOUND},
+    ),
+    delete=extend_schema(
+        tags=['Maquinário'],
+        summary="Excluir máquina",
+        description="Só é possível excluir uma máquina sem registros dependentes, como anúncios publicados.",
+        responses={
+            204: OpenApiResponse(description="Máquina excluída."),
+            404: MACHINE_NOT_FOUND,
+            409: OpenApiResponse(
+                response=ErrorResponseSerializer,
+                description="Existem registros dependentes (ex.: anúncios) impedindo a exclusão.",
+            ),
+        },
+    ),
+)
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def machine_detail(request, pk):
     try:
