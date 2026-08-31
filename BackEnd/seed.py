@@ -17,8 +17,9 @@ from users.models import Users
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from api.models import (
-    Rentals, Contracts, Messages, Reviews,
+    Rentals, Messages, Reviews,
 )
+from contracts.models import Contracts
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 

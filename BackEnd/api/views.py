@@ -1,15 +1,17 @@
 import uuid
-from django.db import IntegrityError
+
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from api.models import Contracts, Rentals, Reviews
+from api.models import Rentals, Reviews
+from api.serializer import RentalSerializer, ReviewSerializer
+from contracts.models import Contracts
 from api.schemas import ContractDocumentSerializer, ContractSignatureSerializer, ErrorResponseSerializer
 from api.serializer import ContractSerializer, RentalSerializer, ReviewSerializer
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
 
 REVIEW_NOT_FOUND = OpenApiResponse(description='Avaliação não encontrada.')
 RENTAL_NOT_FOUND = OpenApiResponse(description='Locação não encontrada.')
@@ -211,7 +213,10 @@ def review_detail(request, pk):
 @api_view(["GET", "POST"])
 def rentals_list(request):
     if request.method == "GET":
-        qs = Rentals.objects.all().select_related("lessee", "postings__machinery__owner")
+        qs = Rentals.objects.all().select_related("lessee", "postings__machinery__owner", "contracts")
+        posting_id = request.query_params.get("postings")
+        if posting_id:
+            qs = qs.filter(postings_id=posting_id)
         lessee_id = request.query_params.get("lessee")
         if lessee_id:
             qs = qs.filter(lessee_id=lessee_id)
@@ -268,7 +273,7 @@ def rentals_list(request):
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
 def rental_detail(request, pk):
     try:
-        rental = Rentals.objects.get(pk=pk)
+        rental = Rentals.objects.select_related("contracts").get(pk=pk)
     except Rentals.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -291,8 +296,6 @@ def rental_detail(request, pk):
 
     rental.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 # --- CONTRACTS ---
 
 @extend_schema(

@@ -5,7 +5,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
-  const { isAuthenticated, userRole, logout } = useAuth();
+  const { isAuthenticated, isLoading, userRole, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +51,9 @@ const Navbar = () => {
         <div className="flex items-center gap-3">
           <ThemeToggle />
 
-          {isAuthenticated ? (
+          {isLoading ? (
+            <div className="w-10 h-10" aria-hidden />
+          ) : isAuthenticated ? (
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}

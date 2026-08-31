@@ -1,40 +1,16 @@
-import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { userService } from "@/services/UserService/UserService";
-import { parseJwt, type JwtPayload } from "@/utils/jwt";
 
 type ProtectedRouteProps = {
   allowedRoles?: string[];
 };
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const { isAuthenticated, userRole, login } = useAuth();
-  const [isVerifying, setIsVerifying] = useState(!isAuthenticated);
+  const { isAuthenticated, isLoading, userRole } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      setIsVerifying(false);
-      return;
-    }
-
-    userService
-      .silentRefresh()
-      .then(async (response) => {
-        const payload = parseJwt<JwtPayload>(response.access);
-        try {
-          const user = await userService.getById(payload.user_id);
-          login(response, user.role);
-        } catch {
-          login(response);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setIsVerifying(false));
-  }, [isAuthenticated, login]);
-
-  if (isVerifying) return null;
+  // O AuthProvider ainda está restaurando a sessão pelo cookie de refresh
+  if (isLoading) return null;
 
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
 

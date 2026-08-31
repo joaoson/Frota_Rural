@@ -16,20 +16,6 @@ from django.db import models
 
 # TODO: CONFORME FOR AVANÇANDO NO PROJETO, CRIAR APPS PARA MODULARIZAR TUDO E NÃO CRIAR MAIS TUDO DENTRO DE API
 # TODO: A IDEIA É QUE ESSA PASTA API DEIXE DE EXISTIR E FIQUE TUDO MODULARIZADO
-class Contracts(models.Model):
-    id = models.UUIDField(primary_key=True)
-    rental = models.OneToOneField('Rentals', models.DO_NOTHING)
-    document_url = models.CharField(max_length=1024, blank=True, null=True)
-    accepted_by_lessor = models.BooleanField(blank=True, null=True)
-    accepted_by_lessee = models.BooleanField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
-    created_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        # managed = False
-        db_table = 'contracts'
-
-
 class Messages(models.Model):
     id = models.UUIDField(primary_key=True)
     sender = models.ForeignKey('users.Users', models.DO_NOTHING)

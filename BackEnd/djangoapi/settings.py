@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'api',
+    'contracts',
     'users',
     'authentication',
     'postings',
@@ -234,3 +235,27 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 # Resend (transactional email)
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')
+
+# --- Assinatura eletrônica de contratos ---
+# Exigir confirmação por e-mail (OTP) antes do aceite. Ligado por padrão: a
+# assinatura eletrônica simples já valeria entre as partes sem ele
+# (MP 2.200-2/2001, art. 10, §2º), mas provar a posse do endereço torna o
+# aceite muito mais difícil de contestar.
+# Só desligue em ambiente de desenvolvimento sem envio de e-mail configurado —
+# com o envio indisponível e a exigência ligada, ninguém consegue assinar.
+CONTRACT_SIGNATURE_REQUIRE_OTP = os.getenv('CONTRACT_SIGNATURE_REQUIRE_OTP', 'true').lower() == 'true'
+CONTRACT_OTP_TTL_SECONDS = int(os.getenv('CONTRACT_OTP_TTL_SECONDS', '600'))
+CONTRACT_OTP_MAX_ATTEMPTS = int(os.getenv('CONTRACT_OTP_MAX_ATTEMPTS', '5'))
+
+# Firebase Storage (fotos de anúncios e demais mídias enviadas por usuários)
+# FIREBASE_STORAGE_BUCKET: ex. "frota-rural.firebasestorage.app"
+# FIREBASE_CREDENTIALS_FILE: caminho do JSON da service account (fora do git)
+FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET', '')
+
+# Caminho relativo é resolvido a partir de BackEnd/, não do diretório de execução.
+_firebase_credentials = os.getenv('FIREBASE_CREDENTIALS_FILE', 'firebase-service-account.json')
+FIREBASE_CREDENTIALS_FILE = str(
+    Path(_firebase_credentials)
+    if os.path.isabs(_firebase_credentials)
+    else BASE_DIR / _firebase_credentials
+)

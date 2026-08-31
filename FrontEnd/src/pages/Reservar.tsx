@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -7,11 +7,14 @@ import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { contractService } from "@/services/ContractService/ContractService";
+import type { Rental, SignatureEvidenceRecord } from "@/services/ContractService/ContractService";
+import type { ContratoData } from "@/pages/Contrato/types";
 
 
 const HORAS_POR_DIARIA = 8;
 // Taxa cobrada pela plataforma (5%)
 const TAXA_PLATAFORMA = 0.05;
+const STATUS_RESERVA_ATIVA = new Set<Rental["status"]>(["pending", "active", "signed"]);
 
 
 interface PostingReservaAPI {
@@ -22,6 +25,7 @@ interface PostingReservaAPI {
   machine_model: string | null;
   machine_usage_purpose: string | null;
   machine_renagro_number: string | null;
+  max_reservation_days: number | null;
 }
 
 type Etapa = 1 | 2 | 3;
@@ -53,6 +57,168 @@ function calcularDiarias(inicio: string, fim: string): number {
   const ms = dataFim.getTime() - dataInicio.getTime();
   if (Number.isNaN(ms) || ms < 0) return 0;
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
+}
+
+function dataLocal(iso: string): Date {
+  const [ano, mes, dia] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function isoData(data: Date): string {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function adicionarDias(iso: string, dias: number): string {
+  const data = dataLocal(iso);
+  data.setDate(data.getDate() + dias);
+  return isoData(data);
+}
+
+function CalendarioDisponibilidade({
+  datasBloqueadas,
+  dataInicio,
+  dataFim,
+  minStartDate,
+  maxReservationDays,
+  onSelecionarData,
+  onLimparInicio,
+  onLimparFim,
+}: {
+  datasBloqueadas: Set<string>;
+  dataInicio: string;
+  dataFim: string;
+  minStartDate: string;
+  maxReservationDays: number | null;
+  onSelecionarData: (data: string) => void;
+  onLimparInicio: () => void;
+  onLimparFim: () => void;
+}) {
+  const [mesInicial, setMesInicial] = useState(() => {
+    const hoje = new Date();
+    return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  });
+  const meses = [0, 1].map((deslocamento) => new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1));
+  const podeVoltar = mesInicial > new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const moverMeses = (deslocamento: number) => {
+    const proximo = new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1);
+    const mesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    if (proximo >= mesAtual) setMesInicial(proximo);
+  };
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+      <div className="border-b border-outline-variant/20 p-4 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-2xl font-black text-tertiary">
+              {dataInicio && dataFim ? `${calcularDiarias(dataInicio, dataFim)} diárias` : "Escolha o período"}
+            </p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {dataInicio ? formatarData(dataInicio) : "Check-in"} – {dataFim ? formatarData(dataFim) : "Check-out"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-low">
+            {[
+              { titulo: "CHECK-IN", data: dataInicio, limpar: onLimparInicio, ativo: !dataInicio || Boolean(dataInicio && !dataFim) },
+              { titulo: "CHECK-OUT", data: dataFim, limpar: onLimparFim, ativo: Boolean(dataInicio && dataFim) },
+            ].map(({ titulo, data, limpar, ativo }) => (
+              <div key={titulo} className={`min-w-36 border-r border-outline-variant/40 p-3 last:border-r-0 ${ativo ? "bg-surface-container-lowest ring-2 ring-inset ring-tertiary" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black tracking-wide text-tertiary">{titulo}</span>
+                  {data && (
+                    <button type="button" onClick={limpar} aria-label={`Limpar ${titulo.toLowerCase()}`} className="text-outline hover:text-tertiary">
+                      <MaterialIcon icon="close" size={17} />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-sm font-bold text-tertiary">{data ? formatarData(data) : "Selecionar"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-4 flex items-center gap-2 text-xs text-on-surface-variant">
+          <MaterialIcon icon="info" size={15} className="text-primary" />
+          Datas riscadas estão indisponíveis. Reservas incluem um dia antes e depois para limpeza e preparação.
+        </p>
+        {maxReservationDays && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-bold text-primary">
+            <MaterialIcon icon="event" size={15} /> Máximo de {maxReservationDays} dias por reserva.
+          </p>
+        )}
+      </div>
+      <div className="p-4 sm:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <button type="button" onClick={() => moverMeses(-1)} disabled={!podeVoltar} aria-label="Mês anterior" className="rounded-full p-2 text-tertiary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-25">
+            <MaterialIcon icon="chevron_left" size={25} />
+          </button>
+          <button type="button" onClick={() => moverMeses(1)} aria-label="Próximo mês" className="rounded-full p-2 text-tertiary hover:bg-surface-container">
+            <MaterialIcon icon="chevron_right" size={25} />
+          </button>
+        </div>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
+        {meses.map((mes) => {
+          const primeiroDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+          const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+          const espacos = Array.from({ length: primeiroDia.getDay() });
+          return (
+            <div key={isoData(mes)}>
+              <p className="mb-5 text-center text-lg font-black capitalize text-tertiary">
+                {mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </p>
+              <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-outline">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((dia, indice) => <span key={`${dia}-${indice}`}>{dia}</span>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {espacos.map((_, indice) => <span key={`vazio-${indice}`} />)}
+                {Array.from({ length: totalDias }, (_, indice) => {
+                  const data = new Date(mes.getFullYear(), mes.getMonth(), indice + 1);
+                  const iso = isoData(data);
+                  const bloqueada = datasBloqueadas.has(iso);
+                  const antesDoPrazo = iso < minStartDate;
+                  const selecionada = iso === dataInicio || iso === dataFim;
+                  const noIntervalo = Boolean(dataInicio && dataFim && iso > dataInicio && iso < dataFim);
+                  const excedeMaximo = Boolean(
+                    dataInicio && !dataFim && iso >= dataInicio && maxReservationDays && calcularDiarias(dataInicio, iso) > maxReservationDays,
+                  );
+                  const indisponivel = bloqueada || antesDoPrazo || excedeMaximo;
+                  return (
+                    <button
+                      type="button"
+                      key={iso}
+                      disabled={indisponivel}
+                      title={bloqueada ? "Indisponível: reserva ou limpeza" : antesDoPrazo ? "Data não disponível" : excedeMaximo ? `Máximo de ${maxReservationDays} dias por reserva` : "Selecionar data"}
+                      onClick={() => onSelecionarData(iso)}
+                      className={`flex aspect-square items-center justify-center rounded-full text-sm font-bold transition ${
+                        selecionada
+                          ? "bg-tertiary text-on-primary shadow-sm"
+                          : noIntervalo
+                            ? "rounded-none bg-primary/10 text-tertiary"
+                            : indisponivel
+                              ? "cursor-not-allowed text-outline/50 line-through"
+                              : "text-tertiary hover:bg-primary/10 hover:text-primary"
+                      }`}
+                    >
+                      {indice + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+      <div className="flex justify-end border-t border-outline-variant/20 px-4 py-4 sm:px-6">
+        <button type="button" onClick={() => { onLimparInicio(); onLimparFim(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-tertiary hover:bg-surface-container">
+          Limpar datas
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Stepper({ etapaAtual }: { etapaAtual: Etapa }) {
@@ -114,13 +280,109 @@ function TituloSecao({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Recibo do aceite eletrônico, exibido logo após a assinatura.
+ *
+ * Traz a evidência que o servidor acabou de gravar em registro imutável: o
+ * hash SHA-256 do documento aceito, o horário UTC, o IP de origem e o hash
+ * encadeado do registro. É o que a parte guarda como comprovante.
+ */
+function ReciboAssinatura({
+  recibo,
+  onConcluir,
+}: {
+  recibo: SignatureEvidenceRecord;
+  onConcluir: () => void;
+}) {
+  const linhas: { rotulo: string; valor: string; mono?: boolean }[] = [
+    { rotulo: "Assinado por", valor: recibo.signer_name || recibo.signer_email || "—" },
+    { rotulo: "E-mail", valor: recibo.signer_email || "—" },
+    { rotulo: "Data e hora (UTC)", valor: formatarUtcCompleto(recibo.signed_at) },
+    { rotulo: "IP de origem", valor: recibo.ip_address || "—" },
+    { rotulo: "Versão do documento", valor: recibo.document_version || "—" },
+    {
+      rotulo: "Posse do e-mail",
+      valor: recibo.otp_verified ? "Confirmada por código" : "Não confirmada por código",
+    },
+  ];
+
+  return (
+    <>
+      <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
+        <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <MaterialIcon icon="verified" className="text-primary" size={24} filled />
+        </div>
+        <div>
+          <div className="font-bold text-tertiary text-sm">Contrato assinado!</div>
+          <div className="text-xs text-on-surface-variant">
+            A reserva está efetivada e a evidência do aceite foi registrada.
+          </div>
+        </div>
+      </div>
+
+      <TituloSecao>Comprovante da Assinatura</TituloSecao>
+      <p className="text-sm text-on-surface-variant mb-5 leading-relaxed">
+        Guarde estes dados. Eles comprovam qual documento você aceitou, quando e de onde — a
+        evidência exigida para a assinatura eletrônica simples (MP nº 2.200-2/2001, art. 10, §2º,
+        e Lei nº 14.063/2020, art. 4º, I).
+      </p>
+
+      <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl divide-y divide-outline-variant/20 mb-6">
+        {linhas.map((linha) => (
+          <div key={linha.rotulo} className="flex justify-between items-baseline gap-4 px-5 py-3">
+            <span className="text-xs text-on-surface-variant shrink-0">{linha.rotulo}</span>
+            <span className="text-sm font-bold text-tertiary text-right break-words">{linha.valor}</span>
+          </div>
+        ))}
+        <div className="px-5 py-3">
+          <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+            Hash {recibo.hash_algorithm.toUpperCase()} do documento assinado
+          </div>
+          <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+            {recibo.document_hash}
+          </div>
+        </div>
+        <div className="px-5 py-3">
+          <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+            Hash do registro (log encadeado)
+          </div>
+          <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+            {recibo.record_hash}
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onConcluir}
+        className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
+      >
+        <MaterialIcon icon="dashboard" size={20} /> Ir para o meu painel
+      </button>
+    </>
+  );
+}
+
+/** Timestamp exibido em UTC, que é como ele consta no registro de assinatura. */
+function formatarUtcCompleto(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ` +
+    `às ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
+  );
+}
+
 const Reservar = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { userId } = useAuth();
   const [createdRental, setCreatedRental] = useState<any>(null);
 
   const [anuncio, setAnuncio] = useState<PostingReservaAPI | null>(null);
+  const [reservasExistentes, setReservasExistentes] = useState<Rental[]>([]);
+  const [carregandoDisponibilidade, setCarregandoDisponibilidade] = useState(true);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -131,6 +393,12 @@ const Reservar = () => {
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
 
+  useEffect(() => {
+    const requestedStart = searchParams.get("inicio");
+    if (requestedStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedStart)) setDataInicio(requestedStart);
+    if (searchParams.get("extensao") === "1") setObservacoes("Solicitação de extensão da locação anterior.");
+  }, [searchParams]);
+
   const minStartDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -140,6 +408,13 @@ const Reservar = () => {
   // Etapa 3 — assinatura
   const [aceitouTermos, setAceitouTermos] = useState(false);
   const [nomeAssinatura, setNomeAssinatura] = useState("");
+  // Documento real gerado pelo backend: é ele que a parte aceita e cujo hash é registrado.
+  const [contratoPreview, setContratoPreview] = useState<ContratoData | null>(null);
+  const [codigoOtp, setCodigoOtp] = useState("");
+  const [otpEnviadoPara, setOtpEnviadoPara] = useState<string | null>(null);
+  const [enviandoOtp, setEnviandoOtp] = useState(false);
+  const [assinando, setAssinando] = useState(false);
+  const [recibo, setRecibo] = useState<SignatureEvidenceRecord | null>(null);
 
   // Etapa 2 — pagamento
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("pix");
@@ -162,8 +437,22 @@ const Reservar = () => {
       });
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    setCarregandoDisponibilidade(true);
+    contractService
+      .listByPosting(id)
+      .then((reservas) => setReservasExistentes(reservas.filter((reserva) => STATUS_RESERVA_ATIVA.has(reserva.status))))
+      .catch((erro: unknown) => {
+        console.error("Erro ao carregar disponibilidade:", erro);
+        toast.error("Não foi possível carregar as datas indisponíveis.");
+      })
+      .finally(() => setCarregandoDisponibilidade(false));
+  }, [id]);
+
   const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Maquinário";
   const valorDiaria = anuncio ? parseFloat(anuncio.hourly_rate) * HORAS_POR_DIARIA : 0;
+  const maxReservationDays = anuncio?.max_reservation_days ?? null;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
     const dias = calcularDiarias(dataInicio, dataFim);
@@ -171,6 +460,43 @@ const Reservar = () => {
     const tax = sub * TAXA_PLATAFORMA;
     return { diarias: dias, subtotal: sub, taxa: tax, total: sub + tax };
   }, [dataInicio, dataFim, valorDiaria]);
+
+  const datasBloqueadas = useMemo(() => {
+    const bloqueadas = new Set<string>();
+    reservasExistentes.forEach((reserva) => {
+      const inicio = adicionarDias(reserva.startDate, -1);
+      const fim = adicionarDias(reserva.endDate, 1);
+      for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+        bloqueadas.add(isoData(data));
+      }
+    });
+    return bloqueadas;
+  }, [reservasExistentes]);
+
+  const periodoEstaBloqueado = (inicio: string, fim: string) => {
+    if (!inicio || !fim) return false;
+    for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+      if (datasBloqueadas.has(isoData(data))) return true;
+    }
+    return false;
+  };
+
+  const selecionarData = (data: string) => {
+    if (!dataInicio || dataFim) {
+      setDataInicio(data);
+      setDataFim("");
+      return;
+    }
+    if (data < dataInicio) {
+      setDataInicio(data);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, data)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
+      return;
+    }
+    setDataFim(data);
+  };
 
   const numeroContrato = `#CTR-${(id ?? "0000").slice(0, 4).toUpperCase()}`;
   const periodoTexto =
@@ -187,6 +513,14 @@ const Reservar = () => {
     }
     if (diarias <= 0) {
       toast.error("A data de fim deve ser igual ou posterior à data de início.");
+      return;
+    }
+    if (maxReservationDays && diarias > maxReservationDays) {
+      toast.error(`Este anúncio permite reservas de no máximo ${maxReservationDays} dias.`);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, dataFim)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
       return;
     }
     setEtapa(2);
@@ -214,6 +548,12 @@ const Reservar = () => {
         toast.success("Pagamento confirmado!");
         setEtapa(3);
         window.scrollTo(0, 0);
+        // Carrega o contrato como ele será assinado — o preview mostra os dados
+        // reais das partes, não um texto de exemplo.
+        contractService
+          .getContractById(rental.id)
+          .then(setContratoPreview)
+          .catch((erro) => console.error("Erro ao carregar o contrato:", erro));
       } catch (err) {
         setProcessando(false);
         toast.error("Erro ao criar locação.");
@@ -221,7 +561,22 @@ const Reservar = () => {
     }, 1200);
   };
 
+  const solicitarCodigo = async () => {
+    if (!createdRental || enviandoOtp) return;
+    setEnviandoOtp(true);
+    try {
+      const { sentTo } = await contractService.requestSignatureOtp(createdRental.id, "locatario");
+      setOtpEnviadoPara(sentTo);
+      toast.success(`Código enviado para ${sentTo}.`);
+    } catch (err) {
+      toast.error("Não foi possível enviar o código por e-mail.");
+    } finally {
+      setEnviandoOtp(false);
+    }
+  };
+
   const assinarContrato = async () => {
+    if (assinando) return;
     if (!aceitouTermos) {
       toast.error("Você precisa aceitar os termos do contrato para continuar.");
       return;
@@ -230,14 +585,34 @@ const Reservar = () => {
       toast.error("Digite seu nome completo para assinar o contrato.");
       return;
     }
+    if (!createdRental) {
+      toast.error("Reserva não encontrada. Refaça o pagamento.");
+      return;
+    }
+    if (codigoOtp.trim().length !== 6) {
+      toast.error("Confirme seu e-mail: solicite o código e informe os 6 dígitos.");
+      return;
+    }
+
+    setAssinando(true);
     try {
-      if (createdRental) {
-        await contractService.signContract(createdRental.id, "locatario", nomeAssinatura);
-      }
+      const { evidence } = await contractService.signContract(
+        createdRental.id,
+        "locatario",
+        nomeAssinatura,
+        codigoOtp.trim(),
+      );
+      // Mostramos o recibo antes de sair da página: é a prova do que foi
+      // assinado, e ela fica guardada no contrato para consulta posterior.
+      setRecibo(evidence);
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
-      navigate("/dashboard-locatario");
+      window.scrollTo(0, 0);
     } catch (err) {
-      toast.error("Erro ao assinar contrato.");
+      const mensagem =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Erro ao assinar contrato.";
+      toast.error(mensagem);
+      setAssinando(false);
     }
   };
 
@@ -345,32 +720,20 @@ const Reservar = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                        Data Início <span className="text-error">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={dataInicio}
-                        min={minStartDate}
-                        onChange={(e) => setDataInicio(e.target.value)}
-                        className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                        Data Fim <span className="text-error">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={dataFim}
-                        min={dataInicio || undefined}
-                        onChange={(e) => setDataFim(e.target.value)}
-                        className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                      />
-                    </div>
-                  </div>
+                  {carregandoDisponibilidade ? (
+                    <div className="mb-5 text-xs text-on-surface-variant">Carregando disponibilidade...</div>
+                  ) : (
+                    <CalendarioDisponibilidade
+                      datasBloqueadas={datasBloqueadas}
+                      dataInicio={dataInicio}
+                      dataFim={dataFim}
+                      minStartDate={minStartDate}
+                      maxReservationDays={maxReservationDays}
+                      onSelecionarData={selecionarData}
+                      onLimparInicio={() => { setDataInicio(""); setDataFim(""); }}
+                      onLimparFim={() => setDataFim("")}
+                    />
+                  )}
 
                   <div className="mb-7">
                     <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
@@ -498,6 +861,13 @@ const Reservar = () => {
 
                 {/* Assinatura */}
                 <CartaoPainel className="lg:col-span-3">
+                  {recibo ? (
+                    <ReciboAssinatura
+                      recibo={recibo}
+                      onConcluir={() => navigate("/dashboard-locatario")}
+                    />
+                  ) : (
+                  <>
                   <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
                     <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                       <MaterialIcon icon="check_circle" className="text-primary dark:text-primary-bright" size={24} filled />
@@ -524,11 +894,21 @@ const Reservar = () => {
                     <p>
                       <strong className="text-tertiary">Contrato nº {numeroContrato.replace("#", "")}</strong>
                     </p>
-                    <p>
-                      Entre as partes: <strong className="text-tertiary">Locador:</strong> João Silva (CPF:
-                      000.000.000-00) e <strong className="text-tertiary">Locatário:</strong>{" "}
-                      {nomeAssinatura.trim() || "Locatário"} (CPF: 111.111.111-11).
-                    </p>
+                    {contratoPreview ? (
+                      <p>
+                        Entre as partes: <strong className="text-tertiary">Locador:</strong>{" "}
+                        {contratoPreview.locador.razao_social}
+                        {contratoPreview.locador.documento &&
+                          ` (${contratoPreview.locador.tipo_documento || "Documento"}: ${contratoPreview.locador.documento})`}{" "}
+                        e <strong className="text-tertiary">Locatário:</strong>{" "}
+                        {contratoPreview.locatario.razao_social}
+                        {contratoPreview.locatario.documento &&
+                          ` (${contratoPreview.locatario.tipo_documento || "Documento"}: ${contratoPreview.locatario.documento})`}
+                        .
+                      </p>
+                    ) : (
+                      <p className="text-outline">Carregando os dados das partes...</p>
+                    )}
                     <p>
                       <strong className="text-tertiary">Objeto:</strong> Locação de {titulo}
                       {anuncio.machine_renagro_number && `, Renagro ${anuncio.machine_renagro_number}`}
@@ -549,6 +929,22 @@ const Reservar = () => {
                       Brasileiro (Lei nº 10.406/2002). A FrotaRural atua como intermediadora tecnológica e não é parte
                       deste contrato.
                     </p>
+                    <p>
+                      A assinatura eletrônica simples tem validade entre as partes nos termos da MP nº 2.200-2/2001,
+                      art. 10, §2º, e da Lei nº 14.063/2020, art. 4º, I. Antes do aceite, você confirma a posse do
+                      seu e-mail por meio de um código. No aceite ficam registrados o hash do documento, a data e
+                      hora UTC, o seu IP e o seu identificador de usuário.
+                    </p>
+                    {contratoPreview?.evidencia && (
+                      <div className="pt-2 border-t border-outline-variant/30">
+                        <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+                          Hash {contratoPreview.evidencia.algoritmo_hash.toUpperCase()} deste documento
+                        </div>
+                        <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+                          {contratoPreview.evidencia.hash_documento_atual}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Aceite */}
@@ -578,6 +974,52 @@ const Reservar = () => {
                     />
                   </div>
 
+                  {/* Confirmação por e-mail: etapa obrigatória, prova a posse do endereço */}
+                  <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 mb-7">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div>
+                        <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+                          Confirmação por e-mail <span className="text-error">*</span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant leading-relaxed">
+                          Para assinar, confirme que o e-mail da sua conta é seu: solicite o código e
+                          informe os 6 dígitos abaixo.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={solicitarCodigo}
+                        disabled={enviandoOtp || !createdRental}
+                        className="shrink-0 px-4 py-2 rounded-lg text-xs font-bold text-primary border border-primary/40 hover:bg-primary/5 transition disabled:opacity-50"
+                      >
+                        {enviandoOtp ? "Enviando..." : otpEnviadoPara ? "Reenviar código" : "Enviar código"}
+                      </button>
+                    </div>
+                    {!otpEnviadoPara && (
+                      <p className="text-xs text-outline">
+                        Clique em <strong>Enviar código</strong> para receber os 6 dígitos no e-mail da
+                        sua conta.
+                      </p>
+                    )}
+                    {otpEnviadoPara && (
+                      <>
+                        <p className="text-xs text-on-surface-variant mb-2">
+                          Código enviado para <strong className="text-tertiary">{otpEnviadoPara}</strong>.
+                          Não recebeu? Verifique o spam ou reenvie.
+                        </p>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={codigoOtp}
+                          onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, ""))}
+                          placeholder="000000"
+                          className="w-40 bg-surface border border-outline-variant/40 rounded-lg px-4 py-2.5 text-sm text-tertiary tracking-[0.35em] font-bold placeholder:text-outline/60 placeholder:tracking-[0.35em] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                        />
+                      </>
+                    )}
+                  </div>
+
                   <div className="flex gap-3">
                     <button
                       onClick={() => {
@@ -590,11 +1032,15 @@ const Reservar = () => {
                     </button>
                     <button
                       onClick={assinarContrato}
-                      className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
+                      disabled={assinando || codigoOtp.trim().length !== 6}
+                      className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
                     >
-                      <MaterialIcon icon="draw" size={20} /> Assinar e Finalizar
+                      <MaterialIcon icon="draw" size={20} />
+                      {assinando ? "Registrando assinatura..." : "Assinar e Finalizar"}
                     </button>
                   </div>
+                  </>
+                  )}
                 </CartaoPainel>
               </div>
             )}

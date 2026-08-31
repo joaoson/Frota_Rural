@@ -7,12 +7,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPService";
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { userService } from "@/services/UserService/UserService";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
-import { validateCPF } from "@/utils/validation/validateCPF";
+import { mensagemErroDocumento } from "@/utils/validation/validateDocument";
+import { mensagemErroCEP } from "@/utils/validation/validateCEP";
 import { UserRole } from "@/services/UserService/models/UserRole";
 import type { CreateUserRequest } from "@/services/UserService/models/CreateUserRequest";
 import { passwordPattern } from "@/utils/regexPatterns";
@@ -42,8 +42,7 @@ const Signup = () => {
       try {
         const data = await fetchAddressByCEP(digits);
         if (data) {
-          const formattedAddress = [data.logradouro, data.bairro].filter(Boolean).join(", ");
-          setAddress(formattedAddress);
+          setAddress(formatAddressFromCEP(data, "logradouro"));
           setCity(data.localidade);
           setUf(data.uf.toUpperCase());
           setErrors((prev) => ({
@@ -60,13 +59,6 @@ const Signup = () => {
       }
     }
   };
-
-  function validateDocument(value: string): boolean {
-    const digits = value.replace(/\D/g, "");
-    if (digits.length === 11) return validateCPF(digits);
-    if (digits.length === 14) return validateCNPJ(digits);
-    return false;
-  }
 
   function calculateMaxBirthDate() {
     const d = new Date();
@@ -98,14 +90,7 @@ const Signup = () => {
         break;
       }
       case "document": {
-        const digits = value.replace(/\D/g, "");
-        if (!digits) {
-          errorMsg = "Documento é obrigatório.";
-        } else if (digits.length !== 11 && digits.length !== 14) {
-          errorMsg = "Documento inválido. Informe CPF (11 dígitos) ou CNPJ (14 dígitos).";
-        } else if (!validateDocument(value)) {
-          errorMsg = digits.length === 14 ? "CNPJ inválido. Verifique os dígitos informados." : "CPF inválido. Verifique os dígitos informados.";
-        }
+        errorMsg = mensagemErroDocumento(value);
         break;
       }
       case "email": {
@@ -135,9 +120,7 @@ const Signup = () => {
         break;
       }
       case "cep": {
-        const digits = value.replace(/\D/g, "");
-        if (!digits) errorMsg = "CEP é obrigatório.";
-        else if (digits.length !== 8) errorMsg = "CEP deve ter exatamente 8 dígitos.";
+        errorMsg = mensagemErroCEP(value, true);
         break;
       }
       case "password": {

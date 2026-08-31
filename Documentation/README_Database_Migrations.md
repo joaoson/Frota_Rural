@@ -7,7 +7,9 @@ Este guia explica o processo passo-a-passo para adicionar uma nova coluna a qual
 Para adicionar uma nova coluna ao seu banco de dados com segurança, você deve usar o Object-Relational Mapping (ORM) integrado do Django e o seu sistema de migrações.
 
 1. **Localize o Arquivo de Models:**
-   Abra o arquivo que contém os modelos do banco de dados: `Frota_Rural/BackEnd/api/models.py`.
+   Abra o arquivo que contém os modelos do banco de dados. Cada app tem o seu:
+   `api/models.py` (Rentals, Messages, Reviews), `contracts/models.py` (Contracts e as
+   evidências de assinatura), `users/models.py`, `machines/models.py`, `postings/models.py`.
 
 2. **Adicione o Campo à Classe do Modelo:**
    Encontre a classe do modelo correspondente à tabela que você deseja modificar (por exemplo, `Machines`, `Users`). Adicione a definição do novo campo utilizando os tipos de campos de modelo do Django.
@@ -23,7 +25,7 @@ Para adicionar uma nova coluna ao seu banco de dados com segurança, você deve 
    ```bash
    python manage.py makemigrations
    ```
-   *Nota: Isso criará um novo arquivo Python na pasta `api/migrations/`.*
+   *Nota: Isso criará um novo arquivo Python na pasta `migrations/` do app correspondente.*
 
 4. **Aplique a Migração:**
    Aplique a migração gerada para atualizar o esquema real do banco de dados PostgreSQL:
@@ -32,13 +34,13 @@ Para adicionar uma nova coluna ao seu banco de dados com segurança, você deve 
    ```
 
 5. **Atualize Serializers e Views (Opcional, mas provavelmente necessário):**
-   Se você quiser que esta nova coluna seja acessível através da API, lembre-se de atualizar o serializer correspondente em `api/serializer.py` e, potencialmente, qualquer lógica de negócio em `api/views.py`.
+   Se você quiser que esta nova coluna seja acessível através da API, lembre-se de atualizar o serializer correspondente no `serializer.py` do app e, potencialmente, qualquer lógica de negócio no `views.py` dele.
 
 ---
 
 ## Exemplos (Mocks) de Migrações para Cada Tabela
 
-Abaixo estão exemplos mostrando como adicionar uma coluna fictícia (`coluna_mock`) a cada tabela existente em `api/models.py`.
+Abaixo estão exemplos mostrando como adicionar uma coluna fictícia (`coluna_mock`) a cada tabela do sistema.
 
 ### 1. Contracts
 ```python

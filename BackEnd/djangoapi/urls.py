@@ -25,6 +25,7 @@ BASE_PATH = 'api/'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path(BASE_PATH, include('api.urls')),
+    path(BASE_PATH, include('contracts.urls')),
     path(BASE_PATH, include('administration.urls')),
     path(BASE_PATH, include('users.urls')),
     path(BASE_PATH, include('postings.urls')),

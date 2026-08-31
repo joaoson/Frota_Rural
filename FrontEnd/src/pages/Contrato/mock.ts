@@ -3,13 +3,17 @@ import type { ContratoData } from "./types";
 export const mockContrato: ContratoData = {
   contrato: {
     numero: "CT-2026-000123",
+    versao_documento: "1.0.0",
     data_geracao: "17/05/2026",
     data_inicio: "20/05/2026",
     data_fim: "25/05/2026",
     prazo_dias: 5,
     valor_unitario: "180,00",
     estimativa_horas: 40,
-    valor_total_estimado: "7.200,00",
+    valor_locacao: "7.200,00",
+    valor_taxa_plataforma: "360,00",
+    percentual_taxa_plataforma: "5,00",
+    valor_total_estimado: "7.560,00",
   },
   operacao: {
     codigo: "OP-78912",
@@ -51,5 +55,35 @@ export const mockContrato: ContratoData = {
   assinatura: {
     data_locador: "17/05/2026 às 14:32",
     data_locatario: "17/05/2026 às 16:15",
+  },
+  evidencia: {
+    hash_documento_atual: "9f2c4a7e1b8d3f6021c5e94a7b0d8f31627a4c9e5b1d8302f47a6c0e93b5d817",
+    algoritmo_hash: "sha256",
+    assinaturas: [
+      {
+        papel: "locador",
+        nome: "João Carlos da Silva",
+        email: "joao.silva@valeverde.com.br",
+        assinado_em_utc: "2026-05-17T14:32:08+00:00",
+        hash_documento: "9f2c4a7e1b8d3f6021c5e94a7b0d8f31627a4c9e5b1d8302f47a6c0e93b5d817",
+        algoritmo_hash: "sha256",
+        versao_documento: "1.0.0",
+        ip: "200.145.32.18",
+        otp_verificado: true,
+        hash_registro: "3d81f0b6a25c9e47d0f83b1c65a29e740c8b53f1e6a90d24b7c85f31029ae64d",
+      },
+      {
+        papel: "locatario",
+        nome: "Maria Aparecida Souza",
+        email: "maria.souza@santaclara.com.br",
+        assinado_em_utc: "2026-05-17T16:15:41+00:00",
+        hash_documento: "9f2c4a7e1b8d3f6021c5e94a7b0d8f31627a4c9e5b1d8302f47a6c0e93b5d817",
+        algoritmo_hash: "sha256",
+        versao_documento: "1.0.0",
+        ip: "189.72.204.91",
+        otp_verificado: true,
+        hash_registro: "b70e29c8d31f5a64029e7b8c1d0f34a65e92b7c04d18f6a3e50c9b27d84f1063",
+      },
+    ],
   },
 };

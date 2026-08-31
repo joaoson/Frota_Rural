@@ -8,10 +8,11 @@ import type { User } from "@/services/UserService/models/User";
 import { maskDocument } from "@/utils/masks/maskDocument";
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
+import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPService";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
+import { UFS } from "@/utils/ufs";
+import { validateDocument } from "@/utils/validation/validateDocument";
+import { mensagemErroCEP } from "@/utils/validation/validateCEP";
 import { passwordPattern } from "@/utils/regexPatterns";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
@@ -21,6 +22,7 @@ import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 import NotificationPopover from "@/components/NotificationPopover";
+import DashboardMachineSearch from "@/components/DashboardMachineSearch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,13 +75,6 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function validateDocument(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 11) return validateCPF(digits);
-  if (digits.length === 14) return validateCNPJ(digits);
-  return false;
-}
-
 const DashboardLocatario = () => {
   const { userId, logout } = useAuth();
   const [user, setUser] = useState<User | null>(null);
@@ -90,8 +85,11 @@ const DashboardLocatario = () => {
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formCity, setFormCity] = useState("");
+  const [formState, setFormState] = useState("");
   const [formCep, setFormCep] = useState("");
   const documentRef = useRef<HTMLInputElement>(null);
+  const cepRef = useRef<HTMLInputElement>(null);
 
   // Formulário alteração de senha
   const [currentPassword, setCurrentPassword] = useState("");
@@ -129,6 +127,9 @@ const DashboardLocatario = () => {
     contractService.listByLessee(userId).then(data => {
       const mapped = data.map(r => ({
         id: r.id,
+        postingId: r.postingId,
+        startDate: r.startDate,
+        endDate: r.endDate,
         owner: r.lessorId === "lessor-joao" ? "João Silva" : r.lessorId === "lessor-pedro" ? "Pedro Souza" : r.lessorId === "lessor-carlos" ? "Carlos Lima" : "Locador",
         machine: r.machineName,
         period: r.period,
@@ -148,6 +149,8 @@ const DashboardLocatario = () => {
     setFormEmail(user.email);
     setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
     setFormAddress(user.address);
+    setFormCity(user.city ?? "");
+    setFormState((user.state ?? "").toUpperCase());
     setFormCep(maskCEP(user.cep ?? ""));
   }, [user]);
 
@@ -168,11 +171,26 @@ const DashboardLocatario = () => {
     }
   };
 
+  const handleCepBlur = () => {
+    const input = cepRef.current;
+    if (!input) return;
+    const erro = mensagemErroCEP(formCep);
+    input.setCustomValidity(erro);
+    if (erro) input.reportValidity();
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
       documentRef.current?.reportValidity();
+      return;
+    }
+    // CEP é opcional aqui, mas pela metade a API recusa o cadastro inteiro.
+    const erroCep = mensagemErroCEP(formCep);
+    if (erroCep) {
+      cepRef.current?.setCustomValidity(erroCep);
+      cepRef.current?.reportValidity();
       return;
     }
     try {
@@ -182,6 +200,8 @@ const DashboardLocatario = () => {
         email: formEmail.toLowerCase().trim(),
         phone: `+55${clearSpecialChars(formPhone)}`,
         address: formAddress.trim(),
+        city: formCity.trim(),
+        state: formState.toUpperCase(),
         cep: clearSpecialChars(formCep),
       });
       setUser(updated);
@@ -291,9 +311,9 @@ const DashboardLocatario = () => {
               </button>
             )}
             {(r.status === "pending" || r.status === "active") && (
-              <button className="px-4 bg-primary/10 text-primary dark:text-primary-bright py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
+              <Link to={`/dashboard-locatario/locacoes/${r.id}`} className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
                 <MaterialIcon icon="analytics" size={14} /> Analisar
-              </button>
+              </Link>
             )}
             {(r.status === "completed" || r.status === "cancelled") && (
               <button onClick={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)} className="px-4 bg-surface-container-high text-on-surface-variant py-2 rounded-lg font-bold text-xs hover:bg-outline-variant/30 transition-colors flex items-center gap-1">
@@ -635,33 +655,7 @@ const DashboardLocatario = () => {
 
           {/* Buscar */}
           {tab === "buscar" && (
-            <div className="space-y-6">
-              <div>
-                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Buscar Máquinas</h1>
-                <div className="h-1 w-16 bg-secondary-container mt-2" />
-                <p className="text-on-surface-variant text-sm mt-3">Encontre o equipamento ideal para sua safra</p>
-              </div>
-              <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Atividade</label>
-                    <select className="w-full bg-surface-container border-none rounded-lg p-3.5 text-on-surface focus:ring-2 focus:ring-primary transition-shadow">
-                      <option>Todas</option><option>Plantio</option><option>Colheita</option><option>Pulverização</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Localização</label>
-                    <input type="text" placeholder="Ex: Sorriso, MT" className="w-full bg-surface-container border-none rounded-lg p-3.5 text-on-surface focus:ring-2 focus:ring-primary transition-shadow" />
-                  </div>
-                  <div className="flex items-end">
-                    <Link to="/buscar-maquinario" className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-lg font-bold text-center hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                      <MaterialIcon icon="search" size={18} /> Buscar
-                    </Link>
-                  </div>
-                </div>
-              </div>
-              <p className="text-on-surface-variant text-center py-12">Use os filtros acima ou <Link to="/buscar-maquinario" className="text-primary dark:text-primary-bright font-bold hover:underline">acesse a busca completa</Link></p>
-            </div>
+            <DashboardMachineSearch />
           )}
 
           {/* Locações */}
@@ -1054,9 +1048,14 @@ const DashboardLocatario = () => {
                       <input
                         type="text"
                         required
+                        pattern="\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}"
+                        title="Informe um CPF válido (000.000.000-00) ou CNPJ válido (00.000.000/0001-00)"
                         ref={documentRef}
                         value={formDocument}
-                        onChange={(e) => setFormDocument(maskDocument(e.target.value))}
+                        onChange={(e) => {
+                          setFormDocument(maskDocument(e.target.value));
+                          documentRef.current?.setCustomValidity("");
+                        }}
                         onBlur={handleDocumentBlur}
                         className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
                       />
@@ -1076,6 +1075,8 @@ const DashboardLocatario = () => {
                       <input
                         type="tel"
                         required
+                        pattern="\(\d{2}\) \d{4,5}-\d{4}"
+                        title="Informe um telefone válido no formato (00) 90000-0000"
                         value={formPhone}
                         onChange={(e) => setFormPhone(maskPhone(e.target.value))}
                         className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
@@ -1084,19 +1085,23 @@ const DashboardLocatario = () => {
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-outline">CEP</label>
                       <input
+                        ref={cepRef}
                         type="text"
                         placeholder="00000-000"
                         value={formCep}
+                        onBlur={handleCepBlur}
                         onChange={async (e) => {
                           const masked = maskCEP(e.target.value);
                           setFormCep(masked);
+                          cepRef.current?.setCustomValidity("");
                           const digits = masked.replace(/\D/g, "");
                           if (digits.length === 8) {
                             try {
                               const data = await fetchAddressByCEP(digits);
                               if (data) {
-                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
-                                setFormAddress(newAddress);
+                                setFormAddress(formatAddressFromCEP(data, "logradouro"));
+                                setFormCity(data.localidade);
+                                setFormState(data.uf.toUpperCase());
                               } else {
                                 toast.error("CEP não encontrado.");
                               }
@@ -1117,6 +1122,35 @@ const DashboardLocatario = () => {
                         onChange={(e) => setFormAddress(e.target.value)}
                         className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
                       />
+                    </div>
+                    {/* Município e UF em campo próprio: é este par que o
+                        contrato usa como foro, e deixá-lo só no texto do
+                        endereço obrigava a adivinhá-lo por regex. */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-outline">Cidade</label>
+                        <input
+                          type="text"
+                          value={formCity}
+                          onChange={(e) => setFormCity(e.target.value)}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-outline">Estado</label>
+                        <select
+                          value={formState}
+                          onChange={(e) => setFormState(e.target.value)}
+                          className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
+                        >
+                          <option value="">—</option>
+                          {UFS.map((uf) => (
+                            <option key={uf} value={uf}>
+                              {uf}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                   <button
@@ -1139,6 +1173,7 @@ const DashboardLocatario = () => {
                         <input
                           type={showCurrentPassword ? "text" : "password"}
                           required
+                          minLength={8}
                           value={currentPassword}
                           onChange={(e) => setCurrentPassword(e.target.value)}
                           placeholder="••••••••"
@@ -1162,7 +1197,10 @@ const DashboardLocatario = () => {
                           pattern={passwordPattern.regex.source}
                           title={passwordPattern.title}
                           value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
+                          onChange={(e) => {
+                            setNewPassword(e.target.value);
+                            confirmPasswordRef.current?.setCustomValidity("");
+                          }}
                           placeholder="••••••••"
                           className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
                         />
@@ -1183,7 +1221,10 @@ const DashboardLocatario = () => {
                           required
                           ref={confirmPasswordRef}
                           value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          onChange={(e) => {
+                            setConfirmPassword(e.target.value);
+                            confirmPasswordRef.current?.setCustomValidity("");
+                          }}
                           placeholder="••••••••"
                           className="w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
                         />

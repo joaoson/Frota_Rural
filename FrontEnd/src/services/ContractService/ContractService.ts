@@ -13,11 +13,67 @@ export interface Rental {
   total: string;
   contractNumber: string;
   status: "pending" | "active" | "completed" | "cancelled" | "signed" | "closed";
+  /** Estado do aceite de cada parte — `status` sozinho não distingue quem assinou. */
+  acceptedByLessor: boolean;
+  acceptedByLessee: boolean;
+  contractStatus: string | null;
   image?: string;
   observacoes?: string;
   hoursUsed?: number;
   initialHorimeter?: number;
   finalHorimeter?: number;
+}
+
+/** Evidência gravada pelo servidor, no formato bruto da trilha de auditoria. */
+export interface SignatureEvidenceRecord {
+  id: string;
+  contract: string;
+  role: "locador" | "locatario";
+  signer: string | null;
+  signer_name: string;
+  signer_email: string;
+  document_version: string;
+  document_hash: string;
+  hash_algorithm: string;
+  signed_at: string;
+  ip_address: string;
+  user_agent: string;
+  otp_verified: boolean;
+  previous_hash: string;
+  record_hash: string;
+}
+
+export interface SignatureReceipt {
+  rental: Rental | null;
+  evidence: SignatureEvidenceRecord | null;
+}
+
+export interface ContractEvidence {
+  contrato_id: string;
+  aluguel_id: string;
+  status: string;
+  documento: { versao: string; hash: string; algoritmo: string };
+  /** false quando algum registro foi alterado ou o encadeamento não fecha. */
+  cadeia_integra: boolean;
+  inconsistencias: string[];
+  assinaturas: SignatureEvidenceRecord[];
+  fundamento_legal: string;
+}
+
+/** Campos do aceite que a API devolve junto de qualquer leitura de aluguel. */
+interface RentalSignatureFields {
+  accepted_by_lessor?: boolean | null;
+  accepted_by_lessee?: boolean | null;
+  contract_status?: string | null;
+}
+
+/** Normaliza o estado do aceite, comum a todas as leituras de aluguel. */
+function estadoAssinatura(r: RentalSignatureFields) {
+  return {
+    acceptedByLessor: Boolean(r.accepted_by_lessor),
+    acceptedByLessee: Boolean(r.accepted_by_lessee),
+    contractStatus: r.contract_status ?? null,
+  };
 }
 
 class ContractService {
@@ -52,6 +108,7 @@ class ContractService {
       total: payload.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     };
   }
 
@@ -71,6 +128,7 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     }));
   }
 
@@ -90,6 +148,27 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
+    }));
+  }
+
+  async listByPosting(postingId: string): Promise<Rental[]> {
+    const response = await AxiosInstance.get<any[]>("rentals/", {
+      params: { postings: postingId },
+    });
+    return response.data.map(r => ({
+      id: r.id,
+      postingId: r.postings,
+      lesseeId: r.lessee,
+      lessorId: "lessor-default",
+      machineName: `${r.machine_brand || ""} ${r.machine_model || ""}`.trim() || "Maquinário",
+      period: `${r.start_date.split("T")[0]} a ${r.end_date.split("T")[0]}`,
+      startDate: r.start_date.split("T")[0],
+      endDate: r.end_date.split("T")[0],
+      total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+      contractNumber: r.contract_number,
+      status: r.status,
+      ...estadoAssinatura(r),
     }));
   }
 
@@ -108,6 +187,7 @@ class ContractService {
       total: parseFloat(r.total_price).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
       contractNumber: r.contract_number,
       status: r.status,
+      ...estadoAssinatura(r),
     };
   }
 
@@ -116,12 +196,40 @@ class ContractService {
     return response.data;
   }
 
-  async signContract(id: string, role: "locador" | "locatario", signatureName: string): Promise<Rental | null> {
-    await AxiosInstance.post(`contracts/${id}/sign`, {
+  async requestSignatureOtp(id: string, role: "locador" | "locatario"): Promise<{ sentTo: string; expiresInSeconds: number }> {
+    const response = await AxiosInstance.post(`contracts/${id}/otp`, { role });
+    return {
+      sentTo: response.data.sent_to,
+      expiresInSeconds: response.data.expires_in_seconds,
+    };
+  }
+
+  /**
+   * Registra o aceite. O servidor grava a evidência (hash SHA-256 do documento
+   * aceito, timestamp UTC, IP, User-Agent e signatário) em log imutável — nada
+   * disso é enviado pelo cliente, justamente para ter valor probatório.
+   */
+  async signContract(
+    id: string,
+    role: "locador" | "locatario",
+    signatureName: string,
+    otp?: string,
+  ): Promise<SignatureReceipt> {
+    const response = await AxiosInstance.post(`contracts/${id}/sign`, {
       role,
-      name: signatureName
+      name: signatureName,
+      ...(otp ? { otp } : {}),
     });
-    return this.getRentalById(id);
+    return {
+      rental: await this.getRentalById(id),
+      evidence: response.data?.signature_evidence ?? null,
+    };
+  }
+
+  /** Trilha de auditoria completa do aceite, com a conferência do encadeamento. */
+  async getContractEvidence(id: string): Promise<ContractEvidence> {
+    const response = await AxiosInstance.get<ContractEvidence>(`contracts/${id}/evidence`);
+    return response.data;
   }
 }
 
