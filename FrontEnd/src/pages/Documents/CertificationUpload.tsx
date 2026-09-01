@@ -1,176 +1,125 @@
-import { type FormEvent, useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
+
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
-import { OperatorDocumentServiceError } from "@/services/OperatorDocumentService/errors/OperatorDocumentError";
-import type { CreateCertificationRequest } from "@/services/OperatorDocumentService/models/CreateCertificationRequest";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  certificationToFormValues,
+  certificationToPayload,
+} from "@/features/documents/api/documentMapper";
+import { useCertificationForm } from "@/features/documents/hooks/useDocumentForms";
+import {
+  useCertification,
+  useSaveCertification,
+  useUploadDocument,
+} from "@/features/documents/hooks/useDocuments";
+import type { CertificationFormValues } from "@/features/documents/types/documentSchemas";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
+
+const API_FIELD_TO_FORM: Partial<Record<string, keyof CertificationFormValues>> = {
+  issuing_organization: "issuingOrganization",
+  title: "title",
+  issue_date: "issueDate",
+  expiration_date: "expirationDate",
+  credential_code: "credentialCode",
+  description: "description",
+};
+
+const INPUT_BASE =
+  "w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow";
+
+function inputClass(hasError: boolean): string {
+  return `${INPUT_BASE} ${
+    hasError ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"
+  }`;
+}
 
 const CertificationUpload = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
-
+  const isEditing = Boolean(id);
   const today = new Date().toISOString().split("T")[0];
 
-  const [issuingOrganization, setIssuingOrganization] = useState("");
-  const [title, setTitle] = useState("");
-  const [issueDate, setIssueDate] = useState("");
-  const [expirationDate, setExpirationDate] = useState("");
-  const [credentialCode, setCredentialCode] = useState("");
-  const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [mediaCleared, setMediaCleared] = useState(false);
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const certificationQuery = useCertification(id ?? null);
+  const saveCertification = useSaveCertification();
+  const uploadDocument = useUploadDocument();
 
-  const validateField = (fieldName: string, value: any) => {
-    let errorMsg = "";
-    switch (fieldName) {
-      case "title":
-        if (!value.trim()) {
-          errorMsg = "Título do curso é obrigatório.";
-        } else if (value.trim().length < 3) {
-          errorMsg = "O título deve ter pelo menos 3 caracteres.";
-        }
-        break;
-      case "issuingOrganization":
-        if (!value.trim()) {
-          errorMsg = "Organização emissora é obrigatória.";
-        } else if (value.trim().length < 2) {
-          errorMsg = "A organização emissora deve ter pelo menos 2 caracteres.";
-        }
-        break;
-      case "issueDate":
-        if (!value) {
-          errorMsg = "Data de emissão é obrigatória.";
-        } else if (value > today) {
-          errorMsg = "A data de emissão não pode ser no futuro.";
-        }
-        break;
-      case "expirationDate":
-        if (value && issueDate && value <= issueDate) {
-          errorMsg = "A data de validade deve ser posterior à data de emissão.";
-        }
-        break;
-      case "description":
-        if (!value.trim()) {
-          errorMsg = "Descrição é obrigatória.";
-        } else if (value.trim().length < 10) {
-          errorMsg = "A descrição deve conter pelo menos 10 caracteres.";
-        }
-        break;
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
-  };
+  const form = useCertificationForm();
+  const { errors } = form.formState;
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingMediaUrl, setExistingMediaUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!!id);
+  // Derivado da query; `mediaCleared` cobre o caso de o usuário remover o arquivo.
+  const certification = certificationQuery.data ?? null;
+  const existingMediaUrl = mediaCleared ? null : (certification?.mediaUrl ?? null);
+  const isLoading = isEditing && certificationQuery.isLoading;
+  const isSubmitting = saveCertification.isPending || uploadDocument.isPending;
 
-  const isEditing = !!id;
-
+  // Preenche o formulário ao carregar uma certificação existente.
   useEffect(() => {
-    if (!id) return;
-
-    operatorDocumentService
-      .getCertificationById(id)
-      .then((cert) => {
-        setIssuingOrganization(cert.issuing_organization);
-        setTitle(cert.title);
-        setIssueDate(cert.issue_date);
-        setExpirationDate(cert.expiration_date ?? "");
-        setCredentialCode(cert.credential_code ?? "");
-        setDescription(cert.description);
-        setExistingMediaUrl(cert.media_url ?? null);
-      })
-      .finally(() => setIsLoading(false));
-  }, [id]);
+    if (!certification) return;
+    form.reset(certificationToFormValues(certification));
+  }, [certification, form]);
 
   const handleFile = (selected: File) => {
-    const allowed =
-      selected.type.startsWith("image/") || selected.type === "application/pdf";
+    const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (allowed) setFile(selected);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
     setDragging(false);
-    const dropped = e.dataTransfer.files[0];
+    const dropped = event.dataTransfer.files[0];
     if (dropped) handleFile(dropped);
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting) return;
-
-    const errorsList = {
-      title: validateField("title", title),
-      issuingOrganization: validateField("issuingOrganization", issuingOrganization),
-      issueDate: validateField("issueDate", issueDate),
-      expirationDate: validateField("expirationDate", expirationDate),
-      description: validateField("description", description),
-    };
-
-    if (Object.values(errorsList).some((err) => err !== "")) {
-      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!userId) {
+      toast.error("Usuário não autenticado. Faça login para cadastrar a certificação.");
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      if (!userId) {
-        toast.error(
-          "Usuário não autenticado. Faça login para cadastrar a certificação.",
-        );
-        return;
-      }
+      const uploadedUrl = file ? await uploadDocument.mutateAsync(file) : undefined;
+      const mediaUrl = uploadedUrl ?? existingMediaUrl ?? undefined;
 
-      let uploadedMediaUrl: string | undefined;
-      if (file) {
-        uploadedMediaUrl = await operatorDocumentService.uploadDocument(file);
-      }
+      await saveCertification.mutateAsync({
+        id,
+        payload: certificationToPayload(values, userId, mediaUrl),
+      });
 
-      const payload: CreateCertificationRequest = {
-        user: userId,
-        issuing_organization: issuingOrganization.trim(),
-        title: title.trim(),
-        issue_date: issueDate,
-        expiration_date: expirationDate || undefined,
-        credential_code: credentialCode.trim() || undefined,
-        description: description.trim(),
-        media_url:
-          uploadedMediaUrl ||
-          existingMediaUrl ||
-          (isEditing ? null : undefined),
-      };
-
-      if (isEditing) {
-        await operatorDocumentService.updateCertification(id, payload);
-        toast.success("Certificação atualizada com sucesso.");
-      } else {
-        await operatorDocumentService.createCertification(payload);
-        toast.success("Certificação cadastrada com sucesso.");
-      }
+      toast.success(
+        isEditing ? "Certificação atualizada com sucesso." : "Certificação cadastrada com sucesso.",
+      );
       navigate("/dashboard");
     } catch (error) {
-      if (error instanceof OperatorDocumentServiceError) {
-        toast.error(error.message);
-      } else {
-        toast.error(
-          isEditing
+      if (error instanceof BadRequestError && error.hasFieldErrors) {
+        let placed = false;
+        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
+          const formField = API_FIELD_TO_FORM[apiField];
+          const message = messages[0];
+          if (formField && message) {
+            form.setError(formField, { type: "server", message });
+            placed = true;
+          }
+        }
+        if (placed) return;
+      }
+      toast.error(
+        error instanceof HttpError
+          ? error.message
+          : isEditing
             ? "Erro ao atualizar certificação. Verifique os dados e tente novamente."
             : "Erro ao cadastrar certificação. Verifique os dados e tente novamente.",
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
+      );
     }
-  };
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -203,7 +152,7 @@ const CertificationUpload = () => {
 
             <form
               className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
-              onSubmit={handleSubmit}
+              onSubmit={onSubmit}
               noValidate
             >
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
@@ -217,16 +166,12 @@ const CertificationUpload = () => {
                 <input
                   type="text"
                   placeholder="Ex.: Operação de Tratores Agrícolas"
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    if (errors.title) validateField("title", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("title", e.target.value)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.title ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.title))}
+                  {...form.register("title")}
                 />
-                {errors.title && <p className="text-[11px] text-error font-medium mt-1">{errors.title}</p>}
+                {errors.title && (
+                  <p className="text-[11px] text-error font-medium mt-1">{errors.title.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -236,16 +181,14 @@ const CertificationUpload = () => {
                 <input
                   type="text"
                   placeholder="Ex.: SENAR"
-                  value={issuingOrganization}
-                  onChange={(e) => {
-                    setIssuingOrganization(e.target.value);
-                    if (errors.issuingOrganization) validateField("issuingOrganization", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("issuingOrganization", e.target.value)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingOrganization ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.issuingOrganization))}
+                  {...form.register("issuingOrganization")}
                 />
-                {errors.issuingOrganization && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingOrganization}</p>}
+                {errors.issuingOrganization && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.issuingOrganization.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-5">
@@ -255,18 +198,15 @@ const CertificationUpload = () => {
                   </label>
                   <input
                     type="date"
-                    value={issueDate}
                     max={today}
-                    onChange={(e) => {
-                      setIssueDate(e.target.value);
-                      if (errors.issueDate) validateField("issueDate", e.target.value);
-                      if (expirationDate) validateField("expirationDate", expirationDate);
-                    }}
-                    onBlur={(e) => validateField("issueDate", e.target.value)}
-                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issueDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                    required
+                    className={inputClass(Boolean(errors.issueDate))}
+                    {...form.register("issueDate")}
                   />
-                  {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
+                  {errors.issueDate && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.issueDate.message}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -274,15 +214,14 @@ const CertificationUpload = () => {
                   </label>
                   <input
                     type="date"
-                    value={expirationDate}
-                    onChange={(e) => {
-                      setExpirationDate(e.target.value);
-                      if (errors.expirationDate) validateField("expirationDate", e.target.value);
-                    }}
-                    onBlur={(e) => validateField("expirationDate", e.target.value)}
-                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.expirationDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                    className={inputClass(Boolean(errors.expirationDate))}
+                    {...form.register("expirationDate")}
                   />
-                  {errors.expirationDate && <p className="text-[11px] text-error font-medium mt-1">{errors.expirationDate}</p>}
+                  {errors.expirationDate && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.expirationDate.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -293,9 +232,8 @@ const CertificationUpload = () => {
                 <input
                   type="text"
                   placeholder="Código fornecido pela instituição, se aplicável (opcional)"
-                  value={credentialCode}
-                  onChange={(e) => setCredentialCode(e.target.value)}
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  {...form.register("credentialCode")}
                 />
               </div>
 
@@ -305,17 +243,15 @@ const CertificationUpload = () => {
                 </label>
                 <textarea
                   placeholder="Descreva o conteúdo do curso, competências adquiridas ou informações relevantes"
-                  value={description}
-                  onChange={(e) => {
-                    setDescription(e.target.value);
-                    if (errors.description) validateField("description", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("description", e.target.value)}
                   rows={4}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.description ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.description))}
+                  {...form.register("description")}
                 />
-                {errors.description && <p className="text-[11px] text-error font-medium mt-1">{errors.description}</p>}
+                {errors.description && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.description.message}
+                  </p>
+                )}
               </div>
 
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
@@ -432,7 +368,7 @@ const CertificationUpload = () => {
                       </a>
                       <button
                         type="button"
-                        onClick={() => setExistingMediaUrl(null)}
+                        onClick={() => setMediaCleared(true)}
                         className="flex items-center px-2 py-2 rounded-lg text-on-surface hover:bg-primary/5 transition-colors cursor-pointer"
                       >
                         <MaterialIcon icon="delete" size={16} />

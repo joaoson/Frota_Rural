@@ -18,16 +18,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { userService } from "@/services/UserService/UserService";
-import type { User } from "@/services/UserService/models/User";
-import {
-  adminService,
-  AdminServiceError,
-} from "@/services/AdminService/AdminService";
+import { useModerateUser } from "@/features/administration/hooks/useModeration";
+import type { UserModerationAction } from "@/features/administration/types/moderation";
+import { useUsers } from "@/features/users/hooks/useUsers";
+import type { User } from "@/features/users/types/user";
+import { HttpError } from "@/shared/http/errors";
 
-type ModerationAction = "warn" | "suspend" | "ban";
+type ModerationAction = UserModerationAction;
 
-const statusBadge = (status: string) => {
+const statusBadge = (status: string | null) => {
   switch (status) {
     case "active":
       return {
@@ -98,8 +97,11 @@ const actionConfig: Record<
 };
 
 const AdminUsers = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const usersQuery = useUsers();
+  const moderateUser = useModerateUser();
+  const users = usersQuery.data;
+  const loading = usersQuery.isLoading;
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -109,27 +111,15 @@ const AdminUsers = () => {
     user: User;
     action: ModerationAction;
   } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const data = await userService.list();
-      setUsers(data);
-    } catch {
-      toast.error("Não foi possível carregar os usuários.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const submitting = moderateUser.isPending;
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    if (usersQuery.isError) toast.error("Não foi possível carregar os usuários.");
+  }, [usersQuery.isError]);
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return users.filter((u) => {
+    return (users ?? []).filter((u) => {
       if (statusFilter !== "all" && u.status !== statusFilter) return false;
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
       if (!term) return true;
@@ -154,25 +144,13 @@ const AdminUsers = () => {
   const runAction = async () => {
     if (!pendingAction) return;
     const { user, action } = pendingAction;
-    setSubmitting(true);
     try {
-      const result =
-        action === "warn"
-          ? await adminService.warn(user.id)
-          : action === "suspend"
-            ? await adminService.suspend(user.id)
-            : await adminService.ban(user.id);
-      toast.success(result?.message ?? "Ação aplicada com sucesso.");
-      await loadUsers();
+      // O store invalida a lista de usuários sozinho; não é preciso recarregar aqui.
+      const message = await moderateUser.mutateAsync({ userId: user.id, action });
+      toast.success(message);
       closeConfirm();
     } catch (error) {
-      const msg =
-        error instanceof AdminServiceError
-          ? error.message
-          : "Falha ao aplicar a ação.";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
+      toast.error(error instanceof HttpError ? error.message : "Falha ao aplicar a ação.");
     }
   };
 
@@ -216,7 +194,7 @@ const AdminUsers = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={loadUsers}
+            onClick={() => void usersQuery.refetch()}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
             <MaterialIcon icon="refresh" size={16} /> Atualizar

@@ -1,12 +1,10 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
+
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { postingService } from "@/services/PostingService/PostingService";
-import { toast } from "sonner";
-import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,111 +16,101 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { toDateInput, toEditPayload } from "@/features/postings/api/postingMapper";
+import { usePostingEditForm } from "@/features/postings/hooks/usePostingForm";
+import {
+  useDeletePosting,
+  usePosting,
+  useUpdatePosting,
+} from "@/features/postings/hooks/usePostings";
+import { postingMachineName } from "@/features/postings/types/posting";
+import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
+import { HttpError } from "@/shared/http/errors";
+import { masked } from "@/shared/lib/maskedRegister";
+import { maskCEP } from "@/utils/masks/maskCEP";
+
+const FIELD =
+  "w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow";
 
 const GerenciarAnuncio = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [posting, setPosting] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [cep, setCep] = useState("");
-  const [location, setLocation] = useState("");
+
+  const postingQuery = usePosting(id ?? null);
+  const updatePosting = useUpdatePosting();
+  const deletePosting = useDeletePosting();
+  const { lookup } = useCepLookup();
+
+  const form = usePostingEditForm();
+  const { errors } = form.formState;
+  const posting = postingQuery.data;
+
+  // Preenche o formulário assim que o anúncio chega do cache/rede.
+  useEffect(() => {
+    if (!posting) return;
+    form.reset({
+      status: posting.status ?? "active",
+      hourlyRate: String(posting.hourlyRate),
+      cep: "",
+      locationAddress: posting.locationAddress ?? "",
+      availabilityStart: toDateInput(posting.availabilityStart),
+      availabilityEnd: toDateInput(posting.availabilityEnd),
+      description: posting.description ?? "",
+    });
+  }, [posting, form]);
 
   useEffect(() => {
-    if (!id) return;
-    postingService
-      .getById(id)
-      .then((data) => {
-        setPosting(data);
-        setLocation(data.location_address || "");
-      })
-      .catch(() => {
-        toast.error("Não foi possível carregar o anúncio.");
-        navigate("/dashboard");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, [id, navigate]);
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting || !id) return;
-    setIsSubmitting(true);
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const hourlyRaw = String(formData.get("hourly_rate") ?? "").trim();
-    const location = String(formData.get("location_address") ?? "").trim();
-    const availabilityStart = String(
-      formData.get("availability_start") ?? ""
-    ).trim();
-    const availabilityEnd = String(
-      formData.get("availability_end") ?? ""
-    ).trim();
-    const description = String(formData.get("description") ?? "").trim();
-    const status = String(formData.get("status") ?? "").trim();
-
-    const hourlyRate = Number(hourlyRaw.replace(",", "."));
-    if (!hourlyRaw || Number.isNaN(hourlyRate) || hourlyRate <= 0) {
-      toast.error("Informe um valor por hora válido.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      await postingService.update(id, {
-        hourly_rate: hourlyRate,
-        location_address: location,
-        availability_start: availabilityStart
-          ? `${availabilityStart}T00:00:00`
-          : undefined,
-        availability_end: availabilityEnd
-          ? `${availabilityEnd}T23:59:59`
-          : undefined,
-        description: description || undefined,
-        status: status || undefined,
-      });
-      toast.success("Anúncio atualizado com sucesso.");
+    if (postingQuery.isError) {
+      toast.error("Não foi possível carregar o anúncio.");
       navigate("/dashboard");
+    }
+  }, [postingQuery.isError, navigate]);
+
+  const handleCepChange = async (value: string) => {
+    if (!isCepComplete(value)) return;
+    try {
+      const address = await lookup(value);
+      form.setValue("locationAddress", `${address.city}, ${address.state}`, {
+        shouldValidate: true,
+      });
     } catch {
-      toast.error("Erro ao atualizar o anúncio.");
-    } finally {
-      setIsSubmitting(false);
+      toast.error("CEP não encontrado.");
     }
   };
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!id) return;
+    try {
+      await updatePosting.mutateAsync({ id, payload: toEditPayload(values) });
+      toast.success("Anúncio atualizado com sucesso.");
+      navigate("/dashboard");
+    } catch (error) {
+      toast.error(error instanceof HttpError ? error.message : "Erro ao atualizar o anúncio.");
+    }
+  });
 
   const handleDelete = async () => {
     if (!id) return;
     try {
-      await postingService.delete(id);
+      await deletePosting.mutateAsync(id);
       toast.success("Anúncio removido.");
       navigate("/dashboard");
-    } catch {
-      toast.error("Erro ao remover anúncio.");
+    } catch (error) {
+      // 409 quando existem locações dependentes — mensagem vem do backend.
+      toast.error(error instanceof HttpError ? error.message : "Erro ao remover anúncio.");
     }
   };
 
-  if (loading) {
+  const cepField = masked(form.register("cep"), maskCEP);
+
+  if (postingQuery.isLoading || !posting) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <MaterialIcon
-          icon="sync"
-          className="animate-spin text-primary mb-4"
-          size={32}
-        />
+        <MaterialIcon icon="sync" className="animate-spin text-primary mb-4" size={32} />
         <p className="text-on-surface-variant font-medium">Carregando anúncio...</p>
       </div>
     );
   }
-
-  const getMachineName = () => {
-    if (!posting) return "";
-    if (posting.machinery_details) {
-      return `${posting.machinery_details.brand} ${posting.machinery_details.model}`;
-    }
-    return posting.machinery;
-  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -144,23 +132,20 @@ const GerenciarAnuncio = () => {
               <div className="h-1 w-16 bg-secondary-container mb-3" />
               <p className="text-on-surface-variant text-sm">
                 Atualize as informações de locação para{" "}
-                <strong className="text-on-surface">{getMachineName()}</strong>
+                <strong className="text-on-surface">{postingMachineName(posting)}</strong>
               </p>
             </div>
 
             <form
               className="space-y-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-8 shadow-sm"
-              onSubmit={handleSubmit}
+              onSubmit={onSubmit}
+              noValidate
             >
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Status do Anúncio
                 </label>
-                <select
-                  name="status"
-                  defaultValue={posting.status || "active"}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                >
+                <select className={FIELD} {...form.register("status")}>
                   <option value="active">Ativo (Visível para busca)</option>
                   <option value="inactive">Pausado (Oculto)</option>
                 </select>
@@ -171,14 +156,17 @@ const GerenciarAnuncio = () => {
                   Valor por Hora (R$) *
                 </label>
                 <input
-                  name="hourly_rate"
                   type="number"
                   min={0}
                   step="0.01"
-                  defaultValue={posting.hourly_rate}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  required
+                  className={FIELD}
+                  {...form.register("hourlyRate")}
                 />
+                {errors.hourlyRate && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.hourlyRate.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -189,25 +177,12 @@ const GerenciarAnuncio = () => {
                   <input
                     type="text"
                     placeholder="00000-000"
-                    value={cep}
-                    onChange={async (e) => {
-                      const masked = maskCEP(e.target.value);
-                      setCep(masked);
-                      const digits = masked.replace(/\D/g, "");
-                      if (digits.length === 8) {
-                        try {
-                          const data = await fetchAddressByCEP(digits);
-                          if (data) {
-                            setLocation(`${data.localidade}, ${data.uf}`);
-                          } else {
-                            toast.error("CEP não encontrado.");
-                          }
-                        } catch (error) {
-                          console.error("Erro ao buscar CEP", error);
-                        }
-                      }
+                    className={FIELD}
+                    {...cepField}
+                    onChange={(event) => {
+                      void cepField.onChange(event);
+                      void handleCepChange(event.target.value);
                     }}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                   />
                 </div>
 
@@ -215,14 +190,12 @@ const GerenciarAnuncio = () => {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Localização *
                   </label>
-                  <input
-                    name="location_address"
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                    required
-                  />
+                  <input type="text" className={FIELD} {...form.register("locationAddress")} />
+                  {errors.locationAddress && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.locationAddress.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -231,31 +204,18 @@ const GerenciarAnuncio = () => {
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Disponível a partir de
                   </label>
-                  <input
-                    name="availability_start"
-                    type="date"
-                    defaultValue={
-                      posting.availability_start
-                        ? posting.availability_start.split("T")[0]
-                        : ""
-                    }
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  />
+                  <input type="date" className={FIELD} {...form.register("availabilityStart")} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Disponível até
                   </label>
-                  <input
-                    name="availability_end"
-                    type="date"
-                    defaultValue={
-                      posting.availability_end
-                        ? posting.availability_end.split("T")[0]
-                        : ""
-                    }
-                    className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                  />
+                  <input type="date" className={FIELD} {...form.register("availabilityEnd")} />
+                  {errors.availabilityEnd && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.availabilityEnd.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -263,12 +223,7 @@ const GerenciarAnuncio = () => {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Descrição
                 </label>
-                <textarea
-                  name="description"
-                  rows={4}
-                  defaultValue={posting.description}
-                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
-                />
+                <textarea rows={4} className={FIELD} {...form.register("description")} />
               </div>
 
               <div className="pt-4 border-t border-outline-variant/30 flex justify-end gap-3">
@@ -285,9 +240,8 @@ const GerenciarAnuncio = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Excluir anúncio?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Esta ação não pode ser desfeita. O anúncio será removido
-                        e não aparecerá mais nos resultados de busca. As
-                        locações em andamento não serão afetadas.
+                        Esta ação não pode ser desfeita. O anúncio será removido e não aparecerá
+                        mais nos resultados de busca. As locações em andamento não serão afetadas.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -304,11 +258,11 @@ const GerenciarAnuncio = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={updatePosting.isPending}
                   className="px-8 py-3.5 text-sm font-bold rounded-lg bg-primary text-on-primary hover:shadow-lg transition-all disabled:opacity-60 flex items-center gap-2"
                 >
                   <MaterialIcon icon="save" size={18} />
-                  {isSubmitting ? "Salvando..." : "Salvar Alterações"}
+                  {updatePosting.isPending ? "Salvando..." : "Salvar Alterações"}
                 </button>
               </div>
             </form>

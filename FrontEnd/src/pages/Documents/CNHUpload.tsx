@@ -1,32 +1,31 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
+
+import cnhExample from "@/assets/cnh_example.jpg";
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
-import { OperatorDocumentServiceError } from "@/services/OperatorDocumentService/errors/OperatorDocumentError";
-import type { CreateOperatorLicenseRequest } from "@/services/OperatorDocumentService/models/CreateOperatorLicenseRequest";
-import type { CNHValidationResult } from "@/services/OperatorDocumentService/models/CNHValidationResult";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { maskRG } from "@/utils/masks/maskRG";
-import { validateRG } from "@/utils/validation/validateRG";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import cnhExample from "@/assets/cnh_example.jpg";
-
-const CNH_CATEGORIES = [
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "AB",
-  "AC",
-  "AD",
-  "AE",
-] as const;
+import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
+import { useCnhForm } from "@/features/documents/hooks/useDocumentForms";
+import {
+  useOperatorLicenses,
+  useSaveLicense,
+  useUploadDocument,
+  useValidateCnhFile,
+} from "@/features/documents/hooks/useDocuments";
+import type { CnhValidationResult } from "@/features/documents/types/document";
+import {
+  CNH_CATEGORIES,
+  type CnhFormValues,
+  maxDriverBirthDate,
+} from "@/features/documents/types/documentSchemas";
+import { BRAZILIAN_STATES } from "@/shared/lib/brazilianStates";
+import { masked } from "@/shared/lib/maskedRegister";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { maskDocument } from "@/utils/masks/maskDocument";
+import { maskRG } from "@/utils/masks/maskRG";
 
 const CNH_SITUATIONS = [
   { value: "active", label: "Ativa" },
@@ -37,36 +36,6 @@ const CNH_SITUATIONS = [
   { value: "ppd", label: "PPD" },
 ] as const;
 
-const UF_OPTIONS = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-] as const;
-
 const UPLOAD_INSTRUCTIONS = [
   "Abra sua CNH e posicione conforme o exemplo ao lado",
   "Não envie fotos de telas ou cópias",
@@ -74,348 +43,143 @@ const UPLOAD_INSTRUCTIONS = [
   "Salve o documento sob formato PNG, JPEG ou PDF",
 ];
 
+const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
+  name: "name",
+  birth_date: "birthDate",
+  cpf: "cpf",
+  rg: "rg",
+  mother_name: "motherName",
+  father_name: "fatherName",
+  nationality: "nationality",
+  birth_place: "birthCity",
+  cnh_number: "cnhNumber",
+  category: "category",
+  first_license_date: "firstLicenseDate",
+  issue_date: "issueDate",
+  expiration_date: "expirationDate",
+  issuing_state: "issuingState",
+  issuing_authority: "issuingAuthority",
+  situation: "situation",
+  points: "points",
+};
+
+const INPUT_BASE =
+  "w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow";
+
+function inputClass(hasError: boolean): string {
+  return `${INPUT_BASE} ${
+    hasError ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"
+  }`;
+}
+
 const CNHUpload = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
-  const cpfRef = useRef<HTMLInputElement>(null);
-  const rgRef = useRef<HTMLInputElement>(null);
-  const birthDateRef = useRef<HTMLInputElement>(null);
 
   const today = new Date().toISOString().split("T")[0];
-  const maxBirthDate = (() => {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 18);
-    return d.toISOString().split("T")[0];
-  })();
-
-  const [name, setName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [rg, setRg] = useState("");
-  const [motherName, setMotherName] = useState("");
-  const [fatherName, setFatherName] = useState("");
-  const [nationality, setNationality] = useState("Brasileiro(a)");
-  const [birthCity, setBirthCity] = useState("");
-  const [birthState, setBirthState] = useState("");
-
-  const [cnhNumber, setCnhNumber] = useState("");
-  const [category, setCategory] = useState("");
-  const [firstLicenseDate, setFirstLicenseDate] = useState("");
-  const [issueDate, setIssueDate] = useState("");
-  const [expirationDate, setExpirationDate] = useState("");
-  const [issuingState, setIssuingState] = useState("");
-  const [issuingAuthority, setIssuingAuthority] = useState("");
-
-  const [situation, setSituation] = useState("");
-  const [acc, setAcc] = useState(false);
-  const [ear, setEar] = useState(false);
-
-  const [medicalRestrictions, setMedicalRestrictions] = useState("");
-  const [observations, setObservations] = useState("");
-  const [points, setPoints] = useState(0);
+  const maxBirthDate = maxDriverBirthDate();
 
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [validationResult, setValidationResult] =
-    useState<CNHValidationResult | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
-  const [existingLicenseId, setExistingLicenseId] = useState<string | null>(
-    null,
-  );
-  const [existingFileUrl, setExistingFileUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [validationResult, setValidationResult] = useState<CnhValidationResult | null>(null);
+
+  const licensesQuery = useOperatorLicenses({ userId: userId ?? undefined }, Boolean(userId));
+  const saveLicense = useSaveLicense();
+  const uploadDocument = useUploadDocument();
+  const validateCnh = useValidateCnhFile();
+
+  const form = useCnhForm();
+  const { errors } = form.formState;
+
+  // Derivado da query: uma fonte de verdade só, sem espelhar em estado local.
+  const existingLicense = licensesQuery.data?.[0] ?? null;
+  const existingLicenseId = existingLicense?.id ?? null;
+  const existingFileUrl = existingLicense?.fileUrl ?? null;
 
   const isEditing = existingLicenseId !== null;
+  const isLoading = Boolean(userId) && licensesQuery.isLoading;
+  const isValidating = validateCnh.isPending;
+  const isSubmitting = saveLicense.isPending || uploadDocument.isPending;
 
+  // Carrega a CNH existente, se houver. Substitui os 20 setters sequenciais.
   useEffect(() => {
-    if (!userId) {
-      setIsLoading(false);
-      return;
-    }
-
-    operatorDocumentService
-      .listLicenses({ user: userId })
-      .then((licenses) => {
-        if (licenses.length === 0) return;
-        const license = licenses[0];
-        setExistingLicenseId(license.id);
-
-        setName(license.name);
-        setBirthDate(license.birth_date);
-        setCpf(maskDocument(license.cpf));
-        setRg(maskRG(license.rg));
-        setMotherName(license.mother_name);
-        setFatherName(license.father_name ?? "");
-        setNationality(license.nationality);
-
-        const parts = license.birth_place.split(" – ");
-        if (parts.length === 2) {
-          setBirthCity(parts[0]);
-          setBirthState(parts[1]);
-        } else {
-          setBirthCity(license.birth_place);
-        }
-
-        setCnhNumber(license.cnh_number);
-        setCategory(license.category);
-        setFirstLicenseDate(license.first_license_date);
-        setIssueDate(license.issue_date);
-        setExpirationDate(license.expiration_date);
-        setIssuingState(license.issuing_state);
-        setIssuingAuthority(license.issuing_authority);
-
-        setSituation(license.situation);
-        setAcc(license.acc);
-        setEar(license.ear);
-
-        setMedicalRestrictions(license.medical_restrictions ?? "");
-        setObservations(license.observations ?? "");
-        setPoints(license.points);
-        setExistingFileUrl(license.file_url ?? null);
-      })
-      .finally(() => setIsLoading(false));
-  }, [userId]);
+    if (!existingLicense) return;
+    form.reset({
+      ...licenseToFormValues(existingLicense),
+      cpf: maskDocument(existingLicense.cpf),
+      rg: maskRG(existingLicense.rg),
+    });
+  }, [existingLicense, form]);
 
   const handleFile = (selected: File) => {
-    const allowed =
-      selected.type.startsWith("image/") || selected.type === "application/pdf";
+    const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (!allowed) return;
 
     setFile(selected);
     setValidationResult(null);
-    setIsValidating(true);
 
-    operatorDocumentService
-      .validateCNHDocument(selected)
+    validateCnh
+      .mutateAsync(selected)
       .then(setValidationResult)
-      .catch((error) => {
+      .catch((error: unknown) => {
         setValidationResult({
-          is_valid: false,
+          isValid: false,
           confidence: "low",
           score: 0,
           error:
-            error instanceof OperatorDocumentServiceError
+            error instanceof HttpError
               ? error.message
               : "Erro inesperado ao validar o documento.",
         });
-      })
-      .finally(() => setIsValidating(false));
+      });
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
     setDragging(false);
-    const dropped = e.dataTransfer.files[0];
+    const dropped = event.dataTransfer.files[0];
     if (dropped) handleFile(dropped);
   };
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const validateField = (fieldName: string, value: any) => {
-    let errorMsg = "";
-    switch (fieldName) {
-      case "name":
-        if (!value.trim()) errorMsg = "Nome completo é obrigatório.";
-        break;
-      case "birthDate":
-        if (!value) {
-          errorMsg = "Data de nascimento é obrigatória.";
-        } else if (value > maxBirthDate) {
-          errorMsg = "O condutor deve ter pelo menos 18 anos.";
-        } else if (value < "1900-01-01") {
-          errorMsg = "Data de nascimento inválida.";
-        }
-        break;
-      case "cpf": {
-        const digits = value.replace(/\D/g, "");
-        if (!digits) {
-          errorMsg = "CPF é obrigatório.";
-        } else if (!validateCPF(digits)) {
-          errorMsg = "CPF inválido. Verifique os dígitos informados.";
-        }
-        break;
-      }
-      case "rg": {
-        const digits = value.replace(/\D/g, "");
-        if (!digits) {
-          errorMsg = "RG é obrigatório.";
-        } else if (!validateRG(digits)) {
-          errorMsg = "RG inválido. Verifique os dígitos informados.";
-        } else if (!/^\d{2}\.\d{3}\.\d{3}-[\dXdx]$/.test(value)) {
-          errorMsg = "O RG deve seguir o formato XX.XXX.XXX-X.";
-        }
-        break;
-      }
-      case "nationality":
-        if (!value) errorMsg = "Nacionalidade é obrigatória.";
-        break;
-      case "birthCity":
-        if (!value.trim()) errorMsg = "Cidade de nascimento é obrigatória.";
-        break;
-      case "birthState":
-        if (!value) errorMsg = "Estado de nascimento é obrigatório.";
-        break;
-      case "motherName":
-        if (!value.trim()) errorMsg = "Nome da mãe é obrigatório.";
-        break;
-      case "cnhNumber": {
-        const cleaned = value.replace(/\D/g, "");
-        if (!cleaned) {
-          errorMsg = "Número da CNH é obrigatório.";
-        } else if (cleaned.length !== 11) {
-          errorMsg = "O número da CNH deve conter exatamente 11 dígitos.";
-        }
-        break;
-      }
-      case "category":
-        if (!value) errorMsg = "Categoria é obrigatória.";
-        break;
-      case "firstLicenseDate":
-        if (!value) {
-          errorMsg = "Data da primeira habilitação é obrigatória.";
-        } else if (value > today) {
-          errorMsg = "A data da primeira habilitação não pode ser no futuro.";
-        }
-        break;
-      case "issueDate":
-        if (!value) {
-          errorMsg = "Data de emissão é obrigatória.";
-        } else if (value > today) {
-          errorMsg = "A data de emissão não pode ser no futuro.";
-        }
-        break;
-      case "expirationDate":
-        if (!value) {
-          errorMsg = "Data de validade é obrigatória.";
-        } else if (situation === "active" && value < today) {
-          errorMsg = "A data de validade de uma CNH ativa deve ser no futuro.";
-        }
-        break;
-      case "issuingState":
-        if (!value) errorMsg = "UF de emissão é obrigatório.";
-        break;
-      case "issuingAuthority":
-        if (!value.trim()) errorMsg = "Órgão emissor é obrigatório.";
-        break;
-      case "situation":
-        if (!value) errorMsg = "Situação é obrigatória.";
-        break;
-      case "points": {
-        const p = Number(value);
-        if (value !== "" && (Number.isNaN(p) || p < 0 || p > 40)) {
-          errorMsg = "A pontuação deve ser entre 0 e 40.";
-        }
-        break;
-      }
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
-  };
-
-  const handleCpfBlur = () => {
-    validateField("cpf", cpf);
-  };
-
-  const handleBirthDateBlur = () => {
-    validateField("birthDate", birthDate);
-  };
-
-  const handleRgBlur = () => {
-    validateField("rg", rg);
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting) return;
-
-    const errorsList = {
-      name: validateField("name", name),
-      birthDate: validateField("birthDate", birthDate),
-      cpf: validateField("cpf", cpf),
-      rg: validateField("rg", rg),
-      nationality: validateField("nationality", nationality),
-      birthCity: validateField("birthCity", birthCity),
-      birthState: validateField("birthState", birthState),
-      motherName: validateField("motherName", motherName),
-      cnhNumber: validateField("cnhNumber", cnhNumber),
-      category: validateField("category", category),
-      firstLicenseDate: validateField("firstLicenseDate", firstLicenseDate),
-      issueDate: validateField("issueDate", issueDate),
-      expirationDate: validateField("expirationDate", expirationDate),
-      issuingState: validateField("issuingState", issuingState),
-      issuingAuthority: validateField("issuingAuthority", issuingAuthority),
-      situation: validateField("situation", situation),
-      points: validateField("points", points),
-    };
-
-    if (Object.values(errorsList).some((err) => err !== "")) {
-      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!userId) {
+      toast.error("Usuário não autenticado. Faça login para cadastrar a CNH.");
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      if (!userId) {
-        toast.error(
-          "Usuário não autenticado. Faça login para cadastrar a CNH.",
-        );
-        return;
-      }
+      const uploadedUrl = file ? await uploadDocument.mutateAsync(file) : undefined;
+      const fileUrl = uploadedUrl ?? existingFileUrl ?? undefined;
 
-      let uploadedFileUrl: string | undefined;
-      if (file) {
-        uploadedFileUrl = await operatorDocumentService.uploadDocument(file);
-      }
+      await saveLicense.mutateAsync({
+        id: existingLicenseId ?? undefined,
+        payload: licenseToPayload(values, userId, fileUrl),
+      });
 
-      const payload: CreateOperatorLicenseRequest = {
-        user: userId,
-        name: name.trim(),
-        birth_date: birthDate,
-        cpf: clearSpecialChars(cpf),
-        rg: clearSpecialChars(rg),
-        mother_name: motherName.trim(),
-        father_name: fatherName.trim() || undefined,
-        nationality: nationality.trim(),
-        birth_place: `${birthCity.trim()} – ${birthState}`,
-        cnh_number: cnhNumber.trim(),
-        category,
-        first_license_date: firstLicenseDate,
-        issue_date: issueDate,
-        expiration_date: expirationDate,
-        issuing_state: issuingState,
-        issuing_authority: issuingAuthority.trim(),
-        situation,
-        acc,
-        ear,
-        medical_restrictions: medicalRestrictions.trim() || undefined,
-        observations: observations.trim() || undefined,
-        points,
-        file_url: uploadedFileUrl || existingFileUrl || undefined,
-      };
-
-      if (isEditing) {
-        await operatorDocumentService.updateLicense(existingLicenseId, payload);
-        toast.success("CNH atualizada com sucesso.");
-      } else {
-        await operatorDocumentService.createLicense(payload);
-        toast.success("CNH cadastrada com sucesso.");
-      }
+      toast.success(isEditing ? "CNH atualizada com sucesso." : "CNH cadastrada com sucesso.");
       navigate("/dashboard");
     } catch (error) {
-      if (error instanceof OperatorDocumentServiceError) {
-        toast.error(error.message);
-      } else {
-        toast.error(
-          isEditing
+      if (error instanceof BadRequestError && error.hasFieldErrors) {
+        let placed = false;
+        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
+          const formField = API_FIELD_TO_FORM[apiField];
+          const message = messages[0];
+          if (formField && message) {
+            form.setError(formField, { type: "server", message });
+            placed = true;
+          }
+        }
+        if (placed) return;
+      }
+      toast.error(
+        error instanceof HttpError
+          ? error.message
+          : isEditing
             ? "Erro ao atualizar CNH. Verifique os dados e tente novamente."
             : "Erro ao cadastrar CNH. Verifique os dados e tente novamente.",
-        );
-      }
-    } finally {
-      setIsSubmitting(false);
+      );
     }
-  };
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -601,7 +365,7 @@ const CNHUpload = () => {
                     >
                       <MaterialIcon
                         icon={
-                          validationResult.is_valid ? "verified" : "warning"
+                          validationResult.isValid ? "verified" : "warning"
                         }
                         size={18}
                       />
@@ -653,11 +417,10 @@ const CNHUpload = () => {
               )}
             </div>
 
-            {((validationResult === null && isEditing) ||
-              validationResult?.is_valid) && (
+            {((validationResult === null && isEditing) || validationResult?.isValid) && (
               <form
                 className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
-                onSubmit={handleSubmit}
+                onSubmit={onSubmit}
                 noValidate
               >
                 <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">
@@ -671,16 +434,12 @@ const CNHUpload = () => {
                   <input
                     type="text"
                     placeholder="Conforme consta na CNH"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (errors.name) validateField("name", e.target.value);
-                    }}
-                    onBlur={(e) => validateField("name", e.target.value)}
-                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.name ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                    required
+                    className={inputClass(Boolean(errors.name))}
+                    {...form.register("name")}
                   />
-                  {errors.name && <p className="text-[11px] text-error font-medium mt-1">{errors.name}</p>}
+                  {errors.name && (
+                    <p className="text-[11px] text-error font-medium mt-1">{errors.name.message}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-5">
@@ -690,18 +449,15 @@ const CNHUpload = () => {
                     </label>
                     <input
                       type="date"
-                      value={birthDate}
-                      ref={birthDateRef}
                       max={maxBirthDate}
-                      onChange={(e) => {
-                        setBirthDate(e.target.value);
-                        if (errors.birthDate) validateField("birthDate", e.target.value);
-                      }}
-                      onBlur={handleBirthDateBlur}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.birthDate))}
+                      {...form.register("birthDate")}
                     />
-                    {errors.birthDate && <p className="text-[11px] text-error font-medium mt-1">{errors.birthDate}</p>}
+                    {errors.birthDate && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.birthDate.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -710,18 +466,12 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="000.000.000-00"
-                      value={cpf}
-                      ref={cpfRef}
-                      onChange={(e) => {
-                        const masked = maskDocument(e.target.value);
-                        setCpf(masked);
-                        if (errors.cpf) validateField("cpf", masked);
-                      }}
-                      onBlur={handleCpfBlur}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cpf ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.cpf))}
+                      {...masked(form.register("cpf"), maskDocument)}
                     />
-                    {errors.cpf && <p className="text-[11px] text-error font-medium mt-1">{errors.cpf}</p>}
+                    {errors.cpf && (
+                      <p className="text-[11px] text-error font-medium mt-1">{errors.cpf.message}</p>
+                    )}
                   </div>
                 </div>
 
@@ -733,38 +483,30 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="00.000.000-0"
-                      value={rg}
-                      ref={rgRef}
-                      onChange={(e) => {
-                        const masked = maskRG(e.target.value);
-                        setRg(masked);
-                        if (errors.rg) validateField("rg", masked);
-                      }}
-                      onBlur={handleRgBlur}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.rg ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.rg))}
+                      {...masked(form.register("rg"), maskRG)}
                     />
-                    {errors.rg && <p className="text-[11px] text-error font-medium mt-1">{errors.rg}</p>}
+                    {errors.rg && (
+                      <p className="text-[11px] text-error font-medium mt-1">{errors.rg.message}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Nacionalidade *
                     </label>
                     <select
-                      value={nationality}
-                      onChange={(e) => {
-                        setNationality(e.target.value);
-                        if (errors.nationality) validateField("nationality", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("nationality", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.nationality ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.nationality))}
+                      {...form.register("nationality")}
                     >
                       <option value="Brasileiro(a)">Brasileiro(a)</option>
                       <option value="Estrangeiro(a)">Estrangeiro(a)</option>
                       <option value="Naturalizado(a)">Naturalizado(a)</option>
                     </select>
-                    {errors.nationality && <p className="text-[11px] text-error font-medium mt-1">{errors.nationality}</p>}
+                    {errors.nationality && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.nationality.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -776,39 +518,35 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="São Paulo"
-                      value={birthCity}
-                      onChange={(e) => {
-                        setBirthCity(e.target.value);
-                        if (errors.birthCity) validateField("birthCity", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("birthCity", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthCity ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.birthCity))}
+                      {...form.register("birthCity")}
                     />
-                    {errors.birthCity && <p className="text-[11px] text-error font-medium mt-1">{errors.birthCity}</p>}
+                    {errors.birthCity && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.birthCity.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Estado de Nascimento *
                     </label>
                     <select
-                      value={birthState}
-                      onChange={(e) => {
-                        setBirthState(e.target.value);
-                        if (errors.birthState) validateField("birthState", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("birthState", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthState ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.birthState))}
+                      {...form.register("birthState")}
                     >
                       <option value="">Selecione</option>
-                      {UF_OPTIONS.map((uf) => (
+                      {BRAZILIAN_STATES.map((uf) => (
                         <option key={uf} value={uf}>
                           {uf}
                         </option>
                       ))}
                     </select>
-                    {errors.birthState && <p className="text-[11px] text-error font-medium mt-1">{errors.birthState}</p>}
+                    {errors.birthState && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.birthState.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -820,16 +558,14 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="Nome completo"
-                      value={motherName}
-                      onChange={(e) => {
-                        setMotherName(e.target.value);
-                        if (errors.motherName) validateField("motherName", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("motherName", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.motherName ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.motherName))}
+                      {...form.register("motherName")}
                     />
-                    {errors.motherName && <p className="text-[11px] text-error font-medium mt-1">{errors.motherName}</p>}
+                    {errors.motherName && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.motherName.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -838,9 +574,8 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="Nome completo"
-                      value={fatherName}
-                      onChange={(e) => setFatherName(e.target.value)}
-                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                      className={inputClass(false)}
+                      {...form.register("fatherName")}
                     />
                   </div>
                 </div>
@@ -857,31 +592,22 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="11 dígitos"
-                      value={cnhNumber}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, "").slice(0, 11);
-                        setCnhNumber(val);
-                        if (errors.cnhNumber) validateField("cnhNumber", val);
-                      }}
-                      onBlur={(e) => validateField("cnhNumber", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.cnhNumber ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.cnhNumber))}
+                      {...form.register("cnhNumber")}
                     />
-                    {errors.cnhNumber && <p className="text-[11px] text-error font-medium mt-1">{errors.cnhNumber}</p>}
+                    {errors.cnhNumber && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.cnhNumber.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Categoria *
                     </label>
                     <select
-                      value={category}
-                      onChange={(e) => {
-                        setCategory(e.target.value);
-                        if (errors.category) validateField("category", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("category", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.category ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.category))}
+                      {...form.register("category")}
                     >
                       <option value="">Selecione</option>
                       {CNH_CATEGORIES.map((cat) => (
@@ -890,7 +616,11 @@ const CNHUpload = () => {
                         </option>
                       ))}
                     </select>
-                    {errors.category && <p className="text-[11px] text-error font-medium mt-1">{errors.category}</p>}
+                    {errors.category && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.category.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -898,17 +628,15 @@ const CNHUpload = () => {
                     </label>
                     <input
                       type="date"
-                      value={firstLicenseDate}
                       max={today}
-                      onChange={(e) => {
-                        setFirstLicenseDate(e.target.value);
-                        if (errors.firstLicenseDate) validateField("firstLicenseDate", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("firstLicenseDate", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.firstLicenseDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.firstLicenseDate))}
+                      {...form.register("firstLicenseDate")}
                     />
-                    {errors.firstLicenseDate && <p className="text-[11px] text-error font-medium mt-1">{errors.firstLicenseDate}</p>}
+                    {errors.firstLicenseDate && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.firstLicenseDate.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -919,17 +647,15 @@ const CNHUpload = () => {
                     </label>
                     <input
                       type="date"
-                      value={issueDate}
                       max={today}
-                      onChange={(e) => {
-                        setIssueDate(e.target.value);
-                        if (errors.issueDate) validateField("issueDate", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("issueDate", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issueDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.issueDate))}
+                      {...form.register("issueDate")}
                     />
-                    {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
+                    {errors.issueDate && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.issueDate.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -937,16 +663,14 @@ const CNHUpload = () => {
                     </label>
                     <input
                       type="date"
-                      value={expirationDate}
-                      onChange={(e) => {
-                        setExpirationDate(e.target.value);
-                        if (errors.expirationDate) validateField("expirationDate", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("expirationDate", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.expirationDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.expirationDate))}
+                      {...form.register("expirationDate")}
                     />
-                    {errors.expirationDate && <p className="text-[11px] text-error font-medium mt-1">{errors.expirationDate}</p>}
+                    {errors.expirationDate && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.expirationDate.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -956,23 +680,21 @@ const CNHUpload = () => {
                       UF de Emissão *
                     </label>
                     <select
-                      value={issuingState}
-                      onChange={(e) => {
-                        setIssuingState(e.target.value);
-                        if (errors.issuingState) validateField("issuingState", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("issuingState", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingState ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.issuingState))}
+                      {...form.register("issuingState")}
                     >
                       <option value="">Selecione</option>
-                      {UF_OPTIONS.map((uf) => (
+                      {BRAZILIAN_STATES.map((uf) => (
                         <option key={uf} value={uf}>
                           {uf}
                         </option>
                       ))}
                     </select>
-                    {errors.issuingState && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingState}</p>}
+                    {errors.issuingState && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.issuingState.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -981,16 +703,14 @@ const CNHUpload = () => {
                     <input
                       type="text"
                       placeholder="DETRAN-SP"
-                      value={issuingAuthority}
-                      onChange={(e) => {
-                        setIssuingAuthority(e.target.value);
-                        if (errors.issuingAuthority) validateField("issuingAuthority", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("issuingAuthority", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.issuingAuthority ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.issuingAuthority))}
+                      {...form.register("issuingAuthority")}
                     />
-                    {errors.issuingAuthority && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingAuthority}</p>}
+                    {errors.issuingAuthority && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.issuingAuthority.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1004,23 +724,21 @@ const CNHUpload = () => {
                       Situação *
                     </label>
                     <select
-                      value={situation}
-                      onChange={(e) => {
-                        setSituation(e.target.value);
-                        if (errors.situation) validateField("situation", e.target.value);
-                      }}
-                      onBlur={(e) => validateField("situation", e.target.value)}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.situation ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                      required
+                      className={inputClass(Boolean(errors.situation))}
+                      {...form.register("situation")}
                     >
                       <option value="">Selecione</option>
-                      {CNH_SITUATIONS.map((s) => (
-                        <option key={s.value} value={s.value}>
-                          {s.label}
+                      {CNH_SITUATIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
                         </option>
                       ))}
                     </select>
-                    {errors.situation && <p className="text-[11px] text-error font-medium mt-1">{errors.situation}</p>}
+                    {errors.situation && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.situation.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -1029,46 +747,35 @@ const CNHUpload = () => {
                     <input
                       type="number"
                       placeholder="0"
-                      value={points}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(40, Number(e.target.value)));
-                        setPoints(val);
-                        if (errors.points) validateField("points", val);
-                      }}
-                      onBlur={(e) => validateField("points", e.target.value)}
                       min={0}
                       max={40}
-                      className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.points ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                      className={inputClass(Boolean(errors.points))}
+                      {...form.register("points")}
                     />
-                    {errors.points && <p className="text-[11px] text-error font-medium mt-1">{errors.points}</p>}
-                    <p className="text-[11px] text-outline font-medium">
-                      Pontos acumulados por infrações (0 a 40).
-                    </p>
+                    {errors.points && (
+                      <p className="text-[11px] text-error font-medium mt-1">
+                        {errors.points.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex gap-8">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={ear}
-                      onChange={(e) => setEar(e.target.checked)}
-                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      className="w-4 h-4 accent-primary"
+                      {...form.register("ear")}
                     />
-                    <span className="text-sm text-on-surface">
-                      EAR — Exerce Atividade Remunerada
-                    </span>
+                    EAR — Exerce Atividade Remunerada
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={acc}
-                      onChange={(e) => setAcc(e.target.checked)}
-                      className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary"
+                      className="w-4 h-4 accent-primary"
+                      {...form.register("acc")}
                     />
-                    <span className="text-sm text-on-surface">
-                      ACC — Autorização p/ Ciclomotor
-                    </span>
+                    ACC — Autorização p/ Ciclomotor
                   </label>
                 </div>
 
@@ -1082,10 +789,9 @@ const CNHUpload = () => {
                   </label>
                   <textarea
                     placeholder="Ex.: Obrigatório uso de lentes corretivas"
-                    value={medicalRestrictions}
-                    onChange={(e) => setMedicalRestrictions(e.target.value)}
                     rows={2}
                     className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    {...form.register("medicalRestrictions")}
                   />
                 </div>
 
@@ -1095,10 +801,9 @@ const CNHUpload = () => {
                   </label>
                   <textarea
                     placeholder="Informações adicionais do documento"
-                    value={observations}
-                    onChange={(e) => setObservations(e.target.value)}
                     rows={2}
                     className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                    {...form.register("observations")}
                   />
                 </div>
 

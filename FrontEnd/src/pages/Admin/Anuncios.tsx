@@ -18,39 +18,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { postingService } from "@/services/PostingService/PostingService";
-import {
-  adminPostingService,
-  AdminPostingServiceError,
-} from "@/services/AdminService/AdminPostingService";
+import { useModeratePosting } from "@/features/administration/hooks/useModeration";
+import type { PostingModerationAction } from "@/features/administration/types/moderation";
+import { usePostings } from "@/features/postings/hooks/usePostings";
+import type { PostingListItem } from "@/features/postings/types/posting";
+import { HttpError } from "@/shared/http/errors";
 
-type ModerationAction = "approve" | "reject";
+type ModerationAction = PostingModerationAction;
 
-type PostingListItem = {
-  id: string;
-  machine_brand: string | null;
-  machine_model: string | null;
-  machine_usage_purpose: string | null;
-  machine_year: number | null;
-  hourly_rate: string | null;
-  location_address: string | null;
-  description: string | null;
-  status: string | null;
-  primary_photo_url: string | null;
-};
 
-const formatPrice = (value: string | null) => {
-  if (value == null) return "—";
-  const num = Number(value);
-  if (Number.isNaN(num)) return "—";
-  return num.toLocaleString("pt-BR", {
+const formatPrice = (value: number | null) => {
+  if (value == null || Number.isNaN(value)) return "—";
+  return value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 };
 
 const machineName = (p: PostingListItem) => {
-  const name = [p.machine_brand, p.machine_model].filter(Boolean).join(" ");
+  const name = [p.machineBrand, p.machineModel].filter(Boolean).join(" ");
   return name || "Máquina sem identificação";
 };
 
@@ -120,8 +106,11 @@ const actionConfig: Record<
 };
 
 const AdminAnuncios = () => {
-  const [postings, setPostings] = useState<PostingListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const postingsQuery = usePostings({});
+  const moderatePosting = useModeratePosting();
+  const postings = postingsQuery.data;
+  const loading = postingsQuery.isLoading;
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
@@ -131,32 +120,20 @@ const AdminAnuncios = () => {
     action: ModerationAction;
   } | null>(null);
   const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const loadPostings = async () => {
-    setLoading(true);
-    try {
-      const data = (await postingService.list({})) as PostingListItem[];
-      setPostings(data);
-    } catch {
-      toast.error("Não foi possível carregar os anúncios.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const submitting = moderatePosting.isPending;
 
   useEffect(() => {
-    loadPostings();
-  }, []);
+    if (postingsQuery.isError) toast.error("Não foi possível carregar os anúncios.");
+  }, [postingsQuery.isError]);
 
   const filteredPostings = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return postings.filter((p) => {
+    return (postings ?? []).filter((p) => {
       if (statusFilter !== "all" && p.status !== statusFilter) return false;
       if (!term) return true;
       return (
         machineName(p).toLowerCase().includes(term) ||
-        (p.location_address ?? "").toLowerCase().includes(term) ||
+        (p.locationAddress ?? "").toLowerCase().includes(term) ||
         (p.description ?? "").toLowerCase().includes(term)
       );
     });
@@ -178,23 +155,17 @@ const AdminAnuncios = () => {
     if (!pendingAction) return;
     const { posting, action } = pendingAction;
     if (action === "reject" && !reason.trim()) return;
-    setSubmitting(true);
     try {
-      const result =
-        action === "approve"
-          ? await adminPostingService.approve(posting.id)
-          : await adminPostingService.reject(posting.id, reason.trim());
-      toast.success(result?.message ?? "Ação aplicada com sucesso.");
-      await loadPostings();
+      // O store invalida a lista de anúncios sozinho.
+      const message = await moderatePosting.mutateAsync({
+        postingId: posting.id,
+        action,
+        reason: reason.trim(),
+      });
+      toast.success(message);
       closeConfirm();
     } catch (error) {
-      const msg =
-        error instanceof AdminPostingServiceError
-          ? error.message
-          : "Falha ao aplicar a ação.";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
+      toast.error(error instanceof HttpError ? error.message : "Falha ao aplicar a ação.");
     }
   };
 
@@ -237,7 +208,7 @@ const AdminAnuncios = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={loadPostings}
+            onClick={() => void postingsQuery.refetch()}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
             <MaterialIcon icon="refresh" size={16} /> Atualizar
@@ -327,9 +298,9 @@ const AdminAnuncios = () => {
                       <TableCell className="px-5 py-4 align-top">
                         <div className="flex items-start gap-3">
                           <div className="w-12 h-12 rounded-lg overflow-hidden bg-surface-container-high shrink-0 flex items-center justify-center">
-                            {p.primary_photo_url ? (
+                            {p.primaryPhotoUrl ? (
                               <img
-                                src={p.primary_photo_url}
+                                src={p.primaryPhotoUrl}
                                 alt={machineName(p)}
                                 className="w-full h-full object-cover"
                               />
@@ -344,16 +315,16 @@ const AdminAnuncios = () => {
                           <div className="min-w-0">
                             <div className="font-bold text-sm text-on-surface">
                               {machineName(p)}
-                              {p.machine_year ? (
+                              {p.machineYear ? (
                                 <span className="text-on-surface-variant font-medium">
                                   {" "}
-                                  · {p.machine_year}
+                                  · {p.machineYear}
                                 </span>
                               ) : null}
                             </div>
-                            {p.machine_usage_purpose ? (
+                            {p.machineUsagePurpose ? (
                               <div className="text-xs text-on-surface-variant">
-                                {p.machine_usage_purpose}
+                                {p.machineUsagePurpose}
                               </div>
                             ) : null}
                             {p.description ? (
@@ -365,10 +336,10 @@ const AdminAnuncios = () => {
                         </div>
                       </TableCell>
                       <TableCell className="px-5 py-4 align-top text-sm text-on-surface-variant max-w-[200px]">
-                        {p.location_address ?? "—"}
+                        {p.locationAddress ?? "—"}
                       </TableCell>
                       <TableCell className="px-5 py-4 align-top text-sm font-bold text-on-surface whitespace-nowrap">
-                        {formatPrice(p.hourly_rate)}
+                        {formatPrice(p.hourlyRate)}
                       </TableCell>
                       <TableCell className="px-5 py-4 align-top">
                         <span
@@ -426,8 +397,8 @@ const AdminAnuncios = () => {
                 {machineName(pendingAction.posting)}
               </div>
               <div className="text-xs text-on-surface-variant">
-                {formatPrice(pendingAction.posting.hourly_rate)} ·{" "}
-                {pendingAction.posting.location_address ?? "sem local"}
+                {formatPrice(pendingAction.posting.hourlyRate)} ·{" "}
+                {pendingAction.posting.locationAddress ?? "sem local"}
               </div>
             </div>
           ) : null}

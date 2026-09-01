@@ -1,80 +1,56 @@
 import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
+import { toast } from "sonner";
+
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import type { LoginUserRequest } from "@/services/UserService/models/LoginUserRequest";
-import { userService } from "@/services/UserService/UserService";
-import { UserServiceError } from "@/services/UserService/errors/UserError";
-import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { parseJwt, type JwtPayload } from "@/utils/jwt";
+import { useLoginForm } from "@/features/auth/hooks/useAuthForms";
+import { useLogin } from "@/features/auth/hooks/useLogin";
+import { parseJwt } from "@/shared/auth/jwt";
+import { HttpError } from "@/shared/http/errors";
+
+const INPUT_BASE =
+  "w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow";
+
+function inputClass(hasError: boolean, extra = ""): string {
+  return `${INPUT_BASE} ${extra} ${
+    hasError ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"
+  }`;
+}
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
 
-  const validateField = (fieldName: string, value: string) => {
-    let errorMsg = "";
-    if (fieldName === "email") {
-      const trimmed = value.trim();
-      if (!trimmed) errorMsg = "E-mail é obrigatório.";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) errorMsg = "E-mail inválido.";
-    } else if (fieldName === "password") {
-      if (!value) errorMsg = "Senha é obrigatória.";
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
-  };
+  const form = useLoginForm();
+  const login = useLogin();
+  const { errors } = form.formState;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const emailError = validateField("email", email);
-    const passwordError = validateField("password", password);
-
-    if (emailError || passwordError) {
-      toast.error("Por favor, preencha as credenciais corretamente.");
-      return;
-    }
-
-    setLoading(true);
-
-    const request: LoginUserRequest = {
-      email: email.toLowerCase().trim(),
-      password: password.trim(),
-    };
-
+  const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const response = await userService.login(request);
-      const payload = parseJwt<JwtPayload>(response.access);
-      const user = await userService.getById(payload.user_id);
-      
-      login(response, user.role);
+      const access = await login.mutateAsync({
+        email: values.email.toLowerCase(),
+        password: values.password,
+      });
+
       toast.success("Login realizado com sucesso!");
-      
-      const from = (location.state as any)?.from;
-      if (from) {
-        navigate(from, { replace: true });
-      } else if (user.role === "locador") {
-        navigate("/dashboard");
-      } else {
-        navigate("/dashboard-locatario");
-      }
+
+      const role = parseJwt(access)?.role ?? null;
+      const from = (location.state as { from?: string } | null)?.from;
+
+      if (from) navigate(from, { replace: true });
+      else if (role === "locador") navigate("/dashboard");
+      else navigate("/dashboard-locatario");
     } catch (error) {
-      if (error instanceof UserServiceError) {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
+      // InvalidCredentials (401) e AccountDisabled (403) já chegam traduzidos
+      // pelo AuthRepository, com mensagens distintas.
+      toast.error(
+        error instanceof HttpError ? error.message : "Não foi possível entrar. Tente novamente.",
+      );
     }
-  };
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -95,7 +71,7 @@ const Login = () => {
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            <form className="space-y-6" onSubmit={onSubmit} noValidate>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   E-mail
@@ -103,17 +79,14 @@ const Login = () => {
                 <input
                   type="email"
                   placeholder="contato@email.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errors.email) validateField("email", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("email", e.target.value)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.email ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.email))}
+                  {...form.register("email")}
                 />
-                {errors.email && <p className="text-[11px] text-error font-medium mt-1">{errors.email}</p>}
+                {errors.email && (
+                  <p className="text-[11px] text-error font-medium mt-1">{errors.email.message}</p>
+                )}
               </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha
@@ -122,14 +95,8 @@ const Login = () => {
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (errors.password) validateField("password", e.target.value);
-                    }}
-                    onBlur={(e) => validateField("password", e.target.value)}
-                    className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 pr-12 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.password ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                    required
+                    className={inputClass(Boolean(errors.password), "pr-12")}
+                    {...form.register("password")}
                   />
                   <button
                     type="button"
@@ -139,27 +106,29 @@ const Login = () => {
                     <MaterialIcon icon={showPassword ? "visibility_off" : "visibility"} size={20} />
                   </button>
                 </div>
-                {errors.password && <p className="text-[11px] text-error font-medium mt-1">{errors.password}</p>}
+                {errors.password && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.password.message}
+                  </p>
+                )}
               </div>
+
               <div className="flex justify-between items-center">
-                <Link
-                  to="/forgot-password"
-                  className="text-sm font-bold text-primary hover:underline"
-                >
+                <Link to="/forgot-password" className="text-sm font-bold text-primary hover:underline">
                   Esqueceu a senha?
                 </Link>
               </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                disabled={login.isPending}
+                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {loading ? (
+                {login.isPending ? (
                   "Carregando..."
                 ) : (
                   <>
-                    <MaterialIcon icon="person_add" size={20} /> Entrar na
-                    Plataforma
+                    <MaterialIcon icon="person_add" size={20} /> Entrar na Plataforma
                   </>
                 )}
               </button>
@@ -167,10 +136,7 @@ const Login = () => {
 
             <p className="text-center text-sm text-on-surface-variant mt-8">
               Não tem conta?{" "}
-              <Link
-                to="/signup"
-                className="font-bold text-primary hover:underline"
-              >
+              <Link to="/signup" className="font-bold text-primary hover:underline">
                 Crie agora
               </Link>
             </p>

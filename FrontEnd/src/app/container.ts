@@ -1,4 +1,14 @@
+import { HttpAuthRepository } from "@/features/auth/api/AuthRepository";
+import { AuthStore } from "@/features/auth/api/AuthStore";
+import { HttpDocumentRepository } from "@/features/documents/api/DocumentRepository";
+import { DocumentStore } from "@/features/documents/api/DocumentStore";
 import { HttpMachineRepository } from "@/features/machines/api/MachineRepository";
+import { HttpModerationRepository } from "@/features/administration/api/ModerationRepository";
+import { ModerationStore } from "@/features/administration/api/ModerationStore";
+import { HttpPostingRepository } from "@/features/postings/api/PostingRepository";
+import { PostingStore } from "@/features/postings/api/PostingStore";
+import { HttpUserRepository } from "@/features/users/api/UserRepository";
+import { UserStore } from "@/features/users/api/UserStore";
 import { MachineStore } from "@/features/machines/api/MachineStore";
 import { InMemoryTokenStore } from "@/shared/auth/InMemoryTokenStore";
 import { SessionService } from "@/shared/auth/SessionService";
@@ -8,6 +18,7 @@ import { AuthenticatedHttpClient } from "@/shared/http/decorators/AuthenticatedH
 import { LoggingHttpClient } from "@/shared/http/decorators/LoggingHttpClient";
 import { RefreshingHttpClient } from "@/shared/http/decorators/RefreshingHttpClient";
 import { createQueryClient } from "@/shared/http/queryClient";
+import { ViaCepClient } from "@/shared/http/ViaCepClient";
 
 /**
  * Composition root.
@@ -49,13 +60,49 @@ export const httpClient: HttpClient = import.meta.env.DEV
   ? new LoggingHttpClient(decoratedHttpClient)
   : decoratedHttpClient;
 
+/**
+ * Segunda cadeia HTTP, para o ViaCEP.
+ *
+ * Base própria e SEM os decorators de autenticação — enviar o Bearer do Frota
+ * Rural a um serviço de terceiros seria vazar credencial. Só é possível porque
+ * a cadeia é composta por destino, e não um interceptor global no axios.
+ */
+export const viaCepClient = new ViaCepClient(
+  new AxiosHttpClient(createAxiosInstance("https://viacep.com.br/ws/")),
+);
+
 export const queryClient = createQueryClient();
+
+// Auth usa o cliente CRU: um 401 de credencial errada não pode disparar refresh.
+const authRepository = new HttpAuthRepository(rawHttpClient);
+
+export const authStore = new AuthStore(authRepository, tokenStore, queryClient);
 
 const machineRepository = new HttpMachineRepository(httpClient);
 
 export const machineStore = new MachineStore(machineRepository, queryClient);
 
+const userRepository = new HttpUserRepository(httpClient);
+
+export const userStore = new UserStore(userRepository, queryClient);
+
+const postingRepository = new HttpPostingRepository(httpClient);
+
+export const postingStore = new PostingStore(postingRepository, queryClient);
+
+const moderationRepository = new HttpModerationRepository(httpClient);
+
+export const moderationStore = new ModerationStore(moderationRepository, queryClient);
+
+const documentRepository = new HttpDocumentRepository(httpClient);
+
+export const documentStore = new DocumentStore(documentRepository, queryClient);
+
 /** Limpa todo estado de servidor em memória. Chamado no logout. */
 export function clearAllStores(): void {
   machineStore.clear();
+  userStore.clear();
+  postingStore.clear();
+  moderationStore.clear();
+  documentStore.clear();
 }

@@ -10,71 +10,94 @@ front e back fica **visível**, porque aparece em `domain/` dos dois lados.
 
 ## 3.2 Estrutura por feature
 
-Layout definido em `specification.md` e registrado em [ADR-009](06-adr.md). Abaixo, o que a feature
-piloto `machines` de fato implementa:
+Layout definido em `specification.md` e registrado em [ADR-009](06-adr.md). Abaixo, o que está de
+fato implementado:
 
 ```
 src/
 ├── app/
-│   └── container.ts                 # composition root
+│   ├── container.ts                 # composition root
+│   ├── app.tsx                      # providers
+│   ├── router.tsx                   # árvore de rotas
+│   └── routes/{public,protected,admin}Routes.tsx
 ├── features/
-│   └── machines/
-│       ├── types/
-│       │   ├── machine.ts           # entidade de domínio (camelCase)
-│       │   ├── machineSchemas.ts    # zod: API, formulário, payload
-│       │   └── brands.ts
-│       ├── api/
-│       │   ├── machineMapper.ts     # DTO <-> entidade; o snake_case morre aqui
-│       │   ├── MachineRepository.ts # interface + implementação HTTP
-│       │   └── MachineStore.ts      # chaves de cache, invalidate, clear
-│       ├── hooks/
-│       │   ├── useCreateMachine.ts
-│       │   └── useMachineForm.ts
-│       └── components/
-│           └── BrandSelect.tsx
+│   ├── auth/          types/ api/ hooks/
+│   ├── users/         types/ api/ hooks/
+│   ├── machines/      types/ api/ hooks/ components/
+│   ├── postings/      types/ api/ hooks/
+│   ├── documents/     types/ api/ hooks/
+│   └── administration/types/ api/ hooks/
 ├── shared/
 │   ├── http/
 │   │   ├── HttpClient.ts            # porta
 │   │   ├── errors.ts
 │   │   ├── AxiosHttpClient.ts       # único módulo que conhece axios
+│   │   ├── ViaCepClient.ts
 │   │   ├── queryClient.ts
 │   │   └── decorators/{Authenticated,Refreshing,Logging}HttpClient.ts
-│   └── auth/
-│       ├── TokenProvider.ts  SessionPort.ts
-│       ├── InMemoryTokenStore.ts
-│       └── SessionService.ts
-└── pages/                           # composição e rota
+│   ├── auth/{TokenProvider,SessionPort,InMemoryTokenStore,SessionService,jwt}.ts
+│   ├── hooks/useCepLookup.ts
+│   └── lib/{maskedRegister,brazilianStates}.ts
+├── pages/                           # composição e rota
+└── services/                        # LEGADO — ainda serve os god components
 ```
+
+Dentro de cada feature, o padrão é sempre o mesmo:
+
+| Arquivo | Papel |
+|---|---|
+| `types/*Schemas.ts` | zod: resposta da API, formulário, payload |
+| `types/<entidade>.ts` | Entidade de domínio em camelCase + regras puras |
+| `api/*Mapper.ts` | DTO ↔ entidade. **O `snake_case` morre aqui** |
+| `api/*Repository.ts` | Interface + implementação HTTP, recebendo `HttpClient` por construtor |
+| `api/*Store.ts` | Chaves de cache, invalidação e `clear()` |
+| `hooks/use*.ts` | Ponte com o React |
+| `components/` | Apresentacionais |
 
 Regras de import, verificáveis por arquivo (não há pasta `domain/` isolada — ver ADR-009):
 
-- `types/` e `api/*Mapper.ts` não importam `axios` nem `react`;
-- só `shared/http/AxiosHttpClient.ts` cita `axios`;
-- `shared/**` nunca importa de `features/**`;
-- só `app/container.ts` instancia adapter concreto.
-
 ```bash
-grep -rE "from ['\"]axios" FrontEnd/src/features/ FrontEnd/src/shared/auth/
-grep -rE "from ['\"]@/features/" FrontEnd/src/shared/
+grep -rnE "^import .*from ['\"]axios['\"]" FrontEnd/src/features/ FrontEnd/src/shared/ FrontEnd/src/app/
+grep -rnE "from ['\"]@/features/" FrontEnd/src/shared/
+grep -rnE "from ['\"]react" FrontEnd/src/features/*/types/ FrontEnd/src/features/*/api/
 ```
 
-Ambos devem sair vazios.
+Os três devem sair vazios, exceto o primeiro em `shared/http/AxiosHttpClient.ts`.
 
-## 3.3 A camada que falta hoje
+### Coexistência declarada
 
-`DashboardLocador.tsx` tem **2.493 linhas**, 21 `useState` e 11 abas comutadas por
-`useState<Tab>` — o que faz o JSX das onze abas viver em um único `return`.
+`services/` continua no repositório porque `DashboardLocador`, `DashboardLocatario`, `Buscar`,
+`BuscarMaquinario`, `Reservar`, `AnuncioDetalhe` e `Contrato` ainda dependem dele. `AuthContext`
+escreve o token nos dois caminhos de propósito. `services/` só pode ser removido quando o último
+consumidor migrar — junto com as features `contracts` e `reviews`, que hoje só teriam consumidores
+fora de escopo.
 
-Esse arquivo não é grande por descuido. É grande porque **não existe lugar entre "service" e "JSX"
-para lógica com estado**. Todo o resto deste documento decorre disso.
+## 3.3 A camada de hooks
 
-A camada ausente é `presentation/hooks/`. Um hook é um **Adapter**: traduz um caso de uso, que não
-sabe nada de React, no modelo de estado que o React entende.
+`DashboardLocador.tsx` tem 2.378 linhas, 32 `useState` e 11 abas comutadas por `useState<Tab>` — o
+JSX das onze abas vive em um único `return`. Não é descuido: é o que acontece quando **não existe
+lugar entre "service" e "JSX"** para lógica com estado.
+
+Essa camada agora existe em `features/*/hooks/`. Um hook é um **Adapter**: converte operações que não
+conhecem React no modelo de estado que o React entende.
 
 ```
-service (HTTP)  →  [ VAZIO ]  →  página de 2.493 linhas
-service (HTTP)  →  hooks      →  página de composição + componentes apresentacionais
+antes:  service (HTTP)  →  [ VAZIO ]  →  página de 2.378 linhas
+depois: repository      →  store  →  hook  →  página de composição
 ```
+
+Efeito medido nas páginas migradas:
+
+| Página | Antes | Depois |
+|---|---|---|
+| `NovoEquipamento.tsx` | 343 linhas, 8 `useState` | 247, **0** |
+| `CNHUpload.tsx` | 1.129 linhas, 32 `useState` | 834, **5** (só UI) |
+| `Signup.tsx` | 539 linhas, 15 `useState` | 352, 1 |
+| `Login.tsx` | 185 linhas, 6 `useState` | 151, 1 |
+| `main.tsx` | 112 linhas | 12 |
+
+Os `useState` que sobraram são estado de UI legítimo — arquivo selecionado, drag-and-drop,
+visibilidade de senha. Nenhum campo de formulário e nenhum estado de servidor.
 
 ## 3.4 TanStack Query como camada de estado de servidor
 
@@ -94,63 +117,53 @@ O projeto adota `@tanstack/react-query` ([ADR-006](06-adr.md)). A divisão fica 
 O `clear()` não é opcional: sem ele, o próximo usuário a logar na mesma aba enxerga o cache do
 anterior. `AuthContext.logout()` chama `clearAllStores()`.
 
-> **O piloto não demonstra o principal.** `NovoEquipamento` é um formulário só de criação, então
-> exercita `useMutation` e pouco mais. Cache, deduplicação e revalidação só aparecem quando
-> `NovoAnuncio` e `DashboardLocador` lerem máquinas pela mesma query key.
+A invalidação já se paga: reprovar um anúncio em `/admin/anuncios` invalida `postingKeys.lists()` e
+a tabela se atualiza sozinha, sem recarregar a página na mão. O mesmo vale para moderação de usuário
+e revisão de documento.
 
-## 3.5 Contrato de serviço uniforme
+## 3.5 Contrato uniforme de repositório
 
-Dos seis serviços atuais, apenas três (`OperatorDocumentService`, `UserService`,
-`PasswordResetService`) têm `models/` + `errors/`. `MachineService` e `PostingService` declaram tipos
-inline; `AdminService` e `AdminPostingService` declaram classes de erro dentro do próprio arquivo.
+Os serviços legados eram inconsistentes: só três dos oito tinham `models/` + `errors/`, metade dos
+métodos de `OperatorDocumentService` não tinha try/catch (deixando `AxiosError` cru vazar), e
+`PostingService.getById` devolvia `any` — motivo pelo qual quatro páginas escreveram à mão o próprio
+formato de anúncio.
 
-Após a migração, `infrastructure/` de cada feature segue três regras:
+Todo repositório migrado segue as mesmas três regras:
 
-**1. Todo método retorna tipo.** `PostingService.getById` não tem anotação de retorno e devolve
-`any`. É por isso que quatro páginas escreveram à mão o próprio formato de posting:
-`AnuncioDetalhe.tsx:15`, `BuscarMaquinario.tsx:39`, `Reservar.tsx:15`, `Admin/Anuncios.tsx:28`. Um
-tipo de retorno elimina quatro DTOs duplicados.
+1. **Todo método retorna entidade de domínio tipada**, validada por zod antes de mapear.
+2. **Todo erro de transporte vira `HttpError`** no `AxiosHttpClient` — um único lugar, para todos.
+3. **Erros carregam `code` + `status`, não texto de UI.** A escolha da mensagem é da página.
 
-**2. Todo método mapeia erro.** Em `OperatorDocumentService`, `listLicenses` (`:70`), `getLicenseById`
-(`:81`), `removeLicense` (`:138`) e suas gêmeas de certificação **não têm try/catch**. Metade dos
-métodos lança `OperatorDocumentServiceError`, a outra metade deixa vazar `AxiosError` cru. Quem chama
-não consegue tratar erro de forma uniforme.
-
-**3. Erros carregam `code` + `status`, não texto de UI.** Hoje as classes de erro guardam mensagens em
-português já traduzidas — copy de interface dentro da camada de infraestrutura, uma violação de
-camada. E não resolve nada: as páginas continuam reinterpretando o erro do axios por conta própria,
-como em `DashboardLocador.tsx:420-433`.
+Erros de negócio ganham subclasse própria quando o mesmo status significa coisas diferentes:
+`InvalidCredentials` (401 no login) é distinto de `UnauthorizedError` (sessão expirada em qualquer
+outra chamada) — e é por isso que o `AuthRepository` recebe o cliente **cru**, sem o decorator de
+refresh.
 
 ## 3.6 zod como Anti-Corruption Layer
 
-`zod` já está no `package.json` e nunca foi importado. Usá-lo não adiciona dependência.
+Cada feature tem `types/*Schemas.ts` com os schemas de resposta, e `api/*Mapper.ts` converte para a
+entidade de domínio. **O `snake_case` da API morre no mapper** — nada acima dele vê `renagro_number`
+ou `validation_status`.
 
-O papel dele é validar a resposta da API **na fronteira**, em `infrastructure/schemas.ts`, e o mapper
-converte o DTO validado em entidade de domínio. Dois ganhos:
+Dois ganhos concretos:
 
-- O `snake_case` da API para de vazar para dentro do domínio.
-- O tipo deixa de ser uma promessa de compilação e passa a ser verificado em runtime. Hoje um
-  `OperatorLicense` é `type`, apagado na compilação: se o back-end mudar um campo, o front quebra em
-  produção, não no build.
+- O tipo deixou de ser promessa de compilação e passou a ser verificado em runtime. Antes,
+  `OperatorLicense` era um `type` apagado no build: uma mudança de campo no backend quebrava em
+  produção, não no `tsc`.
+- Regras de negócio que estavam espalhadas ganharam dono. O dispatcher de documento — 11 dígitos ⇒
+  CPF, 14 ⇒ CNPJ — estava **copiado em três páginas** e agora vive em
+  `features/users/types/userSchemas.ts`. As 17 regras do formulário de CNH viraram um schema só.
 
-## 3.7 Divisão de componentes
+## 3.7 Formulários
 
-**`DashboardLocador.tsx`** (2.493 linhas) → uma rota-filha por aba, cada uma com seu hook. Lógica de
-mutação hoje escrita dentro de handlers JSX (`:1201-1234`, repetida em `:1357-1373` e `:1492`) vai
-para os hooks.
+`react-hook-form` + `zodResolver` substituíram **oito implementações independentes de
+`validateField`**, cada uma com sua própria convenção de mensagem e seu próprio reducer de erros.
 
-**`CNHUpload.tsx`** (974 linhas) tem **30 chamadas de `useState`** em `:91-127`, das quais **22 são
-campos de um único formulário**.
-`react-hook-form` e `@hookform/resolvers` já estão instalados e nunca foram usados. Um `useForm` com
-resolver zod substitui os 22 estados de campo. É a maior redução de código pelo menor esforço em
-todo o front-end.
+Campos com máscara continuam uncontrolled via `shared/lib/maskedRegister.ts`, que reescreve o valor
+antes de repassar o evento ao RHF.
 
-O mesmo arquivo mantém um campo composto separado por travessão — `license.birth_place.split(" – ")`
-na leitura e `${birthCity} – ${birthState}` na escrita. Isso é um Value Object (`BirthPlace`) pedindo
-para existir em `domain/`.
-
-`CertificationUpload.tsx` (402 linhas) é o mesmo desenho em escala menor: uma família de copy-paste,
-não uma abstração compartilhada.
+Erros de campo vindos do backend são posicionados no campo correspondente via `form.setError`, não em
+um toast genérico — um `renagro_number` duplicado aparece embaixo do input, com borda de erro.
 
 ## 3.8 Correções de configuração
 

@@ -1,13 +1,12 @@
-import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { toast } from "sonner";
+
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { passwordPattern } from "@/utils/regexPatterns";
-import type { PasswordResetConfirmRequest } from "@/services/PasswordResetService/models/PasswordResetConfirmRequest";
-import { toast } from "sonner";
-import { passwordResetService } from "@/services/PasswordResetService/PasswordResetService";
-import { PasswordResetServiceError } from "@/services/PasswordResetService/errors/PasswordResetError";
+import { useResetPasswordForm } from "@/features/auth/hooks/useAuthForms";
+import { useConfirmPasswordReset } from "@/features/auth/hooks/usePasswordReset";
+import { HttpError } from "@/shared/http/errors";
 
 // cleanup temporário para lidar com o token vindo do e-mail fake que
 // o django fornece em ambiente de dev (pode tirar quando tivermos o fluxo real com resend ou outra coisa)
@@ -20,64 +19,39 @@ function decodeQPToken(raw: string): string {
   return stripped;
 }
 
+const INPUT_BASE =
+  "w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow";
+
+function inputClass(hasError: boolean): string {
+  return `${INPUT_BASE} ${
+    hasError ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"
+  }`;
+}
+
 const ResetPassword = () => {
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
 
-  const validateField = (fieldName: string, value: string) => {
-    let errorMsg = "";
-    if (fieldName === "newPassword") {
-      if (!value) {
-        errorMsg = "Nova senha é obrigatória.";
-      } else if (!passwordPattern.regex.test(value)) {
-        errorMsg = passwordPattern.title;
-      }
-    } else if (fieldName === "confirmPassword") {
-      if (!value) {
-        errorMsg = "Confirmação de senha é obrigatória.";
-      } else if (value !== newPassword) {
-        errorMsg = "As senhas não coincidem.";
-      }
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
-  };
+  const form = useResetPasswordForm();
+  const confirmReset = useConfirmPasswordReset();
+  const { errors } = form.formState;
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    const newPasswordError = validateField("newPassword", newPassword);
-    const confirmPasswordError = validateField("confirmPassword", confirmPassword);
-
-    if (newPasswordError || confirmPasswordError) {
-      toast.error("Por favor, corrija os erros no formulário antes de prosseguir.");
-      return;
-    }
-
-    setLoading(true);
-
-    const request: PasswordResetConfirmRequest = {
-      token: decodeQPToken(token!),
-      new_password: newPassword,
-    };
-
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!token) return;
     try {
-      await passwordResetService.confirmPasswordReset(request);
+      await confirmReset.mutateAsync({
+        token: decodeQPToken(token),
+        newPassword: values.newPassword,
+      });
       toast.success("Senha redefinida com sucesso!");
       navigate("/login");
     } catch (error) {
-      if (error instanceof PasswordResetServiceError) {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
+      toast.error(
+        error instanceof HttpError ? error.message : "Não foi possível redefinir a senha.",
+      );
     }
-  };
+  });
 
   if (!token) {
     return (
@@ -89,9 +63,7 @@ const ResetPassword = () => {
               <div className="w-16 h-16 bg-error/10 text-error rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <MaterialIcon icon="link_off" size={32} />
               </div>
-              <h1 className="font-headline text-3xl font-bold text-error">
-                Link Inválido
-              </h1>
+              <h1 className="font-headline text-3xl font-bold text-error">Link Inválido</h1>
               <div className="h-1 w-16 bg-secondary-container mx-auto mt-3 mb-2" />
               <p className="text-sm text-on-surface-variant mt-4">
                 Este link de redefinição é inválido ou está incompleto.
@@ -120,16 +92,14 @@ const ResetPassword = () => {
               <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <MaterialIcon icon="lock_open" size={32} />
               </div>
-              <h1 className="font-headline text-3xl font-bold text-primary">
-                Nova Senha
-              </h1>
+              <h1 className="font-headline text-3xl font-bold text-primary">Nova Senha</h1>
               <div className="h-1 w-16 bg-secondary-container mx-auto mt-3 mb-2" />
               <p className="text-sm text-on-surface-variant">
                 Escolha uma nova senha para sua conta
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            <form className="space-y-6" onSubmit={onSubmit} noValidate>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nova Senha
@@ -137,17 +107,16 @@ const ResetPassword = () => {
                 <input
                   type="password"
                   placeholder="••••••••"
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    if (errors.newPassword) validateField("newPassword", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("newPassword", e.target.value)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.newPassword ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.newPassword))}
+                  {...form.register("newPassword")}
                 />
-                {errors.newPassword && <p className="text-[11px] text-error font-medium mt-1">{errors.newPassword}</p>}
+                {errors.newPassword && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.newPassword.message}
+                  </p>
+                )}
               </div>
+
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Confirmar Nova Senha
@@ -155,23 +124,22 @@ const ResetPassword = () => {
                 <input
                   type="password"
                   placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errors.confirmPassword) validateField("confirmPassword", e.target.value);
-                  }}
-                  onBlur={(e) => validateField("confirmPassword", e.target.value)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.confirmPassword ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                  required
+                  className={inputClass(Boolean(errors.confirmPassword))}
+                  {...form.register("confirmPassword")}
                 />
-                {errors.confirmPassword && <p className="text-[11px] text-error font-medium mt-1">{errors.confirmPassword}</p>}
+                {errors.confirmPassword && (
+                  <p className="text-[11px] text-error font-medium mt-1">
+                    {errors.confirmPassword.message}
+                  </p>
+                )}
               </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                disabled={confirmReset.isPending}
+                className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60"
               >
-                {loading ? (
+                {confirmReset.isPending ? (
                   "Salvando..."
                 ) : (
                   <>
@@ -182,10 +150,7 @@ const ResetPassword = () => {
             </form>
 
             <p className="text-center text-sm text-on-surface-variant mt-8">
-              <Link
-                to="/forgot-password"
-                className="font-bold text-primary hover:underline"
-              >
+              <Link to="/forgot-password" className="font-bold text-primary hover:underline">
                 Solicitar novo link
               </Link>
             </p>

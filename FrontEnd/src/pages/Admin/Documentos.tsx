@@ -17,12 +17,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
-import { userService } from "@/services/UserService/UserService";
-import type { OperatorLicense } from "@/services/OperatorDocumentService/models/OperatorLicense";
-import type { Certification } from "@/services/OperatorDocumentService/models/Certification";
-import type { User } from "@/services/UserService/models/User";
-import type { ReviewDocumentRequest } from "@/services/OperatorDocumentService/models/ReviewDocumentRequest";
+import {
+  useCertifications,
+  useOperatorLicenses,
+  useReviewDocument,
+} from "@/features/documents/hooks/useDocuments";
+import type { Certification, OperatorLicense } from "@/features/documents/types/document";
+import type { ReviewDocumentPayload } from "@/features/documents/types/documentSchemas";
+import { userStore } from "@/app/container";
+import type { User } from "@/features/users/types/user";
+import { HttpError } from "@/shared/http/errors";
 
 type DocType = "license" | "certification";
 
@@ -75,10 +79,10 @@ const toReviewItem = (
       type: "license",
       label: lic.name,
       detail: `CNH · Categoria ${lic.category}`,
-      user_id: lic.user,
-      validation_status: lic.validation_status,
-      review_note: lic.review_note,
-      created_at: lic.created_at,
+      user_id: lic.userId,
+      validation_status: lic.validationStatus,
+      review_note: lic.reviewNote,
+      created_at: lic.createdAt,
       raw: lic,
     };
   }
@@ -87,18 +91,32 @@ const toReviewItem = (
     id: cert.id,
     type: "certification",
     label: cert.title,
-    detail: `Certificação · ${cert.issuing_organization}`,
-    user_id: cert.user,
-    validation_status: cert.validation_status,
-    review_note: cert.review_note,
-    created_at: cert.created_at,
+    detail: `Certificação · ${cert.issuingOrganization}`,
+    user_id: cert.userId,
+    validation_status: cert.validationStatus,
+    review_note: cert.reviewNote,
+    created_at: cert.createdAt,
     raw: cert,
   };
 };
 
 const Documentos = () => {
-  const [items, setItems] = useState<ReviewItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const licensesQuery = useOperatorLicenses();
+  const certificationsQuery = useCertifications();
+  const reviewDocument = useReviewDocument();
+  const loading = licensesQuery.isLoading || certificationsQuery.isLoading;
+
+  const items = useMemo<ReviewItem[]>(() => {
+    const licenses = licensesQuery.data ?? [];
+    const certifications = certificationsQuery.data ?? [];
+    return [
+      ...licenses.map((l) => toReviewItem(l, "license")),
+      ...certifications.map((c) => toReviewItem(c, "certification")),
+    ].sort(
+      (a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime(),
+    );
+  }, [licensesQuery.data, certificationsQuery.data]);
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -108,34 +126,13 @@ const Documentos = () => {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const [reviewNote, setReviewNote] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const loadItems = async () => {
-    setLoading(true);
-    try {
-      const [licenses, certifications] = await Promise.all([
-        operatorDocumentService.listLicenses(),
-        operatorDocumentService.listCertifications(),
-      ]);
-      const mapped = [
-        ...licenses.map((l) => toReviewItem(l, "license")),
-        ...certifications.map((c) => toReviewItem(c, "certification")),
-      ].sort(
-        (a, b) =>
-          new Date(b.created_at ?? 0).getTime() -
-          new Date(a.created_at ?? 0).getTime(),
-      );
-      setItems(mapped);
-    } catch {
-      toast.error("Não foi possível carregar os documentos.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const submitting = reviewDocument.isPending;
 
   useEffect(() => {
-    loadItems();
-  }, []);
+    if (licensesQuery.isError || certificationsQuery.isError) {
+      toast.error("Não foi possível carregar os documentos.");
+    }
+  }, [licensesQuery.isError, certificationsQuery.isError]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -159,7 +156,7 @@ const Documentos = () => {
     setDetailOpen(true);
 
     try {
-      const user = await userService.getById(item.user_id);
+      const user = await userStore.fetchById(item.user_id);
       setSelectedUser(user);
     } catch {
       setSelectedUser(null);
@@ -177,33 +174,20 @@ const Documentos = () => {
     if (!selectedItem) return;
     if (action === "rejected" && !reviewNote.trim()) return;
 
-    setSubmitting(true);
+    const payload: ReviewDocumentPayload = {
+      validation_status: action,
+      review_note: reviewNote.trim() || null,
+    };
+
     try {
-      const payload: ReviewDocumentRequest = {
-        validation_status: action,
-        review_note: reviewNote.trim() || null,
-      };
-
-      if (selectedItem.type === "license") {
-        await operatorDocumentService.reviewLicense(selectedItem.id, payload);
-      } else {
-        await operatorDocumentService.reviewCertification(
-          selectedItem.id,
-          payload,
-        );
-      }
-
+      // O store invalida a lista correspondente sozinho.
+      await reviewDocument.mutateAsync({ id: selectedItem.id, kind: selectedItem.type, payload });
       toast.success(
-        action === "approved"
-          ? "Documento aprovado com sucesso."
-          : "Documento recusado.",
+        action === "approved" ? "Documento aprovado com sucesso." : "Documento recusado.",
       );
-      await loadItems();
       closeDetail();
-    } catch {
-      toast.error("Falha ao aplicar a ação.");
-    } finally {
-      setSubmitting(false);
+    } catch (error) {
+      toast.error(error instanceof HttpError ? error.message : "Falha ao aplicar a ação.");
     }
   };
 
@@ -233,14 +217,14 @@ const Documentos = () => {
             Data de Nascimento
           </span>
           <p className="text-on-surface">
-            {new Date(lic.birth_date).toLocaleDateString("pt-BR")}
+            {new Date(lic.birthDate).toLocaleDateString("pt-BR")}
           </p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             Nº CNH
           </span>
-          <p className="text-on-surface">{lic.cnh_number}</p>
+          <p className="text-on-surface">{lic.cnhNumber}</p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
@@ -253,7 +237,7 @@ const Documentos = () => {
             Validade
           </span>
           <p className="text-on-surface">
-            {new Date(lic.expiration_date).toLocaleDateString("pt-BR")}
+            {new Date(lic.expirationDate).toLocaleDateString("pt-BR")}
           </p>
         </div>
         <div>
@@ -266,19 +250,19 @@ const Documentos = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             UF Emissão
           </span>
-          <p className="text-on-surface">{lic.issuing_state}</p>
+          <p className="text-on-surface">{lic.issuingState}</p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             Órgão Emissor
           </span>
-          <p className="text-on-surface">{lic.issuing_authority}</p>
+          <p className="text-on-surface">{lic.issuingAuthority}</p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             Local de Nascimento
           </span>
-          <p className="text-on-surface">{lic.birth_place}</p>
+          <p className="text-on-surface">{lic.birthPlace.toString()}</p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
@@ -308,14 +292,14 @@ const Documentos = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             Organização Emissora
           </span>
-          <p className="text-on-surface">{cert.issuing_organization}</p>
+          <p className="text-on-surface">{cert.issuingOrganization}</p>
         </div>
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
             Data de Emissão
           </span>
           <p className="text-on-surface">
-            {new Date(cert.issue_date).toLocaleDateString("pt-BR")}
+            {new Date(cert.issueDate).toLocaleDateString("pt-BR")}
           </p>
         </div>
         <div>
@@ -323,17 +307,17 @@ const Documentos = () => {
             Validade
           </span>
           <p className="text-on-surface">
-            {cert.expiration_date
-              ? new Date(cert.expiration_date).toLocaleDateString("pt-BR")
+            {cert.expirationDate
+              ? new Date(cert.expirationDate).toLocaleDateString("pt-BR")
               : "Sem validade"}
           </p>
         </div>
-        {cert.credential_code && (
+        {cert.credentialCode && (
           <div className="col-span-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
               Código da Credencial
             </span>
-            <p className="text-on-surface">{cert.credential_code}</p>
+            <p className="text-on-surface">{cert.credentialCode}</p>
           </div>
         )}
       </div>
@@ -398,7 +382,10 @@ const Documentos = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={loadItems}
+            onClick={() => {
+              void licensesQuery.refetch();
+              void certificationsQuery.refetch();
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-container-high transition-colors"
           >
             <MaterialIcon icon="refresh" size={16} /> Atualizar
@@ -581,8 +568,8 @@ const Documentos = () => {
               {(() => {
                 const fileUrl =
                   selectedItem.type === "license"
-                    ? (selectedItem.raw as OperatorLicense).file_url
-                    : (selectedItem.raw as Certification).media_url;
+                    ? (selectedItem.raw as OperatorLicense).fileUrl
+                    : (selectedItem.raw as Certification).mediaUrl;
 
                 if (!fileUrl) return null;
 
