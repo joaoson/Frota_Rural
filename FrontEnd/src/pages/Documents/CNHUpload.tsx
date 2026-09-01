@@ -6,7 +6,7 @@ import cnhExample from "@/assets/cnh_example.jpg";
 import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
 import { useCnhForm } from "@/features/documents/hooks/useDocumentForms";
 import {
@@ -21,11 +21,11 @@ import {
   type CnhFormValues,
   maxDriverBirthDate,
 } from "@/features/documents/types/documentSchemas";
-import { BRAZILIAN_STATES } from "@/shared/lib/brazilianStates";
+import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { masked } from "@/shared/lib/maskedRegister";
 import { BadRequestError, HttpError } from "@/shared/http/errors";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { maskRG } from "@/utils/masks/maskRG";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskRG } from "@/shared/utils/masks/maskRG";
 
 const CNH_SITUATIONS = [
   { value: "active", label: "Ativa" },

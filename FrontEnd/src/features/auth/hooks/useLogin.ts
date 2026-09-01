@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { authStore } from "@/app/container";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { parseJwt } from "@/shared/auth/jwt";
 
 import type { LoginFormValues } from "../types/authSchemas";

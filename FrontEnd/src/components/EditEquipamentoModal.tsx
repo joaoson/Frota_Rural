@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
   Dialog,
@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
+import { validateMachineEdit } from "@/features/machines/types/machineSchemas";
 
 export interface EquipamentoData {
   id: string;
@@ -39,67 +40,20 @@ const EditEquipamentoModal = ({
   const [form, setForm] = useState<EquipamentoData>(equipamento);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (open) {
-      setForm(equipamento);
-      setErrors({});
-    }
-  }, [equipamento, open]);
+  // Recarrega o formulário quando o modal abre com outro equipamento.
+  // Sincronizar no render evita o setState-dentro-de-efeito.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  if (open && loadedFor !== equipamento.id) {
+    setLoadedFor(equipamento.id);
+    setForm(equipamento);
+    setErrors({});
+  }
 
-  const validateField = (fieldName: keyof EquipamentoData, value: string) => {
-    let errorMsg = "";
-    switch (fieldName) {
-      case "registroRenagro": {
-        const cleaned = value.trim();
-        if (!cleaned) {
-          errorMsg = "Registro Renagro é obrigatório.";
-        } else {
-          const regex = /^BR\d{10}$/i;
-          if (!regex.test(cleaned)) {
-            errorMsg = "O registro Renagro deve conter BR seguido de exatamente 10 dígitos (ex: BR1029304899).";
-          }
-        }
-        break;
-      }
-      case "marca":
-        if (!value.trim()) errorMsg = "Marca é obrigatória.";
-        break;
-      case "modelo":
-        if (!value.trim()) errorMsg = "Modelo é obrigatório.";
-        break;
-      case "anoFabricacao": {
-        if (value) {
-          const y = Number(value);
-          const currentYear = new Date().getFullYear();
-          if (Number.isNaN(y) || y < 1980 || y > currentYear + 1) {
-            errorMsg = `O ano deve ser entre 1980 e ${currentYear + 1}.`;
-          }
-        }
-        break;
-      }
-      case "horimetroInicial": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro inicial deve ser positivo.";
-          }
-        }
-        break;
-      }
-      case "horimetroFinal": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro final deve ser positivo.";
-          } else if (form.horimetroInicial && h <= Number(form.horimetroInicial)) {
-            errorMsg = "O horímetro final deve ser maior que o horímetro inicial.";
-          }
-        }
-        break;
-      }
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
+  /** Revalida um campo pelo schema da feature. */
+  const validateField = (fieldName: keyof EquipamentoData, value: string): string => {
+    const message = validateMachineEdit({ ...form, [fieldName]: value })[fieldName] ?? "";
+    setErrors((prev) => ({ ...prev, [fieldName]: message }));
+    return message;
   };
 
   const handleChange = (field: keyof EquipamentoData, value: string) => {
@@ -112,18 +66,9 @@ const EditEquipamentoModal = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const errorsList = {
-      registroRenagro: validateField("registroRenagro", form.registroRenagro),
-      marca: validateField("marca", form.marca),
-      modelo: validateField("modelo", form.modelo),
-      anoFabricacao: validateField("anoFabricacao", form.anoFabricacao),
-      horimetroInicial: validateField("horimetroInicial", form.horimetroInicial),
-      horimetroFinal: validateField("horimetroFinal", form.horimetroFinal),
-    };
-
-    if (Object.values(errorsList).some((err) => err !== "")) {
-      return;
-    }
+    const found = validateMachineEdit(form);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
 
     onSave(form);
     onOpenChange(false);

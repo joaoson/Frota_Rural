@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { motion } from "framer-motion";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";

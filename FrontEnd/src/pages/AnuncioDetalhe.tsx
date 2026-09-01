@@ -1,33 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { postingService } from "@/services/PostingService/PostingService";
+import { usePosting } from "@/features/postings/hooks/usePostings";
+import type { PostingPhoto } from "@/features/postings/types/posting";
 
 const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
 
-interface FotoAPI {
-  url: string;
-  is_primary: boolean | null;
-}
-
-interface PostingDetalheAPI {
-  id: string;
-  hourly_rate: string;
-  location_address: string | null;
-  availability_start: string | null;
-  availability_end: string | null;
-  description: string | null;
-  status: string | null;
-  machine_brand: string | null;
-  machine_model: string | null;
-  machine_year: number | null;
-  machine_usage_purpose: string | null;
-  machine_technical_specifications: string | null;
-  machine_renagro_number: string | null;
-  photos: FotoAPI[];
-}
 
 // Estrelas SVG com preenchimento parcial via linearGradient
 const CAMINHO_ESTRELA = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
@@ -57,15 +37,15 @@ function EstrelasPorNota({ nota, total }: { nota: number; total: number }) {
   );
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR");
+function formatDate(value: Date | null): string {
+  if (!value) return "";
+  return value.toLocaleDateString("pt-BR");
 }
 
-function ordenarFotos(fotos: FotoAPI[]): FotoAPI[] {
+function ordenarFotos(fotos: PostingPhoto[]): PostingPhoto[] {
   return [...fotos].sort((fotoA, fotoB) => {
-    if (fotoA.is_primary && !fotoB.is_primary) return -1;
-    if (!fotoA.is_primary && fotoB.is_primary) return 1;
+    if (fotoA.isPrimary && !fotoB.isPrimary) return -1;
+    if (!fotoA.isPrimary && fotoB.isPrimary) return 1;
     return 0;
   });
 }
@@ -73,31 +53,20 @@ function ordenarFotos(fotos: FotoAPI[]): FotoAPI[] {
 const AnuncioDetalhe = () => {
   const { id } = useParams<{ id: string }>();
 
-  const [anuncio, setAnuncio] = useState<PostingDetalheAPI | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
   const [fotoSelecionada, setFotoSelecionada] = useState(0);
+
+  const postingQuery = usePosting(id ?? null);
+  const anuncio = postingQuery.data ?? null;
+  const loading = postingQuery.isLoading;
+  const erro = postingQuery.isError ? "Não foi possível carregar o anúncio." : null;
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!id) return;
-    setLoading(true);
-    postingService
-      .getById(id)
-      .then((data: PostingDetalheAPI) => {
-        setAnuncio(data);
-        setLoading(false);
-      })
-      .catch((erro: unknown) => {
-        console.error(erro);
-        setErro("Não foi possível carregar o anúncio.");
-        setLoading(false);
-      });
   }, [id]);
 
   const fotos = anuncio ? ordenarFotos(anuncio.photos) : [];
   const urlFotoAtual = fotos[fotoSelecionada]?.url ?? FALLBACK_IMG;
-  const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Sem título";
+  const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Sem título";
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -206,9 +175,9 @@ const AnuncioDetalhe = () => {
                 </div>
                 <h1 className="font-headline text-3xl font-bold text-primary mb-2">{titulo}</h1>
                 <div className="h-1 w-16 bg-secondary-container mb-3" />
-                {anuncio.location_address && (
+                {anuncio.locationAddress && (
                   <p className="text-on-surface-variant flex items-center gap-1 text-sm">
-                    <MaterialIcon icon="location_on" size={16} /> {anuncio.location_address}
+                    <MaterialIcon icon="location_on" size={16} /> {anuncio.locationAddress}
                   </p>
                 )}
               </div>
@@ -217,12 +186,12 @@ const AnuncioDetalhe = () => {
               <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
                 <div className="grid grid-cols-2 gap-5">
                   {[
-                    { label: "Marca / Modelo", valor: [anuncio.machine_brand, anuncio.machine_model].filter(Boolean).join(" ") || null },
-                    { label: "Ano", valor: anuncio.machine_year ? String(anuncio.machine_year) : null },
-                    { label: "Atividade", valor: anuncio.machine_usage_purpose },
-                    { label: "Nº Renagro", valor: anuncio.machine_renagro_number },
-                    { label: "Disponível de", valor: formatDate(anuncio.availability_start) },
-                    { label: "Disponível até", valor: formatDate(anuncio.availability_end) },
+                    { label: "Marca / Modelo", valor: [anuncio.machineBrand, anuncio.machineModel].filter(Boolean).join(" ") || null },
+                    { label: "Ano", valor: anuncio.machineYear ? String(anuncio.machineYear) : null },
+                    { label: "Atividade", valor: anuncio.machineUsagePurpose },
+                    { label: "Nº Renagro", valor: anuncio.machineRenagroNumber },
+                    { label: "Disponível de", valor: formatDate(anuncio.availabilityStart) },
+                    { label: "Disponível até", valor: formatDate(anuncio.availabilityEnd) },
                   ].map((item) =>
                     item.valor ? (
                       <div key={item.label}>
@@ -235,11 +204,11 @@ const AnuncioDetalhe = () => {
               </div>
 
               {/* Especificações técnicas */}
-              {anuncio.machine_technical_specifications && (
+              {anuncio.machineTechnicalSpecifications && (
                 <div>
                   <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">Especificações Técnicas</div>
                   <p className="text-sm text-on-surface-variant leading-relaxed">
-                    {anuncio.machine_technical_specifications}
+                    {anuncio.machineTechnicalSpecifications}
                   </p>
                 </div>
               )}
@@ -269,7 +238,7 @@ const AnuncioDetalhe = () => {
                 <div className="mb-5">
                   <span className="text-[10px] text-outline font-bold uppercase tracking-widest block mb-1">Custo por Hora</span>
                   <div className="text-4xl font-black text-primary">
-                    R$ {parseFloat(anuncio.hourly_rate).toFixed(2)}
+                    R$ {anuncio.hourlyRate.toFixed(2)}
                     <span className="text-sm font-bold text-tertiary">/hora</span>
                   </div>
                 </div>

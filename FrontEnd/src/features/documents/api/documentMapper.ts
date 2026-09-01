@@ -1,4 +1,4 @@
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
+import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 
 import { BirthPlace, type Certification, type CnhValidationResult, type OperatorLicense } from "../types/document";
 import type {

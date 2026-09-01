@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { MapPin, CalendarDays, SlidersHorizontal, X, SearchX, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { postingService } from "@/services/PostingService/PostingService";
+import { usePostings } from "@/features/postings/hooks/usePostings";
+import { postingMachineName, type PostingListItem } from "@/features/postings/types/posting";
 
 const ITENS_POR_PAGINA = 9;
 const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
@@ -35,20 +36,6 @@ function IconeGrade({ n }: { n: number }) {
   );
 }
 
-// Tipo retornado pela API
-interface PostingAPI {
-  id: string;
-  machine_brand: string | null;
-  machine_model: string | null;
-  machine_usage_purpose: string | null;
-  machine_year: number | null;
-  hourly_rate: string;
-  location_address: string | null;
-  availability_start: string | null;
-  availability_end: string | null;
-  status: string | null;
-  primary_photo_url: string | null;
-}
 
 // Tipo usado no componente
 interface Anuncio {
@@ -65,32 +52,42 @@ interface Anuncio {
   ate_comparacao: string;
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR");
+function formatDate(value: Date | null): string {
+  if (!value) return "—";
+  return value.toLocaleDateString("pt-BR");
 }
 
-function mapPosting(anuncioAPI: PostingAPI): Anuncio {
+function toComparableDate(value: Date | null): string {
+  return value ? value.toISOString().slice(0, 10) : "";
+}
+
+function mapPosting(posting: PostingListItem): Anuncio {
   return {
-    id: anuncioAPI.id,
-    imagem: anuncioAPI.primary_photo_url ?? FALLBACK_IMG,
-    titulo: [anuncioAPI.machine_brand, anuncioAPI.machine_model].filter(Boolean).join(" ") || "Sem título",
-    cidade: anuncioAPI.location_address ?? "—",
-    preco: parseFloat(anuncioAPI.hourly_rate),
-    atividade: anuncioAPI.machine_usage_purpose ?? "",
-    ano: anuncioAPI.machine_year ? String(anuncioAPI.machine_year) : "—",
-    de: formatDate(anuncioAPI.availability_start),
-    ate: formatDate(anuncioAPI.availability_end),
-    de_comparacao: anuncioAPI.availability_start?.slice(0, 10) ?? "",
-    ate_comparacao: anuncioAPI.availability_end?.slice(0, 10) ?? "",
+    id: posting.id,
+    imagem: posting.primaryPhotoUrl ?? FALLBACK_IMG,
+    titulo: postingMachineName(posting),
+    cidade: posting.locationAddress ?? "—",
+    preco: posting.hourlyRate,
+    atividade: posting.machineUsagePurpose ?? "",
+    ano: posting.machineYear ? String(posting.machineYear) : "—",
+    de: formatDate(posting.availabilityStart),
+    ate: formatDate(posting.availabilityEnd),
+    de_comparacao: toComparableDate(posting.availabilityStart),
+    ate_comparacao: toComparableDate(posting.availabilityEnd),
   };
 }
 
 const BuscarMaquinario = () => {
   // Dados do back
-  const [anuncios, setAnuncios] = useState<Anuncio[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [erro, setErro]         = useState<string | null>(null);
+  const postingsQuery = usePostings({ status: "active" });
+  const anuncios = useMemo(
+    () => (postingsQuery.data ?? []).map(mapPosting),
+    [postingsQuery.data],
+  );
+  const loading = postingsQuery.isLoading;
+  const erro = postingsQuery.isError
+    ? "Não foi possível carregar os anúncios. Verifique se o servidor está rodando."
+    : null;
 
   // Filtros
   const [busca,       setBusca]       = useState("");
@@ -112,22 +109,6 @@ const BuscarMaquinario = () => {
 
   // Scroll ao entrar na página
   useEffect(() => { window.scrollTo(0, 0); }, []);
-
-  // Busca única ao carregar a página
-  useEffect(() => {
-    setLoading(true);
-    postingService
-      .list({ status: "active" })
-      .then((data: PostingAPI[]) => {
-        setAnuncios(data.map(mapPosting));
-        setLoading(false);
-      })
-      .catch((erro: unknown) => {
-        console.error(erro);
-        setErro("Não foi possível carregar os anúncios. Verifique se o servidor está rodando.");
-        setLoading(false);
-      });
-  }, []);
 
   // Debounce preço: aplica o filtro 400ms após o usuário parar de digitar
   useEffect(() => {
@@ -173,8 +154,14 @@ const BuscarMaquinario = () => {
 
   const temFiltro = busca || atividade || cidade || precoMaxInput || dataInicio || dataFim;
 
-  // Resetar página ao mudar qualquer filtro
-  useEffect(() => { setPagina(1); }, [busca, atividade, cidade, precoMax, dataInicio, dataFim]);
+  // Resetar página ao mudar qualquer filtro. Guardar a assinatura dos filtros e
+  // comparar no render evita o setState-dentro-de-efeito.
+  const assinaturaFiltros = `${busca}|${atividade}|${cidade}|${precoMax}|${dataInicio}|${dataFim}`;
+  const [ultimaAssinatura, setUltimaAssinatura] = useState(assinaturaFiltros);
+  if (assinaturaFiltros !== ultimaAssinatura) {
+    setUltimaAssinatura(assinaturaFiltros);
+    setPagina(1);
+  }
 
   function irParaPagina(n: number) {
     setPagina(n);

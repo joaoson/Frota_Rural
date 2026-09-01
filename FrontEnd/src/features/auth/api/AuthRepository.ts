@@ -14,12 +14,15 @@ import {
 
 /** Nenhuma rota de autenticação tem barra final. */
 const LOGIN_PATH = "login";
+const REFRESH_PATH = "login/refresh";
 const LOGOUT_PATH = "logout";
 const RESET_REQUEST_PATH = "password-reset/request";
 const RESET_CONFIRM_PATH = "password-reset/confirm";
 
 export interface AuthRepository {
   login(email: string, password: string): Promise<string>;
+  /** Renova a sessão a partir do cookie httpOnly. Sem corpo. */
+  refresh(): Promise<string>;
   logout(): Promise<void>;
   requestPasswordReset(email: string): Promise<string>;
   confirmPasswordReset(token: string, newPassword: string): Promise<void>;
@@ -52,6 +55,11 @@ export class HttpAuthRepository implements AuthRepository {
       if (error instanceof ForbiddenError) throw new AccountDisabled(error);
       throw error;
     }
+  }
+
+  async refresh(): Promise<string> {
+    const response = await this.http.send<unknown>({ method: "POST", path: REFRESH_PATH });
+    return accessTokenSchema.parse(response.data).access;
   }
 
   async logout(): Promise<void> {

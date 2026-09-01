@@ -27,7 +27,7 @@ import { postingMachineName } from "@/features/postings/types/posting";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
 import { HttpError } from "@/shared/http/errors";
 import { masked } from "@/shared/lib/maskedRegister";
-import { maskCEP } from "@/utils/masks/maskCEP";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
 
 const FIELD =
   "w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow";

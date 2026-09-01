@@ -1,29 +1,13 @@
-import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
 import "./Contrato.css";
-import type { ContratoData } from "./types";
-import { contractService } from "@/services/ContractService/ContractService";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useContractDocument } from "@/features/contracts/hooks/useContracts";
 
 export default function Contrato() {
   const { id } = useParams<{ id: string }>();
-  const [data, setData] = useState<ContratoData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    contractService
-      .getContractById(id)
-      .then((contractData) => {
-        setData(contractData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Erro ao carregar contrato:", err);
-        setLoading(false);
-      });
-  }, [id]);
+  const documentQuery = useContractDocument(id ?? null);
+  const data = documentQuery.data ?? null;
+  const loading = documentQuery.isLoading;
 
   if (loading) {
     return (

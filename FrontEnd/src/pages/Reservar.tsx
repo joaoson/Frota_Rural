@@ -3,10 +3,13 @@ import { Link, useNavigate, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { contractService } from "@/services/ContractService/ContractService";
+import { useAuth } from "@/contexts/useAuth";
+import { toRentalDateTime } from "@/features/contracts/api/contractMapper";
+import { useCreateRental, useSignContract } from "@/features/contracts/hooks/useContracts";
+import type { Rental } from "@/features/contracts/types/rental";
+import { usePosting } from "@/features/postings/hooks/usePostings";
+import { HttpError } from "@/shared/http/errors";
 
 
 const HORAS_POR_DIARIA = 8;
@@ -14,15 +17,6 @@ const HORAS_POR_DIARIA = 8;
 const TAXA_PLATAFORMA = 0.05;
 
 
-interface PostingReservaAPI {
-  id: string;
-  hourly_rate: string;
-  location_address: string | null;
-  machine_brand: string | null;
-  machine_model: string | null;
-  machine_usage_purpose: string | null;
-  machine_renagro_number: string | null;
-}
 
 type Etapa = 1 | 2 | 3;
 type FormaPagamento = "pix" | "cartao";
@@ -118,11 +112,15 @@ const Reservar = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { userId } = useAuth();
-  const [createdRental, setCreatedRental] = useState<any>(null);
+  const [createdRental, setCreatedRental] = useState<Rental | null>(null);
 
-  const [anuncio, setAnuncio] = useState<PostingReservaAPI | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const postingQuery = usePosting(id ?? null);
+  const anuncio = postingQuery.data ?? null;
+  const loading = postingQuery.isLoading;
+  const erro = postingQuery.isError ? "Não foi possível carregar o anúncio." : null;
+
+  const createRental = useCreateRental();
+  const signContract = useSignContract();
 
   const [etapa, setEtapa] = useState<Etapa>(1);
 
@@ -147,23 +145,10 @@ const Reservar = () => {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    if (!id) return;
-    setLoading(true);
-    postingService
-      .getById(id)
-      .then((data: PostingReservaAPI) => {
-        setAnuncio(data);
-        setLoading(false);
-      })
-      .catch((erro: unknown) => {
-        console.error(erro);
-        setErro("Não foi possível carregar o anúncio.");
-        setLoading(false);
-      });
   }, [id]);
 
-  const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Maquinário";
-  const valorDiaria = anuncio ? parseFloat(anuncio.hourly_rate) * HORAS_POR_DIARIA : 0;
+  const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Maquinário";
+  const valorDiaria = anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
     const dias = calcularDiarias(dataInicio, dataFim);
@@ -199,24 +184,24 @@ const Reservar = () => {
     // Simula o processamento do pagamento 
     setTimeout(async () => {
       try {
-        const rental = await contractService.createRental({
-          postingId: id || "",
-          lesseeId: userId || "locatario-default",
-          lessorId: "lessor-default",
-          machineName: titulo,
-          startDate: dataInicio,
-          endDate: dataFim,
-          total: total,
-          observacoes: observacoes,
+        // `lessorId` e `machineName` não iam para a API — eram só ruído no
+        // payload antigo, com um "lessor-default" fixo que mentia.
+        const rental = await createRental.mutateAsync({
+          postings: id ?? "",
+          lessee: userId ?? "",
+          start_date: toRentalDateTime(dataInicio, "start"),
+          end_date: toRentalDateTime(dataFim, "end"),
+          total_price: total,
+          status: "pending",
         });
         setCreatedRental(rental);
         setProcessando(false);
         toast.success("Pagamento confirmado!");
         setEtapa(3);
         window.scrollTo(0, 0);
-      } catch (err) {
+      } catch (error) {
         setProcessando(false);
-        toast.error("Erro ao criar locação.");
+        toast.error(error instanceof HttpError ? error.message : "Erro ao criar locação.");
       }
     }, 1200);
   };
@@ -232,17 +217,23 @@ const Reservar = () => {
     }
     try {
       if (createdRental) {
-        await contractService.signContract(createdRental.id, "locatario", nomeAssinatura);
+        await signContract.mutateAsync({
+          id: createdRental.id,
+          role: "locatario",
+          name: nomeAssinatura,
+        });
       }
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
       navigate("/dashboard-locatario");
-    } catch (err) {
-      toast.error("Erro ao assinar contrato.");
+    } catch (error) {
+      toast.error(error instanceof HttpError ? error.message : "Erro ao assinar contrato.");
     }
   };
 
-  // ── Resumo de valores 
-  const ResumoValores = () => (
+  // Elemento memoizado, não um componente novo a cada render — criar
+  // componentes durante o render remonta toda a subárvore.
+  const resumoValores = useMemo(
+    () => (
     <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/20">
       <div className="flex justify-between items-center text-sm mb-3">
         <span className="text-on-surface-variant">
@@ -259,6 +250,8 @@ const Reservar = () => {
         <span className="text-2xl font-black text-primary">{formatarReais(total)}</span>
       </div>
     </div>
+    ),
+    [diarias, valorDiaria, subtotal, taxa, total],
   );
 
   return (
@@ -310,21 +303,21 @@ const Reservar = () => {
                       </div>
                       <div>
                         <div className="font-bold text-tertiary">{titulo}</div>
-                        {anuncio.location_address && (
+                        {anuncio.locationAddress && (
                           <div className="text-xs text-on-surface-variant flex items-center gap-1">
-                            <MaterialIcon icon="location_on" size={13} /> {anuncio.location_address}
+                            <MaterialIcon icon="location_on" size={13} /> {anuncio.locationAddress}
                           </div>
                         )}
-                        {anuncio.machine_renagro_number && (
+                        {anuncio.machineRenagroNumber && (
                           <div className="text-[11px] text-outline font-medium tracking-wide mt-0.5">
-                            RENAGRO: {anuncio.machine_renagro_number}
+                            RENAGRO: {anuncio.machineRenagroNumber}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <ResumoValores />
+                  {resumoValores}
                 </CartaoPainel>
 
                 {/* Formulário */}
@@ -338,7 +331,7 @@ const Reservar = () => {
                     <div>
                       <div className="font-bold text-primary">{titulo}</div>
                       <div className="text-xs text-on-surface-variant">
-                        {[anuncio.location_address, anuncio.machine_renagro_number && `Renagro ${anuncio.machine_renagro_number}`]
+                        {[anuncio.locationAddress, anuncio.machineRenagroNumber && `Renagro ${anuncio.machineRenagroNumber}`]
                           .filter(Boolean)
                           .join(" · ")}
                       </div>
@@ -402,7 +395,7 @@ const Reservar = () => {
                 <CartaoPainel className="lg:col-span-2">
                   <TituloSecao>Processar Pagamento</TituloSecao>
                   <p className="text-sm text-on-surface-variant -mt-4 mb-5">Contratação de Aluguel</p>
-                  <ResumoValores />
+                  {resumoValores}
                 </CartaoPainel>
 
                 {/* Forma de pagamento */}
@@ -531,8 +524,8 @@ const Reservar = () => {
                     </p>
                     <p>
                       <strong className="text-tertiary">Objeto:</strong> Locação de {titulo}
-                      {anuncio.machine_renagro_number && `, Renagro ${anuncio.machine_renagro_number}`}
-                      {anuncio.machine_usage_purpose && `, para atividade de ${anuncio.machine_usage_purpose}`}, pelo
+                      {anuncio.machineRenagroNumber && `, Renagro ${anuncio.machineRenagroNumber}`}
+                      {anuncio.machineUsagePurpose && `, para atividade de ${anuncio.machineUsagePurpose}`}, pelo
                       período de {periodoTexto}.
                     </p>
                     <p>

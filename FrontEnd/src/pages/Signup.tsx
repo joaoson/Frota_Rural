@@ -11,12 +11,12 @@ import { useSignupForm } from "@/features/users/hooks/useSignupForm";
 import { maxBirthDate, UserRole } from "@/features/users/types/userSchemas";
 import type { SignupFormValues } from "@/features/users/types/userSchemas";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
-import { BRAZILIAN_STATES } from "@/shared/lib/brazilianStates";
+import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { masked } from "@/shared/lib/maskedRegister";
 import { BadRequestError, HttpError } from "@/shared/http/errors";
-import { maskCEP } from "@/utils/masks/maskCEP";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { maskPhone } from "@/utils/masks/maskPhone";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskPhone } from "@/shared/utils/masks/maskPhone";
 
 const API_FIELD_TO_FORM: Partial<Record<string, keyof SignupFormValues>> = {
   document: "document",

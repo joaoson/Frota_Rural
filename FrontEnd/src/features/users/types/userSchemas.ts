@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { passwordSchema } from "@/features/auth/types/authSchemas";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
-import { validateCPF } from "@/utils/validation/validateCPF";
+import { validateCNPJ } from "@/shared/utils/validation/validateCNPJ";
+import { validateCPF } from "@/shared/utils/validation/validateCPF";
 
 export const UserRole = {
   Locador: "locador",

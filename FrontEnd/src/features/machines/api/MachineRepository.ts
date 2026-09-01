@@ -27,6 +27,8 @@ export interface MachineFilter {
 export interface MachineRepository {
   list(filter?: MachineFilter): Promise<Machine[]>;
   create(payload: CreateMachinePayload): Promise<Machine>;
+  update(id: string, payload: Partial<CreateMachinePayload>): Promise<Machine>;
+  remove(id: string): Promise<void>;
 }
 
 export class HttpMachineRepository implements MachineRepository {
@@ -60,5 +62,19 @@ export class HttpMachineRepository implements MachineRepository {
     });
 
     return toDomain(machineApiSchema.parse(response.data));
+  }
+
+  /** Detalhe NÃO leva barra final — ver nota no topo. */
+  async update(id: string, payload: Partial<CreateMachinePayload>): Promise<Machine> {
+    const response = await this.http.send<unknown>({
+      method: "PATCH",
+      path: `machines/${id}`,
+      body: payload,
+    });
+    return toDomain(machineApiSchema.parse(response.data));
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.http.send<unknown>({ method: "DELETE", path: `machines/${id}` });
   }
 }

@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 
 const Footer = () => {
   const { userRole } = useAuth();

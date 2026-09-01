@@ -1,5 +1,9 @@
 import { HttpAuthRepository } from "@/features/auth/api/AuthRepository";
 import { AuthStore } from "@/features/auth/api/AuthStore";
+import { HttpContractRepository } from "@/features/contracts/api/ContractRepository";
+import { ContractStore } from "@/features/contracts/api/ContractStore";
+import { HttpReviewRepository } from "@/features/reviews/api/ReviewRepository";
+import { ReviewStore } from "@/features/reviews/api/ReviewStore";
 import { HttpDocumentRepository } from "@/features/documents/api/DocumentRepository";
 import { DocumentStore } from "@/features/documents/api/DocumentStore";
 import { HttpMachineRepository } from "@/features/machines/api/MachineRepository";
@@ -98,6 +102,14 @@ const documentRepository = new HttpDocumentRepository(httpClient);
 
 export const documentStore = new DocumentStore(documentRepository, queryClient);
 
+const contractRepository = new HttpContractRepository(httpClient);
+
+export const contractStore = new ContractStore(contractRepository, queryClient);
+
+const reviewRepository = new HttpReviewRepository(httpClient);
+
+export const reviewStore = new ReviewStore(reviewRepository, queryClient);
+
 /** Limpa todo estado de servidor em memória. Chamado no logout. */
 export function clearAllStores(): void {
   machineStore.clear();
@@ -105,4 +117,6 @@ export function clearAllStores(): void {
   postingStore.clear();
   moderationStore.clear();
   documentStore.clear();
+  contractStore.clear();
+  reviewStore.clear();
 }

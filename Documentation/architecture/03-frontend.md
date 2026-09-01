@@ -10,8 +10,8 @@ front e back fica **visível**, porque aparece em `domain/` dos dois lados.
 
 ## 3.2 Estrutura por feature
 
-Layout definido em `specification.md` e registrado em [ADR-009](06-adr.md). Abaixo, o que está de
-fato implementado:
+Layout definido em `specification.md` e registrado em [ADR-009](06-adr.md). A migração está
+**completa**: `src/services/` não existe mais.
 
 ```
 src/
@@ -20,26 +20,23 @@ src/
 │   ├── app.tsx                      # providers
 │   ├── router.tsx                   # árvore de rotas
 │   └── routes/{public,protected,admin}Routes.tsx
-├── features/
-│   ├── auth/          types/ api/ hooks/
-│   ├── users/         types/ api/ hooks/
-│   ├── machines/      types/ api/ hooks/ components/
-│   ├── postings/      types/ api/ hooks/
-│   ├── documents/     types/ api/ hooks/
-│   └── administration/types/ api/ hooks/
+├── features/                        # 8 features, mesma forma em todas
+│   ├── auth/  users/  machines/  postings/
+│   └── documents/  administration/  contracts/  reviews/
 ├── shared/
 │   ├── http/
 │   │   ├── HttpClient.ts            # porta
 │   │   ├── errors.ts
 │   │   ├── AxiosHttpClient.ts       # único módulo que conhece axios
-│   │   ├── ViaCepClient.ts
+│   │   ├── ViaCepClient.ts          # segunda cadeia, sem decorators de auth
 │   │   ├── queryClient.ts
 │   │   └── decorators/{Authenticated,Refreshing,Logging}HttpClient.ts
 │   ├── auth/{TokenProvider,SessionPort,InMemoryTokenStore,SessionService,jwt}.ts
 │   ├── hooks/useCepLookup.ts
-│   └── lib/{maskedRegister,brazilianStates}.ts
-├── pages/                           # composição e rota
-└── services/                        # LEGADO — ainda serve os god components
+│   ├── lib/maskedRegister.ts
+│   └── utils/{masks,validation,clearSpecialChars,regexPatterns,brazilianStates}
+├── contexts/{authContextValue.ts, useAuth.ts, AuthContext.tsx}
+├── components/  pages/  lib/(shadcn)  assets/
 ```
 
 Dentro de cada feature, o padrão é sempre o mesmo:
@@ -57,54 +54,45 @@ Dentro de cada feature, o padrão é sempre o mesmo:
 Regras de import, verificáveis por arquivo (não há pasta `domain/` isolada — ver ADR-009):
 
 ```bash
-grep -rnE "^import .*from ['\"]axios['\"]" FrontEnd/src/features/ FrontEnd/src/shared/ FrontEnd/src/app/
-grep -rnE "from ['\"]@/features/" FrontEnd/src/shared/
-grep -rnE "from ['\"]react" FrontEnd/src/features/*/types/ FrontEnd/src/features/*/api/
+grep -rnE "^import .*from ['\"]axios['\"]" FrontEnd/src/          # só AxiosHttpClient.ts
+grep -rnE "from ['\"]@/features/" FrontEnd/src/shared/            # vazio
+grep -rnE "from ['\"]react['\"]" FrontEnd/src/features/*/types/ FrontEnd/src/features/*/api/   # vazio
+grep -rn "new Http\|new AxiosHttpClient" FrontEnd/src/ | grep -v container.ts                   # vazio
 ```
-
-Os três devem sair vazios, exceto o primeiro em `shared/http/AxiosHttpClient.ts`.
-
-### Coexistência declarada
-
-`services/` continua no repositório porque `DashboardLocador`, `DashboardLocatario`, `Buscar`,
-`BuscarMaquinario`, `Reservar`, `AnuncioDetalhe` e `Contrato` ainda dependem dele. `AuthContext`
-escreve o token nos dois caminhos de propósito. `services/` só pode ser removido quando o último
-consumidor migrar — junto com as features `contracts` e `reviews`, que hoje só teriam consumidores
-fora de escopo.
 
 ## 3.3 A camada de hooks
 
-`DashboardLocador.tsx` tem 2.378 linhas, 32 `useState` e 11 abas comutadas por `useState<Tab>` — o
-JSX das onze abas vive em um único `return`. Não é descuido: é o que acontece quando **não existe
-lugar entre "service" e "JSX"** para lógica com estado.
-
-Essa camada agora existe em `features/*/hooks/`. Um hook é um **Adapter**: converte operações que não
-conhecem React no modelo de estado que o React entende.
+Antes, não existia lugar entre "service" e "JSX" para lógica com estado — daí um dashboard de 2.378
+linhas com 32 `useState`. Essa camada agora existe em `features/*/hooks/`. Um hook é um **Adapter**:
+converte operações que não conhecem React no modelo de estado que o React entende.
 
 ```
-antes:  service (HTTP)  →  [ VAZIO ]  →  página de 2.378 linhas
-depois: repository      →  store  →  hook  →  página de composição
+antes:  service (HTTP)  →  [ VAZIO ]  →  página
+depois: repository → store → hook → página
 ```
-
-Efeito medido nas páginas migradas:
 
 | Página | Antes | Depois |
 |---|---|---|
 | `NovoEquipamento.tsx` | 343 linhas, 8 `useState` | 247, **0** |
-| `CNHUpload.tsx` | 1.129 linhas, 32 `useState` | 834, **5** (só UI) |
+| `CNHUpload.tsx` | 1.129 linhas, 32 `useState` | 834, 5 (só UI) |
 | `Signup.tsx` | 539 linhas, 15 `useState` | 352, 1 |
-| `Login.tsx` | 185 linhas, 6 `useState` | 151, 1 |
+| `DashboardLocador.tsx` | 2.378 linhas, 32 `useState` | 2.366, 24 |
+| `DashboardLocatario.tsx` | 1.216 linhas, 25 `useState` | 1.227, 21 |
 | `main.tsx` | 112 linhas | 12 |
 
-Os `useState` que sobraram são estado de UI legítimo — arquivo selecionado, drag-and-drop,
-visibilidade de senha. Nenhum campo de formulário e nenhum estado de servidor.
+Os dashboards encolheram pouco em linhas porque o volume deles é JSX, não lógica — o que saiu foi
+todo o estado de servidor. Os `useState` restantes são estado de UI legítimo: abas, modais, campos de
+formulário de perfil.
+
+**As nove implementações de `validateField` desapareceram.** A última, em `EditEquipamentoModal`,
+virou um adaptador de três linhas sobre `validateMachineEdit` — as regras vivem no schema zod da
+feature `machines`.
 
 ## 3.4 TanStack Query como camada de estado de servidor
 
-Sem biblioteca de estado de servidor, cada página reimplementa o mesmo trio `loading` / `erro` /
-`data`: `Reservar.tsx:120`, `AnuncioDetalhe.tsx:77`, `GerenciarAnuncio.tsx:24`,
-`Admin/Documentos.tsx:100`. E a manutenção de cache acaba escrita à mão — `DashboardLocador.tsx:727`
-chama `machineService.update` e depois remapeia o estado local para a tela não ficar defasada.
+Antes, cada página reimplementava o trio `loading` / `erro` / `data`, e a manutenção de cache era
+escrita à mão — o dashboard chamava `machineService.update` e depois remapeava o estado local para a
+tela não ficar defasada.
 
 O projeto adota `@tanstack/react-query` ([ADR-006](06-adr.md)). A divisão fica assim:
 
@@ -156,7 +144,7 @@ Dois ganhos concretos:
 
 ## 3.7 Formulários
 
-`react-hook-form` + `zodResolver` substituíram **oito implementações independentes de
+`react-hook-form` + `zodResolver` substituíram **as nove implementações independentes de
 `validateField`**, cada uma com sua própria convenção de mensagem e seu próprio reducer de erros.
 
 Campos com máscara continuam uncontrolled via `shared/lib/maskedRegister.ts`, que reescreve o valor
@@ -165,19 +153,27 @@ antes de repassar o evento ao RHF.
 Erros de campo vindos do backend são posicionados no campo correspondente via `form.setError`, não em
 um toast genérico — um `renagro_number` duplicado aparece embaixo do input, com borda de erro.
 
-## 3.8 Correções de configuração
+## 3.8 Limpeza concluída
 
-- `src/.env` está no diretório errado (o Vite lê da raiz do projeto) **e** sua chave não tem o prefixo
-  `VITE_`. Resultado: `AxiosInstance.ts:4` sempre usa o fallback `http://localhost:8000/api/`. Deve
-  virar `FrontEnd/.env` com `VITE_API_BASE_URL`.
-- `main.tsx:43,48` têm comentários `//` como filhos JSX de `<Routes>` — renderizam como texto.
-- `react-router-dom` está instalado e nunca é importado (só `react-router`).
-- `App.tsx` é importado em `main.tsx:5` e nunca renderizado; `RouteStub.tsx` e
-  `contexts/Constants.tsx` são código morto.
-- Não existe **error boundary** em lugar nenhum. Um erro de render deixa a aplicação em branco.
-- O interceptor de refresh em `AxiosInstance.ts:31-57` não deduplica chamadas concorrentes: dois 401
-  simultâneos disparam dois refreshes.
+Removidos nesta migração:
 
----
+- `src/services/` inteiro — os 8 serviços legados e o `AxiosInstance` com estado global mutável
+- Código morto: `pages/Buscar.tsx` (duplicata não roteada de `BuscarMaquinario`), `pages/RouteStub.tsx`,
+  `App.tsx`, `App.css` (arquivo vazio), `contexts/Constants.tsx`, `pages/Contrato/mock.ts`
+- `react-router-dom`, que só era importado em dois arquivos por engano (o projeto usa `react-router`)
+- `src/utils/` consolidado em `shared/utils/`; `utils/jwt.ts` substituído por `shared/auth/jwt.ts`,
+  que ganhou o `try/catch` que faltava
+- `src/.env`, que ficava no diretório errado para o Vite e cuja chave não tinha o prefixo `VITE_` —
+  o `baseURL` sempre caía no fallback. Agora há `FrontEnd/.env` (ignorado pelo git) e `.env.example`
 
-**Próximo:** [`04-pattern-catalog.md`](04-pattern-catalog.md) · **Referência:** [`reference/frontend-documents-feature.md`](reference/frontend-documents-feature.md)
+Defeitos corrigidos de passagem, que o `any` escondia:
+
+- `GerenciarAnuncio` lia `posting.machinery_details`, campo inexistente na resposta de detalhe
+- Nomes de locador/locatário eram decididos por ids chumbados (`"lessor-default"`, `"locatario-default"`)
+  que nunca chegavam; agora vêm denormalizados da API
+- `showAvaliar` / `showDetalhes` / `showReagendar` eram tipados `number` para ids que são UUID
+- Colunas nullable (`renagro`, `brand`, `model`, `purpose`) eram passadas como `string`
+
+Pendência conhecida: em `DashboardLocatario`, o `reviewee` e o `rental` de uma nova avaliação seguem
+chumbados. O id da locação está em escopo, mas **a API de rentals não devolve o id do locador** — só
+`lessor_name` — então não há como derivar o avaliado sem mudança no backend.

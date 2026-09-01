@@ -1,25 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { userService } from "@/services/UserService/UserService";
-import { machineService } from "@/services/MachineService/MachineService";
-import { postingService } from "@/services/PostingService/PostingService";
-import { operatorDocumentService } from "@/services/OperatorDocumentService/OperatorDocumentService";
-import type { OperatorLicense } from "@/services/OperatorDocumentService/models/OperatorLicense";
-import type { Certification } from "@/services/OperatorDocumentService/models/Certification";
-import { reviewService, type Review } from "@/services/ReviewService/ReviewService";
-import { contractService } from "@/services/ContractService/ContractService";
-import type { User } from "@/services/UserService/models/User";
-import { AxiosError } from "axios";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { maskPhone } from "@/utils/masks/maskPhone";
-import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
-import { passwordPattern } from "@/utils/regexPatterns";
+import { useAuth } from "@/contexts/useAuth";
+import { useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
+import { rentalMachineName } from "@/features/contracts/types/rental";
+import { documentStore } from "@/app/container";
+import { useCertifications, useOperatorLicenses } from "@/features/documents/hooks/useDocuments";
+import type { Certification, OperatorLicense } from "@/features/documents/types/document";
+import { useMachines } from "@/features/machines/hooks/useMachines";
+import { machineStore } from "@/app/container";
+import { usePostings } from "@/features/postings/hooks/usePostings";
+import { postingMachineName } from "@/features/postings/types/posting";
+import {
+  useCreateReview,
+  useDeleteReview,
+  useReceivedReviews,
+  useWrittenReviews,
+} from "@/features/reviews/hooks/useReviews";
+import type { Review } from "@/features/reviews/types/review";
+import { useChangePassword, useUpdateProfile, useUser } from "@/features/users/hooks/useUsers";
+import type { User } from "@/features/users/types/user";
+import { BadRequestError } from "@/shared/http/errors";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskPhone } from "@/shared/utils/masks/maskPhone";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
+import { useCepLookup } from "@/shared/hooks/useCepLookup";
+import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
+import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { validateCNPJ } from "@/shared/utils/validation/validateCNPJ";
+import { passwordPattern } from "@/shared/utils/regexPatterns";
 import {
   Area,
   AreaChart,
@@ -100,7 +109,6 @@ function validateDocument(value: string): boolean {
 
 const DashboardLocador = () => {
   const { userId, logout } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
 
   // Formulário dados pessoais
   const [formName, setFormName] = useState("");
@@ -122,20 +130,85 @@ const DashboardLocador = () => {
 
   const [tab, setTab] = useState<Tab>("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
-  const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
+  const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
+  const [showAvaliar, setShowAvaliar] = useState<string | null>(null);
 
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const [machines, setMachines] = useState<any[]>([]);
-  const [postings, setPostings] = useState<any[]>([]);
-  const [rentals, setRentals] = useState<any[]>([]);
-  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
-  const [givenReviews, setGivenReviews] = useState<Review[]>([]);
-  const [licenses, setLicenses] = useState<OperatorLicense[]>([]);
-  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const userQuery = useUser(userId);
+  const user: User | null = userQuery.data ?? null;
+
+  const machinesQuery = useMachines({ ownerId: userId ?? undefined }, Boolean(userId));
+  const postingsQuery = usePostings({});
+  const rentalsQuery = useRentalsAsLessor(userId);
+  const receivedQuery = useReceivedReviews(userId);
+  const givenQuery = useWrittenReviews(userId);
+  const licensesQuery = useOperatorLicenses({ userId: userId ?? undefined }, Boolean(userId));
+  const certificationsQuery = useCertifications({ userId: userId ?? undefined }, Boolean(userId));
+
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
+  const createReview = useCreateReview();
+  const deleteReview = useDeleteReview();
+  const { lookup } = useCepLookup();
+
+  const receivedReviews: Review[] = receivedQuery.data ?? [];
+  const givenReviews: Review[] = givenQuery.data ?? [];
+  const licenses: OperatorLicense[] = licensesQuery.data ?? [];
+  const certifications: Certification[] = certificationsQuery.data ?? [];
+
+  const machines = useMemo(
+    () =>
+      (machinesQuery.data ?? []).map((m) => ({
+        id: m.id,
+        renagro: m.renagroNumber,
+        brand: m.brand,
+        model: m.model,
+        year: m.year,
+        status: m.status ?? "active",
+        purpose: m.usagePurpose ?? "",
+      })),
+    [machinesQuery.data],
+  );
+
+  // A lista de anúncios ainda é filtrada no cliente porque a API de postings
+  // não aceita filtro por dono — só por `machinery`.
+  const postings = useMemo(() => {
+    const machineIds = new Set((machinesQuery.data ?? []).map((m) => m.id));
+    return (postingsQuery.data ?? [])
+      .filter((p) => machineIds.has(p.machineryId))
+      .map((p) => ({
+        id: p.id,
+        machine: postingMachineName(p),
+        price: p.hourlyRate,
+        location: p.locationAddress,
+        status: p.status ?? "active",
+      }));
+  }, [machinesQuery.data, postingsQuery.data]);
+
+  // O nome do locatário era decidido por um id que nunca chegava
+  // ("locatario-default"); agora vem denormalizado da API.
+  const rentals = useMemo(
+    () =>
+      (rentalsQuery.data ?? []).map((r) => ({
+        id: r.id,
+        lessee: r.lesseeName ?? "Locatário",
+        machine: rentalMachineName(r),
+        period:
+          r.startDate && r.endDate
+            ? `${r.startDate.toLocaleDateString("pt-BR")} a ${r.endDate.toLocaleDateString("pt-BR")}`
+            : "",
+        status: r.status,
+        total: (r.totalPrice ?? 0).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        }),
+        contract: r.contractNumber,
+      })),
+    [rentalsQuery.data],
+  );
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
   const [selectedEquipamento, setSelectedEquipamento] =
     useState<EquipamentoData>({
@@ -150,14 +223,15 @@ const DashboardLocador = () => {
       especificacoes: "",
     });
 
-  const openEditModalForMachine = (m: any) => {
+  const openEditModalForMachine = (m: (typeof machines)[number]) => {
     setSelectedEquipamento({
       id: String(m.id),
-      registroRenagro: m.renagro,
-      marca: m.brand,
-      modelo: m.model,
-      anoFabricacao: String(m.year),
-      finalidade: m.purpose,
+      // Colunas nullable no banco — o `any` anterior escondia isso.
+      registroRenagro: m.renagro ?? "",
+      marca: m.brand ?? "",
+      modelo: m.model ?? "",
+      anoFabricacao: m.year ? String(m.year) : "",
+      finalidade: m.purpose ?? "",
       horimetroInicial: "",
       horimetroFinal: "",
       especificacoes: "",
@@ -165,7 +239,7 @@ const DashboardLocador = () => {
     setIsEditEquipamentoOpen(true);
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "pending":
         return {
@@ -204,64 +278,6 @@ const DashboardLocador = () => {
     }
   };
 
-  useEffect(() => {
-    if (!userId) return;
-    userService
-      .getById(userId)
-      .then(setUser)
-      .catch(console.error);
-
-    reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
-    reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
-
-    contractService.listByLessor(userId).then(data => {
-      const mapped = data.map(r => ({
-        id: r.id,
-        lessee: r.lesseeId === "locatario-default" ? "Fazenda Aurora" : "Fazenda Parceira",
-        machine: r.machineName,
-        period: r.period,
-        status: r.status,
-        total: r.total,
-        contract: r.contractNumber
-      }));
-      setRentals(mapped);
-    }).catch(console.error);
-
-    Promise.all([
-      machineService.list({ owner: userId }),
-      postingService.list({})
-    ]).then(([machinesData, postingsData]) => {
-      const userMachineIds = new Set(machinesData.map((m: any) => m.id));
-      const userPostings = postingsData.filter((p: any) => userMachineIds.has(p.machinery));
-      
-      setMachines(machinesData.map((m: any) => ({
-        id: m.id,
-        renagro: m.renagro_number,
-        brand: m.brand,
-        model: m.model,
-        year: m.year,
-        status: m.status || "active",
-        purpose: m.usage_purpose || ""
-      })));
-
-      setPostings(userPostings.map((p: any) => ({
-        id: p.id,
-        machine: p.machinery_details ? `${p.machinery_details.brand} ${p.machinery_details.model}` : p.machinery,
-        price: p.hourly_rate,
-        location: p.location_address,
-        status: p.status || "active"
-      })));
-    }).catch(console.error);
-
-    operatorDocumentService
-      .listLicenses({ user: userId })
-      .then(setLicenses)
-      .catch(console.error);
-    operatorDocumentService
-      .listCertifications({ user: userId })
-      .then(setCertifications)
-      .catch(console.error);
-  }, [userId]);
 
   useEffect(() => {
     if (!user) return;
@@ -298,27 +314,22 @@ const DashboardLocador = () => {
       return;
     }
     try {
-      const updated = await userService.updateProfile(userId!, {
+      await updateProfile.mutateAsync({
+        id: userId!,
+        input: {
         name: formName.trim(),
         document: clearSpecialChars(formDocument),
         email: formEmail.toLowerCase().trim(),
         phone: `+55${clearSpecialChars(formPhone)}`,
         address: formAddress.trim(),
-        cep: clearSpecialChars(formCep),
+          cep: clearSpecialChars(formCep),
+        },
       });
-      setUser(updated);
       toast.success("Dados atualizados com sucesso.");
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.data) {
-        const data = error.response.data;
-        if (data.email) {
-          toast.error("Este e-mail já está em uso.");
-          return;
-        }
-        if (data.document) {
-          toast.error("Este documento já está cadastrado.");
-          return;
-        }
+      if (error instanceof BadRequestError) {
+        if (error.firstErrorFor("email")) return toast.error("Este e-mail já está em uso.");
+        if (error.firstErrorFor("document")) return toast.error("Este documento já está cadastrado.");
       }
       toast.error("Não foi possível salvar as alterações. Tente novamente.");
     }
@@ -335,17 +346,17 @@ const DashboardLocador = () => {
     }
     confirmPasswordRef.current?.setCustomValidity("");
     try {
-      await userService.updatePassword({
+      await changePassword.mutateAsync({
         id: userId!,
-        currentPassword: currentPassword,
-        newPassword: newPassword,
+        currentPassword,
+        newPassword,
       });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast.success("Senha alterada com sucesso.");
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 400) {
+      if (error instanceof BadRequestError) {
         toast.error("Senha atual incorreta.");
       } else {
         toast.error("Não foi possível alterar a senha. Tente novamente.");
@@ -383,7 +394,7 @@ const DashboardLocador = () => {
     anunciosPage * anunciosPerPage,
   );
 
-  const renderRentalCard = (r: any) => {
+  const renderRentalCard = (r: (typeof rentals)[number]) => {
     const badge = getStatusBadge(r.status);
     return (
       <div
@@ -558,7 +569,7 @@ const DashboardLocador = () => {
                   }
                   setIsSubmittingReview(true);
                   try {
-                    await reviewService.createReview({
+                    await createReview.mutateAsync({
                       reviewer: userId,
                       reviewee: "029d15f3-a577-4238-9c59-42011ddcb5be", // Valid Locatario ID for testing
                       rating: reviewRating,
@@ -569,8 +580,6 @@ const DashboardLocador = () => {
                     setShowAvaliar(null);
                     setReviewRating(5);
                     setReviewComment("");
-                    const updatedGiven = await reviewService.getReviewsByReviewer(userId);
-                    setGivenReviews(updatedGiven);
                   } catch (error) {
                     console.error("Erro ao enviar avaliação:", error);
                     toast.error("Erro ao enviar avaliação.");
@@ -724,7 +733,7 @@ const DashboardLocador = () => {
             equipamento={selectedEquipamento}
             onSave={async (data) => {
               try {
-                await machineService.update(data.id, {
+                await machineStore.update(data.id, {
                   renagro_number: data.registroRenagro,
                   brand: data.marca,
                   model: data.modelo,
@@ -734,22 +743,8 @@ const DashboardLocador = () => {
                   usage_purpose: data.finalidade,
                 });
                 setSelectedEquipamento(data);
-                setMachines((prev) =>
-                  prev.map((m) =>
-                    String(m.id) === data.id
-                      ? {
-                          ...m,
-                          renagro: data.registroRenagro,
-                          brand: data.marca,
-                          model: data.modelo,
-                          year: data.anoFabricacao
-                            ? Number(data.anoFabricacao)
-                            : m.year,
-                          purpose: data.finalidade,
-                        }
-                      : m,
-                  ),
-                );
+                // O store invalida a lista; não é preciso remapear estado local.
+                void machineStore.invalidateLists();
                 toast.success("Equipamento atualizado com sucesso!");
                 setIsEditEquipamentoOpen(false);
               } catch {
@@ -889,7 +884,7 @@ const DashboardLocador = () => {
                         tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
                       />
                       <Tooltip
-                        formatter={(value: any) => [
+                        formatter={(value) => [
                           `R$ ${Number(value).toLocaleString("pt-BR")}`,
                           "Receita",
                         ]}
@@ -969,7 +964,7 @@ const DashboardLocador = () => {
                         tickLine={false}
                       />
                       <Tooltip
-                        formatter={(value: any) => [
+                        formatter={(value) => [
                           `${Number(value).toFixed(1)} ★`,
                           "Nota média",
                         ]}
@@ -1190,24 +1185,24 @@ const DashboardLocador = () => {
                           </h3>
                           <p className="text-sm text-on-surface-variant">
                             Categoria {lic.category} · Validade:{" "}
-                            {new Date(lic.expiration_date).toLocaleDateString(
+                            {new Date(lic.expirationDate).toLocaleDateString(
                               "pt-BR",
                             )}
                           </p>
-                          {lic.validation_status === "rejected" && lic.review_note && (
+                          {lic.validationStatus === "rejected" && lic.reviewNote && (
                             <p className="text-xs text-error mt-1">
-                              Motivo: {lic.review_note}
+                              Motivo: {lic.reviewNote}
                             </p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {lic.validation_status === "approved" ? (
+                        {lic.validationStatus === "approved" ? (
                           <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
                             Aprovado
                           </span>
-                        ) : lic.validation_status === "rejected" ? (
+                        ) : lic.validationStatus === "rejected" ? (
                           <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
                             <MaterialIcon icon="cancel" size={14} /> Recusado
                           </span>
@@ -1245,13 +1240,10 @@ const DashboardLocador = () => {
                                 className="bg-error hover:bg-error/90 text-on-error"
                                 onClick={async () => {
                                   try {
-                                    await operatorDocumentService.removeLicense(
+                                    await documentStore.removeLicense(
                                       lic.id,
                                     );
-                                    setLicenses((prev) =>
-                                      prev.filter((l) => l.id !== lic.id),
-                                    );
-                                    toast.success("CNH removida com sucesso!");
+                                    void documentStore.invalidateLicenses();                                    toast.success("CNH removida com sucesso!");
                                   } catch {
                                     toast.error(
                                       "Não foi possível remover a CNH.",
@@ -1320,25 +1312,25 @@ const DashboardLocador = () => {
                             {cert.title}
                           </h3>
                           <p className="text-sm text-on-surface-variant">
-                            {cert.issuing_organization} ·{" "}
-                            {new Date(cert.issue_date).toLocaleDateString(
+                            {cert.issuingOrganization} ·{" "}
+                            {new Date(cert.issueDate).toLocaleDateString(
                               "pt-BR",
                             )}
                           </p>
-                          {cert.validation_status === "rejected" && cert.review_note && (
+                          {cert.validationStatus === "rejected" && cert.reviewNote && (
                             <p className="text-xs text-error mt-1">
-                              Motivo: {cert.review_note}
+                              Motivo: {cert.reviewNote}
                             </p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {cert.validation_status === "approved" ? (
+                        {cert.validationStatus === "approved" ? (
                           <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
                             Aprovado
                           </span>
-                        ) : cert.validation_status === "rejected" ? (
+                        ) : cert.validationStatus === "rejected" ? (
                           <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-error/10 text-error border border-error/20 flex items-center gap-1.5">
                             <MaterialIcon icon="cancel" size={14} /> Recusado
                           </span>
@@ -1378,13 +1370,10 @@ const DashboardLocador = () => {
                                 className="bg-error hover:bg-error/90 text-on-error"
                                 onClick={async () => {
                                   try {
-                                    await operatorDocumentService.removeCertification(
+                                    await documentStore.removeCertification(
                                       cert.id,
                                     );
-                                    setCertifications((prev) =>
-                                      prev.filter((c) => c.id !== cert.id),
-                                    );
-                                    toast.success(
+                                    void documentStore.invalidateCertifications();                                    toast.success(
                                       "Certificação removida com sucesso!",
                                     );
                                   } catch {
@@ -2000,14 +1989,14 @@ const DashboardLocador = () => {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">
-                            {r.reviewer_name?.slice(0, 2).toUpperCase() || 'NA'}
+                            {r.reviewerName?.slice(0, 2).toUpperCase() || 'NA'}
                           </div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">
-                              {r.reviewer_name}
+                              {r.reviewerName}
                             </div>
                             <div className="text-xs text-on-surface-variant">
-                              {new Date(r.created_at).toLocaleDateString()}
+                              {r.createdAt?.toLocaleDateString('pt-BR') ?? ''}
                             </div>
                           </div>
                         </div>
@@ -2055,14 +2044,14 @@ const DashboardLocador = () => {
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
-                            {r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}
+                            {r.revieweeName?.slice(0, 2).toUpperCase() || 'NA'}
                           </div>
                           <div>
                             <div className="font-bold text-on-surface text-sm">
-                              {r.reviewee_name}
+                              {r.revieweeName}
                             </div>
                             <div className="text-xs text-on-surface-variant">
-                              {new Date(r.created_at).toLocaleDateString()}
+                              {r.createdAt?.toLocaleDateString('pt-BR') ?? ''}
                             </div>
                           </div>
                         </div>
@@ -2084,10 +2073,10 @@ const DashboardLocador = () => {
                           </div>
                           <button
                             onClick={() => {
-                              reviewService.deleteReview(r.id).then(() => {
-                                setGivenReviews(prev => prev.filter(review => review.id !== r.id));
-                                toast.success("Avaliação excluída com sucesso.");
-                              }).catch(() => toast.error("Erro ao excluir avaliação."));
+                              deleteReview
+                                .mutateAsync(r.id)
+                                .then(() => toast.success("Avaliação excluída com sucesso."))
+                                .catch(() => toast.error("Erro ao excluir avaliação."));
                             }}
                             className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors"
                             title="Excluir avaliação"
@@ -2241,15 +2230,14 @@ const DashboardLocador = () => {
                           const digits = masked.replace(/\D/g, "");
                           if (digits.length === 8) {
                             try {
-                              const data = await fetchAddressByCEP(digits);
-                              if (data) {
-                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
-                                setFormAddress(newAddress);
-                              } else {
-                                toast.error("CEP não encontrado.");
-                              }
-                            } catch (error) {
-                              console.error("Erro ao buscar CEP", error);
+                              const address = await lookup(digits);
+                              setFormAddress(
+                                [address.street, address.neighborhood, address.city, address.state]
+                                  .filter(Boolean)
+                                  .join(", "),
+                              );
+                            } catch {
+                              toast.error("CEP não encontrado.");
                             }
                           }
                         }}

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { useMachines } from "@/features/machines/hooks/useMachines";
 import { machineDisplayName } from "@/features/machines/types/machine";
 import { toWritePayload } from "@/features/postings/api/postingMapper";
@@ -14,7 +14,7 @@ import { usePostingForm } from "@/features/postings/hooks/usePostingForm";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
 import { HttpError } from "@/shared/http/errors";
 import { masked } from "@/shared/lib/maskedRegister";
-import { maskCEP } from "@/utils/masks/maskCEP";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ACCEPT_TYPES = ["image/jpeg", "image/png"];

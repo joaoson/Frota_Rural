@@ -32,6 +32,20 @@ export class AuthStore {
     return access;
   }
 
+  /**
+   * Tenta restaurar a sessão pelo cookie de refresh. Devolve o access token ou
+   * null — não lança, porque "não havia sessão" é um caminho normal.
+   */
+  async restoreSession(): Promise<string | null> {
+    try {
+      const access = await this.repository.refresh();
+      this.tokens.setAccessToken(access);
+      return access;
+    } catch {
+      return null;
+    }
+  }
+
   async logout(): Promise<void> {
     try {
       await this.repository.logout();

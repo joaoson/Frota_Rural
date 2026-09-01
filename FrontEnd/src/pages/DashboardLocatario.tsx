@@ -1,20 +1,27 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { reviewService, type Review } from "@/services/ReviewService/ReviewService";
-import { contractService } from "@/services/ContractService/ContractService";
-import { userService } from "@/services/UserService/UserService";
-import type { User } from "@/services/UserService/models/User";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { maskPhone } from "@/utils/masks/maskPhone";
-import { maskCEP } from "@/utils/masks/maskCEP";
-import { fetchAddressByCEP } from "@/services/ViaCEPService";
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { validateCNPJ } from "@/utils/validation/validateCNPJ";
-import { passwordPattern } from "@/utils/regexPatterns";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
+import { useAuth } from "@/contexts/useAuth";
+import { useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
+import { rentalMachineName } from "@/features/contracts/types/rental";
+import {
+  useCreateReview,
+  useDeleteReview,
+  useReceivedReviews,
+  useWrittenReviews,
+} from "@/features/reviews/hooks/useReviews";
+import type { Review } from "@/features/reviews/types/review";
+import { useChangePassword, useUpdateProfile, useUser } from "@/features/users/hooks/useUsers";
+import type { User } from "@/features/users/types/user";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskPhone } from "@/shared/utils/masks/maskPhone";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
+import { useCepLookup } from "@/shared/hooks/useCepLookup";
+import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
+import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { validateCNPJ } from "@/shared/utils/validation/validateCNPJ";
+import { passwordPattern } from "@/shared/utils/regexPatterns";
 import { toast } from "sonner";
-import { AxiosError } from "axios";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
@@ -32,7 +39,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import machine1 from "@/assets/machine-1.jpg";
 import machine2 from "@/assets/machine-2.jpg";
 
 const spendData = [
@@ -82,7 +88,6 @@ function validateDocument(value: string): boolean {
 
 const DashboardLocatario = () => {
   const { userId, logout } = useAuth();
-  const [user, setUser] = useState<User | null>(null);
 
   // Formulário dados pessoais
   const [formName, setFormName] = useState("");
@@ -104,42 +109,52 @@ const DashboardLocatario = () => {
 
   const [tab, setTab] = useState<Tab>("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showReagendar, setShowReagendar] = useState<number | null>(null);
-  const [showDetalhes, setShowDetalhes] = useState<number | null>(null);
-  const [showAvaliar, setShowAvaliar] = useState<number | null>(null);
+  const [showReagendar, setShowReagendar] = useState<string | null>(null);
+  const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
+  const [showAvaliar, setShowAvaliar] = useState<string | null>(null);
 
-  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
-  const [givenReviews, setGivenReviews] = useState<Review[]>([]);
-  const [rentals, setRentals] = useState<any[]>([]);
+  const userQuery = useUser(userId);
+  const user: User | null = userQuery.data ?? null;
+  const receivedQuery = useReceivedReviews(userId);
+  const givenQuery = useWrittenReviews(userId);
+  const rentalsQuery = useRentalsAsLessee(userId);
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
+  const createReview = useCreateReview();
+  const deleteReview = useDeleteReview();
+  const { lookup } = useCepLookup();
+
+  const receivedReviews: Review[] = receivedQuery.data ?? [];
+  const givenReviews: Review[] = givenQuery.data ?? [];
+
+  // Os nomes de locador eram chumbados por id ("lessor-joao" etc.) — ids que
+  // nunca chegavam, porque o serviço antigo mandava "lessor-default" fixo.
+  // Agora vem denormalizado da API.
+  const rentals = useMemo(
+    () =>
+      (rentalsQuery.data ?? []).map((rental) => ({
+        id: rental.id,
+        owner: rental.lessorName ?? "Locador",
+        machine: rentalMachineName(rental),
+        period:
+          rental.startDate && rental.endDate
+            ? `${rental.startDate.toLocaleDateString("pt-BR")} a ${rental.endDate.toLocaleDateString("pt-BR")}`
+            : "",
+        status: rental.status,
+        total: (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+        }),
+        contract: rental.contractNumber,
+        image: machine2,
+      })),
+    [rentalsQuery.data],
+  );
   
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  useEffect(() => {
-    if (!userId) return;
-    userService
-      .getById(userId)
-      .then(setUser)
-      .catch(console.error);
-
-    reviewService.getReviewsByReviewee(userId).then(setReceivedReviews).catch(console.error);
-    reviewService.getReviewsByReviewer(userId).then(setGivenReviews).catch(console.error);
-
-    contractService.listByLessee(userId).then(data => {
-      const mapped = data.map(r => ({
-        id: r.id,
-        owner: r.lessorId === "lessor-joao" ? "João Silva" : r.lessorId === "lessor-pedro" ? "Pedro Souza" : r.lessorId === "lessor-carlos" ? "Carlos Lima" : "Locador",
-        machine: r.machineName,
-        period: r.period,
-        status: r.status,
-        total: r.total,
-        contract: r.contractNumber,
-        image: r.image || (r.id === "rental-3" ? machine1 : machine2)
-      }));
-      setRentals(mapped);
-    }).catch(console.error);
-  }, [userId]);
 
   useEffect(() => {
     if (!user) return;
@@ -176,27 +191,22 @@ const DashboardLocatario = () => {
       return;
     }
     try {
-      const updated = await userService.updateProfile(userId!, {
+      await updateProfile.mutateAsync({
+        id: userId!,
+        input: {
         name: formName.trim(),
         document: clearSpecialChars(formDocument),
         email: formEmail.toLowerCase().trim(),
         phone: `+55${clearSpecialChars(formPhone)}`,
         address: formAddress.trim(),
-        cep: clearSpecialChars(formCep),
+          cep: clearSpecialChars(formCep),
+        },
       });
-      setUser(updated);
       toast.success("Dados atualizados com sucesso.");
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.data) {
-        const data = error.response.data;
-        if (data.email) {
-          toast.error("Este e-mail já está em uso.");
-          return;
-        }
-        if (data.document) {
-          toast.error("Este documento já está cadastrado.");
-          return;
-        }
+      if (error instanceof BadRequestError) {
+        if (error.firstErrorFor("email")) return toast.error("Este e-mail já está em uso.");
+        if (error.firstErrorFor("document")) return toast.error("Este documento já está cadastrado.");
       }
       toast.error("Não foi possível salvar as alterações. Tente novamente.");
     }
@@ -211,17 +221,17 @@ const DashboardLocatario = () => {
     }
     confirmPasswordRef.current?.setCustomValidity("");
     try {
-      await userService.updatePassword({
+      await changePassword.mutateAsync({
         id: userId!,
-        currentPassword: currentPassword,
-        newPassword: newPassword,
+        currentPassword,
+        newPassword,
       });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast.success("Senha alterada com sucesso.");
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 400) {
+      if (error instanceof BadRequestError) {
         toast.error("Senha atual incorreta.");
       } else {
         toast.error("Não foi possível alterar a senha. Tente novamente.");
@@ -229,7 +239,7 @@ const DashboardLocatario = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | null) => {
     switch (status) {
       case "pending": return { icon: "description", classes: "bg-secondary-container/20 text-secondary border border-secondary-container/30", label: "Assinatura Pendente" };
       case "active": return { icon: "circle", classes: "bg-primary/10 text-primary border border-primary/20", label: "Em Operação (Ativo)" };
@@ -242,7 +252,7 @@ const DashboardLocatario = () => {
   const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "active");
   const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled");
 
-  const renderRentalCard = (r: any) => {
+  const renderRentalCard = (r: (typeof rentals)[number]) => {
     const badge = getStatusBadge(r.status);
     return (
       <div key={r.id} className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
@@ -374,26 +384,28 @@ const DashboardLocatario = () => {
                   }
                   setIsSubmittingReview(true);
                   try {
-                    await reviewService.createReview({
+                    // TODO: `reviewee` e `rental` seguem chumbados, como antes.
+                    // O id da locação está em escopo (`r.id`), mas a API de
+                    // rentals NÃO devolve o id do locador — só `lessor_name` —
+                    // então não dá para derivar o avaliado sem mudança no
+                    // backend. Corrigir só um dos dois deixaria a avaliação
+                    // ligada à locação certa e à pessoa errada.
+                    await createReview.mutateAsync({
                       reviewer: userId,
-                      reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80", // Valid Locador ID for testing
+                      reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80",
                       rating: reviewRating,
                       comment: reviewComment,
-                      rental: "fe6c805a-d5be-4dfe-970f-d2c3fae1cf00" // Valid Rental ID for testing
+                      rental: "fe6c805a-d5be-4dfe-970f-d2c3fae1cf00",
                     });
                     toast.success("Avaliação enviada com sucesso!");
                     setShowAvaliar(null);
                     setReviewRating(5);
                     setReviewComment("");
-                    const updatedGiven = await reviewService.getReviewsByReviewer(userId);
-                    setGivenReviews(updatedGiven);
                   } catch (error) {
                     console.error("Erro ao enviar avaliação:", error);
-                    if (error instanceof AxiosError && error.response?.data?.error) {
-                      toast.error(error.response.data.error);
-                    } else {
-                      toast.error("Erro ao enviar avaliação.");
-                    }
+                    toast.error(
+                      error instanceof HttpError ? error.message : "Erro ao enviar avaliação.",
+                    );
                   } finally {
                     setIsSubmittingReview(false);
                   }
@@ -562,7 +574,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Tooltip formatter={(value) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
                       <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#colorSpend)" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -588,7 +600,7 @@ const DashboardLocatario = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
                       <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
                       <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(value: any) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} ★`, 'Nota média']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
                       <Bar dataKey="rating" fill="var(--chart-2)" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -797,10 +809,10 @@ const DashboardLocatario = () => {
                     <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.reviewer_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
+                          <div className="w-11 h-11 rounded-full bg-secondary-container/30 flex items-center justify-center text-sm font-bold text-tertiary">{r.reviewerName?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.reviewer_name}</div>
-                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.reviewerName}</div>
+                            <div className="text-xs text-on-surface-variant">{r.createdAt?.toLocaleDateString('pt-BR') ?? ''}</div>
                           </div>
                         </div>
                         <div className="flex gap-0.5">
@@ -826,10 +838,10 @@ const DashboardLocatario = () => {
                     <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.reviewee_name?.slice(0, 2).toUpperCase() || 'NA'}</div>
+                          <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">{r.revieweeName?.slice(0, 2).toUpperCase() || 'NA'}</div>
                           <div>
-                            <div className="font-bold text-on-surface text-sm">{r.reviewee_name}</div>
-                            <div className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</div>
+                            <div className="font-bold text-on-surface text-sm">{r.revieweeName}</div>
+                            <div className="text-xs text-on-surface-variant">{r.createdAt?.toLocaleDateString('pt-BR') ?? ''}</div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -840,10 +852,10 @@ const DashboardLocatario = () => {
                           </div>
                           <button
                             onClick={() => {
-                              reviewService.deleteReview(r.id).then(() => {
-                                setGivenReviews(prev => prev.filter(review => review.id !== r.id));
-                                toast.success("Avaliação excluída com sucesso.");
-                              }).catch(() => toast.error("Erro ao excluir avaliação."));
+                              deleteReview
+                                .mutateAsync(r.id)
+                                .then(() => toast.success("Avaliação excluída com sucesso."))
+                                .catch(() => toast.error("Erro ao excluir avaliação."));
                             }}
                             className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors" title="Excluir avaliação">
                             <MaterialIcon icon="close" size={16} />
@@ -1093,13 +1105,12 @@ const DashboardLocatario = () => {
                           const digits = masked.replace(/\D/g, "");
                           if (digits.length === 8) {
                             try {
-                              const data = await fetchAddressByCEP(digits);
-                              if (data) {
-                                const newAddress = [data.logradouro, data.bairro, data.localidade, data.uf].filter(Boolean).join(", ");
-                                setFormAddress(newAddress);
-                              } else {
-                                toast.error("CEP não encontrado.");
-                              }
+                              const address = await lookup(digits);
+                              setFormAddress(
+                                [address.street, address.neighborhood, address.city, address.state]
+                                  .filter(Boolean)
+                                  .join(", "),
+                              );
                             } catch (error) {
                               console.error("Erro ao buscar CEP", error);
                             }

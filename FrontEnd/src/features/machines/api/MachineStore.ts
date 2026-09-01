@@ -43,6 +43,14 @@ export class MachineStore {
     return this.repository.create(payload);
   }
 
+  update(id: string, payload: Partial<CreateMachinePayload>): Promise<Machine> {
+    return this.repository.update(id, payload);
+  }
+
+  remove(id: string): Promise<void> {
+    return this.repository.remove(id);
+  }
+
   /** Marca as listas como obsoletas — quem estiver montado refaz a busca. */
   async invalidateLists(): Promise<void> {
     await this.queryClient.invalidateQueries({ queryKey: machineKeys.lists() });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { validateCPF } from "@/utils/validation/validateCPF";
-import { validateRG } from "@/utils/validation/validateRG";
+import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { validateRG } from "@/shared/utils/validation/validateRG";
 
 export const ValidationStatus = {
   Pending: "pending",

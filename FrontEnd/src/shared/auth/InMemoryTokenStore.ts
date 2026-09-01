@@ -7,9 +7,9 @@ export type ExpiredListener = () => void;
  * httpOnly, inacessível ao JS) e permite que interessados — o AuthProvider —
  * reajam à expiração da sessão.
  *
- * O registro de listeners resolve um bug real: `setLogoutCallback` existe em
- * `services/AxiosInstance.ts` mas nunca é chamado por ninguém, então o logout
- * automático do interceptor atual é um no-op.
+ * O registro de listeners resolveu um bug real: no antigo
+ * `services/AxiosInstance.ts` (removido), `setLogoutCallback` existia mas
+ * nunca era chamado — o logout automático do interceptor era um no-op.
  */
 export class InMemoryTokenStore implements TokenProvider {
   private accessToken: string | null = null;

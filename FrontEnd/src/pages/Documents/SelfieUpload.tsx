@@ -49,7 +49,7 @@ const SelfieUpload = () => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       toast.success("Foto pessoal enviada com sucesso!");
       navigate("/dashboard");
-    } catch (err) {
+    } catch {
       toast.error("Erro ao enviar foto pessoal. Tente novamente.");
     } finally {
       setIsSubmitting(false);

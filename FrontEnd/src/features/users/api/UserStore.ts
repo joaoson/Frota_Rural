@@ -42,6 +42,14 @@ export class UserStore {
     return this.repository.updateProfile(id, input);
   }
 
+  changePassword(id: string, currentPassword: string, newPassword: string): Promise<void> {
+    return this.repository.changePassword(id, currentPassword, newPassword);
+  }
+
+  async invalidateDetail(id: string): Promise<void> {
+    await this.queryClient.invalidateQueries({ queryKey: userKeys.detail(id) });
+  }
+
   async invalidateLists(): Promise<void> {
     await this.queryClient.invalidateQueries({ queryKey: userKeys.lists() });
   }

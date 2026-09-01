@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { passwordPattern } from "@/utils/regexPatterns";
+import { passwordPattern } from "@/shared/utils/regexPatterns";
 
 /** Política de senha do produto. Hoje vive em utils e é aplicada de forma inconsistente. */
 export const passwordSchema = z

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { BrandSelect } from "@/features/machines/components/BrandSelect";
 import { useCreateMachine } from "@/features/machines/hooks/useCreateMachine";
 import {

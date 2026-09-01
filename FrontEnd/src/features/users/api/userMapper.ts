@@ -1,4 +1,4 @@
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
+import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 
 import type { User } from "../types/user";
 import type { SignupFormValues, UserApi } from "../types/userSchemas";

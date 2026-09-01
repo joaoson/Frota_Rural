@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import MaterialIcon from "@/components/MaterialIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 
