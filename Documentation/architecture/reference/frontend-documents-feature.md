@@ -1,5 +1,14 @@
 # Referência — `features/documents` no front-end
 
+
+> ⚠️ **Parcialmente desatualizado.** Este documento foi escrito antes da adoção do TanStack Query
+> ([ADR-006](../06-adr.md)) e antes de `specification.md` fixar o layout de pastas
+> ([ADR-009](../06-adr.md)). O `useAsync` descrito aqui **não** foi implementado, e a estrutura
+> `domain/application/infrastructure/presentation` foi substituída por
+> `types/api/hooks/components`. O código realmente implementado está em
+> `FrontEnd/src/features/machines/` — use-o como referência. As partes sobre entidades, Value
+> Objects, mapper e zod como Anti-Corruption Layer continuam válidas.
+
 Implementação **completa e copiável** da feature de documentos, espelhando o módulo piloto do
 back-end. Substitui `services/OperatorDocumentService/` (253 linhas, metade duplicada) e reduz
 `CNHUpload.tsx` (974 linhas, 30 `useState`).

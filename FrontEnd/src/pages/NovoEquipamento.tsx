@@ -1,155 +1,91 @@
-import { type FormEvent, useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
+
+import Footer from "@/components/Footer";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { machineService } from "@/services/MachineService/MachineService";
-import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandSelect } from "@/features/machines/components/BrandSelect";
+import { useCreateMachine } from "@/features/machines/hooks/useCreateMachine";
+import {
+  MACHINE_FORM_DEFAULTS,
+  useMachineForm,
+} from "@/features/machines/hooks/useMachineForm";
+import { toCreatePayload } from "@/features/machines/api/machineMapper";
+import { OTHER_BRAND } from "@/features/machines/types/brands";
+import type { MachineFormValues } from "@/features/machines/types/machineSchemas";
+import { BadRequestError } from "@/shared/http/errors";
 
-const BRANDS = [
-  { value: "john-deere", label: "John Deere", logo: "/brands/john-deere.png" },
-  { value: "massey-ferguson", label: "Massey Ferguson", logo: "/brands/massey-ferguson.png" },
-  { value: "new-holland", label: "New Holland", logo: "/brands/new-holland.png" },
-  { value: "valtra", label: "Valtra", logo: "/brands/valtra.png" },
-  { value: "outra", label: "Outra", logo: "" },
-] as const;
-
-const BrandLogo = ({ logo, label }: { logo: string; label: string }) => {
-  const [hasError, setHasError] = useState(false);
-
-  if (!logo || hasError) {
-    return (
-      <span className="w-5 h-5 rounded-full bg-surface-container-high flex items-center justify-center text-[10px] font-bold">
-        {label.charAt(0).toUpperCase()}
-      </span>
-    );
-  }
-
-  return <img src={logo} alt={label} className="w-5 h-5 rounded-full object-cover" onError={() => setHasError(true)} />;
+/** Campo da API → campo do formulário, para posicionar erros vindos do backend. */
+const API_FIELD_TO_FORM: Partial<Record<string, keyof MachineFormValues>> = {
+  renagro_number: "renagroNumber",
+  brand: "otherBrand",
+  model: "model",
+  year: "year",
+  usage_purpose: "usagePurpose",
+  technical_specifications: "technicalSpecifications",
 };
+
+const INPUT_BASE =
+  "w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow";
+
+function inputClass(hasError: boolean): string {
+  return `${INPUT_BASE} ${
+    hasError ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"
+  }`;
+}
 
 const NovoEquipamento = () => {
   const { userId } = useAuth();
-  const [isBrandSelectOpen, setIsBrandSelectOpen] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState<(typeof BRANDS)[number]["value"]>("john-deere");
-  const [otherBrand, setOtherBrand] = useState("");
-  const [renagroNumber, setRenagroNumber] = useState("");
-  const [model, setModel] = useState("");
-  const [year, setYear] = useState("");
-  const [usagePurpose, setUsagePurpose] = useState("Plantio");
-  const [initialHorimeter, setInitialHorimeter] = useState("");
-  const [technicalSpecifications, setTechnicalSpecifications] = useState("");
+  const form = useMachineForm();
+  const createMachine = useCreateMachine();
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const selectedBrandData = BRANDS.find((brand) => brand.value === selectedBrand) ?? BRANDS[0];
+  const { errors } = form.formState;
+  const brandKey = form.watch("brandKey");
+  const isSubmitting = createMachine.isPending || form.formState.isSubmitting;
 
-  const validateField = (fieldName: string, value: string) => {
-    let errorMsg = "";
-    switch (fieldName) {
-      case "renagroNumber": {
-        const cleaned = value.trim();
-        if (!cleaned) {
-          errorMsg = "Registro Renagro é obrigatório.";
-        } else {
-          const regex = /^BR\d{10}$/i;
-          if (!regex.test(cleaned)) {
-            errorMsg = "O registro Renagro deve conter BR seguido de exatamente 10 dígitos (ex: BR1029304899).";
-          }
-        }
-        break;
-      }
-      case "brand":
-        if (selectedBrand === "outra" && !value.trim()) {
-          errorMsg = "Marca é obrigatória.";
-        }
-        break;
-      case "model":
-        if (!value.trim()) errorMsg = "Modelo é obrigatório.";
-        break;
-      case "year": {
-        if (value) {
-          const y = Number(value);
-          const currentYear = new Date().getFullYear();
-          if (Number.isNaN(y) || y < 1980 || y > currentYear + 1) {
-            errorMsg = `O ano deve ser entre 1980 e ${currentYear + 1}.`;
-          }
-        }
-        break;
-      }
-      case "initialHorimeter": {
-        if (value) {
-          const h = Number(value);
-          if (Number.isNaN(h) || h < 0) {
-            errorMsg = "O horímetro inicial deve ser um valor positivo.";
-          }
-        }
-        break;
-      }
-    }
-    setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
-    return errorMsg;
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting) return;
-
-    const brandToSend = selectedBrand === "outra" ? otherBrand.trim() : selectedBrandData.label;
-
-    const errorsList = {
-      renagroNumber: validateField("renagroNumber", renagroNumber),
-      brand: validateField("brand", otherBrand),
-      model: validateField("model", model),
-      year: validateField("year", year),
-      initialHorimeter: validateField("initialHorimeter", initialHorimeter),
-    };
-
-    if (Object.values(errorsList).some((err) => err !== "")) {
-      toast.error("Por favor, corrija os erros no formulário antes de enviar.");
+  const onSubmit = form.handleSubmit(async (values) => {
+    if (!userId) {
+      toast.error("Usuário não autenticado. Faça login para cadastrar o equipamento.");
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      if (!userId) {
-        toast.error("Usuário não autenticado. Faça login para cadastrar o equipamento.");
-        return;
+      await createMachine.mutateAsync(toCreatePayload(values, userId));
+      toast.success("Equipamento cadastrado com sucesso.");
+      form.reset(MACHINE_FORM_DEFAULTS);
+    } catch (error) {
+      // Erros de campo do backend (ex.: renagro duplicado) vão para o campo,
+      // não para um toast genérico.
+      if (error instanceof BadRequestError && error.hasFieldErrors) {
+        let placed = false;
+        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
+          const formField = API_FIELD_TO_FORM[apiField];
+          const message = messages[0];
+          if (formField && message) {
+            form.setError(formField, { type: "server", message });
+            placed = true;
+          }
+        }
+        if (placed) return;
       }
 
-      await machineService.create({
-        owner: userId,
-        renagro_number: renagroNumber.trim().toUpperCase(),
-        brand: brandToSend,
-        model: model.trim(),
-        year: year ? Number(year) : undefined,
-        technical_specifications: technicalSpecifications.trim(),
-        usage_purpose: usagePurpose.trim(),
-      });
-
-      toast.success("Equipamento cadastrado com sucesso.");
-      setRenagroNumber("");
-      setSelectedBrand("john-deere");
-      setOtherBrand("");
-      setModel("");
-      setYear("");
-      setUsagePurpose("Plantio");
-      setInitialHorimeter("");
-      setTechnicalSpecifications("");
-      setErrors({});
-    } catch {
-      toast.error("Erro ao cadastrar equipamento. Verifique os dados e tente novamente.");
-    } finally {
-      setIsSubmitting(false);
+      toast.error(
+        error instanceof BadRequestError
+          ? error.message
+          : "Erro ao cadastrar equipamento. Verifique os dados e tente novamente.",
+      );
     }
-  };
+  });
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <div className="flex-1 pt-32 pb-20 max-w-2xl mx-auto px-6 w-full">
-        <Link to="/dashboard" className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1">
+        <Link
+          to="/dashboard"
+          className="text-sm font-bold text-primary hover:underline mb-8 inline-flex items-center gap-1"
+        >
           <MaterialIcon icon="arrow_back" size={16} /> Voltar ao Dashboard
         </Link>
 
@@ -161,132 +97,100 @@ const NovoEquipamento = () => {
 
         <form
           className="space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-10 shadow-sm"
-          onSubmit={handleSubmit}
+          onSubmit={onSubmit}
           noValidate
         >
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Nº Registro Renagro *</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Nº Registro Renagro *
+            </label>
             <input
-              name="renagro_number"
               type="text"
               placeholder="BR1029304899"
-              value={renagroNumber}
-              onChange={(e) => {
-                setRenagroNumber(e.target.value);
-                if (errors.renagroNumber) validateField("renagroNumber", e.target.value);
-              }}
-              onBlur={(e) => validateField("renagroNumber", e.target.value)}
-              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.renagroNumber ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-              required
+              className={inputClass(Boolean(errors.renagroNumber))}
+              {...form.register("renagroNumber")}
             />
             {errors.renagroNumber ? (
-              <p className="text-[11px] text-error font-medium mt-1">{errors.renagroNumber}</p>
+              <p className="text-[11px] text-error font-medium mt-1">
+                {errors.renagroNumber.message}
+              </p>
             ) : (
-              <p className="text-[11px] text-outline font-medium">Requisito para formalização do contrato na plataforma.</p>
+              <p className="text-[11px] text-outline font-medium">
+                Requisito para formalização do contrato na plataforma.
+              </p>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Marca *</label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsBrandSelectOpen((prev) => !prev)}
-                  className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm text-on-surface transition-shadow focus:ring-2 focus:outline-none flex items-center justify-between gap-2 ${errors.brand ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <BrandLogo logo={selectedBrandData.logo} label={selectedBrandData.label} />
-                    {selectedBrandData.label}
-                  </span>
-                  <MaterialIcon icon={isBrandSelectOpen ? "expand_less" : "expand_more"} size={18} />
-                </button>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Marca *
+              </label>
+              <BrandSelect
+                value={brandKey}
+                onChange={(value) => {
+                  form.setValue("brandKey", value, { shouldValidate: true });
+                  if (value !== OTHER_BRAND) form.clearErrors("otherBrand");
+                }}
+                hasError={Boolean(errors.otherBrand)}
+              />
 
-                {isBrandSelectOpen ? (
-                  <div className="absolute z-10 mt-2 w-full bg-surface-container-lowest border border-outline-variant/40 rounded-lg shadow-lg p-1">
-                    {BRANDS.map((brand) => (
-                      <button
-                        key={brand.value}
-                        type="button"
-                        onClick={() => {
-                          setSelectedBrand(brand.value);
-                          setIsBrandSelectOpen(false);
-                          if (brand.value !== "outra") {
-                            setErrors((prev) => ({ ...prev, brand: "" }));
-                          }
-                        }}
-                        className="w-full px-3 py-2 text-left rounded-md hover:bg-surface-container transition-colors text-sm text-on-surface flex items-center gap-2"
-                      >
-                        <BrandLogo logo={brand.logo} label={brand.label} />
-                        {brand.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              {selectedBrand === "outra" ? (
+              {brandKey === OTHER_BRAND ? (
                 <>
                   <input
-                    name="other_brand"
                     type="text"
                     placeholder="Digite a marca"
-                    className={`w-full mt-2 bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.brand ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                    value={otherBrand}
-                    onChange={(e) => {
-                      setOtherBrand(e.target.value);
-                      if (errors.brand) validateField("brand", e.target.value);
-                    }}
-                    onBlur={(e) => validateField("brand", e.target.value)}
-                    required
+                    className={`mt-2 ${inputClass(Boolean(errors.otherBrand))}`}
+                    {...form.register("otherBrand")}
                   />
-                  {errors.brand && <p className="text-[11px] text-error font-medium mt-1">{errors.brand}</p>}
+                  {errors.otherBrand && (
+                    <p className="text-[11px] text-error font-medium mt-1">
+                      {errors.otherBrand.message}
+                    </p>
+                  )}
                 </>
               ) : null}
             </div>
+
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Modelo *</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Modelo *
+              </label>
               <input
-                name="model"
                 type="text"
                 placeholder="S700"
-                value={model}
-                onChange={(e) => {
-                  setModel(e.target.value);
-                  if (errors.model) validateField("model", e.target.value);
-                }}
-                onBlur={(e) => validateField("model", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.model ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                required
+                className={inputClass(Boolean(errors.model))}
+                {...form.register("model")}
               />
-              {errors.model && <p className="text-[11px] text-error font-medium mt-1">{errors.model}</p>}
+              {errors.model && (
+                <p className="text-[11px] text-error font-medium mt-1">{errors.model.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Ano de Fabricação</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Ano de Fabricação
+              </label>
               <input
-                name="year"
                 type="number"
                 placeholder="2022"
-                value={year}
-                onChange={(e) => {
-                  setYear(e.target.value);
-                  if (errors.year) validateField("year", e.target.value);
-                }}
-                onBlur={(e) => validateField("year", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.year ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                className={inputClass(Boolean(errors.year))}
+                {...form.register("year")}
               />
-              {errors.year && <p className="text-[11px] text-error font-medium mt-1">{errors.year}</p>}
+              {errors.year && (
+                <p className="text-[11px] text-error font-medium mt-1">{errors.year.message}</p>
+              )}
             </div>
+
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Finalidade de Uso</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Finalidade de Uso
+              </label>
               <select
-                name="usage_purpose"
-                value={usagePurpose}
-                onChange={(e) => setUsagePurpose(e.target.value)}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                {...form.register("usagePurpose")}
               >
                 <option>Plantio</option>
                 <option>Pulverização</option>
@@ -303,35 +207,35 @@ const NovoEquipamento = () => {
             <input
               type="number"
               placeholder="1250 h"
-              value={initialHorimeter}
-              onChange={(e) => {
-                setInitialHorimeter(e.target.value);
-                if (errors.initialHorimeter) validateField("initialHorimeter", e.target.value);
-              }}
-              onBlur={(e) => validateField("initialHorimeter", e.target.value)}
-              className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.initialHorimeter ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+              className={inputClass(Boolean(errors.initialHorimeter))}
+              {...form.register("initialHorimeter")}
             />
-            {errors.initialHorimeter && <p className="text-[11px] text-error font-medium mt-1">{errors.initialHorimeter}</p>}
+            {errors.initialHorimeter && (
+              <p className="text-[11px] text-error font-medium mt-1">
+                {errors.initialHorimeter.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Especificações Técnicas</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              Especificações Técnicas
+            </label>
             <textarea
-              name="technical_specifications"
               placeholder="Motor, plataforma, recursos adicionais..."
               rows={3}
-              value={technicalSpecifications}
-              onChange={(e) => setTechnicalSpecifications(e.target.value)}
               className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              {...form.register("technicalSpecifications")}
             />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base"
+            className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base disabled:opacity-60"
           >
-            <MaterialIcon icon="agriculture" size={20} /> {isSubmitting ? "Cadastrando..." : "Cadastrar Equipamento"}
+            <MaterialIcon icon="agriculture" size={20} />{" "}
+            {isSubmitting ? "Cadastrando..." : "Cadastrar Equipamento"}
           </button>
         </form>
       </div>

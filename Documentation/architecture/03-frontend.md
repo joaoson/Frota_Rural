@@ -10,39 +10,55 @@ front e back fica **visível**, porque aparece em `domain/` dos dois lados.
 
 ## 3.2 Estrutura por feature
 
+Layout definido em `specification.md` e registrado em [ADR-009](06-adr.md). Abaixo, o que a feature
+piloto `machines` de fato implementa:
+
 ```
 src/
+├── app/
+│   └── container.ts                 # composition root
 ├── features/
-│   └── documents/
-│       ├── domain/
-│       │   ├── entities.ts          # OperatorLicense, Certification (com comportamento)
-│       │   ├── valueObjects.ts      # CPF, ValidationStatus
-│       │   ├── errors.ts            # DomainError com code + status
-│       │   └── repositories.ts      # interface OperatorLicenseRepository
-│       ├── application/
-│       │   ├── dto.ts
-│       │   └── useCases/            # reviewDocument, submitLicense
-│       ├── infrastructure/
-│       │   ├── HttpOperatorLicenseRepository.ts   # adaptador axios
-│       │   ├── schemas.ts                          # zod — Anti-Corruption Layer
-│       │   └── mappers.ts                          # DTO da API <-> entidade
-│       └── presentation/
-│           ├── hooks/               # useOperatorLicense, useCnhForm
-│           └── components/          # apresentacionais
+│   └── machines/
+│       ├── types/
+│       │   ├── machine.ts           # entidade de domínio (camelCase)
+│       │   ├── machineSchemas.ts    # zod: API, formulário, payload
+│       │   └── brands.ts
+│       ├── api/
+│       │   ├── machineMapper.ts     # DTO <-> entidade; o snake_case morre aqui
+│       │   ├── MachineRepository.ts # interface + implementação HTTP
+│       │   └── MachineStore.ts      # chaves de cache, invalidate, clear
+│       ├── hooks/
+│       │   ├── useCreateMachine.ts
+│       │   └── useMachineForm.ts
+│       └── components/
+│           └── BrandSelect.tsx
 ├── shared/
-│   ├── api/AxiosInstance.ts
-│   ├── hooks/useAsync.ts
-│   ├── ui/                          # shadcn
-│   └── lib/
-└── pages/                           # composição e rota apenas
+│   ├── http/
+│   │   ├── HttpClient.ts            # porta
+│   │   ├── errors.ts
+│   │   ├── AxiosHttpClient.ts       # único módulo que conhece axios
+│   │   ├── queryClient.ts
+│   │   └── decorators/{Authenticated,Refreshing,Logging}HttpClient.ts
+│   └── auth/
+│       ├── TokenProvider.ts  SessionPort.ts
+│       ├── InMemoryTokenStore.ts
+│       └── SessionService.ts
+└── pages/                           # composição e rota
 ```
 
-Regras de import equivalentes às do back-end: `domain/` não importa `react` nem `axios`;
-`application/` importa só `domain/`; `infrastructure/` e `presentation/` são a borda.
+Regras de import, verificáveis por arquivo (não há pasta `domain/` isolada — ver ADR-009):
+
+- `types/` e `api/*Mapper.ts` não importam `axios` nem `react`;
+- só `shared/http/AxiosHttpClient.ts` cita `axios`;
+- `shared/**` nunca importa de `features/**`;
+- só `app/container.ts` instancia adapter concreto.
 
 ```bash
-grep -rE "from ['\"](axios|react)" FrontEnd/src/features/*/domain/
+grep -rE "from ['\"]axios" FrontEnd/src/features/ FrontEnd/src/shared/auth/
+grep -rE "from ['\"]@/features/" FrontEnd/src/shared/
 ```
+
+Ambos devem sair vazios.
 
 ## 3.3 A camada que falta hoje
 
@@ -60,21 +76,27 @@ service (HTTP)  →  [ VAZIO ]  →  página de 2.493 linhas
 service (HTTP)  →  hooks      →  página de composição + componentes apresentacionais
 ```
 
-## 3.4 `useAsync` — o substituto sem dependências
+## 3.4 TanStack Query como camada de estado de servidor
 
 Sem biblioteca de estado de servidor, cada página reimplementa o mesmo trio `loading` / `erro` /
 `data`: `Reservar.tsx:120`, `AnuncioDetalhe.tsx:77`, `GerenciarAnuncio.tsx:24`,
-`Admin/Documentos.tsx:100`.
+`Admin/Documentos.tsx:100`. E a manutenção de cache acaba escrita à mão — `DashboardLocador.tsx:727`
+chama `machineService.update` e depois remapeia o estado local para a tela não ficar defasada.
 
-Um `useAsync<T>` em `shared/hooks/` centraliza isso.
+O projeto adota `@tanstack/react-query` ([ADR-006](06-adr.md)). A divisão fica assim:
 
-> **Trade-off declarado.** `useAsync` não é TanStack Query. Não há cache, nem deduplicação de
-> requisições em voo, nem revalidação em background, nem invalidação. Toda montagem de página
-> refaz a requisição. Isso é consequência da restrição de não adicionar dependências, e está
-> registrado em [ADR-006](06-adr.md).
+| Peça | Responsabilidade |
+|---|---|
+| `api/<Feature>Store.ts` | Chaves de cache, `invalidateLists()`, `clear()`. Opera sobre o `QueryClient`, **não conhece React** |
+| `hooks/use*.ts` | Ponte com o React: `useQuery` / `useMutation` |
+| `app/container.ts` | Cria o `QueryClient` único |
 
-Consequência visível hoje: `DashboardLocador.tsx:329-375` busca **todos** os anúncios do sistema e
-filtra no cliente, porque não há camada que saiba pedir só o necessário.
+O `clear()` não é opcional: sem ele, o próximo usuário a logar na mesma aba enxerga o cache do
+anterior. `AuthContext.logout()` chama `clearAllStores()`.
+
+> **O piloto não demonstra o principal.** `NovoEquipamento` é um formulário só de criação, então
+> exercita `useMutation` e pouco mais. Cache, deduplicação e revalidação só aparecem quando
+> `NovoAnuncio` e `DashboardLocador` lerem máquinas pela mesma query key.
 
 ## 3.5 Contrato de serviço uniforme
 

@@ -18,6 +18,8 @@ import AdminDocumentos from "@/pages/Admin/Documentos.tsx";
 import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder.tsx";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/app/container";
 
 import SelfieUpload from "./pages/Documents/SelfieUpload.tsx";
 import Login from "./pages/Login.tsx";
@@ -39,6 +41,7 @@ createRoot(document.getElementById("root")!).render(
       enableSystem
       storageKey="frota-rural-theme"
     >
+    <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <AuthProvider>
         <Toaster position="bottom-right" />
@@ -103,6 +106,7 @@ createRoot(document.getElementById("root")!).render(
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,
 );

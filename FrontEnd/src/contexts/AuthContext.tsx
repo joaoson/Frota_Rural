@@ -1,8 +1,9 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
 import { setAccessToken } from "@/services/AxiosInstance";
 import { userService } from "@/services/UserService/UserService";
 import { parseJwt, type JwtPayload } from "@/utils/jwt";
+import { clearAllStores, tokenStore } from "@/app/container";
 
 type AuthContextType = {
   tokens: LoginUserResponse | null;
@@ -27,7 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokens(newTokens);
     setUserId(payload.user_id);
     if (role) setUserRole(role);
+    // Dois caminhos coexistem durante a migração: os services antigos leem
+    // de AxiosInstance, a cadeia nova lê do tokenStore.
     setAccessToken(newTokens.access);
+    tokenStore.setAccessToken(newTokens.access);
   }
 
   function logout() {
@@ -36,7 +40,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserId(null);
     setUserRole(null);
     setAccessToken(null);
+    tokenStore.setAccessToken(null);
+    // Sem isso, o próximo usuário nesta aba veria o cache do anterior.
+    clearAllStores();
   }
+
+  // O RefreshingHttpClient avisa aqui quando o refresh falha de vez. Substitui o
+  // `setLogoutCallback` de AxiosInstance, que existe mas nunca é chamado.
+  useEffect(() => {
+    return tokenStore.subscribeExpired(() => {
+      setTokens(null);
+      setUserId(null);
+      setUserRole(null);
+      clearAllStores();
+    });
+  }, []);
 
   return (
     <AuthContext.Provider

@@ -117,20 +117,40 @@ seguir em um passo a passo — mitigado pelo diagrama de componentes.
 
 ---
 
-## ADR-006 — Sem biblioteca de estado de servidor no front-end
+## ADR-006 — TanStack Query como camada de store no front-end
+
+> **Revisado em junho de 2026.** A versão anterior deste ADR decidia o oposto — `useAsync` próprio,
+> sem dependências. A decisão foi revertida ao implementar o piloto da feature `machines`; o texto
+> antigo está resumido em "Alternativas rejeitadas" para preservar o histórico.
 
 **Contexto.** Nenhuma página cacheia requisições. Cada uma reimplementa `loading` / `erro` / `data`
 (`Reservar.tsx:120`, `AnuncioDetalhe.tsx:77`, `GerenciarAnuncio.tsx:24`, `Admin/Documentos.tsx:100`).
-`DashboardLocador.tsx:329-375` busca **todos** os anúncios do sistema e filtra no cliente.
+`DashboardLocador.tsx:329-375` busca **todos** os anúncios do sistema e filtra no cliente, e
+`DashboardLocador.tsx:727` mantém o cache na mão: chama `machineService.update` e depois remapeia o
+estado local para a tela não ficar defasada — uma atualização otimista escrita à mão.
 
-**Decisão.** `useAsync<T>` próprio em `shared/hooks/`. Nenhuma dependência nova.
+**Decisão.** Adotar `@tanstack/react-query` como camada de estado de servidor. O `MachineStore`
+passa a ser dono das chaves de cache (`machineKeys`) e do ciclo de vida do cache
+(`invalidateLists()`, `clear()`), operando sobre o `QueryClient`; os hooks fazem a ponte com o React.
 
-**Alternativa rejeitada.** *TanStack Query.* Resolveria cache, deduplicação, revalidação e invalidação
-de forma madura. Rejeitada pela restrição explícita de não adicionar dependências ao projeto.
+**Alternativas rejeitadas.**
 
-**Consequências, declaradas.** `useAsync` **não** tem cache, deduplicação de requisições em voo,
-revalidação em background nem invalidação. Toda montagem de página refaz a requisição. É uma
-limitação conhecida e aceita, não um descuido.
+- *`useAsync` próprio com `useSyncExternalStore`* — a decisão anterior. Zero dependências e desenho
+  inteiramente nosso, mas nos deixaria mantendo invalidação de cache à mão. "Escrevemos nosso
+  próprio cache" é uma posição mais frágil de defender do que "usamos uma biblioteca madura", e
+  reinventar infraestrutura é uma crítica clássica em banca.
+- *Manter `useEffect` + `useState`* — é o estado atual, com quatro cópias do mesmo trio e três
+  estilos incompatíveis de tratamento de erro.
+
+**Consequências.** Primeira dependência nova do projeto (~13 kB gzip). A arquitetura em si não muda:
+repository, mapper, ACL com zod, decorators de `HttpClient` e o composition root continuam iguais —
+o TanStack só substitui o que existe **dentro** do store.
+
+> **Limitação aceita conscientemente.** O piloto migrou apenas `NovoEquipamento`, que é um formulário
+> só de criação. Ele exercita `useMutation` e quase nada do que justifica a biblioteca: cache,
+> deduplicação, revalidação e invalidação vivem todos no lado da leitura. O ganho aparece quando
+> `NovoAnuncio` e `DashboardLocador` passarem a ler máquinas pela mesma query key. A decisão é montar
+> a estrutura agora e colher depois — não uma expectativa de ganho imediato.
 
 ---
 
@@ -170,6 +190,35 @@ copiáveis** em `reference/`. A migração do código é trabalho subsequente, m
 responsabilidades misturadas. A documentação compensa especificando o desenho por completo, mas
 **compensação não é equivalência**. Aplicar a referência ao módulo piloto é o próximo passo
 recomendado, e o de melhor relação custo-benefício.
+
+---
+
+## ADR-009 — Estrutura de pastas por feature, com store na pasta `api/`
+
+**Contexto.** `specification.md` define a organização do front-end: `app/`, `features/<feature>/`
+com `{components, api, types, hooks}`, e `shared/`. Ela difere da estrutura de quatro camadas
+(`domain/`, `application/`, `infrastructure/`, `interfaces/`) descrita em `02-backend.md` e usada no
+back-end.
+
+**Decisão.** Seguir `specification.md` no front-end. O mapeamento para Clean Architecture é:
+
+| Pasta da spec | Anel de Clean Architecture |
+|---|---|
+| `types/` (entidade + schemas zod) | Entities |
+| `api/<Feature>Repository.ts` (interface) | porta declarada pelo consumidor |
+| `api/<Feature>Repository.ts` (implementação), `api/*Mapper.ts` | Interface Adapters / Gateway |
+| `api/<Feature>Store.ts` | Interface Adapters — **Presenter / View Model** |
+| `hooks/`, `components/` | Interface Adapters — View |
+| `shared/http/`, `shared/auth/` | Interface Adapters + Frameworks |
+
+**Alternativa rejeitada.** *Impor as quatro pastas do back-end também no front.* Simetria de
+vocabulário, mas contraria o documento de organização que a equipe escreveu, e a spec é a fonte de
+verdade sobre layout.
+
+**Consequências.** A feature não tem uma pasta `domain/` isolada, então o teste de aceitação de
+camada é por arquivo e não por diretório: `types/` e o mapper não podem importar `axios` nem React.
+Um `Store` dentro de `api/` é incomum — o store é apresentação, não acesso a dados —, mas a
+uniformidade com o resto do time vale mais do que a precisão do nome da pasta.
 
 ---
 
