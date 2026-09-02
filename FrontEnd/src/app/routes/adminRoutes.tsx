@@ -2,10 +2,10 @@ import type { ReactElement } from "react";
 import { Navigate, Route } from "react-router";
 
 import AdminLayout from "@/components/AdminLayout";
-import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder";
-import AdminAnuncios from "@/pages/Admin/Anuncios";
-import AdminDocumentos from "@/pages/Admin/Documentos";
-import AdminUsers from "@/pages/Admin/Users";
+import AdminPlaceholder from "@/pages/admin/AdminPlaceholder";
+import AdminAnuncios from "@/pages/admin/Anuncios";
+import AdminDocumentos from "@/pages/admin/Documentos";
+import AdminUsers from "@/pages/admin/Users";
 
 /** Subárvore de administração. Renderizada dentro do bloco protegido. */
 export const adminRoutes: ReactElement = (

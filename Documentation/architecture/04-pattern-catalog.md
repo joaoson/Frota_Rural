@@ -202,7 +202,50 @@ Implementados pelo `QuerySet` do Django. Aproveitados de graça; registrados por
 
 ---
 
-## 4.3 Padrões deliberadamente **não** adotados
+## 4.3 Padrões na camada de apresentação do front
+
+Estes não são teoria: cada um substituiu duplicação medida em `pages/` (ver
+[`03-frontend.md` §3.9](03-frontend.md)).
+
+### 🟡 Decorator — cadeia do `HttpClient`
+
+`AxiosHttpClient` → `AuthenticatedHttpClient` → `RefreshingHttpClient` → `LoggingHttpClient`. Cada
+elo implementa a mesma porta `HttpClient` e envolve o anterior, então dá para montar cadeias
+diferentes por caso: o `AuthRepository` recebe o cliente **cru**, para que um 401 de login não
+dispare a tentativa de refresh; o `ViaCepClient` é uma segunda cadeia, sem os decorators de auth.
+
+### 🔴 Strategy — mapas de selo por domínio
+
+`StatusBadge` desenha; `userStatusBadge`, `postingStatusBadge`, `documentStatusBadge` e
+`rentalStatusBadge` decidem. Cada mapa é uma estratégia intercambiável de `status → BadgeConfig`,
+e é o que permite `shared/` não importar `features/`.
+
+Substituiu 6 implementações de `statusBadge` com 3 formatos de retorno diferentes — e a cópia do
+`rentalStatusBadge` no dashboard do locatário não cobria `validating`, mostrando selo vazio.
+
+### 🟡 Composite — `PageShell`, `AdminTable`, `FormField`
+
+Todos compõem por `children` em vez de por prop de conteúdo, o que mantém a árvore de JSX legível
+e evita a explosão de props que uma API baseada em configuração traria. `AdminFilterBar` é o caso
+claro: o campo de busca é sempre o mesmo, os selects variam por página e entram como `children`.
+
+### 🟡 Template Method — `RentalCard` e `DashboardShell`
+
+A estrutura é fixa (moldura, grade de campos, fileira de botões, painéis expansíveis); os pontos de
+variação são explícitos: contraparte, rótulos da avaliação, presença do painel de reagendamento. O
+dashboard do locador simplesmente não passa `reschedule`, e o botão fica inerte como já era.
+
+`DashboardShell` faz o mesmo pela sidebar, com um parâmetro genérico `<Tab extends string>` para
+que cada dashboard mantenha sua própria união de abas em vez de cair em `string`.
+
+### 🟡 Adapter — `maskedRegister`
+
+Reescreve o valor antes de repassar o evento ao `react-hook-form`, permitindo que campos com máscara
+continuem *uncontrolled*. Adapta a interface de evento do DOM à que o RHF espera.
+
+---
+
+## 4.4 Padrões deliberadamente **não** adotados
 
 Registrar o que foi rejeitado, e por quê, é o que distingue uma decisão de projeto de um valor padrão
 aceito por omissão.
@@ -218,7 +261,7 @@ aceito por omissão.
 
 ---
 
-## 4.4 Rastreabilidade
+## 4.5 Rastreabilidade
 
 | Padrão | Aplicado em | Substitui |
 |---|---|---|
@@ -231,6 +274,10 @@ aceito por omissão.
 | Value Object | `domain/value_objects.py` | `views.py:222`, literais em `administration/views.py` |
 | Layer Supertype | `core/models.py` | `create()` copiado em 4 serializers |
 | DTO | `application/dto.py`, `interfaces/serializers.py` | serializers que persistem |
+| Decorator (front) | `shared/http/decorators/` | interceptors do `AxiosInstance` global |
+| Strategy (front) | `features/*/types/*Badges.ts` | 6 cópias de `statusBadge` |
+| Composite (front) | `shared/components/`, `features/*/components/` | ~65 blocos de campo, 15 shells de página |
+| Template Method (front) | `dashboard/RentalCard`, `dashboard/DashboardShell` | `renderRentalCard` e a sidebar, 2 cópias cada |
 
 ---
 

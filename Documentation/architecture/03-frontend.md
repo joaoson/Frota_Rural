@@ -20,9 +20,10 @@ src/
 │   ├── app.tsx                      # providers
 │   ├── router.tsx                   # árvore de rotas
 │   └── routes/{public,protected,admin}Routes.tsx
-├── features/                        # 8 features, mesma forma em todas
+├── features/                        # 9 features, mesma forma em todas
 │   ├── auth/  users/  machines/  postings/
-│   └── documents/  administration/  contracts/  reviews/
+│   ├── documents/  administration/  contracts/  reviews/
+│   └── dashboard/                   # só apresentação: serve aos dois dashboards
 ├── shared/
 │   ├── http/
 │   │   ├── HttpClient.ts            # porta
@@ -32,11 +33,15 @@ src/
 │   │   ├── queryClient.ts
 │   │   └── decorators/{Authenticated,Refreshing,Logging}HttpClient.ts
 │   ├── auth/{TokenProvider,SessionPort,InMemoryTokenStore,SessionService,jwt}.ts
+│   ├── components/                  # 12 primitivos de apresentação (§3.9)
 │   ├── hooks/useCepLookup.ts
 │   ├── lib/maskedRegister.ts
-│   └── utils/{masks,validation,clearSpecialChars,regexPatterns,brazilianStates}
+│   └── utils/{masks,validation,clearSpecialChars,regexPatterns,getInitials,...}
+├── pages/                           # camada de composição, por domínio (ADR-010)
+│   ├── public/  auth/  dashboard/  machines/
+│   └── postings/  documents/  contracts/  admin/
 ├── contexts/{authContextValue.ts, useAuth.ts, AuthContext.tsx}
-├── components/  pages/  lib/(shadcn)  assets/
+├── components/  lib/(shadcn)  assets/
 ```
 
 Dentro de cada feature, o padrão é sempre o mesmo:
@@ -71,18 +76,18 @@ antes:  service (HTTP)  →  [ VAZIO ]  →  página
 depois: repository → store → hook → página
 ```
 
-| Página | Antes | Depois |
-|---|---|---|
-| `NovoEquipamento.tsx` | 343 linhas, 8 `useState` | 247, **0** |
-| `CNHUpload.tsx` | 1.129 linhas, 32 `useState` | 834, 5 (só UI) |
-| `Signup.tsx` | 539 linhas, 15 `useState` | 352, 1 |
-| `DashboardLocador.tsx` | 2.378 linhas, 32 `useState` | 2.366, 24 |
-| `DashboardLocatario.tsx` | 1.216 linhas, 25 `useState` | 1.227, 21 |
-| `main.tsx` | 112 linhas | 12 |
+| Página | Antes | Depois da migração de dados | Depois da extração de componentes |
+|---|---|---|---|
+| `NovoEquipamento.tsx` | 343 linhas, 8 `useState` | 247, **0** | **186** |
+| `CNHUpload.tsx` | 1.129 linhas, 32 `useState` | 834, 5 (só UI) | **612** |
+| `Signup.tsx` | 539 linhas, 15 `useState` | 352, 1 | **255** |
+| `DashboardLocador.tsx` | 2.378 linhas, 32 `useState` | 2.366, 24 | **1.572** |
+| `DashboardLocatario.tsx` | 1.216 linhas, 25 `useState` | 1.227, 21 | **623** |
+| `main.tsx` | 112 linhas | 12 | 12 |
 
-Os dashboards encolheram pouco em linhas porque o volume deles é JSX, não lógica — o que saiu foi
-todo o estado de servidor. Os `useState` restantes são estado de UI legítimo: abas, modais, campos de
-formulário de perfil.
+A primeira coluna de "depois" é o que a migração de dados entregou. Os dashboards encolheram pouco
+ali porque o volume deles é JSX, não lógica — o que saiu foi todo o estado de servidor. A segunda
+coluna é a extração de componentes descrita em §3.9, que atacou justamente o JSX.
 
 **As nove implementações de `validateField` desapareceram.** A última, em `EditEquipamentoModal`,
 virou um adaptador de três linhas sobre `validateMachineEdit` — as regras vivem no schema zod da
@@ -177,3 +182,96 @@ Defeitos corrigidos de passagem, que o `any` escondia:
 Pendência conhecida: em `DashboardLocatario`, o `reviewee` e o `rental` de uma nova avaliação seguem
 chumbados. O id da locação está em escopo, mas **a API de rentals não devolve o id do locador** — só
 `lessor_name` — então não há como derivar o avaliado sem mudança no backend.
+
+## 3.9 Camada de apresentação
+
+A migração de dados deixou intacta a camada de cima. `pages/` tinha ~8.700 linhas com JSX duplicado
+em escala — parte dela introduzida pela própria migração, feita página por página.
+
+O achado que decidiu a rodada: **a duplicação mais cara não estava dentro dos dashboards, estava
+entre eles.** `DashboardLocador` e `DashboardLocatario` compartilhavam ~750 linhas de JSX
+praticamente idêntico.
+
+### `shared/components/` — genéricos, sem conhecer domínio
+
+| Componente | Substituiu | Ocorrências hoje |
+|---|---|---|
+| `PageShell` | Shell `Navbar`+conteúdo+`Footer` de 15 páginas | 16 |
+| `PageHeader` | 3 variantes de cabeçalho | 8 |
+| `FormField` | Bloco rótulo + campo + erro | 68 |
+| `inputStyles.ts` | **7 cópias byte a byte** de `INPUT_BASE` + `inputClass()` | 8 imports |
+| `PasswordField` | 10 cópias do botão de mostrar/ocultar, cada uma com seu `useState` | 7 |
+| `StatusBadge` | 6 implementações de `statusBadge`, 3 formatos | 6 |
+| `GradientButton` | 19 botões, 6 variantes de `className` | 4 |
+| `FileDropzone` | 4 implementações de área de upload | 4 |
+| `StarRating` | 3 das 4 fileiras de estrelas | 3 |
+| `BackLink` | 7 links "voltar", `className` idêntico | 7 |
+| `LoadingState` / `ErrorState` / `EmptyState` | 5 tratamentos de carregamento, 3 de erro, 7 de lista vazia | 7 |
+
+### `features/*/components/`
+
+| Componente | Substituiu |
+|---|---|
+| `administration/AdminPage` | `<header>` + Atualizar + `ThemeToggle` das 3 telas de moderação, `className` byte a byte igual |
+| `administration/AdminFilterBar` | Busca + selects, 3 páginas |
+| `administration/AdminTable` | Moldura da tabela + `TableHead` repetido 13× |
+| `dashboard/DashboardShell` | Sidebar + topbar + diálogo de saída, 2 cópias de ~100 linhas |
+| `dashboard/AccountSection` | Aba "Minha Conta", 2 cópias de ~200 linhas e ~15 `useState` cada |
+| `dashboard/RentalCard` | `renderRentalCard`, 2 cópias de ~200 linhas |
+| `dashboard/ReviewsSection` | Aba de avaliações — idênticas a menos de espaço em branco |
+
+`features/dashboard/` é a única feature só de apresentação, sem `api/`: estes componentes servem aos
+**dois** dashboards, então não pertencem a nenhuma das features de dados.
+
+### Regra de fronteira
+
+`shared/` não importa `features/`. É por isso que `StatusBadge` recebe um `BadgeConfig` pronto:
+traduzir `status → {ícone, cor, rótulo}` é regra de domínio e vive em
+`features/<f>/types/<dominio>Badges.ts` — `userBadges`, `postingBadges`, `documentBadges`,
+`rentalBadges`.
+
+### Divergências de comportamento resolvidas
+
+Unificar expôs que as cópias tinham divergido, não só em estilo:
+
+- **`AccountSection`**: o dashboard do locatário não validava CPF nem telefone (`pattern` + `title`),
+  falhava em silêncio quando o CEP não existia (`console.error` em vez de `toast.error`) e não
+  limpava o `setCustomValidity` ao digitar. Prevaleceu o comportamento do locador, mais completo.
+- **`rentalStatusBadge`**: a cópia do locatário não cobria `validating` — caía no ramo vazio e não
+  mostrava selo nenhum. Agora os dois exibem "Aguardando Validação".
+- **`FileDropzone`**: a área de upload de `NovoAnuncio` não tinha estado de arraste — nenhum retorno
+  visual ao arrastar um arquivo. Ganhou de graça.
+
+### Defeitos corrigidos de passagem
+
+- **`GerenciarAnuncio` renderizava erro que nunca aparecia.** Usava um `FIELD` próprio, sem estado de
+  erro: as mensagens existiam, mas o input nunca ficava vermelho. `FormField` + `inputClass`
+  corrigem — verificado no navegador, com só os dois campos inválidos em `border-error`.
+- **`ui/sonner.tsx` era código morto.** `app/app.tsx` importava `Toaster` direto de `"sonner"`, então
+  os ícones e as variáveis de tema do wrapper nunca se aplicavam.
+- **`Contrato.css` vazava no `@media print`.** `.page`, `.no-print` e `body` estavam fora do escopo
+  `.contrato-root`, num CSS que entra no bundle global. Hoje os quatro seletores da media query de
+  impressão começam com `.contrato-root`.
+- **`Reservar` tinha rótulo errado no link de voltar**: dizia "Voltar à busca" e navegava para o
+  detalhe do anúncio.
+- **`Help.tsx` era um stub de 10 linhas linkado no rodapé** — quem clicava em "Ajuda" caía numa tela
+  crua, sem `Navbar` nem `Footer`.
+- **`BuscarMaquinario` era a única página com `lucide-react`**; o resto usa `MaterialIcon`. Os sete
+  ícones foram normalizados, e `lucide-react` ficou restrito aos arquivos vendidos do shadcn.
+
+### O que ficou de fora, e por quê
+
+- **Dados mock**, que são muitos: o painel de "Estatísticas" de `GerenciarAnuncio` é inteiro
+  fabricado; os 4 KPIs do `DashboardLocatario` são fixos; chat e notificações são 100% mock;
+  `DashboardSearchBar` e `DashboardPagination` aparecem com handlers no-op em 6+ lugares. Remover
+  isso é decisão de produto.
+- **Dividir os dashboards em um componente por aba.** Extrair o que estava duplicado *entre* os dois
+  é deduplicação; reestruturar o sistema de abas seria outra mudança, com outro risco.
+- **Adotar o `Field` do shadcn**, que está baixado e nunca foi usado: ele fala o vocabulário de
+  tokens do shadcn (`border-input`, `text-muted-foreground`) enquanto as páginas falam os aliases M3
+  (`bg-surface-container`, `text-on-surface-variant`). Adotá-lo mudaria a aparência de todo
+  formulário.
+
+---
+
+**Próximo:** [`04-pattern-catalog.md`](04-pattern-catalog.md) · **Referência:** [`reference/frontend-documents-feature.md`](reference/frontend-documents-feature.md)

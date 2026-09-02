@@ -222,6 +222,45 @@ uniformidade com o resto do time vale mais do que a precisão do nome da pasta.
 
 ---
 
+## ADR-010 — `pages/` como camada de composição, agrupada por domínio
+
+**Contexto.** `specification.md` prevê `app/`, `features/` e `shared/`, mas não descreve onde ficam
+as telas roteadas. Elas existem em `pages/` desde antes da migração: 23 arquivos numa organização
+meio plana, meio agrupada — `Login`/`Signup` soltos na raiz enquanto `ForgotPassword`/`ResetPassword`
+moravam em `PasswordReset/`.
+
+**Decisão.** Manter `pages/` e defini-la como **camada de composição**: uma página monta hooks de
+features com componentes de apresentação e não contém regra de negócio nem chamada HTTP. As pastas
+espelham o domínio, não o roteador:
+
+```
+pages/
+├── public/      Index · Help · NotFound · BuscarMaquinario · AnuncioDetalhe
+├── auth/        Login · Signup · ForgotPassword · ResetPassword
+├── dashboard/   DashboardLocador · DashboardLocatario
+├── machines/    NovoEquipamento
+├── postings/    NovoAnuncio · GerenciarAnuncio · Reservar
+├── documents/   CNHUpload · CertificationUpload · SelfieUpload
+├── contracts/   Contrato + Contrato.css
+└── admin/       Users · Anuncios · Documentos · AdminPlaceholder
+```
+
+**Alternativas rejeitadas.**
+
+*Mover cada tela para `features/<feature>/pages/`.* Aproximaria a estrutura da spec, mas os dois
+dashboards atravessam cinco features (contratos, avaliações, documentos, máquinas, anúncios) — não
+existe feature dona. E `app/routes/` passaria a importar de dentro de oito features.
+
+*Dissolver `pages/` dentro de `app/routes/`.* Misturaria definição de rota com implementação de
+tela, que é justamente a separação que o Front Controller de `app/router.tsx` estabelece.
+
+**Consequências.** Existe uma camada a mais do que a spec descreve, e ela precisa ser disciplinada:
+uma página que voltar a fazer `httpClient.send` está violando o contrato. Em troca, a regra de
+localização fica trivial — *o que a tela é sobre* decide a pasta — e `app/routes/` continua sendo o
+único lugar que conhece o mapa de URLs.
+
+---
+
 ## Pendências registradas
 
 | Item | Onde |
@@ -233,6 +272,8 @@ uniformidade com o resto do time vale mais do que a precisão do nome da pasta.
 | `SECRET_KEY` fixa e reusada como chave JWT; `DEBUG = True` | `settings.py:29` |
 | `CommonMiddleware` duplicado | `settings.py:59,62` |
 | `README_Database_Migrations.md` descreve o layout pré-refatoração | `Documentation/` |
+| `reviewee` e `rental` chumbados ao enviar avaliação, **nos dois dashboards** | a API de rentals não devolve o id da contraparte, só o nome |
+| Painel de estatísticas e KPIs dos dashboards são dados fabricados | decisão de produto, não de arquitetura |
 | `convert_doc_to_pdf.yml` aponta para caminho de docx que mudou | `.github/workflows/` |
 
 ---

@@ -52,7 +52,7 @@ usam `serializer.py`, divergindo da convenção do Django e do DRF.
 | Hook | `use` + substantivo | `useOperatorLicense` |
 | Caso de uso | `camelCase`, verbo | `reviewDocument` |
 
-Arquivos `.tsx` **apenas** com JSX. Hoje `PasswordResetService.tsx` não tem JSX nenhum.
+Arquivos `.tsx` **apenas** com JSX — `PasswordResetService.tsx`, que não tinha JSX nenhum, foi removido com `services/`.
 
 ## 7.3 Enums e constantes
 
@@ -91,10 +91,46 @@ Domínio levanta `DomainError`. Views **não** capturam erro de domínio — o e
 - `infrastructure/` traduz `AxiosError` em `DomainError` — **em todos os métodos**, sem exceção.
 - Erros carregam `code` + `status`, nunca texto de UI já traduzido.
 - A escolha da mensagem é da camada de apresentação.
-- Três estilos coexistem hoje e devem convergir: engolir (`.catch(() => {})`,
-  `DashboardLocador.tsx:329`), logar (`.catch(console.error)`) e `toast`.
+- Convergiram para `toast`: os três estilos que coexistiam — engolir (`.catch(() => {})`), logar
+  (`.catch(console.error)`) e `toast` — não convivem mais. O único `console.*` do front hoje é o
+  `LoggingHttpClient`, que só age em `import.meta.env.DEV`.
 
-## 7.5 Testes
+## 7.5 Camada de apresentação
+
+Registrado em [ADR-010](06-adr.md). Três lugares, com uma pergunta cada:
+
+| Pasta | Pergunta | Exemplos |
+|---|---|---|
+| `shared/components/` | *Serviria a qualquer domínio?* | `PageShell`, `FormField`, `StatusBadge`, `FileDropzone` |
+| `features/<f>/components/` | *Só faz sentido dentro desta feature?* | `AdminTable`, `RentalCard`, `AccountSection` |
+| `pages/<dominio>/` | *É uma tela roteada?* | `NovoAnuncio`, `DashboardLocador` |
+
+Regras:
+
+- **Export nomeado** em `shared/components/` e `features/*/components/`, alinhado com o resto de
+  `features/`. `components/` legado mantém `export default`.
+- **`shared/` nunca importa `features/`.** É por isso que o `StatusBadge` recebe um `BadgeConfig`
+  pronto: traduzir `status → {ícone, cor, rótulo}` é regra de domínio e vive em
+  `features/<f>/types/<dominio>Badges.ts`.
+- **Um módulo não exporta componente e função ao mesmo tempo** — quebra o Fast Refresh, e o
+  `react-refresh/only-export-components` acusa. Foi por isso que `INPUT_BASE`/`inputClass` saíram de
+  `FormField.tsx` para `shared/components/inputStyles.ts`.
+- **Nada de string de classe repetida entre páginas.** Se a mesma `className` aparece em dois
+  arquivos, ou vira componente ou vira constante exportada.
+- Não adotar o `Field` do shadcn: ele fala o vocabulário de tokens do shadcn (`border-input`,
+  `text-muted-foreground`) enquanto as páginas falam os aliases M3 (`bg-surface-container`,
+  `text-on-surface-variant`). Adotá-lo mudaria a aparência de todo formulário.
+
+Verificável:
+
+```bash
+grep -rn "INPUT_BASE =\|function inputClass\|const FIELD =" FrontEnd/src/pages/   # vazio
+grep -rn "const statusBadge\|const getStatusBadge" FrontEnd/src/pages/            # vazio
+grep -rn "min-h-screen bg-background flex flex-col" FrontEnd/src/pages/            # vazio
+grep -rnE "from ['\"]@/features/" FrontEnd/src/shared/                            # vazio
+```
+
+## 7.6 Testes
 
 | Arquivo | Precisa de Django? |
 |---|---|
@@ -105,7 +141,7 @@ Domínio levanta `DomainError`. Views **não** capturam erro de domínio — o e
 Test doubles ficam em `tests/fakes.py`. Nomear `InMemory*` (implementação funcional) ou `Stub*`
 (retorno fixo) — não `Mock*`, salvo quando for de fato um mock com verificação de interação.
 
-## 7.6 Commits e branches
+## 7.7 Commits e branches
 
 Mantida a convenção já praticada pelo time:
 
@@ -118,7 +154,7 @@ docs: add architecture documentation
 Tipos: `feat`, `fix`, `refactor`, `chore`, `docs`, `style`, `test`.
 Branches: `AB-<id>-descricao-curta`.
 
-## 7.7 Checklist de Pull Request
+## 7.8 Checklist de Pull Request
 
 **Arquitetura**
 
@@ -135,7 +171,7 @@ Branches: `AB-<id>-descricao-curta`.
 - [ ] Escrita multi-tabela dentro de Unit of Work
 - [ ] Erro de domínio como `DomainError`, não `Response` montada na mão
 - [ ] Regra nova tem teste que roda sem banco
-- [ ] Sem `any` no TypeScript (hoje há 8, sete deles em `DashboardLocador.tsx`)
+- [ ] Sem `any` no TypeScript (o front está em zero desde a migração; era 8, sete em `DashboardLocador.tsx`)
 
 **Higiene**
 
@@ -144,7 +180,7 @@ Branches: `AB-<id>-descricao-curta`.
       reset em stdout quando `DEBUG`)
 - [ ] Serializer sem `fields = '__all__'`
 
-## 7.8 Ordem de migração sugerida
+## 7.9 Ordem de migração sugerida
 
 Da maior relação valor/risco para a menor:
 

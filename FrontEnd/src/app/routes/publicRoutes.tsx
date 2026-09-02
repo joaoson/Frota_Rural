@@ -1,18 +1,18 @@
 import type { ReactElement } from "react";
 import { Navigate, Route } from "react-router";
 
-import AnuncioDetalhe from "@/pages/AnuncioDetalhe";
-import BuscarMaquinario from "@/pages/BuscarMaquinario";
-import Contrato from "@/pages/Contrato/Contrato";
-import CNHUpload from "@/pages/Documents/CNHUpload";
-import SelfieUpload from "@/pages/Documents/SelfieUpload";
-import Help from "@/pages/Help";
-import Index from "@/pages/Index";
-import Login from "@/pages/Login";
-import ForgotPassword from "@/pages/PasswordReset/ForgotPassword";
-import ResetPassword from "@/pages/PasswordReset/ResetPassword";
-import Reservar from "@/pages/Reservar";
-import Signup from "@/pages/Signup";
+import AnuncioDetalhe from "@/pages/public/AnuncioDetalhe";
+import BuscarMaquinario from "@/pages/public/BuscarMaquinario";
+import Contrato from "@/pages/contracts/Contrato";
+import CNHUpload from "@/pages/documents/CNHUpload";
+import SelfieUpload from "@/pages/documents/SelfieUpload";
+import Help from "@/pages/public/Help";
+import Index from "@/pages/public/Index";
+import Login from "@/pages/auth/Login";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import ResetPassword from "@/pages/auth/ResetPassword";
+import Reservar from "@/pages/postings/Reservar";
+import Signup from "@/pages/auth/Signup";
 
 /** Rotas abertas, sem autenticação. */
 export const publicRoutes: ReactElement[] = [

@@ -47,11 +47,18 @@ Quatro camadas, uma razão de mudança cada. `store_document` como caso de uso �
 
 ### Front-end
 
+Estado inicial:
+
 - `DashboardLocador.tsx` — **2.493 linhas**, 21 `useState`, 11 abas em um `return`, três blocos de
   mock em escopo de módulo, e lógica de mutação dentro de handlers JSX (`:1201-1234`, repetida em
   `:1357-1373` e `:1492`).
 - `CNHUpload.tsx` — **974 linhas**, **30 `useState`** em `:91-127`, dos quais **22 são campos de um
   único formulário**.
+
+Depois de mover o estado de servidor para hooks e extrair a apresentação: `DashboardLocador` tem
+1.572 linhas e `CNHUpload`, 612. A aba "Minha Conta" saiu dos dois dashboards para
+`features/dashboard/components/AccountSection.tsx`, levando junto ~15 `useState` de cada um — o
+componente hoje é o único responsável por editar perfil e senha.
 
 ---
 
@@ -79,6 +86,16 @@ exige copiar e colar mais três pares e manter as três cópias em sincronia par
 Um tipo novo = uma subclasse. O caso de uso não é modificado.
 
 **Antes:** N tipos ⇒ 3N funções · **Depois:** N tipos ⇒ N entidades, 1 caso de uso.
+
+### Front-end
+
+O mesmo formato de violação existia na apresentação: **seis** funções `statusBadge`/`getStatusBadge`
+com `switch` sobre string, cada uma devolvendo `{icon, classes, label}` num formato próprio. Um
+status novo exigia editar as seis.
+
+Hoje `StatusBadge` fecha para modificação — conhece cinco variantes de cor e nada mais — e cada
+domínio estende por um mapa próprio em `features/<f>/types/<dominio>Badges.ts`. O mesmo vale para
+`PageShell`: acrescentar uma largura é acrescentar uma chave em `WIDTHS`, não editar 15 páginas.
 
 ---
 
@@ -128,8 +145,13 @@ cliente depende só do que consome.
 
 ### Front-end
 
-`CreateOperatorLicenseRequest` reescreve à mão os 22 campos de `OperatorLicense` em vez de derivá-los
-(`Omit<OperatorLicense, "id" | "validation_status" | ...>`). Duas listas para manter em sincronia.
+`CreateOperatorLicenseRequest` reescrevia à mão os 22 campos de `OperatorLicense` em vez de derivá-los
+(`Omit<OperatorLicense, "id" | "validation_status" | ...>`) — duas listas para manter em sincronia.
+Hoje os schemas zod da feature derivam o payload do schema de resposta.
+
+Na apresentação, o ISP aparece na forma das props: `StatusBadge` recebe um `BadgeConfig` já resolvido
+— `{icon, variant, label}` — e não o `status` cru. Assim ele não precisa conhecer nenhum domínio, e
+`shared/` continua sem importar `features/`.
 
 ---
 

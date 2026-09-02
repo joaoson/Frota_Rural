@@ -2,13 +2,13 @@ import type { ReactElement } from "react";
 import { Route } from "react-router";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
-import DashboardLocador from "@/pages/DashboardLocador";
-import DashboardLocatario from "@/pages/DashboardLocatario";
-import CertificationUpload from "@/pages/Documents/CertificationUpload";
-import CNHUpload from "@/pages/Documents/CNHUpload";
-import GerenciarAnuncio from "@/pages/GerenciarAnuncio";
-import NovoAnuncio from "@/pages/NovoAnuncio";
-import NovoEquipamento from "@/pages/NovoEquipamento";
+import DashboardLocador from "@/pages/dashboard/DashboardLocador";
+import DashboardLocatario from "@/pages/dashboard/DashboardLocatario";
+import CertificationUpload from "@/pages/documents/CertificationUpload";
+import CNHUpload from "@/pages/documents/CNHUpload";
+import GerenciarAnuncio from "@/pages/postings/GerenciarAnuncio";
+import NovoAnuncio from "@/pages/postings/NovoAnuncio";
+import NovoEquipamento from "@/pages/machines/NovoEquipamento";
 
 import { adminRoutes } from "./adminRoutes";
 
