@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { postingService } from "@/services/PostingService/PostingService";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { contractService } from "@/services/ContractService/ContractService";
+import { paymentService } from "@/services/PaymentService/PaymentService";
 import type { Rental, SignatureEvidenceRecord } from "@/services/ContractService/ContractService";
 import type { ContratoData } from "@/pages/Contrato/types";
 
@@ -419,6 +421,22 @@ const Reservar = () => {
   // Etapa 2 — pagamento
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("pix");
   const [processando, setProcessando] = useState(false);
+  const [retornoStripe] = useState(() => {
+    const busca = new URLSearchParams(window.location.search);
+    return { resultado: busca.get("pagamento"), locacaoId: busca.get("locacao") };
+  });
+  const [confirmandoPagamento, setConfirmandoPagamento] = useState(
+    () => retornoStripe.resultado === "sucesso" && !!retornoStripe.locacaoId,
+  );
+  const confirmacaoIniciada = useRef(false);
+  const [sucessoPagamento, setSucessoPagamento] = useState(false);
+  const [valorPago, setValorPago] = useState("");
+
+  useEffect(() => {
+    if (!sucessoPagamento) return;
+    const timer = window.setTimeout(() => setSucessoPagamento(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [sucessoPagamento]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -449,6 +467,68 @@ const Reservar = () => {
       })
       .finally(() => setCarregandoDisponibilidade(false));
   }, [id]);
+
+  useEffect(() => {
+    if (confirmacaoIniciada.current) return;
+    const { resultado, locacaoId } = retornoStripe;
+    if (!resultado || !locacaoId) return;
+    confirmacaoIniciada.current = true;
+
+    window.history.replaceState({}, "", window.location.pathname);
+
+    if (resultado === "cancelado") {
+      toast.info("Pagamento cancelado. As datas voltam a ficar disponíveis em alguns minutos.");
+      return;
+    }
+
+    let tentativas = 0;
+    const MAX_TENTATIVAS = 20;
+
+    const concluir = async () => {
+      let valorConfirmado = "";
+      try {
+        const rental = await contractService.getRentalById(locacaoId);
+        if (rental) {
+          setCreatedRental(rental);
+          setDataInicio(rental.startDate);
+          setDataFim(rental.endDate);
+          valorConfirmado = rental.total;
+        }
+      } catch (erro) {
+        console.error("Erro ao carregar a locação:", erro);
+      }
+      setConfirmandoPagamento(false);
+      setEtapa(3);
+      window.scrollTo(0, 0);
+      setValorPago(valorConfirmado);
+      setSucessoPagamento(true);
+      contractService
+        .getContractById(locacaoId)
+        .then(setContratoPreview)
+        .catch((erro) => console.error("Erro ao carregar o contrato:", erro));
+    };
+
+    const verificar = async () => {
+      tentativas += 1;
+      try {
+        const { status } = await paymentService.getStatus(locacaoId);
+        if (status === "approved") {
+          await concluir();
+          return;
+        }
+      } catch (erro) {
+        console.error("Erro ao consultar o pagamento:", erro);
+      }
+      if (tentativas >= MAX_TENTATIVAS) {
+        setConfirmandoPagamento(false);
+        toast.error("O pagamento ainda não foi confirmado. Atualize a página em instantes.");
+        return;
+      }
+      window.setTimeout(verificar, 700);
+    };
+
+    verificar();
+  }, [retornoStripe]);
 
   const titulo = [anuncio?.machine_brand, anuncio?.machine_model].filter(Boolean).join(" ") || "Maquinário";
   const valorDiaria = anuncio ? parseFloat(anuncio.hourly_rate) * HORAS_POR_DIARIA : 0;
@@ -527,38 +607,31 @@ const Reservar = () => {
     window.scrollTo(0, 0);
   };
 
-  const pagar = () => {
+  const pagar = async () => {
     if (processando) return;
     setProcessando(true);
-    // Simula o processamento do pagamento 
-    setTimeout(async () => {
-      try {
-        const rental = await contractService.createRental({
-          postingId: id || "",
-          lesseeId: userId || "locatario-default",
-          lessorId: "lessor-default",
-          machineName: titulo,
-          startDate: dataInicio,
-          endDate: dataFim,
-          total: total,
-          observacoes: observacoes,
-        });
-        setCreatedRental(rental);
-        setProcessando(false);
-        toast.success("Pagamento confirmado!");
-        setEtapa(3);
-        window.scrollTo(0, 0);
-        // Carrega o contrato como ele será assinado — o preview mostra os dados
-        // reais das partes, não um texto de exemplo.
-        contractService
-          .getContractById(rental.id)
-          .then(setContratoPreview)
-          .catch((erro) => console.error("Erro ao carregar o contrato:", erro));
-      } catch (err) {
-        setProcessando(false);
-        toast.error("Erro ao criar locação.");
+    try {
+      const rental = await contractService.createRental({
+        postingId: id || "",
+        lesseeId: userId || "locatario-default",
+        lessorId: "lessor-default",
+        machineName: titulo,
+        startDate: dataInicio,
+        endDate: dataFim,
+        total: total,
+        observacoes: observacoes,
+      });
+      const { url } = await paymentService.criarCheckout(rental.id);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setProcessando(false);
+      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
+      if (httpStatus === 409) {
+        toast.error("O período escolhido já está reservado. Escolha outras datas.");
+      } else {
+        toast.error("Não foi possível iniciar o pagamento.");
       }
-    }, 1200);
+    }
   };
 
   const solicitarCodigo = async () => {
@@ -640,6 +713,77 @@ const Reservar = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
+      <AnimatePresence>
+        {sucessoPagamento && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-md px-6"
+            role="status"
+            aria-live="polite"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -12 }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-md rounded-3xl bg-surface-container-lowest border border-outline-variant/40 shadow-2xl px-10 py-12 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.25, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary dark:border-primary-bright flex items-center justify-center mx-auto mb-7"
+              >
+                <MaterialIcon icon="check" size={44} className="text-primary dark:text-primary-bright" filled />
+              </motion.div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.6 }}
+                className="font-headline text-3xl font-black text-primary dark:text-primary-bright mb-3"
+              >
+                Pagamento confirmado
+              </motion.h2>
+
+              {valorPago && (
+                <motion.p
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.6 }}
+                  className="font-headline text-4xl font-black text-tertiary mb-5"
+                >
+                  {valorPago}
+                </motion.p>
+              )}
+
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.75, duration: 0.6 }}
+                className="text-on-surface-variant leading-relaxed mb-8"
+              >
+                As datas da máquina já foram reservadas em seu nome. O próximo passo é assinar o contrato de locação.
+              </motion.p>
+
+              <motion.button
+                type="button"
+                onClick={() => setSucessoPagamento(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9, duration: 0.6 }}
+                className="w-full bg-primary text-on-primary font-bold py-4 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Ir para a assinatura
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex-1 pt-32 pb-20 max-w-[1100px] mx-auto px-6 w-full">
         <Link
           to={`/anuncio/${id}`}
@@ -651,7 +795,19 @@ const Reservar = () => {
         <h1 className="font-headline text-4xl font-black text-primary dark:text-primary-bright mb-2">Solicitar Reserva</h1>
         <div className="h-1.5 w-20 bg-secondary-container mb-10 rounded-full" />
 
-        {loading && (
+        {confirmandoPagamento && (
+          <div className="text-center py-20 bg-surface-container-low rounded-2xl border border-outline-variant/30">
+            <MaterialIcon icon="progress_activity" size={44} className="text-primary dark:text-primary-bright animate-spin mb-4" />
+            <p className="font-headline text-xl font-black text-primary dark:text-primary-bright mb-1">
+              Confirmando seu pagamento
+            </p>
+            <p className="text-on-surface-variant text-sm">
+              Isso leva alguns segundos. Não feche esta página.
+            </p>
+          </div>
+        )}
+
+        {loading && !confirmandoPagamento && (
           <div className="text-center py-20">
             <p className="text-on-surface-variant text-sm">Carregando reserva...</p>
           </div>
@@ -664,7 +820,7 @@ const Reservar = () => {
           </div>
         )}
 
-        {!loading && !erro && anuncio && (
+        {!loading && !erro && !confirmandoPagamento && anuncio && (
           <>
             <Stepper etapaAtual={etapa} />
 
@@ -775,7 +931,7 @@ const Reservar = () => {
                   <div className="space-y-3 mb-7">
                     {([
                       { id: "pix", icone: "qr_code_2", titulo: "Pix", sub: "Aprovação Imediata" },
-                      { id: "cartao", icone: "credit_card", titulo: "Cartão de Crédito", sub: "Parcelamento em até 3x" },
+                      { id: "cartao", icone: "credit_card", titulo: "Cartão de Crédito", sub: "Visa, Mastercard e outros" },
                     ] as const).map((opcao) => {
                       const selecionada = formaPagamento === opcao.id;
                       return (

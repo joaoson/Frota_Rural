@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'machines',
     'administration',
     'document_validation',
+    'payments',
     'drf_spectacular',
 ]
 
@@ -235,6 +236,9 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 # Resend (transactional email)
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')
+
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
 
 # --- Assinatura eletrônica de contratos ---
 # Exigir confirmação por e-mail (OTP) antes do aceite. Ligado por padrão: a

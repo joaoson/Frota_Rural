@@ -32,6 +32,7 @@ urlpatterns = [
     path(BASE_PATH, include('machines.urls')),
     path(BASE_PATH, include('authentication.urls')),
     path(BASE_PATH, include('document_validation.urls')),
+    path(BASE_PATH, include('payments.urls')),
     
     # OpenAPI 3 documentation with Swagger UI
     path(f'{BASE_PATH}schema/', SpectacularAPIView.as_view(), name='schema'),
