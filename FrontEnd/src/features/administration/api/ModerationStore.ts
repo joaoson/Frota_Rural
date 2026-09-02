@@ -6,12 +6,6 @@ import { userKeys } from "@/features/users/api/UserStore";
 import type { PostingModerationAction, UserModerationAction } from "../types/moderation";
 import type { ModerationRepository } from "./ModerationRepository";
 
-/**
- * Moderação não tem cache próprio: ela invalida o cache de OUTRAS features.
- *
- * Banir um usuário muda a lista de usuários; reprovar um anúncio muda a lista de
- * anúncios. Por isso o store depende das chaves de `users` e `postings`.
- */
 export class ModerationStore {
   private readonly repository: ModerationRepository;
   private readonly queryClient: QueryClient;

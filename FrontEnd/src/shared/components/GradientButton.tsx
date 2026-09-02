@@ -1,11 +1,5 @@
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Botão de ação primária com o gradiente da marca.
- *
- * Havia 19 ocorrências em 6 variantes de className — a diferença real era só
- * tamanho e largura.
- */
 type ButtonSize = "sm" | "md" | "lg";
 
 const SIZES: Record<ButtonSize, string> = {
@@ -14,7 +8,6 @@ const SIZES: Record<ButtonSize, string> = {
   lg: "py-4 text-base",
 };
 
-/** Variante das telas de documento, com padding menor no mobile. */
 const RESPONSIVE_SIZE = "py-3.5 sm:py-4 text-base";
 
 interface GradientButtonProps extends React.ComponentProps<"button"> {
@@ -22,7 +15,6 @@ interface GradientButtonProps extends React.ComponentProps<"button"> {
   responsive?: boolean;
   fullWidth?: boolean;
   icon?: string;
-  /** Estado de carregamento: desabilita e troca o rótulo. */
   pending?: boolean;
   pendingLabel?: string;
 }

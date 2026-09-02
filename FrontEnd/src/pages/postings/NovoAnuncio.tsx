@@ -26,7 +26,6 @@ const NovoAnuncio = () => {
   const { userId } = useAuth();
   const navigate = useNavigate();
 
-  // Fotos são estado de UI puro: hoje elas são validadas mas não enviadas.
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
 
   const machinesQuery = useMachines({ status: "active", ownerId: userId ?? undefined });

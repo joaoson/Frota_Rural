@@ -5,7 +5,6 @@ import { contractStore } from "@/app/container";
 import type { Contract, Rental } from "../types/rental";
 import type { CreateRentalPayload, SignatureRole } from "../types/rentalSchemas";
 
-/** Locações em que o usuário é locatário. */
 export function useRentalsAsLessee(userId: string | null) {
   return useQuery({
     ...contractStore.rentalListOptions({ lesseeId: userId ?? undefined }),
@@ -13,7 +12,6 @@ export function useRentalsAsLessee(userId: string | null) {
   });
 }
 
-/** Locações dos equipamentos do usuário como locador. */
 export function useRentalsAsLessor(userId: string | null) {
   return useQuery({
     ...contractStore.rentalListOptions({ lessorId: userId ?? undefined }),

@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import { PageShell } from "@/shared/components/PageShell";
 import MaterialIcon from "@/components/MaterialIcon";
 
-/** Rota curinga. Antes, uma URL inexistente renderizava uma tela em branco. */
 const NotFound = () => (
   <PageShell width="centered">
     <div className="w-full max-w-md text-center">

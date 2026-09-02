@@ -1,21 +1,11 @@
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Cabeçalho de página: título + divisor + subtítulo.
- *
- * Havia três variantes espalhadas por 28 ocorrências — à esquerda (formulários),
- * centralizada com medalhão de ícone (telas de auth) e a das seções de
- * dashboard, que só difere na margem do divisor.
- */
 interface PageHeaderProps {
   title: string;
   subtitle?: React.ReactNode;
-  /** Medalhão acima do título. Só nas telas centralizadas. */
   icon?: string;
   align?: "left" | "center";
-  /** Variante das seções de dashboard: divisor com `mt-2` e subtítulo com `mt-3`. */
   compact?: boolean;
-  /** CTA à direita do título. */
   action?: React.ReactNode;
   className?: string;
 }

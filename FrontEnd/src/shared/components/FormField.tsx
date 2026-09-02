@@ -1,25 +1,14 @@
-/**
- * Bloco label + campo + mensagem de erro/dica.
- *
- * Substitui ~65 ocorrências espalhadas por 10 arquivos, e as **sete cópias byte
- * a byte idênticas** de `INPUT_BASE` + `inputClass()` que existiam nas páginas.
- */
-
 import { cn } from "@/lib/utils";
 
 import { FIELD_LABEL } from "./inputStyles";
 
 interface FormFieldProps {
   label: string;
-  /** Ícone opcional à esquerda do rótulo. */
   icon?: React.ReactNode;
-  /** Mensagem de erro. Quando presente, substitui a dica. */
   error?: string;
-  /** Texto auxiliar exibido quando não há erro. */
   hint?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-  /** Substitui a classe padrão do rótulo. */
   labelClassName?: string;
 }
 

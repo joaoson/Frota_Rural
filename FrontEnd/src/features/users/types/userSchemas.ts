@@ -14,13 +14,6 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 const CPF_LENGTH = 11;
 const CNPJ_LENGTH = 14;
 
-/**
- * CPF ou CNPJ.
- *
- * A regra "11 dígitos ⇒ CPF, 14 ⇒ CNPJ, qualquer outra coisa é inválido" estava
- * copiada em três páginas (`Signup`, `DashboardLocador`, `DashboardLocatario`)
- * e não tinha dono. Aqui ela existe uma vez.
- */
 export const documentSchema = z
   .string()
   .trim()
@@ -48,7 +41,6 @@ export const documentSchema = z
     }
   });
 
-/** Idade mínima para cadastro. */
 export function maxBirthDate(today: Date = new Date()): string {
   const limit = new Date(today);
   limit.setFullYear(limit.getFullYear() - 18);
@@ -101,12 +93,6 @@ export const signupFormSchema = z.object({
 });
 export type SignupFormValues = z.infer<typeof signupFormSchema>;
 
-/**
- * Resposta de usuário.
- *
- * `role` e `status` são `TextField` livres no backend, sem `choices` — um
- * `z.enum` estrito reprovaria linhas legadas do próprio banco.
- */
 export const userApiSchema = z.object({
   id: z.string(),
   name: z.string(),

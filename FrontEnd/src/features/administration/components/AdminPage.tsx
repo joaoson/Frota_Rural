@@ -1,13 +1,6 @@
 import MaterialIcon from "@/components/MaterialIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 
-/**
- * Shell das telas de moderação: barra fixa com título, botão Atualizar e
- * alternador de tema, mais o container de conteúdo.
- *
- * As três páginas de admin tinham este bloco com classNames byte a byte
- * idênticos — só mudavam o título e o que o botão Atualizar dispara.
- */
 interface AdminPageProps {
   title: string;
   onRefresh: () => void;

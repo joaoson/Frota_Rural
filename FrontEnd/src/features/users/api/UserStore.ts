@@ -29,7 +29,6 @@ export class UserStore {
     return { queryKey: userKeys.detail(id), queryFn: () => this.repository.findById(id) };
   }
 
-  /** Busca pontual, aproveitando o cache — para quando não há hook envolvido. */
   fetchById(id: string): Promise<User> {
     return this.queryClient.fetchQuery(this.detailOptions(id));
   }

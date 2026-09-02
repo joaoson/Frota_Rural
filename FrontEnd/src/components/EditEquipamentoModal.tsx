@@ -49,7 +49,6 @@ const EditEquipamentoModal = ({
     setErrors({});
   }
 
-  /** Revalida um campo pelo schema da feature. */
   const validateField = (fieldName: keyof EquipamentoData, value: string): string => {
     const message = validateMachineEdit({ ...form, [fieldName]: value })[fieldName] ?? "";
     setErrors((prev) => ({ ...prev, [fieldName]: message }));

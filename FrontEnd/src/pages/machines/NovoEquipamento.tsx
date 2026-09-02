@@ -17,7 +17,6 @@ import { PageShell } from "@/shared/components/PageShell";
 import { FormField } from "@/shared/components/FormField";
 import { inputClass } from "@/shared/components/inputStyles";
 
-/** Campo da API → campo do formulário, para posicionar erros vindos do backend. */
 const API_FIELD_TO_FORM: Partial<Record<string, keyof MachineFormValues>> = {
   renagro_number: "renagroNumber",
   brand: "otherBrand",
@@ -47,8 +46,6 @@ const NovoEquipamento = () => {
       toast.success("Equipamento cadastrado com sucesso.");
       form.reset(MACHINE_FORM_DEFAULTS);
     } catch (error) {
-      // Erros de campo do backend (ex.: renagro duplicado) vão para o campo,
-      // não para um toast genérico.
       if (error instanceof BadRequestError && error.hasFieldErrors) {
         let placed = false;
         for (const [apiField, messages] of Object.entries(error.fieldErrors)) {

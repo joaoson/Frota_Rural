@@ -18,19 +18,17 @@ export const DEFAULT_BASE_URL = "http://localhost:8000/api/";
 
 export function createAxiosInstance(baseURL?: string): AxiosInstance {
   return axios.create({
-    // `withCredentials` é obrigatório: o refresh token vive num cookie httpOnly
-    // com path=/api/login e só é enviado se as credenciais acompanharem.
+    // withCredentials é obrigatório pois refresh token vive num cookie httpOnly
+    // com path=/api/login e só é enviado se as credenciais acompanharem
     baseURL: baseURL ?? import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL,
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
   });
 }
 
-/**
- * Separa o corpo de erro do backend nas duas formas que ele realmente usa.
- * `{"error": "..."}` / `{"detail": "..."}` viram mensagem plana;
- * `{campo: ["msg"]}` vira `fieldErrors`.
- */
+// Parse de erro do backend nas duas formas que ele usa
+// {"error": "..."}` / `{"detail": "..."}` viram mensagem plana
+// {campo: ["msg"]}` vira `fieldErrors`
 function parseErrorBody(data: unknown): { message?: string; fieldErrors: FieldErrors } {
   const fieldErrors: FieldErrors = {};
   if (data === null || typeof data !== "object") {
@@ -94,10 +92,6 @@ export function toHttpError(error: unknown): HttpError {
   return new UnexpectedError(undefined, error);
 }
 
-/**
- * Adapter. Único módulo do projeto novo que conhece axios — é aqui que o
- * `AxiosError` termina.
- */
 export class AxiosHttpClient implements HttpClient {
   private readonly axios: AxiosInstance;
 

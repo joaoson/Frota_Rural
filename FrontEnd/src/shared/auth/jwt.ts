@@ -1,12 +1,3 @@
-/**
- * Decodificação de JWT.
- *
- * Vem de `utils/jwt.ts`, que é infraestrutura de autenticação e não utilitário
- * genérico — só AuthContext, ProtectedRoute e Login o usam. A diferença em
- * relação ao original é a guarda de erro: lá, um token malformado lançava
- * dentro de `login()` e derrubava a tela.
- */
-
 export interface JwtPayload {
   user_id: string;
   exp: number;

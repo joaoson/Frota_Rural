@@ -37,7 +37,6 @@ function IconeGrade({ n }: { n: number }) {
   );
 }
 
-
 // Tipo usado no componente
 interface Anuncio {
   id: string;
@@ -155,8 +154,6 @@ const BuscarMaquinario = () => {
 
   const temFiltro = busca || atividade || cidade || precoMaxInput || dataInicio || dataFim;
 
-  // Resetar página ao mudar qualquer filtro. Guardar a assinatura dos filtros e
-  // comparar no render evita o setState-dentro-de-efeito.
   const assinaturaFiltros = `${busca}|${atividade}|${cidade}|${precoMax}|${dataInicio}|${dataFim}`;
   const [ultimaAssinatura, setUltimaAssinatura] = useState(assinaturaFiltros);
   if (assinaturaFiltros !== ultimaAssinatura) {

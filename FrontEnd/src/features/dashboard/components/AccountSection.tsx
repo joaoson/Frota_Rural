@@ -18,17 +18,6 @@ import { passwordPattern } from "@/shared/utils/regexPatterns";
 import { validateCNPJ } from "@/shared/utils/validation/validateCNPJ";
 import { validateCPF } from "@/shared/utils/validation/validateCPF";
 
-/**
- * Aba "Minha Conta" dos dois dashboards.
- *
- * Eram duas cópias de ~200 linhas de JSX mais ~15 `useState` cada. Além do
- * estilo, elas tinham divergido em comportamento; ao unificar ficou valendo o
- * lado mais completo (o do locador):
- *
- * - CPF/telefone validados por `pattern` + `title` no HTML — o locatário não tinha;
- * - falha de CEP vira `toast.error`, em vez de só um `console.error` silencioso;
- * - digitar no campo de documento limpa o `setCustomValidity` anterior.
- */
 const ACCOUNT_INPUT =
   "w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm";
 const ACCOUNT_PASSWORD_INPUT =
@@ -45,9 +34,7 @@ function validateDocument(value: string): boolean {
 interface AccountSectionProps {
   userId: string | null;
   user: User | null | undefined;
-  /** Papel exibido sob o nome. Cada dashboard rotula o seu. */
   roleLabel: React.ReactNode;
-  /** Cor do avatar: cada papel usa a sua. */
   avatarClassName?: string;
 }
 
@@ -75,9 +62,6 @@ export function AccountSection({
   const documentRef = useRef<HTMLInputElement>(null);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
 
-  // Preenche o formulário quando o usuário chega do cache/rede. É o ajuste de
-  // estado em render que a documentação do React recomenda no lugar de um
-  // efeito que só chama setState — evita o render em cascata.
   const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
   if (user && user.id !== syncedUserId) {
     setSyncedUserId(user.id);

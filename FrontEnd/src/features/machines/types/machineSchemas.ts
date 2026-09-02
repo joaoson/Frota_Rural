@@ -9,14 +9,6 @@ function maxYear(): number {
   return new Date().getFullYear() + 1;
 }
 
-/**
- * Resposta da API — Anti-Corruption Layer.
- *
- * Quase tudo é nullable porque o model do Django declara `blank=True,
- * null=True` em todos os campos exceto `id` e `owner`. Validar aqui transforma
- * o tipo numa garantia de runtime: hoje um `type` some na compilação e uma
- * mudança de campo no backend só aparece em produção.
- */
 export const machineApiSchema = z.object({
   id: z.string(),
   owner: z.string(),
@@ -35,13 +27,6 @@ export type MachineApi = z.infer<typeof machineApiSchema>;
 
 export const machineListApiSchema = z.array(machineApiSchema);
 
-/**
- * Formulário. Os campos numéricos são string porque é isso que um `<input>`
- * entrega; a conversão acontece no mapper.
- *
- * O padrão `BR` + 10 dígitos é uma regra do front — o backend aceita qualquer
- * string de até 100 caracteres e só impõe unicidade.
- */
 export const machineFormSchema = z
   .object({
     renagroNumber: z
@@ -86,7 +71,6 @@ export const machineFormSchema = z
 
 export type MachineFormValues = z.infer<typeof machineFormSchema>;
 
-/** Corpo aceito por `POST /api/machines/`. Só `owner` é exigido pelo servidor. */
 export interface CreateMachinePayload {
   owner: string;
   renagro_number?: string;
@@ -97,13 +81,6 @@ export interface CreateMachinePayload {
   usage_purpose?: string;
 }
 
-/**
- * Edição de equipamento pelo modal do dashboard.
- *
- * O modal tem contrato de props próprio (`EquipamentoData`, em português), mas
- * as REGRAS moram aqui — era a nona implementação independente de
- * `validateField` no projeto.
- */
 export const machineEditFormSchema = z
   .object({
     registroRenagro: z
@@ -146,7 +123,6 @@ export const machineEditFormSchema = z
     }
   });
 
-/** Valida e devolve os erros por campo, no formato que o modal já usa. */
 export function validateMachineEdit(values: unknown): Record<string, string> {
   const result = machineEditFormSchema.safeParse(values);
   if (result.success) return {};

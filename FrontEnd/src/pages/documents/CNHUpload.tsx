@@ -84,7 +84,6 @@ const CNHUpload = () => {
   const form = useCnhForm();
   const { errors } = form.formState;
 
-  // Derivado da query: uma fonte de verdade só, sem espelhar em estado local.
   const existingLicense = licensesQuery.data?.[0] ?? null;
   const existingLicenseId = existingLicense?.id ?? null;
   const existingFileUrl = existingLicense?.fileUrl ?? null;
@@ -94,7 +93,6 @@ const CNHUpload = () => {
   const isValidating = validateCnh.isPending;
   const isSubmitting = saveLicense.isPending || uploadDocument.isPending;
 
-  // Carrega a CNH existente, se houver. Substitui os 20 setters sequenciais.
   useEffect(() => {
     if (!existingLicense) return;
     form.reset({
@@ -126,7 +124,6 @@ const CNHUpload = () => {
         });
       });
   };
-
 
   const onSubmit = form.handleSubmit(async (values) => {
     if (!userId) {

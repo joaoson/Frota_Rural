@@ -2,7 +2,6 @@ import type { HttpClient } from "@/shared/http/HttpClient";
 
 import type { UserModerationAction } from "../types/moderation";
 
-/** Nenhuma rota de moderação tem barra final. */
 const USERS_BASE = "admin/users";
 const POSTINGS_BASE = "admin/postings";
 
@@ -36,10 +35,6 @@ export class HttpModerationRepository implements ModerationRepository {
     return response.data?.message ?? "Anúncio aprovado.";
   }
 
-  /**
-   * O backend valida `reason` ANTES de procurar o anúncio: motivo vazio em um id
-   * inexistente devolve 400, não 404.
-   */
   async rejectPosting(postingId: string, reason: string): Promise<string> {
     const response = await this.http.send<{ message?: string }>({
       method: "PUT",

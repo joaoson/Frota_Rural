@@ -31,7 +31,6 @@ interface BrandSelectProps {
   hasError?: boolean;
 }
 
-/** Componente apresentacional: props entram, JSX sai. Sem fetch, sem estado de servidor. */
 export function BrandSelect({ value, onChange, hasError = false }: BrandSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const selected = brandByKey(value);

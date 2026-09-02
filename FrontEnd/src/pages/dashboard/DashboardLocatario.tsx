@@ -46,7 +46,6 @@ const ratingsData = [
   { month: "Fev", rating: 5.0 },
 ];
 
-/** Mock: ainda não há endpoint de notificações. */
 const NOTIFICATIONS = [
   { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
   { id: 2, icon: "description", title: "Contrato pronto para assinatura", desc: "Colheitadeira JD S700 · Fazenda São João", time: "3h atrás", unread: true },
@@ -85,9 +84,6 @@ const DashboardLocatario = () => {
   const receivedReviews: Review[] = receivedQuery.data ?? [];
   const givenReviews: Review[] = givenQuery.data ?? [];
 
-  // Os nomes de locador eram chumbados por id ("lessor-joao" etc.) — ids que
-  // nunca chegavam, porque o serviço antigo mandava "lessor-default" fixo.
-  // Agora vem denormalizado da API.
   const rentals = useMemo(
     () =>
       (rentalsQuery.data ?? []).map((rental) => ({
@@ -113,8 +109,6 @@ const DashboardLocatario = () => {
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-
-
   const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "active");
   const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled");
 
@@ -126,11 +120,6 @@ const DashboardLocatario = () => {
     }
     setIsSubmittingReview(true);
     try {
-      // TODO: `reviewee` e `rental` seguem chumbados. O id da locação está em
-      // escopo, mas a API de rentals NÃO devolve o id do locador — só
-      // `lessorName` — então não dá para derivar o avaliado sem mudança no
-      // backend. Corrigir só um dos dois ligaria a avaliação à locação certa e
-      // à pessoa errada.
       await createReview.mutateAsync({
         reviewer: userId,
         reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80",

@@ -3,7 +3,6 @@ export interface PostingPhoto {
   isPrimary: boolean;
 }
 
-/** Item de lista. Traz o id da máquina, mas poucos dados dela. */
 export interface PostingListItem {
   id: string;
   machineryId: string;
@@ -20,7 +19,6 @@ export interface PostingListItem {
   primaryPhotoUrl: string | null;
 }
 
-/** Detalhe. Traz todas as fotos e a máquina expandida, mas **não** o id dela. */
 export interface PostingDetail {
   id: string;
   hourlyRate: number;

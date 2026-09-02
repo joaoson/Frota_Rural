@@ -116,7 +116,6 @@ export function certificationToPayload(
   };
 }
 
-/** Entidade → valores de formulário, para a tela de edição. */
 export function licenseToFormValues(license: OperatorLicense): CnhFormValues {
   return {
     name: license.name,

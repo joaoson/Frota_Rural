@@ -13,12 +13,9 @@ import { BackLink } from "@/shared/components/BackLink";
 import { PageShell } from "@/shared/components/PageShell";
 import { HttpError } from "@/shared/http/errors";
 
-
 const HORAS_POR_DIARIA = 8;
 // Taxa cobrada pela plataforma (5%)
 const TAXA_PLATAFORMA = 0.05;
-
-
 
 type Etapa = 1 | 2 | 3;
 type FormaPagamento = "pix" | "cartao";
@@ -186,8 +183,6 @@ const Reservar = () => {
     // Simula o processamento do pagamento 
     setTimeout(async () => {
       try {
-        // `lessorId` e `machineName` não iam para a API — eram só ruído no
-        // payload antigo, com um "lessor-default" fixo que mentia.
         const rental = await createRental.mutateAsync({
           postings: id ?? "",
           lessee: userId ?? "",
@@ -232,8 +227,6 @@ const Reservar = () => {
     }
   };
 
-  // Elemento memoizado, não um componente novo a cada render — criar
-  // componentes durante o render remonta toda a subárvore.
   const resumoValores = useMemo(
     () => (
     <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/20">

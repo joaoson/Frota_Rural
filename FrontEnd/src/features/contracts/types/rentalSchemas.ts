@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-/** `total_price` é Decimal no DRF → chega como string. */
 export const rentalApiSchema = z.object({
   id: z.string(),
   postings: z.string(),
@@ -14,7 +13,6 @@ export const rentalApiSchema = z.object({
   status: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
-  // Denormalizados, read-only
   lessee_name: z.string().nullish(),
   lessor_name: z.string().nullish(),
   machine_brand: z.string().nullish(),
@@ -24,7 +22,6 @@ export const rentalApiSchema = z.object({
 export type RentalApi = z.infer<typeof rentalApiSchema>;
 export const rentalListApiSchema = z.array(rentalApiSchema);
 
-/** `accepted_by_*` são booleanos NULLABLE — três estados, não dois. */
 export const contractApiSchema = z.object({
   id: z.string(),
   rental: z.string(),

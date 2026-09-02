@@ -33,11 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     reset();
   }, [reset]);
 
-  /**
-   * O RefreshingHttpClient avisa aqui quando o refresh falha de vez. Substitui o
-   * `setLogoutCallback` do antigo AxiosInstance (removido), que existia mas
-   * nunca era chamado.
-   */
+  // RefreshingHttpClient avisa aqui quando o refresh falha de vez
   useEffect(() => tokenStore.subscribeExpired(reset), [reset]);
 
   const value = useMemo(

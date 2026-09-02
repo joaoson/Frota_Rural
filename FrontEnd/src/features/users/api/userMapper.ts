@@ -31,11 +31,6 @@ export interface CreateUserPayload {
   password: string;
 }
 
-/**
- * `city` e `state` são coletados pelo formulário mas NÃO entram no payload: a
- * tabela `users` não tem essas colunas — o DRF os descartava silenciosamente.
- * Continuam na UI porque alimentam a busca por CEP e a conferência do endereço.
- */
 export function toCreatePayload(values: SignupFormValues): CreateUserPayload {
   return {
     name: values.name,

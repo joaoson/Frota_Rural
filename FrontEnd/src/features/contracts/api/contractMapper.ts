@@ -45,10 +45,6 @@ export function contractToDomain(dto: ContractApi): Contract {
   };
 }
 
-/**
- * O backend espera datetime; o formulário entrega `YYYY-MM-DD`. As horas fixas
- * (08:00 / 18:00) vêm do comportamento anterior e são preservadas.
- */
 export function toRentalDateTime(date: string, time: "start" | "end"): string {
   return `${date}T${time === "start" ? "08:00:00" : "18:00:00"}Z`;
 }

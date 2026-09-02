@@ -1,14 +1,6 @@
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Estado de carregamento.
- *
- * Existiam **cinco** tratamentos diferentes no projeto: spinner de borda,
- * spinner de ícone `sync`, texto centralizado, linha de tabela e um spinner
- * pequeno inline — inclusive com reticências diferentes ("..." vs "…").
- */
 interface LoadingStateProps {
-  /** Texto abaixo/no lugar do spinner. */
   label?: string;
   variant?: "spinner" | "text" | "inline";
   className?: string;
@@ -42,7 +34,6 @@ export function LoadingState({ label, variant = "spinner", className }: LoadingS
   );
 }
 
-/** Tela cheia — usada quando a página inteira ainda não tem dados. */
 export function FullPageLoading({ label = "Carregando..." }: { label?: string }) {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center">

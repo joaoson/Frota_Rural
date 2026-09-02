@@ -5,11 +5,8 @@ import type { InMemoryTokenStore } from "@/shared/auth/InMemoryTokenStore";
 import type { AuthRepository } from "./AuthRepository";
 
 /**
- * Store de sessão.
- *
- * Guarda o access token através do TokenProvider e é quem limpa TODO o cache de
- * servidor no logout — sem isso, o próximo usuário na mesma aba enxergaria os
- * dados do anterior.
+ * Guarda o access token através do TokenProvider e 
+ * limpa TODO o cache de servidor no logout
  */
 export class AuthStore {
   private readonly repository: AuthRepository;
@@ -32,10 +29,7 @@ export class AuthStore {
     return access;
   }
 
-  /**
-   * Tenta restaurar a sessão pelo cookie de refresh. Devolve o access token ou
-   * null — não lança, porque "não havia sessão" é um caminho normal.
-   */
+  // Tenta restaurar a sessão pelo cookie de refresh
   async restoreSession(): Promise<string | null> {
     try {
       const access = await this.repository.refresh();

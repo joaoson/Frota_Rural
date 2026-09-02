@@ -1,4 +1,3 @@
-/** Ações de moderação. Objeto `as const` — o tsconfig proíbe `enum`. */
 export const UserModerationAction = {
   Warn: "warn",
   Suspend: "suspend",
@@ -14,7 +13,6 @@ export const PostingModerationAction = {
 export type PostingModerationAction =
   (typeof PostingModerationAction)[keyof typeof PostingModerationAction];
 
-/** Estado resultante de cada ação, para a UI atualizar sem reconsultar. */
 export const USER_STATUS_AFTER: Record<UserModerationAction, string> = {
   warn: "warned",
   suspend: "suspended",

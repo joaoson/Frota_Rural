@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { passwordPattern } from "@/shared/utils/regexPatterns";
 
-/** Política de senha do produto. Hoje vive em utils e é aplicada de forma inconsistente. */
 export const passwordSchema = z
   .string()
   .min(8, "A senha deve ter no mínimo 8 caracteres.")
@@ -31,6 +30,5 @@ export const resetPasswordFormSchema = z
   });
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordFormSchema>;
 
-/** Resposta do login e do refresh — o backend devolve exatamente uma chave. */
 export const accessTokenSchema = z.object({ access: z.string() });
 export type AccessToken = z.infer<typeof accessTokenSchema>;

@@ -1,6 +1,5 @@
 import type { BadgeConfig } from "@/shared/components/StatusBadge";
 
-/** Status de revisão do documento do operador → selo. */
 export function documentStatusBadge(status: string): BadgeConfig {
   switch (status) {
     case "approved":

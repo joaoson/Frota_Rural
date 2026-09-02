@@ -1,11 +1,5 @@
 import type { BadgeConfig } from "@/shared/components/StatusBadge";
 
-/**
- * Status de moderação do usuário → selo.
- *
- * Traduzir status em rótulo e cor é regra de domínio, então mora na feature.
- * `shared/components/StatusBadge` só sabe desenhar o selo.
- */
 export function userStatusBadge(status: string | null): BadgeConfig {
   switch (status) {
     case "active":

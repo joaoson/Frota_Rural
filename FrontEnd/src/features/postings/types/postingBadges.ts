@@ -1,6 +1,5 @@
 import type { BadgeConfig } from "@/shared/components/StatusBadge";
 
-/** Status do anúncio → selo. */
 export function postingStatusBadge(status: string | null): BadgeConfig {
   switch (status) {
     case "active":

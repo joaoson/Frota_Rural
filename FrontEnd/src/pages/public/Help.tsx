@@ -4,11 +4,6 @@ import { EmptyState } from "@/shared/components/EmptyState";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { PageShell } from "@/shared/components/PageShell";
 
-/**
- * A página está linkada no rodapé desde o início, mas era um stub cru sem
- * Navbar nem Footer. Enquanto não há conteúdo de suporte, ao menos entrega o
- * shell padrão e um caminho de saída.
- */
 function Help() {
   return (
     <PageShell>

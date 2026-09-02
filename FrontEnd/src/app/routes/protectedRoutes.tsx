@@ -12,10 +12,6 @@ import NovoEquipamento from "@/pages/machines/NovoEquipamento";
 
 import { adminRoutes } from "./adminRoutes";
 
-/**
- * Rotas que exigem sessão. O bloco externo garante autenticação; o interno
- * restringe por papel.
- */
 export const protectedRoutes: ReactElement = (
   <Route element={<ProtectedRoute />}>
     <Route path="/dashboard" element={<DashboardLocador />} />

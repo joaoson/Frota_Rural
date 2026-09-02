@@ -1,7 +1,3 @@
-/**
- * Estado de erro de carregamento. Havia três cópias, uma delas com fundo,
- * arredondamento e opacidade de borda diferentes sem motivo.
- */
 interface ErrorStateProps {
   title?: string;
   message?: React.ReactNode;

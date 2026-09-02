@@ -12,12 +12,6 @@ function toDate(value: string | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/**
- * DTO da API → entidade de domínio.
- *
- * É aqui que o `snake_case` termina. Nada acima desta função vê
- * `renagro_number` ou `usage_purpose`.
- */
 export function toDomain(dto: MachineApi): Machine {
   return {
     id: dto.id,
@@ -34,14 +28,6 @@ export function toDomain(dto: MachineApi): Machine {
   };
 }
 
-/**
- * Valores do formulário → corpo da API.
- *
- * `initialHorimeter` é coletado pelo formulário mas NÃO entra no payload: o
- * model `Machines` não tem esse campo (horímetro pertence a `Rentals`). O
- * comportamento é idêntico ao da versão anterior da página, que também o
- * validava e descartava — mantido de propósito, registrado como pendência.
- */
 export function toCreatePayload(
   values: MachineFormValues,
   ownerId: string,

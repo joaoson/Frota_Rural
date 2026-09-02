@@ -1,10 +1,5 @@
 import type { HttpClient, HttpRequest, HttpResponse } from "../HttpClient";
 
-/**
- * Decorator de observabilidade. O composition root só o inclui na cadeia sob
- * `import.meta.env.DEV`, então em produção ele não está *desligado* — está
- * ausente. Isso é o que uma cadeia composta permite e um interceptor global não.
- */
 export class LoggingHttpClient implements HttpClient {
   private readonly inner: HttpClient;
 

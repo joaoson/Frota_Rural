@@ -107,7 +107,6 @@ const AdminUsers = () => {
     if (!pendingAction) return;
     const { user, action } = pendingAction;
     try {
-      // O store invalida a lista de usuários sozinho; não é preciso recarregar aqui.
       const message = await moderateUser.mutateAsync({ userId: user.id, action });
       toast.success(message);
       closeConfirm();

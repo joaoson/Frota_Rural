@@ -47,7 +47,6 @@ const Signup = () => {
   const { errors } = form.formState;
   const role = form.watch("role");
 
-  /** Preenche endereço, cidade e UF quando o CEP fica completo. */
   const handleCepChange = async (value: string) => {
     if (!isCepComplete(value)) return;
     try {

@@ -1,14 +1,5 @@
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Selo de status. O componente é genérico; a tradução
- * `status → {ícone, variante, rótulo}` é regra de domínio e vive em cada
- * feature (em `types/<dominio>Badges.ts`), para que `shared/` não precise
- * conhecer os estados de nenhum domínio.
- *
- * Substitui 6 implementações de `statusBadge`/`getStatusBadge` e o `<span>` de
- * render que estava repetido 6 vezes.
- */
 export type BadgeVariant = "success" | "pending" | "error" | "neutral" | "muted";
 
 const VARIANTS: Record<BadgeVariant, string> = {
@@ -27,7 +18,6 @@ export interface BadgeConfig {
 
 interface StatusBadgeProps {
   config: BadgeConfig;
-  /** Variante compacta das tabelas de moderação. */
   dense?: boolean;
   iconSize?: number;
   className?: string;

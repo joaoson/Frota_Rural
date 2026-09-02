@@ -2,29 +2,16 @@ import { useState } from "react";
 
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Área de upload com arrastar-e-soltar.
- *
- * Havia quatro implementações: três quase idênticas nas telas de documento e
- * uma em `NovoAnuncio` que **não tinha estado de arraste nenhum** — nenhum
- * retorno visual ao arrastar. Unificar corrige isso de passagem.
- */
 interface FileDropzoneProps {
-  /** Recebe os arquivos escolhidos, por arraste ou por seleção. */
   onFiles: (files: FileList) => void;
   accept: string;
   multiple?: boolean;
   file?: File | null;
-  /** Arquivo já enviado antes, se houver. */
   existingUrl?: string | null;
-  /** Rótulo do estado vazio. */
   emptyLabel?: string;
-  /** Linha de formatos/limite abaixo do rótulo. */
   hint?: string;
-  /** Marca a área como inválida. */
   hasError?: boolean;
   existingLabel?: string;
-  /** Ícone do estado vazio. */
   emptyIcon?: string;
 }
 

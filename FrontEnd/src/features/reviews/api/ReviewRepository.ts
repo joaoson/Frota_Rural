@@ -8,7 +8,6 @@ import {
 } from "../types/reviewSchemas";
 import { toDomain } from "./reviewMapper";
 
-/** Coleção com barra final; detalhe sem. */
 const COLLECTION_PATH = "reviews/";
 
 export interface ReviewFilter {
@@ -34,7 +33,6 @@ export class HttpReviewRepository implements ReviewRepository {
     const response = await this.http.send<unknown>({
       method: "GET",
       path: COLLECTION_PATH,
-      // O serviço antigo concatenava a query na URL na mão.
       query: {
         reviewee: filter.revieweeId,
         reviewer: filter.reviewerId,

@@ -36,8 +36,6 @@ const Login = () => {
       else if (role === "locador") navigate("/dashboard");
       else navigate("/dashboard-locatario");
     } catch (error) {
-      // InvalidCredentials (401) e AccountDisabled (403) já chegam traduzidos
-      // pelo AuthRepository, com mensagens distintas.
       toast.error(
         error instanceof HttpError ? error.message : "Não foi possível entrar. Tente novamente.",
       );

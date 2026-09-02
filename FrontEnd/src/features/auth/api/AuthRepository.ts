@@ -12,7 +12,6 @@ import {
   InvalidResetToken,
 } from "../types/authErrors";
 
-/** Nenhuma rota de autenticação tem barra final. */
 const LOGIN_PATH = "login";
 const REFRESH_PATH = "login/refresh";
 const LOGOUT_PATH = "logout";
@@ -21,20 +20,13 @@ const RESET_CONFIRM_PATH = "password-reset/confirm";
 
 export interface AuthRepository {
   login(email: string, password: string): Promise<string>;
-  /** Renova a sessão a partir do cookie httpOnly. Sem corpo. */
+  // Renova a sessão a partir do cookie httpOnly
   refresh(): Promise<string>;
   logout(): Promise<void>;
   requestPasswordReset(email: string): Promise<string>;
   confirmPasswordReset(token: string, newPassword: string): Promise<void>;
 }
 
-/**
- * Recebe o HttpClient **cru**, sem os decorators de auth/refresh.
- *
- * Se o login passasse pelo RefreshingHttpClient, uma credencial errada (401)
- * dispararia uma tentativa de refresh antes de falhar — comportamento errado e
- * confuso de depurar.
- */
 export class HttpAuthRepository implements AuthRepository {
   private readonly http: HttpClient;
 
@@ -66,7 +58,7 @@ export class HttpAuthRepository implements AuthRepository {
     await this.http.send<unknown>({ method: "POST", path: LOGOUT_PATH });
   }
 
-  /** Responde sempre 200, mesmo para e-mail inexistente — é intencional no backend. */
+  // Responde sempre 200, mesmo para e-mail inexistente
   async requestPasswordReset(email: string): Promise<string> {
     const response = await this.http.send<{ message?: string }>({
       method: "POST",
@@ -84,8 +76,6 @@ export class HttpAuthRepository implements AuthRepository {
         body: { token, new_password: newPassword },
       });
     } catch (error) {
-      // O backend usa 400 tanto para erro de campo quanto para token inválido,
-      // distinguindo apenas pela chave `detail` — que vira `message` no adapter.
       if (error instanceof BadRequestError && !error.hasFieldErrors) {
         throw new InvalidResetToken(error);
       }

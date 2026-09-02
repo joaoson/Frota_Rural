@@ -7,12 +7,6 @@ import type { Review } from "@/features/reviews/types/review";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { StarRating } from "@/shared/components/StarRating";
 
-/**
- * Aba de avaliações dos dois dashboards.
- *
- * As duas cópias eram idênticas a menos de espaço em branco e do `?:` vs `&&`
- * que envolvia o bloco.
- */
 function ReviewCard({
   name,
   date,

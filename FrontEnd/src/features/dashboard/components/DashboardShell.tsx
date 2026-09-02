@@ -16,14 +16,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-/**
- * Sidebar + topbar dos dois dashboards.
- *
- * As duas páginas tinham ~100 linhas idênticas aqui, com apenas três
- * diferenças reais: a cor do avatar, o que aparece na linha de papel e a
- * tipagem de `Tab`. Ficaram como props; a tipagem virou parâmetro genérico,
- * então cada dashboard mantém sua própria união de abas sem `string` solto.
- */
 export interface SidebarItem<Tab extends string> {
   icon: string;
   label: string;
@@ -44,12 +36,10 @@ interface DashboardShellProps<Tab extends string> {
   tab: Tab;
   onTabChange: (tab: Tab) => void;
   onLogout: () => void;
-  /** A aba cuja seleção abre o diálogo de saída em vez de trocar de conteúdo. */
   logoutTab: Tab;
   initials: string;
   accountName: React.ReactNode;
   accountRole: React.ReactNode;
-  /** Cor do avatar: cada papel usa a sua. */
   avatarClassName?: string;
   notifications: NotificationItem[];
   children: React.ReactNode;

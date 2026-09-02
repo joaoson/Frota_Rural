@@ -26,7 +26,6 @@ import { HttpError } from "@/shared/http/errors";
 
 type ModerationAction = PostingModerationAction;
 
-
 const formatPrice = (value: number | null) => {
   if (value == null || Number.isNaN(value)) return "—";
   return value.toLocaleString("pt-BR", {
@@ -111,7 +110,6 @@ const AdminAnuncios = () => {
     const { posting, action } = pendingAction;
     if (action === "reject" && !reason.trim()) return;
     try {
-      // O store invalida a lista de anúncios sozinho.
       const message = await moderatePosting.mutateAsync({
         postingId: posting.id,
         action,

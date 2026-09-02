@@ -20,10 +20,6 @@ export const CNH_SITUATIONS = [
   "ppd",
 ] as const;
 
-/**
- * `validation_status` chega como string livre na leitura: linhas antigas podem
- * ter qualquer valor. A restrição vale só na escrita.
- */
 export const operatorLicenseApiSchema = z.object({
   id: z.string(),
   user: z.string(),
@@ -57,7 +53,6 @@ export const operatorLicenseApiSchema = z.object({
 export type OperatorLicenseApi = z.infer<typeof operatorLicenseApiSchema>;
 export const operatorLicenseListApiSchema = z.array(operatorLicenseApiSchema);
 
-/** Sem `institution`: a coluna não existe no modelo nem no serializer. */
 export const certificationApiSchema = z.object({
   id: z.string(),
   user: z.string(),
@@ -76,7 +71,6 @@ export const certificationApiSchema = z.object({
 export type CertificationApi = z.infer<typeof certificationApiSchema>;
 export const certificationListApiSchema = z.array(certificationApiSchema);
 
-/** Resultado do classificador. `error` aparece mesmo em 200, quando o ML degrada. */
 export const cnhValidationApiSchema = z.object({
   is_valid: z.boolean(),
   confidence: z.enum(["high", "medium", "low"]),
@@ -93,7 +87,6 @@ function todayIso(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-/** Idade mínima do condutor. */
 export function maxDriverBirthDate(): string {
   const limit = new Date();
   limit.setFullYear(limit.getFullYear() - 18);
@@ -167,7 +160,6 @@ export const cnhFormSchema = z
     ear: z.boolean(),
     medicalRestrictions: z.string().trim(),
     observations: z.string().trim(),
-    // String, como todo campo numérico de `<input>`. A conversão vive no mapper.
     points: z
       .string()
       .trim()
@@ -178,7 +170,6 @@ export const cnhFormSchema = z
       }, "A pontuação deve ser entre 0 e 40."),
   })
   .superRefine((values, ctx) => {
-    // Regra que depende de dois campos: só uma CNH ativa precisa estar no prazo.
     if (values.situation === "active" && values.expirationDate && values.expirationDate < todayIso()) {
       ctx.addIssue({
         code: "custom",
@@ -210,7 +201,6 @@ export const certificationFormSchema = z
       ),
     expirationDate: z.string().trim(),
     credentialCode: z.string().trim(),
-    // O backend exige `description` não-vazia: é TextField sem blank=True.
     description: z
       .string()
       .trim()

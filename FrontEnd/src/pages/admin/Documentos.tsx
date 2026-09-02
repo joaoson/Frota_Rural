@@ -156,7 +156,6 @@ const Documentos = () => {
     };
 
     try {
-      // O store invalida a lista correspondente sozinho.
       await reviewDocument.mutateAsync({ id: selectedItem.id, kind: selectedItem.type, payload });
       toast.success(
         action === "approved" ? "Documento aprovado com sucesso." : "Documento recusado.",

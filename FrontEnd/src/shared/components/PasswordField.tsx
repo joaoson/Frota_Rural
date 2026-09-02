@@ -5,19 +5,11 @@ import MaterialIcon from "@/components/MaterialIcon";
 import { FormField } from "./FormField";
 import { inputClass } from "./inputStyles";
 
-/**
- * Campo de senha com botão de mostrar/ocultar.
- *
- * O botão do olho estava copiado byte a byte em 10 lugares, cada um com seu
- * próprio `useState`.
- */
 interface PasswordFieldProps extends React.ComponentProps<"input"> {
   label: string;
   error?: string;
   hint?: React.ReactNode;
-  /** Substitui a classe padrão do input. Precisa reservar espaço à direita para o botão. */
   inputClassName?: string;
-  /** Classe do rótulo, quando o contexto usa outra escala. */
   labelClassName?: string;
 }
 

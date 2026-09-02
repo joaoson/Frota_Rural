@@ -28,7 +28,6 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
 
     let cancelled = false;
     void (async () => {
-      // O papel vem da claim do próprio token — sem GET /users/{id} extra.
       const access = await authStore.restoreSession();
       if (cancelled) return;
       if (access) login({ access }, parseJwt(access)?.role ?? null);
@@ -38,8 +37,6 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     return () => {
       cancelled = true;
     };
-    // `login` é recriado a cada render do provider; incluí-lo faria o efeito
-    // rodar em loop. A intenção é rodar uma vez por mudança de autenticação.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 

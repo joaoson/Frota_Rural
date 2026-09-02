@@ -3,7 +3,6 @@ export interface Rental {
   postingId: string;
   lesseeId: string;
   operatorId: string | null;
-  /** Nome do locador, denormalizado pela API. Antes era `"lessor-default"` fixo. */
   lessorName: string | null;
   lesseeName: string | null;
   machineBrand: string | null;
@@ -11,7 +10,6 @@ export interface Rental {
   contractNumber: string | null;
   startDate: Date | null;
   endDate: Date | null;
-  /** Número, não string formatada — formatar é papel da apresentação. */
   totalPrice: number | null;
   initialHourMeter: number | null;
   finalHourMeter: number | null;
@@ -22,7 +20,6 @@ export interface Contract {
   id: string;
   rentalId: string;
   documentUrl: string | null;
-  /** Tri-estado: a coluna aceita null. */
   acceptedByLessor: boolean | null;
   acceptedByLessee: boolean | null;
   status: string | null;

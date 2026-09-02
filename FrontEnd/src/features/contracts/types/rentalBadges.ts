@@ -1,10 +1,5 @@
 import type { BadgeConfig } from "@/shared/components/StatusBadge";
 
-/**
- * Status da locação → selo. Os dois dashboards tinham cópias deste mapa, e a do
- * locatário não cobria `validating` — caía no ramo vazio e não mostrava selo
- * nenhum. Unificado, os dois passam a exibir "Aguardando Validação".
- */
 export function rentalStatusBadge(status: string | null): BadgeConfig {
   switch (status) {
     case "pending":

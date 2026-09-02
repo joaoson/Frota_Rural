@@ -14,11 +14,6 @@ export const MACHINE_FORM_DEFAULTS: MachineFormValues = {
   technicalSpecifications: "",
 };
 
-/**
- * Substitui os oito `useState` de campo e o `switch` de `validateField` da
- * versão anterior de NovoEquipamento. As regras passam a viver no schema zod,
- * num só lugar, reutilizável.
- */
 export function useMachineForm(): UseFormReturn<MachineFormValues> {
   return useForm<MachineFormValues>({
     resolver: zodResolver(machineFormSchema),

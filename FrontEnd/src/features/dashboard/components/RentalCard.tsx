@@ -3,13 +3,6 @@ import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StarRating } from "@/shared/components/StarRating";
 
-/**
- * Cartão de locação dos dashboards.
- *
- * `renderRentalCard` existia nos dois arquivos com ~200 linhas 85% iguais. O
- * que realmente muda é a contraparte (locador vs. locatário), os rótulos da
- * avaliação e o painel de reagendamento, que só o locatário tem.
- */
 export interface RentalCardData {
   id: string;
   status: string | null;
@@ -20,7 +13,6 @@ export interface RentalCardData {
 }
 
 interface Counterparty {
-  /** "Locador" ou "Locatário". */
   label: string;
   name: string;
   icon: string;
@@ -28,10 +20,8 @@ interface Counterparty {
 }
 
 interface ReviewPanel {
-  /** Rótulo do botão que abre o painel. */
   buttonLabel: string;
   title: string;
-  /** Pergunta acima das estrelas. */
   prompt: string;
   open: boolean;
   onToggle: () => void;
@@ -54,7 +44,6 @@ interface RentalCardProps {
   review: ReviewPanel;
   detailsOpen: boolean;
   onToggleDetails: () => void;
-  /** Só o dashboard do locatário abre o painel de reagendamento. */
   reschedule?: ReschedulePanel;
 }
 

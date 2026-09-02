@@ -1,11 +1,3 @@
-/**
- * Hierarquia de erros de transporte.
- *
- * O `AxiosError` morre no adapter e nunca chega às camadas de cima. Erros
- * carregam `code` e `status` — não texto de UI já traduzido; a escolha da
- * mensagem é da camada de apresentação.
- */
-
 export type FieldErrors = Record<string, string[]>;
 
 export class HttpError extends Error {
@@ -22,8 +14,8 @@ export class HttpError extends Error {
 
 /**
  * 400. O backend devolve DUAS formas para o mesmo status:
- * `{campo: ["msg"]}` (DRF) e `{"error": "..."}`. Ambas são normalizadas aqui:
- * a primeira vira `fieldErrors`, a segunda vira `message`.
+ * {campo: ["msg"]} -> fieldErrors
+ * {"error": "..."} -> message
  */
 export class BadRequestError extends HttpError {
   readonly fieldErrors: FieldErrors;
@@ -33,7 +25,7 @@ export class BadRequestError extends HttpError {
     this.fieldErrors = fieldErrors;
   }
 
-  /** Primeira mensagem registrada para um campo, se houver. */
+  // Primeira mensagem registrada quando existem vários erros para um campo
   firstErrorFor(field: string): string | undefined {
     return this.fieldErrors[field]?.[0];
   }
@@ -73,7 +65,7 @@ export class ServerError extends HttpError {
   }
 }
 
-/** Sem resposta: offline, DNS, CORS, timeout. */
+// Offline, DNS, CORS, timeout
 export class NetworkError extends HttpError {
   constructor(message = "Não foi possível conectar ao servidor.", cause?: unknown) {
     super("network_error", message, undefined, cause);

@@ -1,10 +1,3 @@
-/**
- * Entidade de domínio, em camelCase.
- *
- * É um `type` e não uma classe: o backend não impõe nenhum invariante além da
- * unicidade do renagro, então não há estado a proteger. A única regra que
- * existe — o formato do registro — vive no schema zod, na fronteira.
- */
 export interface Machine {
   id: string;
   ownerId: string;

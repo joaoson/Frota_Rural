@@ -45,7 +45,6 @@ const GerenciarAnuncio = () => {
   const { errors } = form.formState;
   const posting = postingQuery.data;
 
-  // Preenche o formulário assim que o anúncio chega do cache/rede.
   useEffect(() => {
     if (!posting) return;
     form.reset({
@@ -96,7 +95,6 @@ const GerenciarAnuncio = () => {
       toast.success("Anúncio removido.");
       navigate("/dashboard");
     } catch (error) {
-      // 409 quando existem locações dependentes — mensagem vem do backend.
       toast.error(error instanceof HttpError ? error.message : "Erro ao remover anúncio.");
     }
   };

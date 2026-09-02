@@ -26,33 +26,15 @@ import { ViaCepClient } from "@/shared/http/ViaCepClient";
 
 /**
  * Composition root.
- *
- * Único módulo autorizado a instanciar adapters concretos. Todo o resto recebe
- * abstrações por construtor — é isso que torna a inversão de dependência real e
- * não apenas nominal.
- *
- * Ordem da cadeia, de dentro para fora:
- *
- *   AxiosHttpClient          transporte
- *   └ AuthenticatedHttpClient  injeta Authorization
- *     └ RefreshingHttpClient     renova em 401 e repete
- *       └ LoggingHttpClient        só em desenvolvimento
- *
- * Authenticated fica DENTRO de Refreshing de propósito: a repetição pós-refresh
- * volta a passar pelo header e pega o token novo sozinha.
- */
+ * Instancia adapters concretos. Posteriormente, acessados por exportação.
+*/
 
 const axiosInstance = createAxiosInstance();
 
-/** Cliente cru, sem decorators. */
 const rawHttpClient = new AxiosHttpClient(axiosInstance);
 
 export const tokenStore = new InMemoryTokenStore();
 
-/**
- * O SessionService usa o cliente CRU. Se usasse a cadeia decorada, um 401 no
- * próprio refresh dispararia outro refresh.
- */
 const sessionService = new SessionService(rawHttpClient, tokenStore);
 
 const decoratedHttpClient: HttpClient = new RefreshingHttpClient(
@@ -64,20 +46,12 @@ export const httpClient: HttpClient = import.meta.env.DEV
   ? new LoggingHttpClient(decoratedHttpClient)
   : decoratedHttpClient;
 
-/**
- * Segunda cadeia HTTP, para o ViaCEP.
- *
- * Base própria e SEM os decorators de autenticação — enviar o Bearer do Frota
- * Rural a um serviço de terceiros seria vazar credencial. Só é possível porque
- * a cadeia é composta por destino, e não um interceptor global no axios.
- */
 export const viaCepClient = new ViaCepClient(
   new AxiosHttpClient(createAxiosInstance("https://viacep.com.br/ws/")),
 );
 
 export const queryClient = createQueryClient();
 
-// Auth usa o cliente CRU: um 401 de credencial errada não pode disparar refresh.
 const authRepository = new HttpAuthRepository(rawHttpClient);
 
 export const authStore = new AuthStore(authRepository, tokenStore, queryClient);
@@ -110,7 +84,6 @@ const reviewRepository = new HttpReviewRepository(httpClient);
 
 export const reviewStore = new ReviewStore(reviewRepository, queryClient);
 
-/** Limpa todo estado de servidor em memória. Chamado no logout. */
 export function clearAllStores(): void {
   machineStore.clear();
   userStore.clear();

@@ -1,9 +1,3 @@
-/**
- * Marcas conhecidas. `outra` libera um campo de texto livre.
- *
- * Objeto `as const` em vez de `enum`: o tsconfig do projeto usa
- * `erasableSyntaxOnly`, que proíbe `enum` do TypeScript.
- */
 export const BRANDS = [
   { value: "john-deere", label: "John Deere", logo: "/brands/john-deere.png" },
   { value: "massey-ferguson", label: "Massey Ferguson", logo: "/brands/massey-ferguson.png" },
@@ -22,7 +16,6 @@ export function brandByKey(key: BrandKey): (typeof BRANDS)[number] {
   return BRANDS.find((brand) => brand.value === key) ?? BRANDS[0];
 }
 
-/** Rótulo que vai para a API — o backend guarda o nome, não a chave. */
 export function brandLabel(key: BrandKey): string {
   return brandByKey(key).label;
 }

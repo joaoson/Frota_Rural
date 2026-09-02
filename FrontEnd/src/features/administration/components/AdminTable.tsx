@@ -8,10 +8,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-/**
- * Tabela das telas de moderação. O `TableHead` com o mesmo className aparecia
- * 13 vezes entre as três páginas; a moldura, 3 vezes.
- */
 export interface AdminColumn {
   label: string;
   align?: "left" | "right";
@@ -46,7 +42,6 @@ export function AdminTable({ columns, children }: AdminTableProps) {
   );
 }
 
-/** Linha de mensagem que ocupa a tabela inteira: carregando ou lista vazia. */
 export function AdminTableMessage({
   colSpan,
   icon,

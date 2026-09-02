@@ -2,12 +2,6 @@ import { QueryClient } from "@tanstack/react-query";
 
 import { HttpError } from "./errors";
 
-/**
- * Configuração do cache de estado de servidor.
- *
- * O `retry` conhece a hierarquia de erros: repetir um 400 ou um 404 não muda o
- * resultado e só atrasa o feedback ao usuário.
- */
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {

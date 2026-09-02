@@ -12,12 +12,6 @@ import {
 } from "../types/documentSchemas";
 import { certificationToDomain, licenseToDomain, validationToDomain } from "./documentMapper";
 
-/**
- * Barras finais, sem regra derivável — codificadas uma a uma:
- *   coleções e ações "de recurso" levam barra: `operator-licenses/`,
- *   `documents/upload/`, `operator-licenses/validate-document/`
- *   detalhe e `{id}/review` NÃO levam.
- */
 const LICENSES_PATH = "operator-licenses/";
 const CERTIFICATIONS_PATH = "certifications/";
 const UPLOAD_PATH = "documents/upload/";
@@ -75,7 +69,7 @@ export class HttpDocumentRepository implements DocumentRepository {
     return licenseToDomain(operatorLicenseApiSchema.parse(response.data));
   }
 
-  /** Atenção: qualquer PATCH reseta `validation_status` para `pending` no backend. */
+  // Qualquer PATCH reseta `validation_status` para `pending` no backend
   async updateLicense(id: string, payload: Record<string, unknown>): Promise<OperatorLicense> {
     const response = await this.http.send<unknown>({
       method: "PATCH",
@@ -161,10 +155,6 @@ export class HttpDocumentRepository implements DocumentRepository {
     return uploadResponseSchema.parse(response.data).url;
   }
 
-  /**
-   * O classificador devolve HTTP 200 mesmo quando falha internamente, com a
-   * chave `error` preenchida. Quem chama precisa olhar `error`, não só o status.
-   */
   async validateCnhFile(file: File): Promise<CnhValidationResult> {
     const form = new FormData();
     form.append("file", file);

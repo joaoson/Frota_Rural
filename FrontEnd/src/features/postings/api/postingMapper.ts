@@ -13,7 +13,6 @@ function toDate(value: string | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/** Decimais vêm como string do DRF. */
 function toNumber(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
@@ -64,7 +63,6 @@ export function detailToDomain(dto: PostingDetailApi): PostingDetail {
   };
 }
 
-/** Datas do formulário são `YYYY-MM-DD`; a API espera datetime. */
 function toDateTime(date: string, time: string): string | null {
   return date ? `${date}T${time}` : null;
 }
@@ -91,7 +89,6 @@ export function toEditPayload(values: PostingEditFormValues): PostingWritePayloa
   };
 }
 
-/** Datas da API vêm como datetime ISO; o input `type="date"` precisa de YYYY-MM-DD. */
 export function toDateInput(value: Date | null): string {
   return value ? value.toISOString().split("T")[0] : "";
 }

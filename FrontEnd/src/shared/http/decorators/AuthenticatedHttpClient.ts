@@ -2,14 +2,6 @@ import type { TokenProvider } from "@/shared/auth/TokenProvider";
 
 import type { HttpClient, HttpRequest, HttpResponse } from "../HttpClient";
 
-/**
- * Decorator: anexa o header Authorization.
- *
- * Fica DENTRO do RefreshingHttpClient na cadeia, então a repetição após um
- * refresh passa por aqui de novo e pega o token novo automaticamente. É o que
- * dispensa a reatribuição manual de header que o interceptor atual faz em
- * `services/AxiosInstance.ts`.
- */
 export class AuthenticatedHttpClient implements HttpClient {
   private readonly inner: HttpClient;
   private readonly tokens: TokenProvider;

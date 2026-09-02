@@ -1,15 +1,10 @@
 import MaterialIcon from "@/components/MaterialIcon";
 
-/**
- * Estado vazio. Unifica os cartões dos dashboards, as linhas vazias das tabelas
- * de admin e a versão "rica" que existia só na busca.
- */
 interface EmptyStateProps {
   icon: string;
   title: string;
   description?: React.ReactNode;
   action?: React.ReactNode;
-  /** `card` desenha a moldura; `bare` só o conteúdo, para usar dentro de tabela. */
   variant?: "card" | "bare";
   className?: string;
 }

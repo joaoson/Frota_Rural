@@ -11,7 +11,6 @@ import {
 } from "../types/rentalSchemas";
 import { contractToDomain, rentalToDomain } from "./contractMapper";
 
-/** Coleções com barra final; detalhe e `{id}/sign` sem. */
 const RENTALS_PATH = "rentals/";
 const CONTRACTS_PATH = "contracts/";
 
@@ -25,7 +24,6 @@ export interface ContractRepository {
   findRentalById(id: string): Promise<Rental>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
   listContracts(): Promise<Contract[]>;
-  /** Payload agregado montado à mão pelo backend — formato próprio. */
   findContractDocument(id: string): Promise<ContratoData>;
   sign(id: string, role: SignatureRole, name?: string): Promise<Contract>;
 }
@@ -51,7 +49,6 @@ export class HttpContractRepository implements ContractRepository {
     return rentalToDomain(rentalApiSchema.parse(response.data));
   }
 
-  /** Cria a locação. O backend cria o contrato como efeito colateral. */
   async createRental(payload: CreateRentalPayload): Promise<Rental> {
     const response = await this.http.send<unknown>({
       method: "POST",
@@ -66,11 +63,6 @@ export class HttpContractRepository implements ContractRepository {
     return contractApiSchema.array().parse(response.data).map(contractToDomain);
   }
 
-  /**
-   * `GET /api/contracts/{id}` NÃO devolve o ContractSerializer: devolve um
-   * documento agregado, montado à mão na view. E o `{id}` aceita tanto o id do
-   * contrato quanto o da locação.
-   */
   async findContractDocument(id: string): Promise<ContratoData> {
     const response = await this.http.send<ContratoData>({
       method: "GET",

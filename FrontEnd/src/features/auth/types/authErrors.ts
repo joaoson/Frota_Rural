@@ -1,10 +1,5 @@
 import { HttpError } from "@/shared/http/errors";
 
-/**
- * Um 401 vindo do login significa "credencial errada"; o mesmo 401 em qualquer
- * outra chamada significa "sessão expirada". Traduzir aqui impede que a UI
- * confunda os dois.
- */
 export class InvalidCredentials extends HttpError {
   constructor(cause?: unknown) {
     super("invalid_credentials", "E-mail ou senha incorretos.", 401, cause);

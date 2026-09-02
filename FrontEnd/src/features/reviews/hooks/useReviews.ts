@@ -10,12 +10,10 @@ export function useReviews(filter: ReviewFilter, enabled = true) {
   return useQuery({ ...reviewStore.listOptions(filter), enabled });
 }
 
-/** Avaliações recebidas por um usuário. */
 export function useReceivedReviews(userId: string | null) {
   return useReviews({ revieweeId: userId ?? undefined }, Boolean(userId));
 }
 
-/** Avaliações escritas por um usuário. */
 export function useWrittenReviews(userId: string | null) {
   return useReviews({ reviewerId: userId ?? undefined }, Boolean(userId));
 }

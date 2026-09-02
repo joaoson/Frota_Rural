@@ -10,7 +10,6 @@ export interface Review {
   createdAt: Date | null;
 }
 
-/** Média das notas. Devolve null quando não há avaliação — não 0. */
 export function averageRating(reviews: Review[]): number | null {
   if (reviews.length === 0) return null;
   const total = reviews.reduce((sum, review) => sum + review.rating, 0);

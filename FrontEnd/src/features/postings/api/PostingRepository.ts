@@ -9,7 +9,6 @@ import {
 } from "../types/postingSchemas";
 import { detailToDomain, listItemToDomain } from "./postingMapper";
 
-/** Coleção e fotos levam barra final; detalhe não leva. */
 const COLLECTION_PATH = "postings/";
 
 export interface PostingFilter {
@@ -53,7 +52,6 @@ export class HttpPostingRepository implements PostingRepository {
     return detailToDomain(postingDetailApiSchema.parse(response.data));
   }
 
-  /** Devolve só o id: a resposta de escrita tem formato diferente do detalhe. */
   async create(payload: PostingWritePayload): Promise<string> {
     const response = await this.http.send<unknown>({
       method: "POST",

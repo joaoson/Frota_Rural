@@ -1,6 +1,5 @@
 import type { ValidationStatus } from "./documentSchemas";
 
-/** Naturalidade: o backend guarda "Cidade – UF" em um campo só. */
 export class BirthPlace {
   static readonly SEPARATOR = " – ";
   readonly city: string;
@@ -81,7 +80,6 @@ export function isPending(document: ReviewableDocument): boolean {
   return document.validationStatus === "pending";
 }
 
-/** Regra de negócio: esta CNH habilita a operar? */
 export function enablesOperation(license: OperatorLicense, today: Date = new Date()): boolean {
   const notExpired = new Date(license.expirationDate) >= today;
   const situationOk = !["suspended", "revoked", "blocked"].includes(license.situation);

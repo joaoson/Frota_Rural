@@ -73,7 +73,6 @@ const ratingsData = [
   { month: "Fev", rating: 4.9 },
 ];
 
-/** Mock: ainda não há endpoint de notificações. */
 const NOTIFICATIONS = [
   {
     id: 1,
@@ -160,8 +159,6 @@ const DashboardLocador = () => {
     [machinesQuery.data],
   );
 
-  // A lista de anúncios ainda é filtrada no cliente porque a API de postings
-  // não aceita filtro por dono — só por `machinery`.
   const postings = useMemo(() => {
     const machineIds = new Set((machinesQuery.data ?? []).map((m) => m.id));
     return (postingsQuery.data ?? [])
@@ -175,8 +172,6 @@ const DashboardLocador = () => {
       }));
   }, [machinesQuery.data, postingsQuery.data]);
 
-  // O nome do locatário era decidido por um id que nunca chegava
-  // ("locatario-default"); agora vem denormalizado da API.
   const rentals = useMemo(
     () =>
       (rentalsQuery.data ?? []).map((r) => ({
@@ -213,7 +208,6 @@ const DashboardLocador = () => {
   const openEditModalForMachine = (m: (typeof machines)[number]) => {
     setSelectedEquipamento({
       id: String(m.id),
-      // Colunas nullable no banco — o `any` anterior escondia isso.
       registroRenagro: m.renagro ?? "",
       marca: m.brand ?? "",
       modelo: m.model ?? "",
@@ -225,7 +219,6 @@ const DashboardLocador = () => {
     });
     setIsEditEquipamentoOpen(true);
   };
-
 
   const activeRentals = useMemo(
     () =>
@@ -265,9 +258,6 @@ const DashboardLocador = () => {
     }
     setIsSubmittingReview(true);
     try {
-      // TODO: `reviewee` e `rental` seguem chumbados, como no dashboard do
-      // locatário. A API de rentals não devolve o id da contraparte — só o
-      // nome — então não dá para derivar o avaliado sem mudança no backend.
       await createReview.mutateAsync({
         reviewer: userId,
         reviewee: "029d15f3-a577-4238-9c59-42011ddcb5be",
@@ -342,7 +332,6 @@ const DashboardLocador = () => {
               usage_purpose: data.finalidade,
             });
             setSelectedEquipamento(data);
-            // O store invalida a lista; não é preciso remapear estado local.
             void machineStore.invalidateLists();
             toast.success("Equipamento atualizado com sucesso!");
             setIsEditEquipamentoOpen(false);

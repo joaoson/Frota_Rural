@@ -1,18 +1,10 @@
 import MaterialIcon from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
-/**
- * Avaliação por estrelas. Unifica três das quatro implementações que existiam:
- * a fileira somente-leitura, o seletor clicável e a contagem da landing.
- *
- * A quarta — o SVG com preenchimento fracionado de `AnuncioDetalhe` — continua
- * separada, porque resolve outro problema (nota decimal).
- */
 interface StarRatingProps {
   value: number;
   max?: number;
   size?: number;
-  /** Torna as estrelas clicáveis. */
   onChange?: (value: number) => void;
   className?: string;
 }

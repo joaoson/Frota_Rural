@@ -48,13 +48,11 @@ const CertificationUpload = () => {
   const form = useCertificationForm();
   const { errors } = form.formState;
 
-  // Derivado da query; `mediaCleared` cobre o caso de o usuário remover o arquivo.
   const certification = certificationQuery.data ?? null;
   const existingMediaUrl = mediaCleared ? null : (certification?.mediaUrl ?? null);
   const isLoading = isEditing && certificationQuery.isLoading;
   const isSubmitting = saveCertification.isPending || uploadDocument.isPending;
 
-  // Preenche o formulário ao carregar uma certificação existente.
   useEffect(() => {
     if (!certification) return;
     form.reset(certificationToFormValues(certification));
@@ -64,7 +62,6 @@ const CertificationUpload = () => {
     const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (allowed) setFile(selected);
   };
-
 
   const onSubmit = form.handleSubmit(async (values) => {
     if (!userId) {

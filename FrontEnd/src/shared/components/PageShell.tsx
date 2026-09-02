@@ -1,12 +1,6 @@
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 
-/**
- * Shell padrão de página pública/autenticada: Navbar + conteúdo + Footer.
- *
- * Estava repetido em 15 páginas. O `<div>` externo era byte a byte idêntico em
- * todas; o wrapper interno é que variava — daí a prop `width`.
- */
 export type PageWidth = "narrow" | "medium" | "wide" | "extraWide" | "centered" | "full";
 
 const WIDTHS: Record<PageWidth, string> = {
@@ -18,14 +12,12 @@ const WIDTHS: Record<PageWidth, string> = {
   full: "flex-1 pt-32 pb-20 px-6 w-full",
 };
 
-/** Variante das telas de documento: padding menor no mobile. */
 const RESPONSIVE_WIDTH =
   "flex-1 pt-24 sm:pt-32 pb-16 sm:pb-20 max-w-4xl mx-auto px-4 sm:px-6 w-full";
 
 interface PageShellProps {
   children: React.ReactNode;
   width?: PageWidth;
-  /** Usa o wrapper com breakpoints das telas de upload de documento. */
   responsive?: boolean;
   className?: string;
 }

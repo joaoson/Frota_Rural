@@ -2,7 +2,6 @@ import { Link } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
 
-/** Link de voltar com seta. Estava repetido em 7 páginas, className idêntico. */
 interface BackLinkProps {
   to: string;
   children: React.ReactNode;
