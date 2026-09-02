@@ -9,11 +9,10 @@ import { AccountSection } from "@/features/dashboard/components/AccountSection";
 import { DashboardShell } from "@/features/dashboard/components/DashboardShell";
 import { RentalCard } from "@/features/dashboard/components/RentalCard";
 import { ReviewsSection } from "@/features/dashboard/components/ReviewsSection";
-import { documentStore } from "@/app/container";
+import { documentStore, machineStore } from "@/app/container";
 import { useCertifications, useOperatorLicenses } from "@/features/documents/hooks/useDocuments";
 import type { Certification, OperatorLicense } from "@/features/documents/types/document";
 import { useMachines } from "@/features/machines/hooks/useMachines";
-import { machineStore } from "@/app/container";
 import { usePostings } from "@/features/postings/hooks/usePostings";
 import { postingMachineName } from "@/features/postings/types/posting";
 import {

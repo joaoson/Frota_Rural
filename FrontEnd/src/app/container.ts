@@ -28,15 +28,12 @@ import { ViaCepClient } from "@/shared/http/ViaCepClient";
  * Composition root.
  * Instancia adapters concretos. Posteriormente, acessados por exportação.
 */
-
 const axiosInstance = createAxiosInstance();
-
 const rawHttpClient = new AxiosHttpClient(axiosInstance);
 
 export const tokenStore = new InMemoryTokenStore();
 
 const sessionService = new SessionService(rawHttpClient, tokenStore);
-
 const decoratedHttpClient: HttpClient = new RefreshingHttpClient(
   new AuthenticatedHttpClient(rawHttpClient, tokenStore),
   sessionService,
@@ -53,36 +50,27 @@ export const viaCepClient = new ViaCepClient(
 export const queryClient = createQueryClient();
 
 const authRepository = new HttpAuthRepository(rawHttpClient);
-
 export const authStore = new AuthStore(authRepository, tokenStore, queryClient);
 
-const machineRepository = new HttpMachineRepository(httpClient);
+const stores = {
+  machines: new MachineStore(new HttpMachineRepository(httpClient), queryClient),
+  users: new UserStore(new HttpUserRepository(httpClient), queryClient),
+  postings: new PostingStore(new HttpPostingRepository(httpClient), queryClient),
+  moderation: new ModerationStore(new HttpModerationRepository(httpClient), queryClient),
+  documents: new DocumentStore(new HttpDocumentRepository(httpClient), queryClient),
+  contracts: new ContractStore(new HttpContractRepository(httpClient), queryClient),
+  reviews: new ReviewStore(new HttpReviewRepository(httpClient), queryClient),
+} as const;
 
-export const machineStore = new MachineStore(machineRepository, queryClient);
-
-const userRepository = new HttpUserRepository(httpClient);
-
-export const userStore = new UserStore(userRepository, queryClient);
-
-const postingRepository = new HttpPostingRepository(httpClient);
-
-export const postingStore = new PostingStore(postingRepository, queryClient);
-
-const moderationRepository = new HttpModerationRepository(httpClient);
-
-export const moderationStore = new ModerationStore(moderationRepository, queryClient);
-
-const documentRepository = new HttpDocumentRepository(httpClient);
-
-export const documentStore = new DocumentStore(documentRepository, queryClient);
-
-const contractRepository = new HttpContractRepository(httpClient);
-
-export const contractStore = new ContractStore(contractRepository, queryClient);
-
-const reviewRepository = new HttpReviewRepository(httpClient);
-
-export const reviewStore = new ReviewStore(reviewRepository, queryClient);
+export const {
+  machines: machineStore,
+  users: userStore,
+  postings: postingStore,
+  moderation: moderationStore,
+  documents: documentStore,
+  contracts: contractStore,
+  reviews: reviewStore,
+} = stores;
 
 export function clearAllStores(): void {
   machineStore.clear();
