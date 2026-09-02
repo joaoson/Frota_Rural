@@ -2506,10 +2506,10 @@ const DashboardLocador = () => {
                   </div>
                   <form className="space-y-4" onSubmit={handleUpdateProfile}>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="nome-completo" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Nome Completo
                       </label>
-                      <input
+                      <input id="nome-completo"
                         type="text"
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
@@ -2518,10 +2518,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="cpf-cnpj" className="text-xs font-bold uppercase tracking-wider text-outline">
                         CPF / CNPJ
                       </label>
-                      <input
+                      <input id="cpf-cnpj"
                         ref={documentRef}
                         type="text"
                         value={formDocument}
@@ -2537,10 +2537,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="e-mail" className="text-xs font-bold uppercase tracking-wider text-outline">
                         E-mail
                       </label>
-                      <input
+                      <input id="e-mail"
                         type="email"
                         value={formEmail}
                         onChange={(e) => setFormEmail(e.target.value)}
@@ -2549,10 +2549,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="telefone" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Telefone
                       </label>
-                      <input
+                      <input id="telefone"
                         type="tel"
                         value={formPhone}
                         onChange={(e) =>
@@ -2565,10 +2565,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="cep" className="text-xs font-bold uppercase tracking-wider text-outline">
                         CEP
                       </label>
-                      <input
+                      <input id="cep"
                         ref={cepRef}
                         type="text"
                         placeholder="00000-000"
@@ -2598,10 +2598,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="endereco" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Endereço
                       </label>
-                      <input
+                      <input id="endereco"
                         type="text"
                         value={formAddress}
                         onChange={(e) => setFormAddress(e.target.value)}
@@ -2614,10 +2614,10 @@ const DashboardLocador = () => {
                         endereço obrigava a adivinhá-lo por regex. */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2 col-span-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                        <label htmlFor="cidade" className="text-xs font-bold uppercase tracking-wider text-outline">
                           Cidade
                         </label>
-                        <input
+                        <input id="cidade"
                           type="text"
                           value={formCity}
                           onChange={(e) => setFormCity(e.target.value)}
@@ -2625,10 +2625,10 @@ const DashboardLocador = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                        <label htmlFor="estado" className="text-xs font-bold uppercase tracking-wider text-outline">
                           Estado
                         </label>
-                        <select
+                        <select id="estado"
                           value={formState}
                           onChange={(e) => setFormState(e.target.value)}
                           className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
@@ -2657,11 +2657,11 @@ const DashboardLocador = () => {
                   </h2>
                   <form className="space-y-4" onSubmit={handleUpdatePassword}>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="senha-atual" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Senha Atual
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="senha-atual"
                           type={showCurrentPassword ? "text" : "password"}
                           placeholder="••••••••"
                           value={currentPassword}
@@ -2680,11 +2680,11 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Nova Senha
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="nova-senha"
                           type={showNewPassword ? "text" : "password"}
                           placeholder="••••••••"
                           value={newPassword}
@@ -2707,11 +2707,11 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="confirmar-nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Confirmar Nova Senha
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="confirmar-nova-senha"
                           ref={confirmPasswordRef}
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="••••••••"

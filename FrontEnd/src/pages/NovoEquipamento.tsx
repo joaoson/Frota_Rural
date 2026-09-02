@@ -163,8 +163,8 @@ const NovoEquipamento = () => {
           noValidate
         >
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Nº Registro Renagro *</label>
-            <input
+            <label htmlFor="no-registro-renagro" className="text-[10px] font-bold uppercase tracking-widest text-outline">Nº Registro Renagro *</label>
+            <input id="no-registro-renagro"
               name="renagro_number"
               type="text"
               placeholder="BR1029304899"
@@ -243,8 +243,8 @@ const NovoEquipamento = () => {
               ) : null}
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Modelo *</label>
-              <input
+              <label htmlFor="modelo" className="text-[10px] font-bold uppercase tracking-widest text-outline">Modelo *</label>
+              <input id="modelo"
                 name="model"
                 type="text"
                 placeholder="S700"
@@ -263,8 +263,8 @@ const NovoEquipamento = () => {
 
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Ano de Fabricação</label>
-              <input
+              <label htmlFor="ano-de-fabricacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">Ano de Fabricação</label>
+              <input id="ano-de-fabricacao"
                 name="year"
                 type="number"
                 placeholder="2022"
@@ -279,8 +279,8 @@ const NovoEquipamento = () => {
               {errors.year && <p className="text-[11px] text-error font-medium mt-1">{errors.year}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Finalidade de Uso</label>
-              <select
+              <label htmlFor="finalidade-de-uso" className="text-[10px] font-bold uppercase tracking-widest text-outline">Finalidade de Uso</label>
+              <select id="finalidade-de-uso"
                 name="usage_purpose"
                 value={usagePurpose}
                 onChange={(e) => setUsagePurpose(e.target.value)}
@@ -295,8 +295,8 @@ const NovoEquipamento = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Especificações Técnicas</label>
-            <textarea
+            <label htmlFor="especificacoes-tecnicas" className="text-[10px] font-bold uppercase tracking-widest text-outline">Especificações Técnicas</label>
+            <textarea id="especificacoes-tecnicas"
               name="technical_specifications"
               placeholder="Motor, plataforma, recursos adicionais..."
               rows={3}

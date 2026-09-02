@@ -343,17 +343,17 @@ const DashboardLocatario = () => {
               </h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Início</label>
-                  <input type="date" className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
+                  <label htmlFor="nova-data-inicio" className="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Início</label>
+                  <input id="nova-data-inicio" type="date" className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Fim</label>
-                  <input type="date" className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
+                  <label htmlFor="nova-data-fim" className="text-xs font-bold uppercase tracking-wider text-outline">Nova Data Fim</label>
+                  <input id="nova-data-fim" type="date" className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm" />
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-outline">Motivo</label>
-                <textarea placeholder="Ex: Chuvas atrasaram o preparo..." rows={2} className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" />
+                <label htmlFor="motivo" className="text-xs font-bold uppercase tracking-wider text-outline">Motivo</label>
+                <textarea id="motivo" placeholder="Ex: Chuvas atrasaram o preparo..." rows={2} className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm resize-none" />
               </div>
               <button className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
                 <MaterialIcon icon="send" size={16} /> Enviar Solicitação
@@ -1034,8 +1034,8 @@ const DashboardLocatario = () => {
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Nome Completo</label>
-                      <input
+                      <label htmlFor="nome-completo" className="text-xs font-bold uppercase tracking-wider text-outline">Nome Completo</label>
+                      <input id="nome-completo"
                         type="text"
                         required
                         value={formName}
@@ -1044,8 +1044,8 @@ const DashboardLocatario = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">CPF / CNPJ</label>
-                      <input
+                      <label htmlFor="cpf-cnpj" className="text-xs font-bold uppercase tracking-wider text-outline">CPF / CNPJ</label>
+                      <input id="cpf-cnpj"
                         type="text"
                         required
                         pattern="\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}"
@@ -1061,8 +1061,8 @@ const DashboardLocatario = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">E-mail</label>
-                      <input
+                      <label htmlFor="e-mail" className="text-xs font-bold uppercase tracking-wider text-outline">E-mail</label>
+                      <input id="e-mail"
                         type="email"
                         required
                         value={formEmail}
@@ -1071,8 +1071,8 @@ const DashboardLocatario = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Telefone</label>
-                      <input
+                      <label htmlFor="telefone" className="text-xs font-bold uppercase tracking-wider text-outline">Telefone</label>
+                      <input id="telefone"
                         type="tel"
                         required
                         pattern="\(\d{2}\) \d{4,5}-\d{4}"
@@ -1083,8 +1083,8 @@ const DashboardLocatario = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">CEP</label>
-                      <input
+                      <label htmlFor="cep" className="text-xs font-bold uppercase tracking-wider text-outline">CEP</label>
+                      <input id="cep"
                         ref={cepRef}
                         type="text"
                         placeholder="00000-000"
@@ -1114,8 +1114,8 @@ const DashboardLocatario = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Endereço</label>
-                      <input
+                      <label htmlFor="endereco" className="text-xs font-bold uppercase tracking-wider text-outline">Endereço</label>
+                      <input id="endereco"
                         type="text"
                         required
                         value={formAddress}
@@ -1128,8 +1128,8 @@ const DashboardLocatario = () => {
                         endereço obrigava a adivinhá-lo por regex. */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2 col-span-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">Cidade</label>
-                        <input
+                        <label htmlFor="cidade" className="text-xs font-bold uppercase tracking-wider text-outline">Cidade</label>
+                        <input id="cidade"
                           type="text"
                           value={formCity}
                           onChange={(e) => setFormCity(e.target.value)}
@@ -1137,8 +1137,8 @@ const DashboardLocatario = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">Estado</label>
-                        <select
+                        <label htmlFor="estado" className="text-xs font-bold uppercase tracking-wider text-outline">Estado</label>
+                        <select id="estado"
                           value={formState}
                           onChange={(e) => setFormState(e.target.value)}
                           className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
@@ -1168,9 +1168,9 @@ const DashboardLocatario = () => {
                   <h2 className="font-headline text-xl font-bold text-tertiary">Alterar Senha</h2>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Senha Atual</label>
+                      <label htmlFor="senha-atual" className="text-xs font-bold uppercase tracking-wider text-outline">Senha Atual</label>
                       <div className="relative">
-                        <input
+                        <input id="senha-atual"
                           type={showCurrentPassword ? "text" : "password"}
                           required
                           minLength={8}
@@ -1189,9 +1189,9 @@ const DashboardLocatario = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Nova Senha</label>
+                      <label htmlFor="nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">Nova Senha</label>
                       <div className="relative">
-                        <input
+                        <input id="nova-senha"
                           type={showNewPassword ? "text" : "password"}
                           required
                           pattern={passwordPattern.regex.source}
@@ -1214,9 +1214,9 @@ const DashboardLocatario = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">Confirmar Nova Senha</label>
+                      <label htmlFor="confirmar-nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">Confirmar Nova Senha</label>
                       <div className="relative">
-                        <input
+                        <input id="confirmar-nova-senha"
                           type={showConfirmPassword ? "text" : "password"}
                           required
                           ref={confirmPasswordRef}

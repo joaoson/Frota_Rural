@@ -97,10 +97,10 @@ const Login = () => {
 
             <form className="space-y-6" onSubmit={handleSubmit} noValidate>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="e-mail" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   E-mail
                 </label>
-                <input
+                <input id="e-mail"
                   type="email"
                   placeholder="contato@email.com"
                   value={email}
@@ -115,11 +115,11 @@ const Login = () => {
                 {errors.email && <p className="text-[11px] text-error font-medium mt-1">{errors.email}</p>}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="senha" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha
                 </label>
                 <div className="relative">
-                  <input
+                  <input id="senha"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}

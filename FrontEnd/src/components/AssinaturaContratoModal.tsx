@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
+import HashDisplay from "@/components/HashDisplay";
 import {
   Dialog,
   DialogContent,
@@ -233,20 +234,16 @@ export default function AssinaturaContratoModal({
                   </div>
                 ))}
                 <div className="px-5 py-3">
-                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
-                    Hash {recibo.hash_algorithm.toUpperCase()} do documento assinado
-                  </div>
-                  <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
-                    {recibo.document_hash}
-                  </div>
+                  <HashDisplay
+                    label={`Hash ${recibo.hash_algorithm.toUpperCase()} do documento assinado`}
+                    value={recibo.document_hash}
+                  />
                 </div>
                 <div className="px-5 py-3">
-                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
-                    Hash do registro (log encadeado)
-                  </div>
-                  <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
-                    {recibo.record_hash}
-                  </div>
+                  <HashDisplay
+                    label="Hash do registro (log encadeado)"
+                    value={recibo.record_hash}
+                  />
                 </div>
               </div>
 
@@ -337,12 +334,10 @@ export default function AssinaturaContratoModal({
                 </p>
                 {contrato.evidencia && (
                   <div className="pt-2 border-t border-outline-variant/30">
-                    <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
-                      Hash {contrato.evidencia.algoritmo_hash.toUpperCase()} deste documento
-                    </div>
-                    <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
-                      {contrato.evidencia.hash_documento_atual}
-                    </div>
+                    <HashDisplay
+                      label={`Hash ${contrato.evidencia.algoritmo_hash.toUpperCase()} deste documento`}
+                      value={contrato.evidencia.hash_documento_atual}
+                    />
                   </div>
                 )}
               </div>
@@ -387,10 +382,10 @@ export default function AssinaturaContratoModal({
 
               {/* Assinatura digital */}
               <div className="mb-5">
-                <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                <label htmlFor="nome-completo-assinatura-digital" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
                   Nome Completo (Assinatura Digital)
                 </label>
-                <input
+                <input id="nome-completo-assinatura-digital"
                   type="text"
                   value={nomeAssinatura}
                   onChange={(e) => setNomeAssinatura(e.target.value)}

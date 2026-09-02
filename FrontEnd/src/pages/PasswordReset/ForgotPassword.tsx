@@ -94,10 +94,10 @@ const ForgotPassword = () => {
 
                 <form className="space-y-6" onSubmit={handleSubmit} noValidate>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="e-mail" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       E-mail
                     </label>
-                    <input
+                    <input id="e-mail"
                       type="email"
                       placeholder="contato@email.com"
                       value={email}

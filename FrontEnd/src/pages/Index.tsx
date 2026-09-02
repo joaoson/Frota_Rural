@@ -85,28 +85,28 @@ const Index = () => {
             <h2 className="font-headline text-lg font-bold text-primary dark:text-primary-bright mb-8">Encontre o equipamento ideal para a sua safra</h2>
             <div className="flex flex-col md:flex-row gap-4 mb-6">
               <div className="flex-[3] space-y-1.5">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Busca</label>
-                <input type="text" placeholder="Ex: Trator, Colheitadeira, Pulverizador..." className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
+                <label htmlFor="busca" className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Busca</label>
+                <input id="busca" type="text" placeholder="Ex: Trator, Colheitadeira, Pulverizador..." className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
               </div>
               <div className="flex-[2] space-y-1.5">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Localização</label>
-                <input type="text" placeholder="Ex: Sorriso, MT" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
+                <label htmlFor="localizacao" className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Localização</label>
+                <input id="localizacao" type="text" placeholder="Ex: Sorriso, MT" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
               </div>
             </div>
             <div className="flex flex-col md:flex-row items-end gap-4 mt-2">
               <div className="flex-[2] space-y-1.5 w-full">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Atividade Agrícola</label>
-                <select className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow">
+                <label htmlFor="atividade-agricola" className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Atividade Agrícola</label>
+                <select id="atividade-agricola" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow">
                   <option>Todas</option><option>Plantio</option><option>Pulverização</option><option>Colheita</option><option>Preparo de Solo</option>
                 </select>
               </div>
               <div className="flex-1 space-y-1.5 w-full">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Data Início</label>
-                <input type="date" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
+                <label htmlFor="data-inicio" className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Data Início</label>
+                <input id="data-inicio" type="date" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
               </div>
               <div className="flex-1 space-y-1.5 w-full">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Data Fim</label>
-                <input type="date" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
+                <label htmlFor="data-fim" className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Data Fim</label>
+                <input id="data-fim" type="date" className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-on-surface text-sm focus:ring-2 focus:ring-primary transition-shadow" />
               </div>
               <Link to="/buscar-maquinario" className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-lg font-bold text-sm hover:shadow-lg transition-all inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
                 <MaterialIcon icon="search" size={18} /> Buscar

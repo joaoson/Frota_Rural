@@ -654,10 +654,10 @@ const Documentos = () => {
               })()}
 
               <div className="pt-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                <label htmlFor="observacao-motivo" className="text-[10px] font-bold uppercase tracking-wider text-outline">
                   Observação / Motivo
                 </label>
-                <textarea
+                <textarea id="observacao-motivo"
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
                   rows={3}

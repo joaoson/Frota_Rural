@@ -11,7 +11,7 @@ from api.models import Rentals, Reviews
 from api.serializer import RentalSerializer, ReviewSerializer
 from contracts.models import Contracts
 from api.schemas import ContractDocumentSerializer, ContractSignatureSerializer, ErrorResponseSerializer
-from api.serializer import ContractSerializer, RentalSerializer, ReviewSerializer
+from contracts.serializer import ContractSerializer
 
 REVIEW_NOT_FOUND = OpenApiResponse(description='Avaliação não encontrada.')
 RENTAL_NOT_FOUND = OpenApiResponse(description='Locação não encontrada.')

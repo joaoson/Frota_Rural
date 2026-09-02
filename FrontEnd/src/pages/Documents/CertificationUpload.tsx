@@ -211,10 +211,10 @@ const CertificationUpload = () => {
               </p>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="titulo-do-curso" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Título do Curso *
                 </label>
-                <input
+                <input id="titulo-do-curso"
                   type="text"
                   placeholder="Ex.: Operação de Tratores Agrícolas"
                   value={title}
@@ -230,10 +230,10 @@ const CertificationUpload = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="organizacao-emissora" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Organização Emissora *
                 </label>
-                <input
+                <input id="organizacao-emissora"
                   type="text"
                   placeholder="Ex.: SENAR"
                   value={issuingOrganization}
@@ -250,10 +250,10 @@ const CertificationUpload = () => {
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="data-de-emissao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Data de Emissão *
                   </label>
-                  <input
+                  <input id="data-de-emissao"
                     type="date"
                     value={issueDate}
                     max={today}
@@ -269,10 +269,10 @@ const CertificationUpload = () => {
                   {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="data-de-validade-opcional" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Data de Validade (Opcional)
                   </label>
-                  <input
+                  <input id="data-de-validade-opcional"
                     type="date"
                     value={expirationDate}
                     onChange={(e) => {
@@ -287,10 +287,10 @@ const CertificationUpload = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="codigo-da-credencial" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Código da Credencial
                 </label>
-                <input
+                <input id="codigo-da-credencial"
                   type="text"
                   placeholder="Código fornecido pela instituição, se aplicável (opcional)"
                   value={credentialCode}
@@ -300,10 +300,10 @@ const CertificationUpload = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="descricao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Descrição *
                 </label>
-                <textarea
+                <textarea id="descricao"
                   placeholder="Descreva o conteúdo do curso, competências adquiridas ou informações relevantes"
                   value={description}
                   onChange={(e) => {
