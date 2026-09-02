@@ -218,7 +218,7 @@ const Signup = () => {
               </div>
               <div className="space-y-2">
                 <label htmlFor="cpf-cnpj" className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                  CPF / CNPJ {role}*
+                  CPF / CNPJ*
                 </label>
                 <input id="cpf-cnpj"
                   type="text"
