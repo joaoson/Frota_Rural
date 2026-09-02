@@ -29,6 +29,17 @@ class Users(AbstractBaseUser):
     cep = models.CharField(max_length=9, blank=True, null=True)
     birth_date = models.DateField()
     status = models.CharField(max_length=50, blank=True, null=True)
+    # Operadores cadastrados de dentro do painel pertencem a quem os criou.
+    # Sem esse vínculo o locatário não teria como listar "os seus" operadores:
+    # a tabela users é global e o papel sozinho não diz de quem é a equipe.
+    employer = models.ForeignKey(
+        'self',
+        models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='operators',
+        db_column='employer_id',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

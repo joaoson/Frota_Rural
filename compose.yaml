@@ -15,6 +15,19 @@ services:
       timeout: 5s
       retries: 12
 
+  redis:
+    image: redis:7.4-alpine
+    # Sem persistencia: o channel layer e um barramento efemero, salvar em disco
+    # so custaria latencia. O Postgres continua sendo a fonte de verdade.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   backend:
     build:
       context: .
@@ -31,6 +44,8 @@ services:
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       ML_PYTHON: /opt/ml-venv/bin/python
+      REDIS_URL: redis://redis:6379/0
+      CHANNEL_LAYER_BACKEND: redis
     command: ["/entrypoint.sh"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -40,6 +55,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -47,6 +64,7 @@ services:
       dockerfile: Devops/docker/frontend/Dockerfile
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/}
+      VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-ws://localhost:8000}
       CHOKIDAR_USEPOLLING: "true"
     command: npm run dev -- --host 0.0.0.0
     ports:

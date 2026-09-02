@@ -11,11 +11,13 @@ import { fetchAddressByCEP, formatAddressFromCEP } from "@/services/ViaCEPServic
 import { maskPhone } from "@/utils/masks/maskPhone";
 import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { userService } from "@/services/UserService/UserService";
-import { mensagemErroDocumento } from "@/utils/validation/validateDocument";
-import { mensagemErroCEP } from "@/utils/validation/validateCEP";
 import { UserRole } from "@/services/UserService/models/UserRole";
 import type { CreateUserRequest } from "@/services/UserService/models/CreateUserRequest";
-import { passwordPattern } from "@/utils/regexPatterns";
+import {
+  maxBirthDate,
+  validatePersonField,
+  type PersonField,
+} from "@/utils/validation/personFields";
 
 const Signup = () => {
   const [role, setRole] = useState<UserRole>(UserRole.Locatario);
@@ -60,78 +62,8 @@ const Signup = () => {
     }
   };
 
-  function calculateMaxBirthDate() {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 18);
-    return d.toISOString().split("T")[0];
-  }
-
   const validateField = (fieldName: string, value: string) => {
-    let errorMsg = "";
-    switch (fieldName) {
-      case "name": {
-        const trimmed = value.trim();
-        if (!trimmed) errorMsg = "Nome é obrigatório.";
-        else if (trimmed.length < 3) errorMsg = "Nome deve ter no mínimo 3 caracteres.";
-        else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ\s]+$/.test(trimmed)) errorMsg = "Nome deve conter apenas letras.";
-        break;
-      }
-      case "birthDate": {
-        if (!value) {
-          errorMsg = "Data de nascimento é obrigatória.";
-        } else {
-          const maxDate = calculateMaxBirthDate();
-          if (value > maxDate) {
-            errorMsg = "É necessário ter 18 anos ou mais para se cadastrar.";
-          } else if (value < "1900-01-01") {
-            errorMsg = "Data inválida.";
-          }
-        }
-        break;
-      }
-      case "document": {
-        errorMsg = mensagemErroDocumento(value);
-        break;
-      }
-      case "email": {
-        const trimmed = value.trim();
-        if (!trimmed) errorMsg = "E-mail é obrigatório.";
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) errorMsg = "E-mail inválido.";
-        break;
-      }
-      case "phone": {
-        const digits = value.replace(/\D/g, "");
-        if (!digits) errorMsg = "Telefone é obrigatório.";
-        else if (digits.length !== 10 && digits.length !== 11) errorMsg = "Telefone deve ter 10 ou 11 dígitos.";
-        break;
-      }
-      case "address": {
-        if (!value.trim()) errorMsg = "Endereço é obrigatório.";
-        else if (value.trim().length < 5) errorMsg = "Endereço deve ter pelo menos 5 caracteres.";
-        break;
-      }
-      case "city": {
-        if (!value.trim()) errorMsg = "Cidade é obrigatória.";
-        else if (value.trim().length < 2) errorMsg = "Cidade deve ter pelo menos 2 caracteres.";
-        break;
-      }
-      case "uf": {
-        if (!value) errorMsg = "Selecione o estado.";
-        break;
-      }
-      case "cep": {
-        errorMsg = mensagemErroCEP(value, true);
-        break;
-      }
-      case "password": {
-        if (!value) {
-          errorMsg = "Senha é obrigatória.";
-        } else if (!passwordPattern.regex.test(value)) {
-          errorMsg = passwordPattern.title;
-        }
-        break;
-      }
-    }
+    const errorMsg = validatePersonField(fieldName as PersonField, value);
     setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
     return errorMsg;
   };
@@ -238,12 +170,6 @@ const Signup = () => {
               >
                 Sou Locador
               </button>
-              <button
-                onClick={() => setRole(UserRole.Operador)}
-                className={`flex-1 py-3.5 text-sm font-bold transition-all border-l border-outline-variant/30 ${role === UserRole.Operador ? "bg-primary text-on-primary shadow-sm" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}
-              >
-                Sou Operador
-              </button>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>
@@ -280,7 +206,7 @@ const Signup = () => {
                   className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.birthDate ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
                   required
                   min="1900-01-01"
-                  max={calculateMaxBirthDate()}
+                  max={maxBirthDate()}
                 />
                 {errors.birthDate ? (
                   <p className="text-[11px] text-error font-medium mt-1">{errors.birthDate}</p>
@@ -292,7 +218,7 @@ const Signup = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                  CPF / CNPJ {role}*
+                  CPF / CNPJ*
                 </label>
                 <input
                   type="text"

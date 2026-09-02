@@ -34,3 +34,24 @@ docker compose down -v # também remove o banco local em container
 As alterações em `BackEnd/` e `FrontEnd/` são montadas como volumes e recarregadas
 automaticamente. Dependências Python e Node, o ambiente de ML e o banco permanecem
 em volumes ou na imagem para que o host não interfira na execução.
+
+## Chat em tempo real
+
+O `compose.yaml` sobe um serviço `redis` (imagem `redis:7.4-alpine`) usado
+apenas como *channel layer* do Django Channels — barramento efêmero entre
+processos ASGI. O Postgres continua sendo a única fonte de verdade das
+mensagens; nada de chat é persistido no Redis, por isso o serviço não tem
+volume.
+
+WebSocket é servido na mesma porta do HTTP: `ws://localhost:8000/ws/chat`.
+
+### Sem Docker?
+
+Dá para rodar tudo localmente sem Redis. Em `BackEnd/.env`:
+
+    CHANNEL_LAYER_BACKEND=memory
+
+O `runserver` atende tudo num processo só, então o `InMemoryChannelLayer`
+alcança as duas abas do browser e a feature inteira funciona ponta a ponta.
+Fora do `DJANGO_DEBUG=true` esse valor é recusado (`ImproperlyConfigured`):
+com mais de um worker o fan-out entre processos não aconteceria.

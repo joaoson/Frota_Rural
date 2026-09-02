@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import MapaLocalizacao from "@/components/MapaLocalizacao";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { postingService } from "@/services/PostingService/PostingService";
 import { contractService, type Rental } from "@/services/ContractService/ContractService";
+import { chatService } from "@/services/ChatService/ChatService";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
 
@@ -193,6 +196,33 @@ function CalendarioDisponibilidade({
 
 const AnuncioDetalhe = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [abrindoChat, setAbrindoChat] = useState(false);
+
+  /**
+   * O frontend não conhece o dono do anúncio — `PostingDetailSerializer` não
+   * expõe o user id de propósito. Por isso o servidor resolve o par e devolve
+   * o thread_id pronto.
+   */
+  const abrirConversa = async () => {
+    if (!id) return;
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    setAbrindoChat(true);
+    try {
+      const thread = await chatService.resolveThread("posting", id);
+      navigate(`/mensagens/${encodeURIComponent(thread.thread_id)}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível abrir a conversa.",
+      );
+    } finally {
+      setAbrindoChat(false);
+    }
+  };
 
   const [anuncio, setAnuncio] = useState<PostingDetalheAPI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -446,13 +476,15 @@ const AnuncioDetalhe = () => {
                 </Link>
 
                 {/* Botão: Conversar com Locador */}
-                <Link
-                  to={`/chat/${anuncio.id}`}
-                  className="flex items-center justify-center gap-2 w-full border-2 border-primary text-primary dark:text-primary-bright py-3.5 rounded-lg font-bold text-base hover:bg-primary/5 transition-colors"
+                <button
+                  type="button"
+                  onClick={abrirConversa}
+                  disabled={abrindoChat}
+                  className="flex items-center justify-center gap-2 w-full border-2 border-primary text-primary dark:text-primary-bright py-3.5 rounded-lg font-bold text-base hover:bg-primary/5 transition-colors disabled:opacity-60"
                 >
                   <MaterialIcon icon="chat" size={20} />
-                  Conversar com o Locador
-                </Link>
+                  {abrindoChat ? "Abrindo conversa..." : "Conversar com o Locador"}
+                </button>
               </div>
 
             </div>

@@ -4,7 +4,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from users.models import Users
-from users.serializer import UserSerializer, ChangePasswordSerializer
+from users.serializer import (
+    UserSerializer,
+    ChangePasswordSerializer,
+    OperatorSerializer,
+    OperatorCreateSerializer,
+)
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
 
 # Create your views here.
@@ -230,4 +235,134 @@ def change_password(request, pk):
 
     user.set_password(serializer.validated_data['new_password'])
     user.save()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Operadores da equipe -----------------------------------------------
+#
+# Um operador cadastrado aqui pertence a quem o cadastrou (`employer`). Todos
+# os endpoints abaixo filtram por `request.user`: não existe leitura ou escrita
+# na equipe de outra pessoa, mesmo conhecendo o id do operador.
+
+OPERATOR_NOT_FOUND = OpenApiResponse(
+    description="Operador não encontrado na sua equipe."
+)
+
+
+def _operator_queryset(request):
+    return Users.objects.filter(employer=request.user, role='operador')
+
+
+def _conflict_from_integrity_error(exc):
+    error_msg = str(exc).lower()
+    if 'email' in error_msg:
+        return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
+    if 'document' in error_msg:
+        return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
+    return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Operadores'],
+        summary="Listar os operadores da minha equipe",
+        description="Retorna os operadores cadastrados pelo usuário autenticado, em ordem alfabética.",
+        responses={200: OperatorSerializer(many=True)},
+    ),
+    post=extend_schema(
+        tags=['Operadores'],
+        summary="Cadastrar um operador na minha equipe",
+        description=(
+            "Cria uma conta com papel `operador` já vinculada ao usuário autenticado. "
+            "A senha inicial é definida por quem cadastra e repassada ao operador."
+        ),
+        request=OperatorCreateSerializer,
+        responses={
+            201: OperatorSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            403: OpenApiResponse(description="Cadastro bloqueado (documento de conta banida)."),
+            409: USER_CONFLICT,
+        },
+    ),
+)
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def operators(request):
+    if request.method == 'GET':
+        serializer = OperatorSerializer(_operator_queryset(request).order_by('name'), many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    document = request.data.get('document')
+    if document and Users.objects.filter(document=document, status='banned').exists():
+        return Response(
+            {'error': 'Cadastro bloqueado: documento vinculado a conta banida.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    serializer = OperatorCreateSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        operator = serializer.save(employer=request.user)
+    except IntegrityError as e:
+        return _conflict_from_integrity_error(e)
+
+    return Response(OperatorSerializer(operator).data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=['Operadores'],
+        summary="Consultar um operador da minha equipe",
+        responses={200: OperatorSerializer, 404: OPERATOR_NOT_FOUND},
+    ),
+    patch=extend_schema(
+        tags=['Operadores'],
+        summary="Atualizar um operador da minha equipe",
+        description="Atualiza apenas os campos enviados. Papel e vínculo não são editáveis.",
+        request=OperatorSerializer,
+        responses={
+            200: OperatorSerializer,
+            400: OpenApiResponse(description="Dados de entrada inválidos."),
+            404: OPERATOR_NOT_FOUND,
+            409: USER_CONFLICT,
+        },
+    ),
+    delete=extend_schema(
+        tags=['Operadores'],
+        summary="Desvincular um operador da minha equipe",
+        description=(
+            "Remove o vínculo sem apagar a conta: o histórico de locações em que o "
+            "operador aparece continua íntegro, e ele deixa de constar na equipe."
+        ),
+        responses={
+            204: OpenApiResponse(description="Operador desvinculado."),
+            404: OPERATOR_NOT_FOUND,
+        },
+    ),
+)
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def operator_detail(request, pk):
+    try:
+        operator = _operator_queryset(request).get(pk=pk)
+    except Users.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        return Response(OperatorSerializer(operator).data, status=status.HTTP_200_OK)
+
+    if request.method == 'PATCH':
+        serializer = OperatorSerializer(operator, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            return _conflict_from_integrity_error(e)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    operator.employer = None
+    operator.save(update_fields=['employer'])
     return Response(status=status.HTTP_204_NO_CONTENT)

@@ -17,6 +17,8 @@ import AdminUsers from "@/pages/Admin/Users.tsx";
 import AdminAnuncios from "@/pages/Admin/Anuncios.tsx";
 import AdminDocumentos from "@/pages/Admin/Documentos.tsx";
 import AdminPlaceholder from "@/pages/Admin/AdminPlaceholder.tsx";
+import AdminDenuncias from "@/pages/Admin/Denuncias.tsx";
+import Mensagens from "@/pages/Mensagens/Mensagens.tsx";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 
@@ -28,6 +30,8 @@ import Help from "./pages/Help.tsx";
 import Contrato from "./pages/Contrato/Contrato.tsx";
 import Reservar from "@/pages/Reservar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
+import { ChatSocketProvider } from "@/contexts/ChatSocketContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import CertificationUpload from "./pages/Documents/CertificationUpload.tsx";
@@ -42,6 +46,8 @@ createRoot(document.getElementById("root")!).render(
     >
     <BrowserRouter>
       <AuthProvider>
+        <ChatUnreadProvider>
+        <ChatSocketProvider>
         <Toaster position="bottom-right" />
         <Routes>
           <Route path="/" element={<Index />} />
@@ -56,6 +62,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/signup/document-upload" element={<CNHUpload />} />
           <Route path="/signup/profile-upload" element={<SelfieUpload />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="/mensagens" element={<Mensagens />} />
+            <Route path="/mensagens/:threadId" element={<Mensagens />} />
             <Route path="/dashboard" element={<DashboardLocador />} />
             <Route
               path="/dashboard-locatario"
@@ -82,6 +90,9 @@ createRoot(document.getElementById("root")!).render(
               path="/document/certification/:id"
               element={<CertificationUpload />}
             />
+            {/* O painel admin exigia apenas autenticação: qualquer locador ou
+                locatário logado abria /admin e batia nos endpoints de lá. */}
+            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="users" replace />} />
               <Route path="users" element={<AdminUsers />} />
@@ -89,12 +100,13 @@ createRoot(document.getElementById("root")!).render(
               <Route path="documentos" element={<AdminDocumentos />} />
               <Route
                 path="denuncias"
-                element={<AdminPlaceholder title="Denúncias" />}
+                element={<AdminDenuncias />}
               />
               <Route
                 path="relatorios"
                 element={<AdminPlaceholder title="Relatórios" />}
               />
+            </Route>
             </Route>
           </Route>
           <Route path="/buscar" element={<Navigate to="/buscar-maquinario" replace />} />
@@ -103,6 +115,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/reservar/:id" element={<Reservar />} />
           <Route path="/contrato/:id" element={<Contrato />} />
         </Routes>
+        </ChatSocketProvider>
+        </ChatUnreadProvider>
       </AuthProvider>
     </BrowserRouter>
     </ThemeProvider>

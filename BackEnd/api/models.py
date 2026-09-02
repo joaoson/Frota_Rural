@@ -16,20 +16,6 @@ from django.db import models
 
 # TODO: CONFORME FOR AVANÇANDO NO PROJETO, CRIAR APPS PARA MODULARIZAR TUDO E NÃO CRIAR MAIS TUDO DENTRO DE API
 # TODO: A IDEIA É QUE ESSA PASTA API DEIXE DE EXISTIR E FIQUE TUDO MODULARIZADO
-class Messages(models.Model):
-    id = models.UUIDField(primary_key=True)
-    sender = models.ForeignKey('users.Users', models.DO_NOTHING)
-    receiver = models.ForeignKey('users.Users', models.DO_NOTHING, related_name='messages_receiver_set')
-    rental = models.ForeignKey('Rentals', models.DO_NOTHING)
-    content = models.TextField()
-    sent_at = models.DateTimeField(blank=True, null=True)
-    flagged_for_moderation = models.BooleanField(blank=True, null=True)
-
-    class Meta:
-        # managed = False
-        db_table = 'messages'
-
-
 class Rentals(models.Model):
     id = models.UUIDField(primary_key=True)
     postings = models.ForeignKey('postings.Postings', models.DO_NOTHING)

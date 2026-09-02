@@ -9,6 +9,7 @@ import { UserServiceError } from "@/services/UserService/errors/UserError";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseJwt, type JwtPayload } from "@/utils/jwt";
+import { homeRouteForRole } from "@/utils/homeRoute";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -60,13 +61,7 @@ const Login = () => {
       toast.success("Login realizado com sucesso!");
       
       const from = (location.state as any)?.from;
-      if (from) {
-        navigate(from, { replace: true });
-      } else if (user.role === "locador") {
-        navigate("/dashboard");
-      } else {
-        navigate("/dashboard-locatario");
-      }
+      navigate(from ?? homeRouteForRole(user.role), { replace: true });
     } catch (error) {
       if (error instanceof UserServiceError) {
         toast.error(error.message);
