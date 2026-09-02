@@ -29,6 +29,7 @@ import Contrato from "./pages/Contrato/Contrato.tsx";
 import Reservar from "@/pages/Reservar.tsx";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PageTitle from "@/components/PageTitle";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import CertificationUpload from "./pages/Documents/CertificationUpload.tsx";
 
@@ -42,6 +43,7 @@ createRoot(document.getElementById("root")!).render(
     >
     <BrowserRouter>
       <AuthProvider>
+        <PageTitle />
         <Toaster position="bottom-right" />
         <Routes>
           <Route path="/" element={<Index />} />
