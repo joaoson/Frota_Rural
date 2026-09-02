@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import MaterialIcon from "@/components/MaterialIcon";
+import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
   const { isAuthenticated, isLoading, userRole, logout } = useAuth();
+  const { unread_total: unreadTotal } = useChatUnread();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +52,21 @@ const Navbar = () => {
         
         <div className="flex items-center gap-3">
           <ThemeToggle />
+
+          {isAuthenticated ? (
+            <Link
+              to="/mensagens"
+              aria-label="Mensagens"
+              className="relative text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors"
+            >
+              <MaterialIcon icon="chat_bubble" size={24} />
+              {unreadTotal > 0 ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-error text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-surface-container-lowest">
+                  {unreadTotal > 9 ? "9+" : unreadTotal}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
 
           {isLoading ? (
             <div className="w-10 h-10" aria-hidden />

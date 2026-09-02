@@ -13,6 +13,8 @@ import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { UFS } from "@/utils/ufs";
 import { validateDocument } from "@/utils/validation/validateDocument";
 import { mensagemErroCEP } from "@/utils/validation/validateCEP";
+import ChatInboxPanel from "@/components/ChatInboxPanel";
+import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { passwordPattern } from "@/utils/regexPatterns";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
@@ -23,6 +25,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import ThemeToggle from "@/components/ThemeToggle";
 import NotificationPopover from "@/components/NotificationPopover";
 import DashboardMachineSearch from "@/components/DashboardMachineSearch";
+import OperadoresPanel from "@/components/OperadoresPanel";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +63,7 @@ const sidebarItems = [
   { icon: "search", label: "Buscar Máquinas", tab: "buscar" },
   { icon: "event_available", label: "Minhas Locações", tab: "locacoes" },
   { icon: "description", label: "Contratos", tab: "contratos" },
+  { icon: "engineering", label: "Operadores", tab: "operadores" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
@@ -67,7 +71,7 @@ const sidebarItems = [
   { icon: "logout", label: "Sair", tab: "sair" },
 ];
 
-type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta" | "sair";
+type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "operadores" | "avaliacoes" | "chat" | "notificacoes" | "conta" | "sair";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -77,6 +81,7 @@ function getInitials(name: string): string {
 
 const DashboardLocatario = () => {
   const { userId, logout } = useAuth();
+  const { unread_total: unreadTotal } = useChatUnread();
   const [user, setUser] = useState<User | null>(null);
 
   // Formulário dados pessoais
@@ -463,6 +468,11 @@ const DashboardLocatario = () => {
               >
                 <MaterialIcon icon={item.icon} size={20} />
                 <span>{item.label}</span>
+                {item.tab === "chat" && unreadTotal > 0 ? (
+                  <span className="ml-auto w-5 h-5 bg-error text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center">
+                    {unreadTotal > 9 ? "9+" : unreadTotal}
+                  </span>
+                ) : null}
               </button>
             );
 
@@ -524,7 +534,6 @@ const DashboardLocatario = () => {
             notifications={[
               { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
               { id: 2, icon: "description", title: "Contrato pronto para assinatura", desc: "Colheitadeira JD S700 · Fazenda São João", time: "3h atrás", unread: true },
-              { id: 3, icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
             ]}
             />
           </div>
@@ -773,6 +782,9 @@ const DashboardLocatario = () => {
             </div>
           )}
 
+          {/* Operadores */}
+          {tab === "operadores" && <OperadoresPanel />}
+
           {/* Avaliações Tab */}
           {tab === "avaliacoes" && (
             <div className="space-y-8">
@@ -859,6 +871,7 @@ const DashboardLocatario = () => {
 
           {/* Chat */}
           {tab === "chat" && (
+            <ChatInboxPanel subtitle="Converse com seus locadores" />
             <div className="space-y-6">
               <div>
                 <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">Mensagens</h1>
@@ -974,7 +987,6 @@ const DashboardLocatario = () => {
               <div className="space-y-3">
                 {[
                   { icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
-                  { icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
                   { icon: "event_repeat", title: "Reagendamento aprovado", desc: "Novo período: 15–20 Fev/2026 · Trator Valtra BH194", time: "2 dias atrás", unread: false },
                   { icon: "payments", title: "Pagamento processado", desc: "R$ 15.000,00 — Trator Valtra BH194", time: "3 dias atrás", unread: false },
                 ].map((n, i) => (

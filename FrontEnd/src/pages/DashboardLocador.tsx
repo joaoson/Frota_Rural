@@ -20,6 +20,8 @@ import { clearSpecialChars } from "@/utils/clearSpecialChars";
 import { UFS } from "@/utils/ufs";
 import { validateDocument } from "@/utils/validation/validateDocument";
 import { mensagemErroCEP } from "@/utils/validation/validateCEP";
+import ChatInboxPanel from "@/components/ChatInboxPanel";
+import { useChatUnread } from "@/contexts/ChatUnreadContext";
 import { passwordPattern } from "@/utils/regexPatterns";
 import {
   Area,
@@ -128,6 +130,7 @@ function situacaoAssinatura(c: {
 
 const DashboardLocador = () => {
   const { userId, logout } = useAuth();
+  const { unread_total: unreadTotal } = useChatUnread();
   const [user, setUser] = useState<User | null>(null);
 
   // Formulário dados pessoais
@@ -858,6 +861,11 @@ const DashboardLocador = () => {
               >
                 <MaterialIcon icon={item.icon} size={20} />
                 <span>{item.label}</span>
+                {item.tab === "chat" && unreadTotal > 0 ? (
+                  <span className="ml-auto w-5 h-5 bg-error text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center">
+                    {unreadTotal > 9 ? "9+" : unreadTotal}
+                  </span>
+                ) : null}
               </button>
             );
 
@@ -2017,6 +2025,7 @@ const DashboardLocador = () => {
 
           {/* Chat */}
           {tab === "chat" ? (
+            <ChatInboxPanel subtitle="Converse com seus locatários" />
             <div className="space-y-6">
               <div>
                 <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">

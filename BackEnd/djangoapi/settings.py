@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,23 +28,32 @@ load_dotenv(dotenv_path=str(BASE_DIR / '.env'))
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--rxohg4%^v8&aj58z)v+*)_ry)d9rhf@s&wearauq4hdt#7kp1'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-local-development-only')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # Precisa vir antes de staticfiles: o app `daphne` substitui o comando
+    # `runserver` por um servidor ASGI. O runserver do Django 6.0 ainda e
+    # WSGI-only, entao sem isto o WebSocket simplesmente nao sobe em dev.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'rest_framework',
     'corsheaders',
     'api',
@@ -53,6 +64,7 @@ INSTALLED_APPS = [
     'machines',
     'administration',
     'document_validation',
+    'chat',
     'drf_spectacular',
 ]
 
@@ -97,6 +109,32 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'djangoapi.wsgi.application'
+ASGI_APPLICATION = 'djangoapi.asgi.application'
+
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+# O Channels usa o Redis apenas como barramento efemero entre processos ASGI.
+# O Postgres continua sendo a unica fonte de verdade das mensagens.
+#
+# `memory` existe para desenvolvimento local sem Redis: funciona porque o
+# runserver atende tudo em um unico processo. Com mais de um worker o fan-out
+# entre processos simplesmente nao acontece -- por isso a checagem abaixo
+# recusa `memory` fora do DEBUG.
+CHANNEL_LAYER_BACKEND = os.getenv('CHANNEL_LAYER_BACKEND', 'redis').lower()
+
+if CHANNEL_LAYER_BACKEND == 'memory':
+    if not DEBUG:
+        raise ImproperlyConfigured(
+            'CHANNEL_LAYER_BACKEND=memory so e permitido com DJANGO_DEBUG=true.'
+        )
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [REDIS_URL], 'capacity': 1000, 'expiry': 10},
+        }
+    }
 
 AUTH_USER_MODEL = 'users.Users'
 
@@ -155,6 +193,7 @@ SPECTACULAR_SETTINGS = {
         {'name': 'Locações', 'description': 'Reservas e ciclo de vida das locações.'},
         {'name': 'Contratos', 'description': 'Geração e assinatura dos contratos de locação.'},
         {'name': 'Avaliações', 'description': 'Reputação de locadores e locatários.'},
+        {'name': 'Mensagens', 'description': 'Chat entre locadores, locatários e operadores.'},
         {'name': 'Documentos', 'description': 'CNHs, certificações e validação por Machine Learning.'},
         {'name': 'Administração', 'description': 'Moderação de usuários e anúncios.'},
     ],
@@ -259,3 +298,12 @@ FIREBASE_CREDENTIALS_FILE = str(
     if os.path.isabs(_firebase_credentials)
     else BASE_DIR / _firebase_credentials
 )
+
+# Moderação do chat: mensagens com estas palavras entram na fila da moderação,
+# mas continuam sendo entregues (flag suave, não bloqueio).
+CHAT_BANNED_WORDS = [
+    w.strip().lower() for w in os.getenv('CHAT_BANNED_WORDS', '').split(',') if w.strip()
+]
+CHAT_MAX_MESSAGE_LENGTH = int(os.getenv('CHAT_MAX_MESSAGE_LENGTH', '4000'))
+CHAT_RATE_LIMIT_MESSAGES = int(os.getenv('CHAT_RATE_LIMIT_MESSAGES', '20'))
+CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('CHAT_RATE_LIMIT_WINDOW_SECONDS', '10'))

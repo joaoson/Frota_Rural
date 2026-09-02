@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import MaterialIcon from "@/components/MaterialIcon";
 import { contractService, type Rental } from "@/services/ContractService/ContractService";
@@ -7,12 +7,35 @@ import { contractService, type Rental } from "@/services/ContractService/Contrac
 const toDate = (value: string) => new Date(`${value.slice(0, 10)}T12:00:00`);
 const isoDate = (value: Date) => value.toISOString().slice(0, 10);
 const daysBetween = (start: string, end: string) => Math.max(1, Math.round((toDate(end).getTime() - toDate(start).getTime()) / 86_400_000) + 1);
+import { chatService } from "@/services/ChatService/ChatService";
+import { toast } from "sonner";
+
 const formatDate = (value: string) => toDate(value).toLocaleDateString("pt-BR");
 
 const AnaliseLocacao = () => {
   const { rentalId } = useParams<{ rentalId: string }>();
+  const navigate = useNavigate();
   const [rental, setRental] = useState<Rental | null>(null);
   const [loading, setLoading] = useState(true);
+  const [abrindoChat, setAbrindoChat] = useState(false);
+
+  // O servidor deriva o outro participante da locação. Se houver operador
+  // designado, o par fica ambíguo e a API devolve 400 pedindo o peer_id —
+  // por isso o erro vai para o toast em vez de virar navegação quebrada.
+  const abrirConversa = async () => {
+    if (!rentalId) return;
+    setAbrindoChat(true);
+    try {
+      const thread = await chatService.resolveThread("rental", rentalId);
+      navigate(`/mensagens/${encodeURIComponent(thread.thread_id)}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível abrir a conversa.",
+      );
+    } finally {
+      setAbrindoChat(false);
+    }
+  };
 
   useEffect(() => {
     if (!rentalId) return;
@@ -48,7 +71,7 @@ const AnaliseLocacao = () => {
 
       <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm"><div className="mb-6 flex items-start justify-between"><div><h2 className="font-headline text-xl font-bold text-on-surface">Evolução financeira</h2><p className="text-sm text-on-surface-variant">Valor acumulado do período contratado</p></div><strong className="text-primary">{analytics.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></div><div className="h-64"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.chart}><defs><linearGradient id="rentalValue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={.35} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" opacity={.25} /><XAxis dataKey="dia" tickLine={false} axisLine={false} /><YAxis tickFormatter={(v) => `R$${v}`} tickLine={false} axisLine={false} /><Tooltip formatter={(value) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><Area type="monotone" dataKey="valor" stroke="hsl(var(--primary))" fill="url(#rentalValue)" strokeWidth={3} /></AreaChart></ResponsiveContainer></div></section>
 
-      <section className="rounded-2xl border border-secondary-container/40 bg-secondary-fixed/20 p-6"><h2 className="font-headline text-xl font-bold text-on-surface">Próximos passos</h2><p className="mt-1 text-sm text-on-surface-variant">Você pode solicitar uma extensão do período ou criar uma nova reserva para este mesmo equipamento.</p><div className="mt-5 flex flex-col gap-3 sm:flex-row"><Link to={`/reservar/${rental.postingId}?inicio=${extensionStart}&extensao=1`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-on-primary"><MaterialIcon icon="event_repeat" size={18} /> Estender locação</Link><Link to={`/reservar/${rental.postingId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-bold text-primary"><MaterialIcon icon="replay" size={18} /> Alugar novamente</Link></div></section>
+      <section className="rounded-2xl border border-secondary-container/40 bg-secondary-fixed/20 p-6"><h2 className="font-headline text-xl font-bold text-on-surface">Próximos passos</h2><p className="mt-1 text-sm text-on-surface-variant">Você pode solicitar uma extensão do período ou criar uma nova reserva para este mesmo equipamento.</p><div className="mt-5 flex flex-col gap-3 sm:flex-row"><Link to={`/reservar/${rental.postingId}?inicio=${extensionStart}&extensao=1`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-on-primary"><MaterialIcon icon="event_repeat" size={18} /> Estender locação</Link><Link to={`/reservar/${rental.postingId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-bold text-primary"><MaterialIcon icon="replay" size={18} /> Alugar novamente</Link><button type="button" onClick={abrirConversa} disabled={abrindoChat} className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-bold text-primary disabled:opacity-60"><MaterialIcon icon="chat" size={18} /> {abrindoChat ? "Abrindo..." : "Mensagens da locação"}</button></div></section>
     </div>
   </main>;
 };

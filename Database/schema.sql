@@ -20,9 +20,12 @@ CREATE TABLE users (
     city VARCHAR(100),
     state VARCHAR(2),
     status VARCHAR(50) DEFAULT 'active',
+    -- Operador cadastrado de dentro do painel pertence a quem o criou.
+    employer_id UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_users_employer_id ON users(employer_id);
 
 -- Credentials
 CREATE TABLE credentials (
@@ -180,12 +183,44 @@ CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     sender_id UUID NOT NULL REFERENCES users(id),
     receiver_id UUID NOT NULL REFERENCES users(id),
-    rental_id UUID NOT NULL REFERENCES rentals(id) ON DELETE CASCADE,
+    -- Uma thread e derivada: ou pertence a uma locacao, ou e uma consulta sobre
+    -- um anuncio feita antes de existir locacao. Exatamente um dos dois.
+    rental_id UUID REFERENCES rentals(id) ON DELETE CASCADE,
+    posting_id UUID REFERENCES postings(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
-    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    flagged_for_moderation BOOLEAN DEFAULT false
+    sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP WITH TIME ZONE,
+    hidden_at TIMESTAMP WITH TIME ZONE,
+    client_id UUID,
+    flagged_for_moderation BOOLEAN NOT NULL DEFAULT false,
+    CONSTRAINT messages_exactly_one_scope CHECK (
+        (rental_id IS NOT NULL AND posting_id IS NULL)
+     OR (rental_id IS NULL AND posting_id IS NOT NULL)
+    )
 );
-CREATE INDEX idx_messages_rental_id ON messages(rental_id);
+-- Idempotencia de envio: reenvio com o mesmo client_id nao duplica a linha.
+CREATE UNIQUE INDEX messages_sender_client_id_uniq ON messages (sender_id, client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX idx_messages_rental_thread   ON messages (rental_id, sent_at DESC, id DESC);
+CREATE INDEX idx_messages_posting_thread  ON messages (posting_id, sent_at DESC, id DESC);
+CREATE INDEX idx_messages_sender_recent   ON messages (sender_id, sent_at DESC);
+CREATE INDEX idx_messages_receiver_recent ON messages (receiver_id, sent_at DESC);
+CREATE INDEX idx_messages_unread          ON messages (receiver_id) WHERE read_at IS NULL;
+CREATE INDEX idx_messages_flagged         ON messages (sent_at DESC) WHERE flagged_for_moderation;
+
+-- Denuncias de mensagens + decisao da moderacao na mesma linha.
+CREATE TABLE message_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    reported_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    reason TEXT NOT NULL,
+    resolution VARCHAR(20),
+    resolution_note TEXT,
+    resolved_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (message_id, reported_by_id)
+);
+CREATE INDEX idx_message_reports_pending ON message_reports (created_at DESC) WHERE resolution IS NULL;
 
 -- Reviews
 CREATE TABLE reviews (

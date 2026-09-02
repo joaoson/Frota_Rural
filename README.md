@@ -126,7 +126,21 @@ O script de criação do schema está em [`Database/schema.sql`](Database/schema
 | PostgreSQL | 17 | Banco de dados |
 | Poppler | — | Leitura de PDFs no ML (`brew install poppler` no macOS) |
 
-### 1. Banco de dados
+### Desenvolvimento containerizado (recomendado)
+
+O ambiente reproduzível — PostgreSQL, Django, dependências de ML e Vite — pode ser
+iniciado sem instalar Python, Node, PostgreSQL ou Poppler no host:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Consulte [`Devops/README.md`](Devops/README.md) para os serviços, comandos e dados
+de desenvolvimento. A decisão de arquitetura está em
+[`Documentation/adr/0001-containerized-development-environment.md`](Documentation/adr/0001-containerized-development-environment.md).
+
+### 1. Banco de dados (execução sem containers)
 
 Crie um banco local chamado `frota_rural` e, na raiz de `BackEnd/`, um arquivo `.env`:
 

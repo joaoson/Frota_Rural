@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router";
+import { homeRouteForRole } from "@/utils/homeRoute";
 import { useAuth } from "@/contexts/AuthContext";
 
 type ProtectedRouteProps = {
@@ -15,10 +16,7 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
 
   if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
-    if (userRole === "locador") return <Navigate to="/dashboard" replace />;
-    if (userRole === "locatario") return <Navigate to="/dashboard-locatario" replace />;
-    if (userRole === "admin") return <Navigate to="/admin" replace />;
-    return <Navigate to="/" replace />;
+    return <Navigate to={homeRouteForRole(userRole)} replace />;
   }
 
   return <Outlet />;
