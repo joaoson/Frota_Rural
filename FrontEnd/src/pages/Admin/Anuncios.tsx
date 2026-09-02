@@ -433,10 +433,10 @@ const AdminAnuncios = () => {
           ) : null}
           {pendingAction?.action === "reject" ? (
             <div className="pt-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-outline">
+              <label htmlFor="motivo-da-reprovacao" className="text-[10px] font-bold uppercase tracking-wider text-outline">
                 Motivo da reprovação
               </label>
-              <textarea
+              <textarea id="motivo-da-reprovacao"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={4}

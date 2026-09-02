@@ -135,8 +135,8 @@ const EditEquipamentoModal = ({
         <form onSubmit={handleSubmit} className="px-8 pb-8 pt-6 space-y-6" noValidate>
           {/* Renagro */}
           <div className="space-y-1.5">
-            <label className={labelClass}>Nº Registro Renagro *</label>
-            <input
+            <label htmlFor="no-registro-renagro" className={labelClass}>Nº Registro Renagro *</label>
+            <input id="no-registro-renagro"
               type="text"
               value={form.registroRenagro}
               onChange={(e) => handleChange("registroRenagro", e.target.value)}
@@ -156,8 +156,8 @@ const EditEquipamentoModal = ({
           {/* Marca / Modelo */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className={labelClass}>Marca *</label>
-              <input
+              <label htmlFor="marca" className={labelClass}>Marca *</label>
+              <input id="marca"
                 type="text"
                 value={form.marca}
                 onChange={(e) => handleChange("marca", e.target.value)}
@@ -168,8 +168,8 @@ const EditEquipamentoModal = ({
               {errors.marca && <p className="text-[11px] text-error font-medium mt-1">{errors.marca}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className={labelClass}>Modelo *</label>
-              <input
+              <label htmlFor="modelo" className={labelClass}>Modelo *</label>
+              <input id="modelo"
                 type="text"
                 value={form.modelo}
                 onChange={(e) => handleChange("modelo", e.target.value)}
@@ -184,8 +184,8 @@ const EditEquipamentoModal = ({
           {/* Ano / Finalidade */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className={labelClass}>Ano de Fabricação</label>
-              <input
+              <label htmlFor="ano-de-fabricacao" className={labelClass}>Ano de Fabricação</label>
+              <input id="ano-de-fabricacao"
                 type="number"
                 value={form.anoFabricacao}
                 onChange={(e) => handleChange("anoFabricacao", e.target.value)}
@@ -196,8 +196,8 @@ const EditEquipamentoModal = ({
               {errors.anoFabricacao && <p className="text-[11px] text-error font-medium mt-1">{errors.anoFabricacao}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className={labelClass}>Finalidade de Uso</label>
-              <select
+              <label htmlFor="finalidade-de-uso" className={labelClass}>Finalidade de Uso</label>
+              <select id="finalidade-de-uso"
                 value={form.finalidade}
                 onChange={(e) => handleChange("finalidade", e.target.value)}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
@@ -212,8 +212,8 @@ const EditEquipamentoModal = ({
 
           {/* Especificações */}
           <div className="space-y-1.5">
-            <label className={labelClass}>Especificações Técnicas</label>
-            <textarea
+            <label htmlFor="especificacoes-tecnicas" className={labelClass}>Especificações Técnicas</label>
+            <textarea id="especificacoes-tecnicas"
               value={form.especificacoes}
               onChange={(e) => handleChange("especificacoes", e.target.value)}
               rows={3}

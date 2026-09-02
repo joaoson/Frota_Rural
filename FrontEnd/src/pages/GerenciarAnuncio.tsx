@@ -241,10 +241,10 @@ const GerenciarAnuncio = () => {
               noValidate
             >
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="status-do-anuncio" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Status do Anúncio
                 </label>
-                <select
+                <select id="status-do-anuncio"
                   name="status"
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
@@ -256,10 +256,10 @@ const GerenciarAnuncio = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="valor-por-hora-r" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Valor por Hora (R$) *
                 </label>
-                <input
+                <input id="valor-por-hora-r"
                   name="hourly_rate"
                   type="number"
                   min={0}
@@ -280,10 +280,10 @@ const GerenciarAnuncio = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="cep" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     CEP
                   </label>
-                  <input
+                  <input id="cep"
                     type="text"
                     placeholder="00000-000"
                     value={cep}
@@ -316,10 +316,10 @@ const GerenciarAnuncio = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="localizacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Localização *
                   </label>
-                  <input
+                  <input id="localizacao"
                     name="location_address"
                     type="text"
                     value={location}
@@ -347,10 +347,10 @@ const GerenciarAnuncio = () => {
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="disponivel-a-partir-de" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Disponível a partir de
                   </label>
-                  <input
+                  <input id="disponivel-a-partir-de"
                     name="availability_start"
                     type="date"
                     min={piso(inicioGravado)}
@@ -370,10 +370,10 @@ const GerenciarAnuncio = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="disponivel-ate" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Disponível até
                   </label>
-                  <input
+                  <input id="disponivel-ate"
                     name="availability_end"
                     type="date"
                     min={minFim}
@@ -395,10 +395,10 @@ const GerenciarAnuncio = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="maximo-de-dias-por-reserva" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Máximo de dias por reserva
                 </label>
-                <input
+                <input id="maximo-de-dias-por-reserva"
                   name="max_reservation_days"
                   type="number"
                   min={1}
@@ -417,10 +417,10 @@ const GerenciarAnuncio = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="descricao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Descrição
                 </label>
-                <textarea
+                <textarea id="descricao"
                   name="description"
                   rows={4}
                   value={description}

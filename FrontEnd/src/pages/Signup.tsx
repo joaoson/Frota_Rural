@@ -174,10 +174,10 @@ const Signup = () => {
 
             <form className="space-y-5" onSubmit={handleSubmit} noValidate>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="nome-completo" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nome Completo*
                 </label>
-                <input
+                <input id="nome-completo"
                   type="text"
                   placeholder="João da Silva"
                   value={name}
@@ -192,10 +192,10 @@ const Signup = () => {
                 {errors.name && <p className="text-[11px] text-error font-medium mt-1">{errors.name}</p>}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="data-de-nascimento" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Data de Nascimento*
                 </label>
-                <input
+                <input id="data-de-nascimento"
                   type="date"
                   value={birthDate}
                   onChange={(e) => {
@@ -217,10 +217,10 @@ const Signup = () => {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                  CPF / CNPJ*
+                <label htmlFor="cpf-cnpj" className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  CPF / CNPJ {role}*
                 </label>
-                <input
+                <input id="cpf-cnpj"
                   type="text"
                   placeholder="000.000.000-00 ou 00.000.000/0001-00"
                   value={document}
@@ -242,10 +242,10 @@ const Signup = () => {
                 )}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="e-mail" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   E-mail*
                 </label>
-                <input
+                <input id="e-mail"
                   type="email"
                   placeholder="contato@email.com"
                   value={email}
@@ -260,10 +260,10 @@ const Signup = () => {
                 {errors.email && <p className="text-[11px] text-error font-medium mt-1">{errors.email}</p>}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="telefone" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Telefone *
                 </label>
-                <input
+                <input id="telefone"
                   type="tel"
                   placeholder="(00) 90000-0000"
                   value={phone}
@@ -279,10 +279,10 @@ const Signup = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="cep" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   CEP*
                 </label>
-                <input
+                <input id="cep"
                   type="text"
                   placeholder="00000-000"
                   value={cep}
@@ -303,10 +303,10 @@ const Signup = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="endereco" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Endereço*
                 </label>
-                <input
+                <input id="endereco"
                   type="text"
                   placeholder="Rua, número, complemento"
                   value={address}
@@ -322,10 +322,10 @@ const Signup = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="cidade" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Cidade*
                   </label>
-                  <input
+                  <input id="cidade"
                     type="text"
                     placeholder="Sorriso"
                     value={city}
@@ -340,10 +340,10 @@ const Signup = () => {
                   {errors.city && <p className="text-[11px] text-error font-medium mt-1">{errors.city}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="estado" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Estado*
                   </label>
-                  <select
+                  <select id="estado"
                     value={uf}
                     onChange={(e) => {
                       setUf(e.target.value);
@@ -387,11 +387,11 @@ const Signup = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="senha" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha*
                 </label>
                 <div className="relative">
-                  <input
+                  <input id="senha"
                     type={showPassword ? "text" : "password"}
                     placeholder="Mínimo 8 caracteres"
                     value={password}

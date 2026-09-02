@@ -131,10 +131,10 @@ const ResetPassword = () => {
 
             <form className="space-y-6" onSubmit={handleSubmit} noValidate>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="nova-senha" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Nova Senha
                 </label>
-                <input
+                <input id="nova-senha"
                   type="password"
                   placeholder="••••••••"
                   value={newPassword}
@@ -149,10 +149,10 @@ const ResetPassword = () => {
                 {errors.newPassword && <p className="text-[11px] text-error font-medium mt-1">{errors.newPassword}</p>}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor="confirmar-nova-senha" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Confirmar Nova Senha
                 </label>
-                <input
+                <input id="confirmar-nova-senha"
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}

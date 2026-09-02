@@ -665,10 +665,10 @@ const CNHUpload = () => {
                 </p>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="nome-completo" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Nome Completo *
                   </label>
-                  <input
+                  <input id="nome-completo"
                     type="text"
                     placeholder="Conforme consta na CNH"
                     value={name}
@@ -685,10 +685,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="data-de-nascimento" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Data de Nascimento *
                     </label>
-                    <input
+                    <input id="data-de-nascimento"
                       type="date"
                       value={birthDate}
                       ref={birthDateRef}
@@ -704,10 +704,10 @@ const CNHUpload = () => {
                     {errors.birthDate && <p className="text-[11px] text-error font-medium mt-1">{errors.birthDate}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="cpf" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       CPF *
                     </label>
-                    <input
+                    <input id="cpf"
                       type="text"
                       placeholder="000.000.000-00"
                       value={cpf}
@@ -727,10 +727,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="rg" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       RG *
                     </label>
-                    <input
+                    <input id="rg"
                       type="text"
                       placeholder="00.000.000-0"
                       value={rg}
@@ -747,10 +747,10 @@ const CNHUpload = () => {
                     {errors.rg && <p className="text-[11px] text-error font-medium mt-1">{errors.rg}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="nacionalidade" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Nacionalidade *
                     </label>
-                    <select
+                    <select id="nacionalidade"
                       value={nationality}
                       onChange={(e) => {
                         setNationality(e.target.value);
@@ -770,10 +770,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="cidade-de-nascimento" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Cidade de Nascimento *
                     </label>
-                    <input
+                    <input id="cidade-de-nascimento"
                       type="text"
                       placeholder="São Paulo"
                       value={birthCity}
@@ -788,10 +788,10 @@ const CNHUpload = () => {
                     {errors.birthCity && <p className="text-[11px] text-error font-medium mt-1">{errors.birthCity}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="estado-de-nascimento" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Estado de Nascimento *
                     </label>
-                    <select
+                    <select id="estado-de-nascimento"
                       value={birthState}
                       onChange={(e) => {
                         setBirthState(e.target.value);
@@ -814,10 +814,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="nome-da-mae" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Nome da Mãe *
                     </label>
-                    <input
+                    <input id="nome-da-mae"
                       type="text"
                       placeholder="Nome completo"
                       value={motherName}
@@ -832,10 +832,10 @@ const CNHUpload = () => {
                     {errors.motherName && <p className="text-[11px] text-error font-medium mt-1">{errors.motherName}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="nome-do-pai-opcional" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Nome do Pai (opcional)
                     </label>
-                    <input
+                    <input id="nome-do-pai-opcional"
                       type="text"
                       placeholder="Nome completo"
                       value={fatherName}
@@ -851,10 +851,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="no-cnh" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Nº CNH *
                     </label>
-                    <input
+                    <input id="no-cnh"
                       type="text"
                       placeholder="11 dígitos"
                       value={cnhNumber}
@@ -870,10 +870,10 @@ const CNHUpload = () => {
                     {errors.cnhNumber && <p className="text-[11px] text-error font-medium mt-1">{errors.cnhNumber}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="categoria" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Categoria *
                     </label>
-                    <select
+                    <select id="categoria"
                       value={category}
                       onChange={(e) => {
                         setCategory(e.target.value);
@@ -893,10 +893,10 @@ const CNHUpload = () => {
                     {errors.category && <p className="text-[11px] text-error font-medium mt-1">{errors.category}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="primeira-habilitacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Primeira Habilitação *
                     </label>
-                    <input
+                    <input id="primeira-habilitacao"
                       type="date"
                       value={firstLicenseDate}
                       max={today}
@@ -914,10 +914,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="data-de-emissao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Data de Emissão *
                     </label>
-                    <input
+                    <input id="data-de-emissao"
                       type="date"
                       value={issueDate}
                       max={today}
@@ -932,10 +932,10 @@ const CNHUpload = () => {
                     {errors.issueDate && <p className="text-[11px] text-error font-medium mt-1">{errors.issueDate}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="data-de-validade" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Data de Validade *
                     </label>
-                    <input
+                    <input id="data-de-validade"
                       type="date"
                       value={expirationDate}
                       onChange={(e) => {
@@ -952,10 +952,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="uf-de-emissao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       UF de Emissão *
                     </label>
-                    <select
+                    <select id="uf-de-emissao"
                       value={issuingState}
                       onChange={(e) => {
                         setIssuingState(e.target.value);
@@ -975,10 +975,10 @@ const CNHUpload = () => {
                     {errors.issuingState && <p className="text-[11px] text-error font-medium mt-1">{errors.issuingState}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="orgao-emissor" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Órgão Emissor *
                     </label>
-                    <input
+                    <input id="orgao-emissor"
                       type="text"
                       placeholder="DETRAN-SP"
                       value={issuingAuthority}
@@ -1000,10 +1000,10 @@ const CNHUpload = () => {
 
                 <div className="grid grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="situacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Situação *
                     </label>
-                    <select
+                    <select id="situacao"
                       value={situation}
                       onChange={(e) => {
                         setSituation(e.target.value);
@@ -1023,10 +1023,10 @@ const CNHUpload = () => {
                     {errors.situation && <p className="text-[11px] text-error font-medium mt-1">{errors.situation}</p>}
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                    <label htmlFor="pontuacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                       Pontuação
                     </label>
-                    <input
+                    <input id="pontuacao"
                       type="number"
                       placeholder="0"
                       value={points}
@@ -1077,10 +1077,10 @@ const CNHUpload = () => {
                 </p>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="restricoes-medicas" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Restrições Médicas
                   </label>
-                  <textarea
+                  <textarea id="restricoes-medicas"
                     placeholder="Ex.: Obrigatório uso de lentes corretivas"
                     value={medicalRestrictions}
                     onChange={(e) => setMedicalRestrictions(e.target.value)}
@@ -1090,10 +1090,10 @@ const CNHUpload = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <label htmlFor="observacoes" className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     Observações
                   </label>
-                  <textarea
+                  <textarea id="observacoes"
                     placeholder="Informações adicionais do documento"
                     value={observations}
                     onChange={(e) => setObservations(e.target.value)}

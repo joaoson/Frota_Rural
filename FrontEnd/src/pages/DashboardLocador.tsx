@@ -2026,6 +2026,180 @@ const DashboardLocador = () => {
           {/* Chat */}
           {tab === "chat" ? (
             <ChatInboxPanel subtitle="Converse com seus locatários" />
+            <div className="space-y-6">
+              <div>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright">
+                  Mensagens
+                </h1>
+                <div className="h-1 w-16 bg-secondary-container mt-2" />
+                <p className="text-on-surface-variant text-sm mt-3">
+                  Converse com seus locatários
+                </p>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-240px)]">
+                <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+                  <div className="p-4 border-b border-outline-variant/30">
+                    <div className="relative">
+                      <MaterialIcon
+                        icon="search"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-outline"
+                        size={18}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Buscar conversa..."
+                        className="w-full bg-surface-container border-none rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {[
+                      {
+                        name: "Fazenda Aurora",
+                        initials: "FA",
+                        lastMsg: "Vou confirmar a reserva então!",
+                        time: "10:32",
+                        unread: 2,
+                        online: true,
+                      },
+                      {
+                        name: "Fazenda São João",
+                        initials: "SJ",
+                        lastMsg: "Quando posso retirar a colheitadeira?",
+                        time: "Ontem",
+                        unread: 0,
+                        online: false,
+                      },
+                      {
+                        name: "Fazenda Boa Vista",
+                        initials: "BV",
+                        lastMsg: "Obrigado pelo excelente serviço!",
+                        time: "20/01",
+                        unread: 0,
+                        online: false,
+                      },
+                    ].map((contact, i) => (
+                      <div
+                        key={contact.name}
+                        className={`w-full p-4 flex items-center gap-3 hover:bg-surface-container-high transition-colors border-b border-outline-variant/20 ${
+                          i === 0 ? "bg-primary/5" : ""
+                        } group cursor-pointer`}
+                      >
+                        <div className="relative">
+                          <div className="w-11 h-11 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-sm">
+                            {contact.initials}
+                          </div>
+                          {contact.online ? (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-container-lowest" />
+                          ) : null}
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-on-surface text-sm">
+                              {contact.name}
+                            </span>
+                            <span className="text-[11px] text-on-surface-variant">
+                              {contact.time}
+                            </span>
+                          </div>
+                          <p className="text-sm text-on-surface-variant truncate">
+                            {contact.lastMsg}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {contact.unread > 0 ? (
+                            <span className="w-5 h-5 bg-primary text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center">
+                              {contact.unread}
+                            </span>
+                          ) : null}
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-outline hover:text-primary dark:hover:text-primary-bright hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100"
+                            title="Arquivar conversa"
+                          >
+                            <MaterialIcon icon="archive" size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Excluir conversa"
+                          >
+                            <MaterialIcon icon="close" size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+                  <div className="p-4 border-b border-outline-variant/30 bg-surface-container flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-bold text-sm">
+                          FA
+                        </div>
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-primary rounded-full border-2 border-surface-container" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-on-surface text-sm">
+                          Fazenda Aurora
+                        </div>
+                        <div className="text-[10px] font-bold text-primary dark:text-primary-bright uppercase tracking-wider flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-primary rounded-full" />{" "}
+                          Online
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-surface/50">
+                    <div className="text-center">
+                      <span className="text-[11px] text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">
+                        Hoje, 10:20
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] font-bold text-outline">
+                        10:20
+                      </span>
+                      <div className="bg-surface-container p-3.5 rounded-2xl rounded-tl-sm text-sm text-tertiary max-w-[75%] leading-relaxed font-medium shadow-sm">
+                        Bom dia! O Trator Valtra BH194 está disponível para o
+                        período de 02 a 10 de fevereiro?
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[10px] font-bold text-outline">
+                        10:25
+                      </span>
+                      <div className="bg-primary text-on-primary p-3.5 rounded-2xl rounded-tr-sm text-sm max-w-[75%] leading-relaxed font-medium shadow-sm">
+                        Bom dia! Sim, está disponível. Já com operador
+                        certificado NR-31.
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className="text-[10px] font-bold text-outline">
+                        10:32
+                      </span>
+                      <div className="bg-surface-container p-3.5 rounded-2xl rounded-tl-sm text-sm text-tertiary max-w-[75%] leading-relaxed font-medium shadow-sm">
+                        Perfeito! Vou confirmar a reserva então. Obrigada!
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
+                    <button aria-label="Anexar arquivo" className="text-outline hover:text-primary dark:hover:text-primary-bright transition-colors p-2 rounded-lg hover:bg-surface-container">
+                      <MaterialIcon icon="attach_file" size={20} />
+                    </button>
+                    <input
+                      type="text"
+                      placeholder="Digite sua mensagem..."
+                      className="flex-1 bg-surface-container border-none rounded-full px-5 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface"
+                    />
+                    <button aria-label="Enviar mensagem" className="w-10 h-10 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-sm">
+                      <MaterialIcon icon="send" size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : null}
 
           {/* Notificações */}
@@ -2341,10 +2515,10 @@ const DashboardLocador = () => {
                   </div>
                   <form className="space-y-4" onSubmit={handleUpdateProfile}>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="nome-completo" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Nome Completo
                       </label>
-                      <input
+                      <input id="nome-completo"
                         type="text"
                         value={formName}
                         onChange={(e) => setFormName(e.target.value)}
@@ -2353,10 +2527,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="cpf-cnpj" className="text-xs font-bold uppercase tracking-wider text-outline">
                         CPF / CNPJ
                       </label>
-                      <input
+                      <input id="cpf-cnpj"
                         ref={documentRef}
                         type="text"
                         value={formDocument}
@@ -2372,10 +2546,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="e-mail" className="text-xs font-bold uppercase tracking-wider text-outline">
                         E-mail
                       </label>
-                      <input
+                      <input id="e-mail"
                         type="email"
                         value={formEmail}
                         onChange={(e) => setFormEmail(e.target.value)}
@@ -2384,10 +2558,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="telefone" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Telefone
                       </label>
-                      <input
+                      <input id="telefone"
                         type="tel"
                         value={formPhone}
                         onChange={(e) =>
@@ -2400,10 +2574,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="cep" className="text-xs font-bold uppercase tracking-wider text-outline">
                         CEP
                       </label>
-                      <input
+                      <input id="cep"
                         ref={cepRef}
                         type="text"
                         placeholder="00000-000"
@@ -2433,10 +2607,10 @@ const DashboardLocador = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="endereco" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Endereço
                       </label>
-                      <input
+                      <input id="endereco"
                         type="text"
                         value={formAddress}
                         onChange={(e) => setFormAddress(e.target.value)}
@@ -2449,10 +2623,10 @@ const DashboardLocador = () => {
                         endereço obrigava a adivinhá-lo por regex. */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-2 col-span-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                        <label htmlFor="cidade" className="text-xs font-bold uppercase tracking-wider text-outline">
                           Cidade
                         </label>
-                        <input
+                        <input id="cidade"
                           type="text"
                           value={formCity}
                           onChange={(e) => setFormCity(e.target.value)}
@@ -2460,10 +2634,10 @@ const DashboardLocador = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                        <label htmlFor="estado" className="text-xs font-bold uppercase tracking-wider text-outline">
                           Estado
                         </label>
-                        <select
+                        <select id="estado"
                           value={formState}
                           onChange={(e) => setFormState(e.target.value)}
                           className="w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm"
@@ -2492,11 +2666,11 @@ const DashboardLocador = () => {
                   </h2>
                   <form className="space-y-4" onSubmit={handleUpdatePassword}>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="senha-atual" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Senha Atual
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="senha-atual"
                           type={showCurrentPassword ? "text" : "password"}
                           placeholder="••••••••"
                           value={currentPassword}
@@ -2515,11 +2689,11 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Nova Senha
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="nova-senha"
                           type={showNewPassword ? "text" : "password"}
                           placeholder="••••••••"
                           value={newPassword}
@@ -2542,11 +2716,11 @@ const DashboardLocador = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      <label htmlFor="confirmar-nova-senha" className="text-xs font-bold uppercase tracking-wider text-outline">
                         Confirmar Nova Senha
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="confirmar-nova-senha"
                           ref={confirmPasswordRef}
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="••••••••"

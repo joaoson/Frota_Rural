@@ -33,6 +33,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ChatUnreadProvider } from "@/contexts/ChatUnreadContext";
 import { ChatSocketProvider } from "@/contexts/ChatSocketContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PageTitle from "@/components/PageTitle";
 import CNHUpload from "./pages/Documents/CNHUpload.tsx";
 import CertificationUpload from "./pages/Documents/CertificationUpload.tsx";
 
@@ -48,6 +49,7 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <ChatUnreadProvider>
         <ChatSocketProvider>
+        <PageTitle />
         <Toaster position="bottom-right" />
         <Routes>
           <Route path="/" element={<Index />} />

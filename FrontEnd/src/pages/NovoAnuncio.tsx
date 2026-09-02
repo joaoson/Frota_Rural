@@ -310,8 +310,8 @@ const NovoAnuncio = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Valor por Hora (R$) *</label>
-            <input
+            <label htmlFor="valor-por-hora-r" className="text-[10px] font-bold uppercase tracking-widest text-outline">Valor por Hora (R$) *</label>
+            <input id="valor-por-hora-r"
               name="hourly_rate"
               type="number"
               min={0}
@@ -331,8 +331,8 @@ const NovoAnuncio = () => {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">CEP</label>
-              <input
+              <label htmlFor="cep" className="text-[10px] font-bold uppercase tracking-widest text-outline">CEP</label>
+              <input id="cep"
                 type="text"
                 placeholder="00000-000"
                 value={cep}
@@ -364,8 +364,8 @@ const NovoAnuncio = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Localização *</label>
-              <input
+              <label htmlFor="localizacao" className="text-[10px] font-bold uppercase tracking-widest text-outline">Localização *</label>
+              <input id="localizacao"
                 name="location_address"
                 type="text"
                 placeholder="Sorriso, MT"
@@ -391,8 +391,8 @@ const NovoAnuncio = () => {
 
           <div className="grid grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Disponível a partir de</label>
-              <input
+              <label htmlFor="disponivel-a-partir-de" className="text-[10px] font-bold uppercase tracking-widest text-outline">Disponível a partir de</label>
+              <input id="disponivel-a-partir-de"
                 name="availability_start"
                 type="date"
                 min={hoje}
@@ -407,8 +407,8 @@ const NovoAnuncio = () => {
               {errors.availabilityStart && <p className="text-[11px] text-error font-medium mt-1">{errors.availabilityStart}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Disponível até</label>
-              <input
+              <label htmlFor="disponivel-ate" className="text-[10px] font-bold uppercase tracking-widest text-outline">Disponível até</label>
+              <input id="disponivel-ate"
                 name="availability_end"
                 type="date"
                 min={availabilityStart || hoje}
@@ -425,10 +425,10 @@ const NovoAnuncio = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+            <label htmlFor="maximo-de-dias-por-reserva" className="text-[10px] font-bold uppercase tracking-widest text-outline">
               Máximo de dias por reserva
             </label>
-            <input
+            <input id="maximo-de-dias-por-reserva"
               name="max_reservation_days"
               type="number"
               min={1}
@@ -447,8 +447,8 @@ const NovoAnuncio = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Descrição</label>
-            <textarea
+            <label htmlFor="descricao" className="text-[10px] font-bold uppercase tracking-widest text-outline">Descrição</label>
+            <textarea id="descricao"
               name="description"
               placeholder="Detalhes sobre o equipamento e condições..."
               rows={3}
@@ -459,8 +459,8 @@ const NovoAnuncio = () => {
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-outline">Fotos do Anúncio (Opcional)</label>
-            <input
+            <label htmlFor="fotos-do-anuncio-opcional" className="text-[10px] font-bold uppercase tracking-widest text-outline">Fotos do Anúncio (Opcional)</label>
+            <input id="fotos-do-anuncio-opcional"
               ref={fileInputRef}
               type="file"
               accept="image/jpeg,image/png"

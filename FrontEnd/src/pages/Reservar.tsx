@@ -736,10 +736,10 @@ const Reservar = () => {
                   )}
 
                   <div className="mb-7">
-                    <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                    <label htmlFor="observacoes-opcional" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
                       Observações (opcional)
                     </label>
-                    <textarea
+                    <textarea id="observacoes-opcional"
                       rows={4}
                       value={observacoes}
                       onChange={(e) => setObservacoes(e.target.value)}
@@ -962,10 +962,10 @@ const Reservar = () => {
 
                   {/* Assinatura digital */}
                   <div className="mb-7">
-                    <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                    <label htmlFor="nome-completo-assinatura-digital" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
                       Nome Completo (Assinatura Digital)
                     </label>
-                    <input
+                    <input id="nome-completo-assinatura-digital"
                       type="text"
                       value={nomeAssinatura}
                       onChange={(e) => setNomeAssinatura(e.target.value)}
