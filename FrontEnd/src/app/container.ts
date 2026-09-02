@@ -16,7 +16,11 @@ import { UserStore } from "@/features/users/api/UserStore";
 import { MachineStore } from "@/features/machines/api/MachineStore";
 import { InMemoryTokenStore } from "@/shared/auth/InMemoryTokenStore";
 import { SessionService } from "@/shared/auth/SessionService";
-import { AxiosHttpClient, createAxiosInstance } from "@/shared/http/AxiosHttpClient";
+import {
+  AxiosHttpClient,
+  createAxiosInstance,
+  createPublicAxiosInstance,
+} from "@/shared/http/AxiosHttpClient";
 import type { HttpClient } from "@/shared/http/HttpClient";
 import { AuthenticatedHttpClient } from "@/shared/http/decorators/AuthenticatedHttpClient";
 import { LoggingHttpClient } from "@/shared/http/decorators/LoggingHttpClient";
@@ -44,7 +48,7 @@ export const httpClient: HttpClient = import.meta.env.DEV
   : decoratedHttpClient;
 
 export const viaCepClient = new ViaCepClient(
-  new AxiosHttpClient(createAxiosInstance("https://viacep.com.br/ws/")),
+  new AxiosHttpClient(createPublicAxiosInstance("https://viacep.com.br/ws/")),
 );
 
 export const queryClient = createQueryClient();

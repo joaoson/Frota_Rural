@@ -26,6 +26,11 @@ export function createAxiosInstance(baseURL?: string): AxiosInstance {
   });
 }
 
+// Para APIs de terceiros e sem credenciais
+export function createPublicAxiosInstance(baseURL: string): AxiosInstance {
+  return axios.create({ baseURL });
+}
+
 // Parse de erro do backend nas duas formas que ele usa
 // {"error": "..."}` / `{"detail": "..."}` viram mensagem plana
 // {campo: ["msg"]}` vira `fieldErrors`
