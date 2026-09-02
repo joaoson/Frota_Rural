@@ -945,11 +945,11 @@ const DashboardLocatario = () => {
                     </div>
                   </div>
                   <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
-                    <button className="text-outline hover:text-primary dark:hover:text-primary-bright transition-colors p-2 rounded-lg hover:bg-surface-container">
+                    <button aria-label="Anexar arquivo" className="text-outline hover:text-primary dark:hover:text-primary-bright transition-colors p-2 rounded-lg hover:bg-surface-container">
                       <MaterialIcon icon="attach_file" size={20} />
                     </button>
                     <input type="text" placeholder="Digite sua mensagem..." className="flex-1 bg-surface-container border-none rounded-full px-5 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface" />
-                    <button className="w-10 h-10 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-sm">
+                    <button aria-label="Enviar mensagem" className="w-10 h-10 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-sm">
                       <MaterialIcon icon="send" size={18} />
                     </button>
                   </div>
