@@ -97,8 +97,6 @@
 
 :root {
     color-scheme: light;
-
-    /* Frota Rural — Material Design 3 (aligned with doc-to-design-prototypes) */
     --background: hsl(45 100% 96%);
     --foreground: hsl(50 33% 9%);
     --card: hsl(0 0% 100%);

@@ -63,6 +63,7 @@ requests==2.33.1
 resend==2.29.0
 service-identity==26.1.0
 sqlparse==0.5.5
+stripe==15.6.1
 Twisted==26.4.0
 txaio==26.6.1
 types-PyYAML==6.0.12.20250915
