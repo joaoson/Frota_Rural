@@ -1,25 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { postingService } from "@/services/PostingService/PostingService";
+import { Link } from "react-router";
+import { postingStore } from "@/app/container";
+import type { PostingListItem } from "@/features/postings/types/posting";
 import MaterialIcon from "@/components/MaterialIcon";
 
-type Posting = {
-  id: string;
-  machine_brand: string | null;
-  machine_model: string | null;
-  machine_usage_purpose: string | null;
-  machine_year: number | null;
-  hourly_rate: string;
-  location_address: string | null;
-  availability_start: string | null;
-  availability_end: string | null;
-  primary_photo_url: string | null;
-};
 
 const FALLBACK_IMAGE = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
 
 const DashboardMachineSearch = () => {
-  const [postings, setPostings] = useState<Posting[]>([]);
+  const [postings, setPostings] = useState<PostingListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
@@ -30,22 +19,23 @@ const DashboardMachineSearch = () => {
   const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
-    postingService.list({ status: "active" })
-      .then((data: Posting[]) => setPostings(data))
+    postingStore.list({ status: "active" })
+      .then((data: PostingListItem[]) => setPostings(data))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
   const results = useMemo(() => postings.filter((posting) => {
-    const title = [posting.machine_brand, posting.machine_model].filter(Boolean).join(" ");
-    const searchable = [title, posting.location_address, posting.machine_usage_purpose, posting.machine_year].join(" ").toLowerCase();
+    const title = [posting.machineBrand, posting.machineModel].filter(Boolean).join(" ");
+    const searchable = [title, posting.locationAddress, posting.machineUsagePurpose, posting.machineYear].join(" ").toLowerCase();
     if (search && !searchable.includes(search.toLowerCase())) return false;
-    if (activity && posting.machine_usage_purpose?.toLowerCase() !== activity.toLowerCase()) return false;
-    if (location && !posting.location_address?.toLowerCase().includes(location.toLowerCase())) return false;
-    if (maxPrice && Number(posting.hourly_rate) > Number(maxPrice)) return false;
+    if (activity && posting.machineUsagePurpose?.toLowerCase() !== activity.toLowerCase()) return false;
+    if (location && !posting.locationAddress?.toLowerCase().includes(location.toLowerCase())) return false;
+    if (maxPrice && Number(posting.hourlyRate) > Number(maxPrice)) return false;
 
-    const availableFrom = posting.availability_start?.slice(0, 10);
-    const availableUntil = posting.availability_end?.slice(0, 10);
+    // A entidade traz Date; a comparação é textual em YYYY-MM-DD.
+    const availableFrom = posting.availabilityStart?.toISOString().slice(0, 10);
+    const availableUntil = posting.availabilityEnd?.toISOString().slice(0, 10);
     if (startDate && availableUntil && availableUntil < startDate) return false;
     if (endDate && availableFrom && availableFrom > endDate) return false;
     return true;
@@ -99,11 +89,11 @@ const DashboardMachineSearch = () => {
       {!loading && !error && results.length === 0 && <div className="rounded-2xl bg-surface-container-low p-10 text-center text-on-surface-variant">Nenhum equipamento encontrado para estes filtros.</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {results.map((posting) => {
-          const title = [posting.machine_brand, posting.machine_model].filter(Boolean).join(" ") || "Maquinário";
+          const title = [posting.machineBrand, posting.machineModel].filter(Boolean).join(" ") || "Maquinário";
           return <article key={posting.id} className="overflow-hidden rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
-            <img src={posting.primary_photo_url ?? FALLBACK_IMAGE} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }} alt={title} className="h-40 w-full object-cover" />
-            <div className="p-5 space-y-3"><div><h2 className="font-bold text-on-surface">{title}</h2><p className="text-xs text-on-surface-variant">{posting.location_address || "Localização não informada"}</p></div>
-              <div className="flex justify-between text-sm"><span>{posting.machine_usage_purpose || "Atividade não informada"}</span><strong className="text-primary">{Number(posting.hourly_rate).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/h</strong></div>
+            <img src={posting.primaryPhotoUrl ?? FALLBACK_IMAGE} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }} alt={title} className="h-40 w-full object-cover" />
+            <div className="p-5 space-y-3"><div><h2 className="font-bold text-on-surface">{title}</h2><p className="text-xs text-on-surface-variant">{posting.locationAddress || "Localização não informada"}</p></div>
+              <div className="flex justify-between text-sm"><span>{posting.machineUsagePurpose || "Atividade não informada"}</span><strong className="text-primary">{Number(posting.hourlyRate).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/h</strong></div>
               <Link to={`/anuncio/${posting.id}`} className="flex justify-center rounded-lg bg-primary py-2.5 text-sm font-bold text-on-primary">Ver disponibilidade</Link>
             </div>
           </article>;

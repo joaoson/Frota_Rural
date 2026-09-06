@@ -6,7 +6,7 @@ import {
   urlTile,
   coordenadasParaTile,
   type Coordenadas,
-} from "@/services/GeocodingService";
+} from "@/shared/http/GeocodingClient";
 
 interface MapaLocalizacaoProps {
   /** Endereço a exibir. Costuma vir do campo de localização ou do CEP. */

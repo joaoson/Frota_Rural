@@ -1,0 +1,477 @@
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate, useParams } from "react-router";
+import MaterialIcon from "@/components/MaterialIcon";
+import MapaLocalizacao from "@/components/MapaLocalizacao";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { chatStore, contractStore, postingStore } from "@/app/container";
+import type { PostingDetail, PostingPhoto } from "@/features/postings/types/posting";
+import type { Rental } from "@/features/contracts/types/rental";
+import { useAuth } from "@/contexts/useAuth";
+import { toast } from "sonner";
+
+const FALLBACK_IMG = "https://placehold.co/800x600/e8e0d0/2D3F1E?text=Sem+foto";
+
+
+/** A entidade traz Date; a página compara datas como YYYY-MM-DD. */
+const isoOuNulo = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+
+const CAMINHO_ESTRELA = "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z";
+const COR_CHEIA = "var(--chart-2)";
+const COR_VAZIA = "var(--outline-variant)";
+
+function EstrelasPorNota({ nota, total }: { nota: number; total: number }) {
+  return (
+    <span className="flex gap-0.5">
+      {Array.from({ length: total }).map((_, indice) => {
+        const fracao = Math.min(1, Math.max(0, nota - indice));
+        const gradId = `star-grad-${indice}`;
+
+        return (
+          <svg key={indice} width="16" height="16" viewBox="0 0 24 24">
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
+                <stop offset={`${fracao * 100}%`} stopColor={COR_CHEIA} />
+                <stop offset={`${fracao * 100}%`} stopColor={COR_VAZIA} />
+              </linearGradient>
+            </defs>
+            <path d={CAMINHO_ESTRELA} fill={`url(#${gradId})`} />
+          </svg>
+        );
+      })}
+    </span>
+  );
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+function ordenarFotos(fotos: PostingPhoto[]): PostingPhoto[] {
+  return [...fotos].sort((fotoA, fotoB) => {
+    if (fotoA.isPrimary && !fotoB.isPrimary) return -1;
+    if (!fotoA.isPrimary && fotoB.isPrimary) return 1;
+    return 0;
+  });
+}
+
+function dataLocal(iso: string): Date {
+  const [ano, mes, dia] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function isoData(data: Date): string {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+function adicionarDias(iso: string, dias: number): string {
+  const data = dataLocal(iso);
+  data.setDate(data.getDate() + dias);
+  return isoData(data);
+}
+
+function CalendarioDisponibilidade({
+  reservas,
+  availabilityStart,
+  availabilityEnd,
+}: {
+  reservas: Rental[];
+  availabilityStart: string | null;
+  availabilityEnd: string | null;
+}) {
+  const [mesInicial, setMesInicial] = useState(() => {
+    const hoje = new Date();
+    return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  });
+  const hoje = useMemo(() => isoData(new Date()), []);
+  const bloqueadas = useMemo(() => {
+    const datas = new Set<string>();
+    reservas.forEach((reserva: Rental) => {
+      const inicio = adicionarDias(isoOuNulo(reserva.startDate) ?? "", -1);
+      const fim = adicionarDias(isoOuNulo(reserva.endDate) ?? "", 1);
+      for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+        datas.add(isoData(data));
+      }
+    });
+    return datas;
+  }, [reservas]);
+  const meses = [0, 1].map((deslocamento) => new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1));
+  const mesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+      <div className="border-b border-outline-variant/20 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <MaterialIcon icon="calendar_month" size={20} className="text-primary" />
+          <h2 className="font-headline text-lg font-bold text-tertiary">Disponibilidade</h2>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-on-surface-variant">
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-primary" /> Disponível</span>
+          <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full bg-outline/40" /> Indisponível</span>
+          <span className="text-outline">Inclui intervalo de limpeza antes e depois das reservas.</span>
+        </div>
+      </div>
+      <div className="p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            type="button"
+            aria-label="Mês anterior"
+            disabled={mesInicial <= mesAtual}
+            onClick={() => setMesInicial(new Date(mesInicial.getFullYear(), mesInicial.getMonth() - 1, 1))}
+            className="rounded-full p-1.5 text-tertiary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-25"
+          >
+            <MaterialIcon icon="chevron_left" size={22} />
+          </button>
+          <button
+            type="button"
+            aria-label="Próximo mês"
+            onClick={() => setMesInicial(new Date(mesInicial.getFullYear(), mesInicial.getMonth() + 1, 1))}
+            className="rounded-full p-1.5 text-tertiary hover:bg-surface-container"
+          >
+            <MaterialIcon icon="chevron_right" size={22} />
+          </button>
+        </div>
+        <div className="grid gap-7 sm:grid-cols-2">
+          {meses.map((mes) => {
+            const primeiroDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+            const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+            return (
+              <div key={isoData(mes)}>
+                <p className="mb-3 text-center text-sm font-black capitalize text-tertiary">
+                  {mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                </p>
+                <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-outline">
+                  {["D", "S", "T", "Q", "Q", "S", "S"].map((dia, indice) => <span key={`${dia}-${indice}`}>{dia}</span>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: primeiroDia.getDay() }, (_, indice) => <span key={`vazio-${indice}`} />)}
+                  {Array.from({ length: totalDias }, (_, indice) => {
+                    const iso = isoData(new Date(mes.getFullYear(), mes.getMonth(), indice + 1));
+                    const indisponivel = iso < hoje || bloqueadas.has(iso) || (availabilityStart && iso < availabilityStart.slice(0, 10)) || (availabilityEnd && iso > availabilityEnd.slice(0, 10));
+                    return (
+                      <span
+                        key={iso}
+                        title={indisponivel ? "Indisponível" : "Disponível"}
+                        className={`flex aspect-square items-center justify-center rounded-full text-[11px] font-bold ${
+                          indisponivel ? "text-outline/50 line-through" : "bg-primary/10 text-primary"
+                        }`}
+                      >
+                        {indice + 1}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const AnuncioDetalhe = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [abrindoChat, setAbrindoChat] = useState(false);
+
+  /**
+   * O frontend não conhece o dono do anúncio — `PostingDetailSerializer` não
+   * expõe o user id de propósito. Por isso o servidor resolve o par e devolve
+   * o thread_id pronto.
+   */
+  const abrirConversa = async () => {
+    if (!id) return;
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    setAbrindoChat(true);
+    try {
+      const thread = await chatStore.resolveThread("posting", id);
+      navigate(`/mensagens/${encodeURIComponent(thread.threadId)}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível abrir a conversa.",
+      );
+    } finally {
+      setAbrindoChat(false);
+    }
+  };
+
+  const [anuncio, setAnuncio] = useState<PostingDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [fotoSelecionada, setFotoSelecionada] = useState(0);
+  const [reservas, setReservas] = useState<Rental[]>([]);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (!id) return;
+    setLoading(true);
+    postingStore
+      .findById(id)
+      .then((data: PostingDetail) => {
+        setAnuncio(data);
+        setLoading(false);
+      })
+      .catch((erro: unknown) => {
+        console.error(erro);
+        setErro("Não foi possível carregar o anúncio.");
+        setLoading(false);
+      });
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    contractStore
+      .listByPosting(id)
+      .then((dados: Rental[]) => setReservas(dados.filter((reserva: Rental) => ["pending", "active", "signed"].includes(reserva.status ?? ""))))
+      .catch((erro: unknown) => console.error("Erro ao carregar disponibilidade:", erro));
+  }, [id]);
+
+  const fotos = anuncio ? ordenarFotos(anuncio.photos) : [];
+  const urlFotoAtual = fotos[fotoSelecionada]?.url ?? FALLBACK_IMG;
+  const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Sem título";
+
+  // Coordenadas gravadas no anúncio dispensam a geocodificação a cada abertura
+  // da página. Anúncios antigos não as têm, e aí o mapa volta a resolver o
+  // endereço sozinho.
+  const coordenadasDoAnuncio =
+    anuncio?.latitude && anuncio?.longitude
+      ? {
+          lat: Number(anuncio.latitude),
+          lon: Number(anuncio.longitude),
+          nomeExibicao: anuncio.locationAddress ?? "",
+        }
+      : null;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar />
+
+      <div className="flex-1 pt-32 pb-20 max-w-[1200px] mx-auto px-6 w-full">
+
+        <Link
+          to="/buscar-maquinario"
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
+        >
+          <MaterialIcon icon="arrow_back" size={16} /> Voltar à busca
+        </Link>
+
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-20">
+            <p className="text-on-surface-variant text-sm">Carregando anúncio...</p>
+          </div>
+        )}
+
+        {/* Erro */}
+        {!loading && erro && (
+          <div className="text-center py-20 bg-error-container rounded-2xl border border-error/20">
+            <p className="text-error font-bold mb-2">Erro ao carregar</p>
+            <p className="text-on-surface-variant text-sm">{erro}</p>
+          </div>
+        )}
+
+        {/* Conteúdo principal */}
+        {!loading && !erro && anuncio && (
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+
+            {/* ── Galeria ── */}
+            <div className="lg:col-span-3 space-y-4">
+
+              {/* Foto principal */}
+              <div className="rounded-2xl overflow-hidden bg-surface-container-high h-[420px] shadow-sm relative group">
+                <img
+                  src={urlFotoAtual}
+                  alt={titulo}
+                  className="w-full h-full object-cover"
+                  onError={(evento) => { evento.currentTarget.src = FALLBACK_IMG; }}
+                />
+                {fotos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setFotoSelecionada((prev) => (prev === 0 ? fotos.length - 1 : prev - 1))}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-container-lowest/80 rounded-full flex items-center justify-center shadow hover:bg-surface-container-lowest transition opacity-0 group-hover:opacity-100"
+                    >
+                      <MaterialIcon icon="chevron_left" size={20} className="text-primary dark:text-primary-bright" />
+                    </button>
+                    <button
+                      onClick={() => setFotoSelecionada((prev) => (prev === fotos.length - 1 ? 0 : prev + 1))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-surface-container-lowest/80 rounded-full flex items-center justify-center shadow hover:bg-surface-container-lowest transition opacity-0 group-hover:opacity-100"
+                    >
+                      <MaterialIcon icon="chevron_right" size={20} className="text-primary dark:text-primary-bright" />
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Miniaturas */}
+              {fotos.length > 1 && (
+                <div className="grid grid-cols-3 gap-3">
+                  {fotos.map((foto, indice) => (
+                    <button
+                      key={indice}
+                      onClick={() => setFotoSelecionada(indice)}
+                      className={`rounded-xl overflow-hidden h-24 bg-surface-container-high cursor-pointer hover:opacity-80 transition-all border-2 ${indice === fotoSelecionada
+                          ? "border-primary shadow-md"
+                          : "border-outline-variant/20"
+                        }`}
+                    >
+                      <img
+                        src={foto.url}
+                        alt={`Foto ${indice + 1}`}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                        onError={(evento) => { evento.currentTarget.src = FALLBACK_IMG; }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <CalendarioDisponibilidade
+                reservas={reservas}
+                availabilityStart={isoOuNulo((anuncio.availabilityStart))}
+                availabilityEnd={isoOuNulo((anuncio.availabilityEnd))}
+              />
+
+              {/* Descrição */}
+              {anuncio.description && (
+                <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
+                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">Descrição</div>
+                  <p className="text-sm text-on-surface-variant leading-relaxed">{anuncio.description}</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Detalhes ── */}
+            <div className="lg:col-span-2 space-y-8">
+
+              {/* Cabeçalho */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="px-3 py-1 bg-primary/10 text-primary dark:text-primary-bright font-bold text-[10px] rounded uppercase tracking-widest border border-primary/20 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    Disponível
+                  </span>
+                </div>
+                <h1 className="font-headline text-3xl font-bold text-primary dark:text-primary-bright mb-2">{titulo}</h1>
+                <div className="h-1 w-16 bg-secondary-container mb-3" />
+                {anuncio.locationAddress && (
+                  <p className="text-on-surface-variant flex items-center gap-1 text-sm">
+                    <MaterialIcon icon="location_on" size={16} /> {anuncio.locationAddress}
+                  </p>
+                )}
+              </div>
+
+              {/* Especificações */}
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
+                <div className="grid grid-cols-2 gap-5">
+                  {[
+                    { label: "Marca / Modelo", valor: [anuncio.machineBrand, anuncio.machineModel].filter(Boolean).join(" ") || null },
+                    { label: "Ano", valor: anuncio.machineYear ? String(anuncio.machineYear) : null },
+                    { label: "Atividade", valor: anuncio.machineUsagePurpose },
+                    { label: "Nº Renagro", valor: anuncio.machineRenagroNumber },
+                    { label: "Disponível de", valor: formatDate(isoOuNulo(anuncio.availabilityStart)) },
+                    { label: "Disponível até", valor: formatDate(isoOuNulo(anuncio.availabilityEnd)) },
+                  ].map((item) =>
+                    item.valor ? (
+                      <div key={item.label}>
+                        <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">{item.label}</div>
+                        <div className="font-bold text-tertiary text-sm">{item.valor}</div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              </div>
+
+              {/* Localização no mapa — a distância pesa na decisão de alugar */}
+              {anuncio.locationAddress && (
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">
+                    Localização
+                  </div>
+                  <MapaLocalizacao
+                    endereco={anuncio.locationAddress}
+                    cep={null}
+                    coordenadas={coordenadasDoAnuncio}
+                    altura="h-64"
+                  />
+                </div>
+              )}
+
+              {/* Especificações técnicas */}
+              {anuncio.machineTechnicalSpecifications && (
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">Especificações Técnicas</div>
+                  <p className="text-sm text-on-surface-variant leading-relaxed">
+                    {anuncio.machineTechnicalSpecifications}
+                  </p>
+                </div>
+              )}
+
+              {/* Selo: Operador verificado */}
+              <div className="bg-primary/5 border border-primary/20 p-5 rounded-xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                  <MaterialIcon icon="verified_user" className="text-primary dark:text-primary-bright" size={22} />
+                </div>
+                <div>
+                  <div className="font-bold text-primary dark:text-primary-bright text-sm">Operador com NR-31 Verificado</div>
+                  <div className="text-[11px] text-on-surface-variant">Credencial validada pelo sistema Confia Rural</div>
+                </div>
+              </div>
+
+              {/* Avaliações do locador */}
+              <div className="border-t border-outline-variant/20 pt-5">
+                <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-2">Avaliações do Locador</div>
+                <div className="flex items-center gap-2">
+                  <EstrelasPorNota nota={4.8} total={5} />
+                  <span className="font-bold text-tertiary text-sm">4.8 (12 avaliações)</span>
+                </div>
+              </div>
+
+              {/* CTA — Preço + botões */}
+              <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/20">
+                <div className="mb-5">
+                  <span className="text-[10px] text-outline font-bold uppercase tracking-widest block mb-1">Custo por Hora</span>
+                  <div className="text-4xl font-black text-primary dark:text-primary-bright">
+                    R$ {anuncio.hourlyRate.toFixed(2)}
+                    <span className="text-sm font-bold text-tertiary">/hora</span>
+                  </div>
+                </div>
+
+                {/* Botão: Solicitar Reserva */}
+                <Link
+                  to={`/reservar/${anuncio.id}`}
+                  className="block w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold text-center hover:shadow-lg transition-all shadow-md text-lg mb-3"
+                >
+                  Solicitar Reserva
+                </Link>
+
+                {/* Botão: Conversar com Locador */}
+                <button
+                  type="button"
+                  onClick={abrirConversa}
+                  disabled={abrindoChat}
+                  className="flex items-center justify-center gap-2 w-full border-2 border-primary text-primary dark:text-primary-bright py-3.5 rounded-lg font-bold text-base hover:bg-primary/5 transition-colors disabled:opacity-60"
+                >
+                  <MaterialIcon icon="chat" size={20} />
+                  {abrindoChat ? "Abrindo conversa..." : "Conversar com o Locador"}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default AnuncioDetalhe;

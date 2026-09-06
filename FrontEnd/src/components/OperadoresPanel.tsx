@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AxiosError } from "axios";
+import { BadRequestError } from "@/shared/http/errors";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
@@ -13,22 +13,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { operatorService } from "@/services/OperatorService/OperatorService";
-import type { Operator } from "@/services/OperatorService/models/Operator";
-import { maskDocument } from "@/utils/masks/maskDocument";
-import { maskPhone } from "@/utils/masks/maskPhone";
-import { maskCEP } from "@/utils/masks/maskCEP";
-import { clearSpecialChars } from "@/utils/clearSpecialChars";
-import { UFS } from "@/utils/ufs";
-import {
-  fetchAddressByCEP,
-  formatAddressFromCEP,
-} from "@/services/ViaCEPService";
+import { operatorStore } from "@/app/container";
+import type { Operator } from "@/features/operators/types/operator";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskPhone } from "@/shared/utils/masks/maskPhone";
+import { maskCEP } from "@/shared/utils/masks/maskCEP";
+import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
+import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
+import { viaCepClient } from "@/app/container";
+import { formatAddress } from "@/shared/http/ViaCepClient";
 import {
   maxBirthDate,
   validatePersonField,
   type PersonField,
-} from "@/utils/validation/personFields";
+} from "@/shared/utils/validation/personFields";
 
 type FormState = {
   name: string;
@@ -92,7 +90,7 @@ function getInitials(name: string): string {
 function operatorToForm(operator: Operator): FormState {
   return {
     name: operator.name,
-    birthDate: operator.birth_date,
+    birthDate: operator.birthDate,
     document: maskDocument(operator.document),
     email: operator.email,
     phone: maskPhone(operator.phone?.replace(/^\+55/, "") ?? ""),
@@ -132,10 +130,10 @@ const OperadoresPanel = () => {
   const isEditing = editingId !== null;
 
   useEffect(() => {
-    operatorService
+    operatorStore
       .list()
       .then(setOperators)
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Erro ao carregar operadores", error);
         toast.error("Não foi possível carregar seus operadores.");
       })
@@ -169,16 +167,16 @@ const OperadoresPanel = () => {
     const digits = value.replace(/\D/g, "");
     if (digits.length !== 8) return;
     try {
-      const data = await fetchAddressByCEP(digits);
+      const data = await viaCepClient.findByCep(digits);
       if (!data) {
         toast.error("CEP não encontrado.");
         return;
       }
       setForm((prev) => ({
         ...prev,
-        address: formatAddressFromCEP(data, "logradouro"),
-        city: data.localidade,
-        uf: data.uf.toUpperCase(),
+        address: formatAddress(data, "logradouro"),
+        city: data.city,
+        uf: data.state.toUpperCase(),
       }));
       setErrors((prev) => ({ ...prev, address: "", city: "", uf: "" }));
     } catch (error) {
@@ -240,13 +238,13 @@ const OperadoresPanel = () => {
     setSaving(true);
     try {
       if (isEditing) {
-        const updated = await operatorService.update(editingId, payload);
+        const updated = await operatorStore.update(editingId, payload);
         setOperators((prev) =>
           prev.map((o) => (o.id === updated.id ? updated : o)),
         );
         toast.success("Operador atualizado.");
       } else {
-        const created = await operatorService.create({
+        const created = await operatorStore.create({
           ...payload,
           password: form.password,
         });
@@ -259,24 +257,17 @@ const OperadoresPanel = () => {
       }
       closeForm();
     } catch (error) {
-      if (error instanceof AxiosError && error.response?.data) {
-        const data = error.response.data;
-        if (data.document) {
+      if (error instanceof BadRequestError) {
+        if (error.firstErrorFor("document")) {
           setErrors((prev) => ({ ...prev, document: "Este documento já está cadastrado." }));
-          toast.error("Este documento já está cadastrado.");
-          return;
+          return toast.error("Este documento já está cadastrado.");
         }
-        if (data.email) {
+        if (error.firstErrorFor("email")) {
           setErrors((prev) => ({ ...prev, email: "Este e-mail já está em uso." }));
-          toast.error("Este e-mail já está em uso.");
-          return;
+          return toast.error("Este e-mail já está em uso.");
         }
-        if (data.error) {
-          toast.error(data.error);
-          return;
-        }
+        return toast.error(error.message);
       }
-      console.error("Erro ao salvar operador", error);
       toast.error("Não foi possível salvar o operador. Tente novamente.");
     } finally {
       setSaving(false);
@@ -285,7 +276,7 @@ const OperadoresPanel = () => {
 
   const handleUnlink = async (operator: Operator) => {
     try {
-      await operatorService.unlink(operator.id);
+      await operatorStore.unlink(operator.id);
       setOperators((prev) => prev.filter((o) => o.id !== operator.id));
       if (editingId === operator.id) closeForm();
       toast.success(`${operator.name} foi desvinculado da sua equipe.`);
@@ -437,7 +428,7 @@ const OperadoresPanel = () => {
                   className={inputClass(Boolean(errors.uf))}
                 >
                   <option value="">Selecione</option>
-                  {UFS.map((uf) => (
+                  {BRAZILIAN_STATES.map((uf) => (
                     <option key={uf} value={uf}>
                       {uf}
                     </option>

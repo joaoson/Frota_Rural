@@ -9,10 +9,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
-import { contractService } from "@/services/ContractService/ContractService";
-import type { SignatureEvidenceRecord } from "@/services/ContractService/ContractService";
-import type { ContratoData } from "@/pages/Contrato/types";
-import { formatarUtcCompleto } from "@/utils/formatarUtc";
+import { contractStore } from "@/app/container";
+import type { SignatureEvidence } from "@/features/contracts/types/rental";
+import type { ContratoData } from "@/features/contracts/types/contractDocument";
+import { HttpError } from "@/shared/http/errors";
+import { formatarUtcCompleto } from "@/shared/utils/formatarUtc";
 
 export type PapelAssinatura = "locador" | "locatario";
 
@@ -23,7 +24,7 @@ interface AssinaturaContratoModalProps {
   contratoId: string;
   papel: PapelAssinatura;
   /** Chamado depois do aceite gravado, para a tela recarregar o contrato. */
-  onAssinado?: (evidencia: SignatureEvidenceRecord | null) => void;
+  onAssinado?: (evidencia: SignatureEvidence | null) => void;
 }
 
 const rotuloDaOutraParte: Record<PapelAssinatura, string> = {
@@ -57,7 +58,7 @@ export default function AssinaturaContratoModal({
   const [otpEnviadoPara, setOtpEnviadoPara] = useState<string | null>(null);
   const [enviandoOtp, setEnviandoOtp] = useState(false);
   const [assinando, setAssinando] = useState(false);
-  const [recibo, setRecibo] = useState<SignatureEvidenceRecord | null>(null);
+  const [recibo, setRecibo] = useState<SignatureEvidence | null>(null);
 
   // Cada abertura recomeça do zero: o modal serve a vários contratos da lista.
   useEffect(() => {
@@ -73,9 +74,9 @@ export default function AssinaturaContratoModal({
     setCarregando(true);
 
     let cancelado = false;
-    contractService
-      .getContractById(contratoId)
-      .then((dados) => {
+    contractStore
+      .findContractDocument(contratoId)
+      .then((dados: ContratoData) => {
         if (cancelado) return;
         setContrato(dados);
         // Sugere o nome cadastrado da parte; o campo continua editável porque
@@ -83,9 +84,8 @@ export default function AssinaturaContratoModal({
         const parte = dados?.[papel === "locador" ? "locador" : "locatario"];
         setNomeAssinatura(parte?.representante_nome || parte?.razao_social || "");
       })
-      .catch((e) => {
+      .catch(() => {
         if (cancelado) return;
-        console.error("Erro ao carregar o contrato:", e);
         setErro("Não foi possível carregar o contrato para assinatura.");
       })
       .finally(() => {
@@ -103,7 +103,7 @@ export default function AssinaturaContratoModal({
     if (enviandoOtp) return;
     setEnviandoOtp(true);
     try {
-      const { sentTo } = await contractService.requestSignatureOtp(contratoId, papel);
+      const { sentTo } = await contractStore.requestSignatureOtp(contratoId, papel);
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (e) {
@@ -133,7 +133,7 @@ export default function AssinaturaContratoModal({
 
     setAssinando(true);
     try {
-      const { evidence } = await contractService.signContract(
+      const { evidence } = await contractStore.sign(
         contratoId,
         papel,
         nomeAssinatura,
@@ -143,10 +143,7 @@ export default function AssinaturaContratoModal({
       toast.success("Contrato assinado! A evidência do aceite foi registrada.");
       onAssinado?.(evidence);
     } catch (e) {
-      const mensagem =
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Erro ao assinar o contrato.";
-      toast.error(mensagem);
+      toast.error(e instanceof HttpError ? e.message : "Erro ao assinar o contrato.");
     } finally {
       setAssinando(false);
     }
@@ -154,14 +151,14 @@ export default function AssinaturaContratoModal({
 
   const linhasRecibo = recibo
     ? [
-        { rotulo: "Assinado por", valor: recibo.signer_name || recibo.signer_email || "—" },
-        { rotulo: "E-mail", valor: recibo.signer_email || "—" },
-        { rotulo: "Data e hora (UTC)", valor: formatarUtcCompleto(recibo.signed_at) },
-        { rotulo: "IP de origem", valor: recibo.ip_address || "—" },
-        { rotulo: "Versão do documento", valor: recibo.document_version || "—" },
+        { rotulo: "Assinado por", valor: recibo.signerName || recibo.signerEmail || "—" },
+        { rotulo: "E-mail", valor: recibo.signerEmail || "—" },
+        { rotulo: "Data e hora (UTC)", valor: formatarUtcCompleto(recibo.signedAt) },
+        { rotulo: "IP de origem", valor: recibo.ipAddress || "—" },
+        { rotulo: "Versão do documento", valor: recibo.documentVersion || "—" },
         {
           rotulo: "Posse do e-mail",
-          valor: recibo.otp_verified ? "Confirmada por código" : "Não confirmada por código",
+          valor: recibo.otpVerified ? "Confirmada por código" : "Não confirmada por código",
         },
       ]
     : [];
@@ -235,14 +232,14 @@ export default function AssinaturaContratoModal({
                 ))}
                 <div className="px-5 py-3">
                   <HashDisplay
-                    label={`Hash ${recibo.hash_algorithm.toUpperCase()} do documento assinado`}
-                    value={recibo.document_hash}
+                    label={`Hash ${recibo.hashAlgorithm.toUpperCase()} do documento assinado`}
+                    value={recibo.documentHash}
                   />
                 </div>
                 <div className="px-5 py-3">
                   <HashDisplay
                     label="Hash do registro (log encadeado)"
-                    value={recibo.record_hash}
+                    value={recibo.recordHash}
                   />
                 </div>
               </div>

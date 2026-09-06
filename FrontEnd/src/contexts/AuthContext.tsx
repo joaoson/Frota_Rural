@@ -1,91 +1,70 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { LoginUserResponse } from "@/services/UserService/models/LoginUserResponse";
-import { setAccessToken, setLogoutCallback } from "@/services/AxiosInstance";
-import { userService } from "@/services/UserService/UserService";
-import { parseJwt, type JwtPayload } from "@/utils/jwt";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type AuthContextType = {
-  tokens: LoginUserResponse | null;
-  userId: string | null;
-  userRole: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (tokens: LoginUserResponse, role?: string | null) => void;
-  setUserRole: (role: string | null) => void;
-  logout: () => void;
-};
+import { authStore, clearAllStores, tokenStore } from "@/app/container";
+import { parseJwt } from "@/shared/auth/jwt";
 
-const AuthContext = createContext<AuthContextType | null>(null);
+import { AuthContext, type AuthSession } from "./authContextValue";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [tokens, setTokens] = useState<LoginUserResponse | null>(null);
+  const [tokens, setTokens] = useState<AuthSession | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
   const isAuthenticated = tokens !== null;
 
-  const login = useCallback(
-    (newTokens: LoginUserResponse, role?: string | null) => {
-      const payload = parseJwt<JwtPayload>(newTokens.access);
-      setTokens(newTokens);
-      setUserId(payload.user_id);
-      if (role) setUserRole(role);
-      setAccessToken(newTokens.access);
-    },
-    [],
-  );
-
-  const clearSession = useCallback(() => {
+  const reset = useCallback(() => {
     setTokens(null);
     setUserId(null);
     setUserRole(null);
-    setAccessToken(null);
+    clearAllStores();
+  }, []);
+
+  const login = useCallback((session: AuthSession, role?: string | null) => {
+    const payload = parseJwt(session.access);
+    setTokens(session);
+    setUserId(payload?.user_id ?? null);
+    // O papel vem da claim do token quando o chamador não informa.
+    setUserRole(role ?? payload?.role ?? null);
+    tokenStore.setAccessToken(session.access);
   }, []);
 
   const logout = useCallback(() => {
-    userService.logout().catch(() => {});
-    clearSession();
-  }, [clearSession]);
+    void authStore.logout();
+    reset();
+  }, [reset]);
 
-  // Permite que o interceptor do Axios limpe o estado quando o refresh falha
-  useEffect(() => {
-    setLogoutCallback(clearSession);
-  }, [clearSession]);
+  // RefreshingHttpClient avisa aqui quando o refresh falha de vez
+  useEffect(() => tokenStore.subscribeExpired(reset), [reset]);
 
-  // Restaura a sessão a partir do cookie de refresh ao carregar/recarregar a página
+  // Restaura a sessão pelo cookie de refresh ao carregar a página. Fica aqui, e
+  // não no ProtectedRoute, para que toda rota já receba a resposta pronta.
   const hasBootstrapped = useRef(false);
   useEffect(() => {
     if (hasBootstrapped.current) return;
     hasBootstrapped.current = true;
 
-    userService
-      .silentRefresh()
-      .then(async (response) => {
-        const payload = parseJwt<JwtPayload>(response.access);
-        try {
-          const user = await userService.getById(payload.user_id);
-          login(response, user.role);
-        } catch {
-          login(response);
-        }
+    void authStore
+      .restoreSession()
+      .then((access) => {
+        if (access) login({ access }, parseJwt(access)?.role ?? null);
       })
-      .catch(() => {})
       .finally(() => setIsLoading(false));
   }, [login]);
 
-  return (
-    <AuthContext.Provider
-      value={{ tokens, userId, userRole, isAuthenticated, isLoading, login, setUserRole, logout }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      tokens,
+      userId,
+      userRole,
+      isAuthenticated,
+      isLoading,
+      login,
+      setUserRole,
+      logout,
+    }),
+    [tokens, userId, userRole, isAuthenticated, isLoading, login, logout],
   );
-}
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

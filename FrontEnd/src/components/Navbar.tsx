@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import MaterialIcon from "@/components/MaterialIcon";
-import { useChatUnread } from "@/contexts/ChatUnreadContext";
+import { useUnreadCount } from "@/features/chat/hooks/useChat";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
   const { isAuthenticated, isLoading, userRole, logout } = useAuth();
-  const { unread_total: unreadTotal } = useChatUnread();
+  const unreadTotal = useUnreadCount().data?.unreadTotal ?? 0;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

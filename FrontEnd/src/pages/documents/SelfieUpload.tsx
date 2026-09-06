@@ -1,0 +1,141 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+import { PageShell } from "@/shared/components/PageShell";
+import { FormField } from "@/shared/components/FormField";
+import { FileDropzone } from "@/shared/components/FileDropzone";
+import MaterialIcon from "@/components/MaterialIcon";
+import selfieExample from "@/assets/selfie_example.jpg";
+
+const tips = [
+  "Centralize seu rosto no centro da câmera",
+  "Tire a foto na frente de um fundo claro e com boa iluminação",
+  "Evite acessórios que cubram o rosto",
+];
+
+const SelfieUpload = () => {
+  const navigate = useNavigate();
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFile = (selected: File) => {
+    if (selected.type.startsWith("image/")) {
+      setFile(selected);
+      setError("");
+    } else {
+      setError("Por favor, envie um arquivo de imagem válido (JPG, PNG).");
+    }
+  };
+
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!file) {
+      setError("A foto pessoal é obrigatória.");
+      toast.error("Por favor, selecione uma foto antes de enviar.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Simulate photo upload & verification process
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      toast.success("Foto pessoal enviada com sucesso!");
+      navigate("/dashboard");
+    } catch {
+      toast.error("Erro ao enviar foto pessoal. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <PageShell responsive>
+      <div className="mb-8 sm:mb-10">
+        <h1 className="font-headline text-2xl sm:text-3xl font-bold text-primary mb-1">
+          Foto Pessoal
+        </h1>
+        <div className="h-1 w-16 bg-secondary-container mb-3" />
+        <p className="text-on-surface-variant text-sm">
+          Envie uma foto do seu rosto para verificação de identidade
+        </p>
+      </div>
+
+      <form
+        className="space-y-6 sm:space-y-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6 sm:p-10 shadow-sm"
+        onSubmit={handleSubmit}
+        noValidate
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="rounded-xl border border-outline-variant/30 overflow-hidden flex flex-col">
+            <div className="flex-1 flex justify-center items-center bg-surface-container-high px-6 py-6">
+              <img
+                src={selfieExample}
+                alt="Exemplo de posicionamento de foto de perfil"
+                className="h-44 sm:h-52 w-44 sm:w-52 object-cover rounded-full"
+              />
+            </div>
+
+            <div className="px-5 py-3 bg-surface-container border-t border-outline-variant/30">
+              <p className="text-[11px] text-outline font-medium text-center">
+                Posicione seu rosto dentro do círculo
+              </p>
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="rounded-xl border border-outline-variant/40 bg-surface-container overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-5 py-3.5 border-b border-outline-variant/30 bg-surface-container-high">
+              <MaterialIcon
+                icon="tips_and_updates"
+                size={18}
+                className="text-primary"
+              />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                Dicas para uma boa foto
+              </span>
+            </div>
+            <ul className="px-5 py-4 space-y-4 flex-1">
+              {tips.map((item, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3 text-sm text-on-surface"
+                >
+                  <span className="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                    {i + 1}
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Upload area */}
+        <FormField label="Foto Pessoal *" error={error ?? undefined} className="space-y-3">
+          <FileDropzone
+            accept="image/*"
+            file={file}
+            hasError={Boolean(error)}
+            emptyIcon="add_a_photo"
+            emptyLabel="Arraste a foto ou clique para selecionar"
+            hint="JPG, PNG — Máx. 5MB"
+            onFiles={(files) => handleFile(files[0])}
+          />
+        </FormField>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary font-bold py-3.5 sm:py-4 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <MaterialIcon icon="upload" size={20} />{" "}
+          {isSubmitting ? "Enviando..." : "Enviar Foto"}
+        </button>
+      </form>
+    </PageShell>
+  );
+};
+
+export default SelfieUpload;
