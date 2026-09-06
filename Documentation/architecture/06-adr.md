@@ -261,6 +261,31 @@ localização fica trivial — *o que a tela é sobre* decide a pasta — e `app
 
 ---
 
+## ADR-011 — Converter o chat à arquitetura, em vez de manter o `snake_case` do time
+
+**Contexto.** O chat chegou pela `develop` com uma decisão escrita e justificada em
+`ChatModels.ts`: *"Os nomes são snake_case de propósito: é exatamente o que o backend devolve, e
+traduzir para camelCase aqui só criaria um ponto a mais para divergir."* Isso contraria o ADR-009,
+que manda o `snake_case` morrer no mapper, e a regra de erros do §7.4 — o `ChatService` tinha a
+própria hierarquia (`ChatServiceError`, `ChatError`) em paralelo à de `HttpError`.
+
+**Decisão.** Converter: zod na fronteira, `chatMapper` traduzindo para camelCase, entidades próprias
+em `types/chat.ts` e os erros do transporte normalizados pelo `AxiosHttpClient` como em todas as
+outras features.
+
+**Alternativa rejeitada.** *Manter o chat como exceção documentada.* Custaria menos e respeitaria o
+argumento do autor, que não é ruim: a tradução é de fato mais um ponto a manter em sincronia. Foi
+rejeitada porque o projeto é avaliado por consistência arquitetural, e uma feature falando outra
+convenção obriga quem lê a saber de qual lado da fronteira está — exatamente o que a ACL existe para
+evitar. Com o mapper, o `snake_case` fica confinado a `chatSchemas.ts`.
+
+**Consequências.** O payload do WebSocket passa pelo mesmo ACL do REST: `message.new` e
+`thread.updated` são validados com os mesmos schemas antes de virar entidade. Um campo que o backend
+renomeie falha no zod, em um lugar, em vez de virar `undefined` espalhado pela UI. O custo foi
+reescrever o acesso a campos em oito arquivos, feito de uma vez.
+
+---
+
 ## Pendências registradas
 
 | Item | Onde |
@@ -269,6 +294,7 @@ localização fica trivial — *o que a tela é sobre* decide a pasta — e `app
 | `DEFAULT_PERMISSION_CLASSES` ausente ⇒ DRF em `AllowAny` | `djangoapi/settings.py` |
 | `role` como `TextField` livre, nunca verificado no servidor | `users/models.py` |
 | `.env` versionados; **rotacionar `RESEND_API_KEY`** | `BackEnd/.env`, `FrontEnd/src/.env` |
+| Fotos do seed apontam para `storage.example.com` (bucket fictício) | dado de teste, não código |
 | `SECRET_KEY` fixa e reusada como chave JWT; `DEBUG = True` | `settings.py:29` |
 | `CommonMiddleware` duplicado | `settings.py:59,62` |
 | `README_Database_Migrations.md` descreve o layout pré-refatoração | `Documentation/` |

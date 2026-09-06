@@ -1,6 +1,10 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { PostingDetail, PostingListItem } from "../types/posting";
+import type {
+  PostingDetail,
+  PostingListItem,
+  UploadPhotosResult,
+} from "../types/posting";
 import type { PostingWritePayload } from "../types/postingSchemas";
 import type { PostingFilter, PostingRepository } from "./PostingRepository";
 
@@ -47,6 +51,18 @@ export class PostingStore {
 
   remove(id: string): Promise<void> {
     return this.repository.remove(id);
+  }
+
+  findById(id: string): Promise<PostingDetail> {
+    return this.repository.findById(id);
+  }
+
+  list(filter?: PostingFilter): Promise<PostingListItem[]> {
+    return this.repository.list(filter);
+  }
+
+  uploadPhotos(postingId: string, files: File[]): Promise<UploadPhotosResult> {
+    return this.repository.uploadPhotos(postingId, files);
   }
 
   async invalidateLists(): Promise<void> {

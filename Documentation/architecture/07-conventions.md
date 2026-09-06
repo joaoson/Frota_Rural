@@ -114,7 +114,10 @@ Regras:
   `features/<f>/types/<dominio>Badges.ts`.
 - **Um módulo não exporta componente e função ao mesmo tempo** — quebra o Fast Refresh, e o
   `react-refresh/only-export-components` acusa. Foi por isso que `INPUT_BASE`/`inputClass` saíram de
-  `FormField.tsx` para `shared/components/inputStyles.ts`.
+  `FormField.tsx` para `shared/components/inputStyles.ts`, e que o `ChatSocketContext` foi dividido
+  em três: o provider, o valor do contexto e os hooks de consumo.
+- **Acessibilidade vem do componente, não do chamador.** `FormField` e `PasswordField` geram o id com
+  `useId()` e ligam `htmlFor`/`id` sozinhos — nenhum formulário precisa escrever ids à mão.
 - **Nada de string de classe repetida entre páginas.** Se a mesma `className` aparece em dois
   arquivos, ou vira componente ou vira constante exportada.
 - Não adotar o `Field` do shadcn: ele fala o vocabulário de tokens do shadcn (`border-input`,

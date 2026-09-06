@@ -17,7 +17,16 @@ const MaterialIcon = ({ icon, className = "", filled = false, size, style: custo
   };
 
   return (
-    <span className={`material-symbols-outlined ${className}`} style={style} {...props}>
+    // O texto do ícone é a ligadura da fonte (ex.: "delete"), que leitores de
+    // tela leem literalmente. Por padrão o ícone é decorativo e fica oculto para
+    // tecnologia assistiva; quem precisar expô-lo pode sobrescrever via props.
+    <span
+      className={`material-symbols-outlined ${className}`}
+      style={style}
+      aria-hidden="true"
+      translate="no"
+      {...props}
+    >
       {icon}
     </span>
   );

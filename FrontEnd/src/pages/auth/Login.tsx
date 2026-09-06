@@ -11,6 +11,7 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { PageShell } from "@/shared/components/PageShell";
 import { PasswordField } from "@/shared/components/PasswordField";
 import { HttpError } from "@/shared/http/errors";
+import { homeRouteForRole } from "@/shared/utils/homeRoute";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -32,9 +33,7 @@ const Login = () => {
       const role = parseJwt(access)?.role ?? null;
       const from = (location.state as { from?: string } | null)?.from;
 
-      if (from) navigate(from, { replace: true });
-      else if (role === "locador") navigate("/dashboard");
-      else navigate("/dashboard-locatario");
+      navigate(from ?? homeRouteForRole(role), { replace: true });
     } catch (error) {
       toast.error(
         error instanceof HttpError ? error.message : "Não foi possível entrar. Tente novamente.",

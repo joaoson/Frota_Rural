@@ -6,6 +6,8 @@ from .views import (
     ban_user,
     approve_posting,
     reject_posting,
+    chat_moderation_queue,
+    chat_moderation_resolve,
 )
 
 urlpatterns = [
@@ -14,4 +16,6 @@ urlpatterns = [
     path('admin/users/<uuid:pk>/ban', ban_user, name='ban_user'),
     path('admin/postings/<uuid:pk>/approve', approve_posting, name='approve_posting'),
     path('admin/postings/<uuid:pk>/reject', reject_posting, name='reject_posting'),
+    path('admin/chat/messages/', chat_moderation_queue, name='chat_moderation_queue'),
+    path('admin/chat/messages/<uuid:pk>/resolve', chat_moderation_resolve, name='chat_moderation_resolve'),
 ]

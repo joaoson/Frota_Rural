@@ -10,7 +10,6 @@ export const MACHINE_FORM_DEFAULTS: MachineFormValues = {
   model: "",
   year: "",
   usagePurpose: "Plantio",
-  initialHorimeter: "",
   technicalSpecifications: "",
 };
 

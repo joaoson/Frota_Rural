@@ -20,9 +20,10 @@ src/
 │   ├── app.tsx                      # providers
 │   ├── router.tsx                   # árvore de rotas
 │   └── routes/{public,protected,admin}Routes.tsx
-├── features/                        # 9 features, mesma forma em todas
+├── features/                        # 12 features, mesma forma em todas
 │   ├── auth/  users/  machines/  postings/
 │   ├── documents/  administration/  contracts/  reviews/
+│   ├── chat/  payments/  operators/  # vieram da develop, convertidas
 │   └── dashboard/                   # só apresentação: serve aos dois dashboards
 ├── shared/
 │   ├── http/
@@ -271,6 +272,56 @@ Unificar expôs que as cópias tinham divergido, não só em estilo:
   tokens do shadcn (`border-input`, `text-muted-foreground`) enquanto as páginas falam os aliases M3
   (`bg-surface-container`, `text-on-surface-variant`). Adotá-lo mudaria a aparência de todo
   formulário.
+
+ · **Referência:** [`reference/frontend-documents-feature.md`](reference/frontend-documents-feature.md)
+
+## 3.10 O merge da `develop`
+
+A branch de arquitetura correu em paralelo a 22 commits de produto. O merge trouxe Chat, assinatura
+de contrato com hashing, Stripe, fotos no Firebase, acessibilidade e dark mode.
+
+O risco não estavam nos conflitos — o git os aponta. Estava nos **33 arquivos novos que entraram sem
+conflito nenhum** importando `@/services/…`: sem tratamento, o merge passaria e ressuscitaria a
+arquitetura antiga em paralelo à nova.
+
+### Três features novas
+
+| Feature | Veio de | Nota |
+|---|---|---|
+| `chat/` | `ChatService` + `useChatSocket` + 5 componentes | Tem `api/ChatSocketClient` — o `<feature>Client` que a spec prevê para transporte próprio |
+| `payments/` | `PaymentService` | Checkout do Stripe; o status reconsulta enquanto `pending`, porque a confirmação vem por webhook |
+| `operators/` | `OperatorService` | CRUD de `users/operators` |
+
+`GeocodingService` virou `shared/http/GeocodingClient.ts`, ao lado do `ViaCepClient`: os dois são
+gateways para serviços públicos de terceiros.
+
+O chat foi **convertido** à arquitetura (zod + mapper + camelCase + `HttpError`), abandonando o
+`snake_case` que o time adotou de propósito. O `ChatUnreadContext` saiu: contagem de não-lidas é
+estado de servidor e mora no store, com o socket empurrando pelo `setQueryData`. O
+`ChatSocketContext` ficou — uma conexão única compartilhada é papel legítimo de contexto.
+
+### O que o merge corrigiu
+
+- **`/admin` sem guarda de papel.** A develop envolveu o subtree com `allowedRoles={["admin"]}`;
+  esta branch não tinha. Qualquer usuário autenticado abria o painel.
+- **`users.city` e `users.state`.** As migrações `0003` e `0004` criaram as colunas; o mapper daqui
+  as descartava do payload, perdendo dados do cadastro em silêncio.
+- **Admin caindo no dashboard errado.** O `homeRouteForRole` unificou o mapa papel → rota, que
+  divergia entre `Login` e `ProtectedRoute`.
+- **Restauração de sessão.** Saiu do `ProtectedRoute` para o `AuthProvider`, que passou a expor
+  `isLoading` — some o flash de rota protegida antes da sessão resolver.
+- **Fotos de anúncio.** Deixaram de ser validadas e descartadas: `PostingRepository.uploadPhotos`
+  envia ao Firebase, com a primeira virando capa e falha individual não abortando o resto.
+
+### A refatoração pagando juros
+
+A develop fez dois passes manuais: 206 ocorrências de `dark:text-primary-bright` e `htmlFor`/`id` em
+cada formulário. Aqui a acessibilidade coube em **dois arquivos** — `FormField` e `PasswordField`
+geram o id com `useId()` e ligam rótulo e controle sozinhos, o que também é mais robusto que ids
+escritos à mão.
+
+O mesmo vale para o resto: o mock de chat dos dois dashboards (176 e 99 linhas) virou
+`<ChatInboxPanel />`, e a busca do locatário (29 linhas) virou `<DashboardMachineSearch />`.
 
 ---
 

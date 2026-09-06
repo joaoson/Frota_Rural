@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 import MaterialIcon from "@/components/MaterialIcon";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -45,6 +47,8 @@ interface RentalCardProps {
   detailsOpen: boolean;
   onToggleDetails: () => void;
   reschedule?: ReschedulePanel;
+  /** Quando presente, "Analisar" vira link para a análise da locação. */
+  analysisHref?: string;
 }
 
 const PANEL_INPUT =
@@ -77,6 +81,7 @@ export function RentalCard({
   detailsOpen,
   onToggleDetails,
   reschedule,
+  analysisHref,
 }: RentalCardProps) {
   const badge = rentalStatusBadge(rental.status);
   const isOpenStage = rental.status === "pending" || rental.status === "active";
@@ -130,11 +135,19 @@ export function RentalCard({
               <MaterialIcon icon="star" size={14} /> {review.buttonLabel}
             </button>
           )}
-          {isOpenStage && (
-            <button className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
-              <MaterialIcon icon="analytics" size={14} /> Analisar
-            </button>
-          )}
+          {isOpenStage &&
+            (analysisHref ? (
+              <Link
+                to={analysisHref}
+                className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20"
+              >
+                <MaterialIcon icon="analytics" size={14} /> Analisar
+              </Link>
+            ) : (
+              <button className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
+                <MaterialIcon icon="analytics" size={14} /> Analisar
+              </button>
+            ))}
           {isClosedStage && (
             <button
               onClick={onToggleDetails}

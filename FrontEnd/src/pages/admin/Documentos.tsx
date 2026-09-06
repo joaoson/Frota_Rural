@@ -460,7 +460,7 @@ const Documentos = () => {
                     : "workspace_premium"
                 }
                 size={20}
-                className="text-primary"
+                className="text-primary dark:text-primary-bright"
               />
               Revisar{" "}
               {selectedItem?.type === "license" ? "CNH" : "Certificação"}
@@ -507,7 +507,7 @@ const Documentos = () => {
                         <MaterialIcon
                           icon={isImage ? "image" : "picture_as_pdf"}
                           size={16}
-                          className="text-primary"
+                          className="text-primary dark:text-primary-bright"
                         />
                         <span className="text-[10px] font-bold uppercase tracking-wider text-outline">
                           Documento Anexado
@@ -517,7 +517,7 @@ const Documentos = () => {
                         href={fullUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary dark:text-primary-bright hover:underline"
                       >
                         <MaterialIcon icon="open_in_new" size={14} />
                         Abrir
@@ -553,7 +553,7 @@ const Documentos = () => {
                           target="_blank"
                           rel="noopener noreferrer"
                           download
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-primary dark:text-primary-bright bg-primary/10 hover:bg-primary/20 transition-colors"
                         >
                           <MaterialIcon icon="download" size={14} />
                           Baixar
@@ -565,10 +565,10 @@ const Documentos = () => {
               })()}
 
               <div className="pt-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-outline">
+                <label htmlFor="observacao-motivo" className="text-[10px] font-bold uppercase tracking-wider text-outline">
                   Observação / Motivo
                 </label>
-                <textarea
+                <textarea id="observacao-motivo"
                   value={reviewNote}
                   onChange={(e) => setReviewNote(e.target.value)}
                   rows={3}

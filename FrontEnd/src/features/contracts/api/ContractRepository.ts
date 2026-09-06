@@ -1,15 +1,30 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
 import type { ContratoData } from "../types/contractDocument";
-import type { Contract, Rental } from "../types/rental";
+import type {
+  Contract,
+  ContractEvidence,
+  Rental,
+  SignatureOtp,
+  SignatureReceipt,
+} from "../types/rental";
 import {
   contractApiSchema,
+  contractEvidenceApiSchema,
   type CreateRentalPayload,
   rentalApiSchema,
   rentalListApiSchema,
+  signatureEvidenceApiSchema,
+  signatureOtpApiSchema,
   type SignatureRole,
 } from "../types/rentalSchemas";
-import { contractToDomain, rentalToDomain } from "./contractMapper";
+import {
+  contractToDomain,
+  rentalToDomain,
+  toContractEvidence,
+  toSignatureEvidence,
+  toSignatureOtp,
+} from "./contractMapper";
 
 const RENTALS_PATH = "rentals/";
 const CONTRACTS_PATH = "contracts/";
@@ -22,10 +37,13 @@ export interface RentalFilter {
 export interface ContractRepository {
   listRentals(filter: RentalFilter): Promise<Rental[]>;
   findRentalById(id: string): Promise<Rental>;
+  listByPosting(postingId: string): Promise<Rental[]>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
   listContracts(): Promise<Contract[]>;
   findContractDocument(id: string): Promise<ContratoData>;
-  sign(id: string, role: SignatureRole, name?: string): Promise<Contract>;
+  sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt>;
+  requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp>;
+  findEvidence(id: string): Promise<ContractEvidence>;
 }
 
 export class HttpContractRepository implements ContractRepository {
@@ -40,6 +58,16 @@ export class HttpContractRepository implements ContractRepository {
       method: "GET",
       path: RENTALS_PATH,
       query: { lessee: filter.lesseeId, lessor: filter.lessorId },
+    });
+    return rentalListApiSchema.parse(response.data).map(rentalToDomain);
+  }
+
+  /** Locações de um anúncio — alimenta o calendário de disponibilidade. */
+  async listByPosting(postingId: string): Promise<Rental[]> {
+    const response = await this.http.send<unknown>({
+      method: "GET",
+      path: RENTALS_PATH,
+      query: { postings: postingId },
     });
     return rentalListApiSchema.parse(response.data).map(rentalToDomain);
   }
@@ -71,12 +99,44 @@ export class HttpContractRepository implements ContractRepository {
     return response.data;
   }
 
-  async sign(id: string, role: SignatureRole, name?: string): Promise<Contract> {
-    const response = await this.http.send<unknown>({
+  /**
+   * Registra o aceite. A evidência (hash do documento, timestamp UTC, IP e
+   * User-Agent) é gravada pelo servidor em log imutável — nada disso sobe do
+   * cliente, justamente para ter valor probatório.
+   */
+  async sign(
+    id: string,
+    role: SignatureRole,
+    name: string,
+    otp?: string,
+  ): Promise<SignatureReceipt> {
+    const response = await this.http.send<{ signature_evidence?: unknown }>({
       method: "POST",
       path: `contracts/${id}/sign`,
-      body: { role, name },
+      body: { role, name, ...(otp ? { otp } : {}) },
     });
-    return contractToDomain(contractApiSchema.parse(response.data));
+    const raw = response.data?.signature_evidence;
+    return {
+      rental: await this.findRentalById(id),
+      evidence: raw ? toSignatureEvidence(signatureEvidenceApiSchema.parse(raw)) : null,
+    };
+  }
+
+  async requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp> {
+    const response = await this.http.send<unknown>({
+      method: "POST",
+      path: `contracts/${id}/otp`,
+      body: { role },
+    });
+    return toSignatureOtp(signatureOtpApiSchema.parse(response.data));
+  }
+
+  /** Trilha de auditoria completa, com a conferência do encadeamento de hashes. */
+  async findEvidence(id: string): Promise<ContractEvidence> {
+    const response = await this.http.send<unknown>({
+      method: "GET",
+      path: `contracts/${id}/evidence`,
+    });
+    return toContractEvidence(contractEvidenceApiSchema.parse(response.data));
   }
 }

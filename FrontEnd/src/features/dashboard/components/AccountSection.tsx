@@ -8,6 +8,8 @@ import { FormField } from "@/shared/components/FormField";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { PasswordField } from "@/shared/components/PasswordField";
 import { useCepLookup } from "@/shared/hooks/useCepLookup";
+import { formatAddress } from "@/shared/http/ViaCepClient";
+import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { BadRequestError } from "@/shared/http/errors";
 import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 import { getInitials } from "@/shared/utils/getInitials";
@@ -15,8 +17,7 @@ import { maskCEP } from "@/shared/utils/masks/maskCEP";
 import { maskDocument } from "@/shared/utils/masks/maskDocument";
 import { maskPhone } from "@/shared/utils/masks/maskPhone";
 import { passwordPattern } from "@/shared/utils/regexPatterns";
-import { validateCNPJ } from "@/shared/utils/validation/validateCNPJ";
-import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { validateDocument } from "@/shared/utils/validation/validateDocument";
 
 const ACCOUNT_INPUT =
   "w-full bg-surface-container border-none rounded-lg p-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm";
@@ -24,12 +25,6 @@ const ACCOUNT_PASSWORD_INPUT =
   "w-full bg-surface-container border-none rounded-lg p-3.5 pr-12 text-sm focus:ring-2 focus:ring-primary text-on-surface shadow-sm";
 const ACCOUNT_LABEL = "text-xs font-bold uppercase tracking-wider text-outline";
 
-function validateDocument(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 11) return validateCPF(digits);
-  if (digits.length === 14) return validateCNPJ(digits);
-  return false;
-}
 
 interface AccountSectionProps {
   userId: string | null;
@@ -53,6 +48,8 @@ export function AccountSection({
   const [formEmail, setFormEmail] = useState("");
   const [formPhone, setFormPhone] = useState("");
   const [formAddress, setFormAddress] = useState("");
+  const [formCity, setFormCity] = useState("");
+  const [formState, setFormState] = useState("");
   const [formCep, setFormCep] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -70,6 +67,8 @@ export function AccountSection({
     setFormEmail(user.email);
     setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
     setFormAddress(user.address);
+    setFormCity(user.city ?? "");
+    setFormState(user.state ?? "");
     setFormCep(maskCEP(user.cep ?? ""));
   }
 
@@ -97,11 +96,9 @@ export function AccountSection({
     if (digits.length !== 8) return;
     try {
       const address = await lookup(digits);
-      setFormAddress(
-        [address.street, address.neighborhood, address.city, address.state]
-          .filter(Boolean)
-          .join(", "),
-      );
+      setFormAddress(formatAddress(address, "logradouro"));
+      setFormCity(address.city);
+      setFormState(address.state.toUpperCase());
     } catch {
       toast.error("CEP não encontrado.");
     }
@@ -124,6 +121,8 @@ export function AccountSection({
           email: formEmail.toLowerCase().trim(),
           phone: `+55${clearSpecialChars(formPhone)}`,
           address: formAddress.trim(),
+          city: formCity.trim(),
+          state: formState.toUpperCase(),
           cep: clearSpecialChars(formCep),
         },
       });
@@ -264,6 +263,32 @@ export function AccountSection({
                 className={ACCOUNT_INPUT}
               />
             </FormField>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField label="Cidade" labelClassName={ACCOUNT_LABEL} className="col-span-2">
+                <input
+                  type="text"
+                  value={formCity}
+                  onChange={(event) => setFormCity(event.target.value)}
+                  className={ACCOUNT_INPUT}
+                />
+              </FormField>
+
+              <FormField label="Estado" labelClassName={ACCOUNT_LABEL}>
+                <select
+                  value={formState}
+                  onChange={(event) => setFormState(event.target.value)}
+                  className={ACCOUNT_INPUT}
+                >
+                  <option value="">--</option>
+                  {BRAZILIAN_STATES.map((uf) => (
+                    <option key={uf} value={uf}>
+                      {uf}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
           </div>
 
           <button

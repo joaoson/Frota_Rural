@@ -238,6 +238,18 @@ dashboard do locador simplesmente não passa `reschedule`, e o botão fica inert
 `DashboardShell` faz o mesmo pela sidebar, com um parâmetro genérico `<Tab extends string>` para
 que cada dashboard mantenha sua própria união de abas em vez de cair em `string`.
 
+### 🟡 Adapter + 🔴 Observer — `ChatSocketClient`
+
+O WebSocket é o caso que a `specification.md` prevê para `<feature>Client`: transporte próprio, que
+não cabe no `HttpClient`. Ele adapta o socket ao mesmo vocabulário do REST — os eventos
+`message.new` e `thread.updated` passam pelos **mesmos schemas zod** antes de virar entidade — e
+publica para múltiplos assinantes via `ChatSocketContext`, que é o Observer: cada tela registra
+handlers e os remove ao desmontar, sem que o socket reconecte.
+
+O ponto não óbvio, e que o código documenta: o channel layer não guarda histórico, então o que
+chega com o socket caído se perde. A garantia de não perder mensagem é o resync via REST a cada
+reconexão, não o WebSocket.
+
 ### 🟡 Adapter — `maskedRegister`
 
 Reescreve o valor antes de repassar o evento ao `react-hook-form`, permitindo que campos com máscara
@@ -278,6 +290,7 @@ aceito por omissão.
 | Strategy (front) | `features/*/types/*Badges.ts` | 6 cópias de `statusBadge` |
 | Composite (front) | `shared/components/`, `features/*/components/` | ~65 blocos de campo, 15 shells de página |
 | Template Method (front) | `dashboard/RentalCard`, `dashboard/DashboardShell` | `renderRentalCard` e a sidebar, 2 cópias cada |
+| Adapter + Observer (front) | `features/chat/api/ChatSocketClient`, `contexts/ChatSocketContext` | socket preso a uma tela, que congelava o badge |
 
 ---
 

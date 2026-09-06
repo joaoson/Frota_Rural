@@ -13,7 +13,7 @@ Este guia explica o processo passo-a-passo para adicionar uma nova coluna a qual
 
 1. **Localize o Arquivo de Models:**
    Abra o `models.py` do app correspondente — por exemplo `BackEnd/machines/models.py` para
-   `Machines`, ou `BackEnd/document_validation/models.py` para `OperatorLicense`. A tabela abaixo
+   `Machines`, ou `BackEnd/contracts/models.py` para as evidências de assinatura. A tabela abaixo
    mapeia cada model ao seu app.
 
 2. **Adicione o Campo à Classe do Modelo:**
@@ -60,12 +60,15 @@ Este guia explica o processo passo-a-passo para adicionar uma nova coluna a qual
 | `Postings`, `PostingsPhotos` | `postings` | `BackEnd/postings/models.py` |
 | `PostingModeration` | `administration` | `BackEnd/administration/models.py` |
 | `OperatorLicense`, `Certification` | `document_validation` | `BackEnd/document_validation/models.py` |
-| `Contracts`, `Rentals`, `Messages`, `Reviews` | `api` *(legado)* | `BackEnd/api/models.py` |
+| `Contracts`, `ContractSignatures`, `ContractSignatureOtps` | `contracts` | `BackEnd/contracts/models.py` |
+| `Messages`, `MessageReports` | `chat` | `BackEnd/chat/models.py` |
+| `Payments` | `payments` | `BackEnd/payments/models.py` |
+| `Rentals`, `Reviews` | `api` *(legado)* | `BackEnd/api/models.py` |
 
 O model `Credentials`, citado em versões anteriores deste guia, **não existe mais** — foi substituído
 por `OperatorLicense` e `Certification` em `document_validation`.
 
-Os quatro models restantes em `api` ainda serão extraídos para apps próprios (ver o TODO em
+Os dois models restantes em `api` ainda serão extraídos para apps próprios (ver o TODO em
 `BackEnd/api/models.py:17-18`). Eles foram gerados por `inspectdb` e, por isso, usam
 `models.DO_NOTHING` nas FKs e `id = UUIDField(primary_key=True)` **sem default** — ao mexer neles,
 lembre-se de que o UUID e os timestamps precisam ser preenchidos manualmente.

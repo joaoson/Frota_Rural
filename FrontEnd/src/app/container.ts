@@ -9,6 +9,12 @@ import { DocumentStore } from "@/features/documents/api/DocumentStore";
 import { HttpMachineRepository } from "@/features/machines/api/MachineRepository";
 import { HttpModerationRepository } from "@/features/administration/api/ModerationRepository";
 import { ModerationStore } from "@/features/administration/api/ModerationStore";
+import { HttpChatRepository } from "@/features/chat/api/ChatRepository";
+import { ChatStore } from "@/features/chat/api/ChatStore";
+import { HttpOperatorRepository } from "@/features/operators/api/OperatorRepository";
+import { OperatorStore } from "@/features/operators/api/OperatorStore";
+import { HttpPaymentRepository } from "@/features/payments/api/PaymentRepository";
+import { PaymentStore } from "@/features/payments/api/PaymentStore";
 import { HttpPostingRepository } from "@/features/postings/api/PostingRepository";
 import { PostingStore } from "@/features/postings/api/PostingStore";
 import { HttpUserRepository } from "@/features/users/api/UserRepository";
@@ -37,7 +43,7 @@ const rawHttpClient = new AxiosHttpClient(axiosInstance);
 
 export const tokenStore = new InMemoryTokenStore();
 
-const sessionService = new SessionService(rawHttpClient, tokenStore);
+export const sessionService = new SessionService(rawHttpClient, tokenStore);
 const decoratedHttpClient: HttpClient = new RefreshingHttpClient(
   new AuthenticatedHttpClient(rawHttpClient, tokenStore),
   sessionService,
@@ -60,6 +66,9 @@ const stores = {
   machines: new MachineStore(new HttpMachineRepository(httpClient), queryClient),
   users: new UserStore(new HttpUserRepository(httpClient), queryClient),
   postings: new PostingStore(new HttpPostingRepository(httpClient), queryClient),
+  payments: new PaymentStore(new HttpPaymentRepository(httpClient), queryClient),
+  operators: new OperatorStore(new HttpOperatorRepository(httpClient), queryClient),
+  chat: new ChatStore(new HttpChatRepository(httpClient), queryClient),
   moderation: new ModerationStore(new HttpModerationRepository(httpClient), queryClient),
   documents: new DocumentStore(new HttpDocumentRepository(httpClient), queryClient),
   contracts: new ContractStore(new HttpContractRepository(httpClient), queryClient),
@@ -70,6 +79,9 @@ export const {
   machines: machineStore,
   users: userStore,
   postings: postingStore,
+  payments: paymentStore,
+  operators: operatorStore,
+  chat: chatStore,
   moderation: moderationStore,
   documents: documentStore,
   contracts: contractStore,

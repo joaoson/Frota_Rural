@@ -2,6 +2,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { postingStore } from "@/app/container";
 
+import type { UploadPhotosResult } from "../types/posting";
+
 import type { PostingFilter } from "../api/PostingRepository";
 import type { PostingWritePayload } from "../types/postingSchemas";
 
@@ -43,6 +45,15 @@ export function useUpdatePosting() {
 export function useDeletePosting() {
   return useMutation<void, Error, string>({
     mutationFn: (id) => postingStore.remove(id),
+    onSuccess: () => {
+      void postingStore.invalidateLists();
+    },
+  });
+}
+
+export function useUploadPostingPhotos() {
+  return useMutation<UploadPhotosResult, Error, { postingId: string; files: File[] }>({
+    mutationFn: ({ postingId, files }) => postingStore.uploadPhotos(postingId, files),
     onSuccess: () => {
       void postingStore.invalidateLists();
     },

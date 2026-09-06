@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { FlaggedDecision, FlaggedMessage } from "../types/moderation";
 
 import { postingKeys } from "@/features/postings/api/PostingStore";
 import { userKeys } from "@/features/users/api/UserStore";
@@ -37,4 +38,16 @@ export class ModerationStore {
   clear(): void {
     // Sem cache próprio — nada a limpar.
   }
+  listFlaggedMessages(status?: string): Promise<FlaggedMessage[]> {
+    return this.repository.listFlaggedMessages(status);
+  }
+
+  resolveFlaggedMessage(
+    messageId: string,
+    decision: FlaggedDecision,
+    note?: string,
+  ): Promise<void> {
+    return this.repository.resolveFlaggedMessage(messageId, decision, note);
+  }
+
 }

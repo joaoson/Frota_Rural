@@ -2,14 +2,19 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
+import MapaLocalizacao from "@/components/MapaLocalizacao";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
 import { useMachines } from "@/features/machines/hooks/useMachines";
 import { machineDisplayName } from "@/features/machines/types/machine";
 import { toWritePayload } from "@/features/postings/api/postingMapper";
-import { useCreatePosting } from "@/features/postings/hooks/usePostings";
+import {
+  useCreatePosting,
+  useUploadPostingPhotos,
+} from "@/features/postings/hooks/usePostings";
 import { usePostingForm } from "@/features/postings/hooks/usePostingForm";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
+import type { Coordenadas } from "@/shared/http/GeocodingClient";
 import { HttpError } from "@/shared/http/errors";
 import { masked } from "@/shared/lib/maskedRegister";
 import { maskCEP } from "@/shared/utils/masks/maskCEP";
@@ -33,6 +38,9 @@ const NovoAnuncio = () => {
 
   const form = usePostingForm();
   const createPosting = useCreatePosting();
+  const uploadPhotos = useUploadPostingPhotos();
+  // Guardadas no anúncio para o mapa não geocodificar a cada exibição.
+  const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const { lookup } = useCepLookup();
   const { errors } = form.formState;
 
@@ -69,10 +77,20 @@ const NovoAnuncio = () => {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await createPosting.mutateAsync(toWritePayload(values));
-      toast.success(
-        "Anúncio publicado. O envio das fotos à API ainda não está disponível — as imagens foram apenas validadas neste formulário.",
-      );
+      const postingId = await createPosting.mutateAsync(toWritePayload(values, coordenadas));
+
+      if (photoFiles.length > 0) {
+        const { failed } = await uploadPhotos.mutateAsync({ postingId, files: photoFiles });
+        if (failed === 0) toast.success("Anúncio publicado com as fotos.");
+        else if (failed < photoFiles.length)
+          toast.warning(
+            `Anúncio publicado, mas ${failed} de ${photoFiles.length} fotos não foram enviadas.`,
+          );
+        else toast.warning("Anúncio publicado, mas as fotos não puderam ser enviadas.");
+      } else {
+        toast.success("Anúncio publicado.");
+      }
+
       form.reset();
       setPhotoFiles([]);
       navigate("/dashboard");
@@ -86,7 +104,7 @@ const NovoAnuncio = () => {
   });
 
   const cepField = masked(form.register("cep"), maskCEP);
-  const isBusy = createPosting.isPending;
+  const isBusy = createPosting.isPending || uploadPhotos.isPending;
 
   return (
     <PageShell>
@@ -166,10 +184,12 @@ const NovoAnuncio = () => {
               {...form.register("locationAddress")}
             />
           </FormField>
-          <div className="bg-surface-container-high rounded-xl h-48 flex items-center justify-center text-on-surface-variant text-sm border border-outline-variant/20">
-            <MaterialIcon icon="map" size={24} className="mr-2 text-outline" /> Mapa de seleção de
-            localização
-          </div>
+          <MapaLocalizacao
+            endereco={form.watch("locationAddress")}
+            cep={form.watch("cep")}
+            coordenadas={coordenadas}
+            onCoordenadas={setCoordenadas}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-5">

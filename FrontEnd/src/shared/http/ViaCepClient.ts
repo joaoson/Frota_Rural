@@ -26,6 +26,26 @@ export interface Address {
 
 export const CEP_LENGTH = 8;
 
+/**
+ * Monta o texto do endereço na granularidade que a tela precisa.
+ *
+ * - `logradouro`: rua e bairro. Para telas com campos próprios de Cidade e
+ *   Estado — repetir o município aqui criaria duas fontes para o mesmo dado.
+ * - `completo`: rua, bairro, município e UF, quando o endereço é o único campo.
+ * - `municipio`: só município e UF, para a localização pública de um anúncio.
+ */
+export function formatAddress(
+  address: Address,
+  granularity: "logradouro" | "completo" | "municipio" = "completo",
+): string {
+  const parts = {
+    logradouro: [address.street, address.neighborhood],
+    completo: [address.street, address.neighborhood, address.city, address.state],
+    municipio: [address.city, address.state],
+  }[granularity];
+  return parts.filter(Boolean).join(", ");
+}
+
 export class CepNotFound extends HttpError {
   constructor(cep: string) {
     super("cep_not_found", "CEP não encontrado.", 404);

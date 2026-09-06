@@ -2,7 +2,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { contractStore } from "@/app/container";
 
-import type { Contract, Rental } from "../types/rental";
+import type {
+  Rental,
+  SignatureOtp,
+  SignatureReceipt,
+} from "../types/rental";
 import type { CreateRentalPayload, SignatureRole } from "../types/rentalSchemas";
 
 export function useRentalsAsLessee(userId: string | null) {
@@ -38,14 +42,26 @@ export function useCreateRental() {
 export interface SignContractInput {
   id: string;
   role: SignatureRole;
-  name?: string;
+  name: string;
+  /** Só quando o contrato exige confirmação por código. */
+  otp?: string;
 }
 
 export function useSignContract() {
-  return useMutation<Contract, Error, SignContractInput>({
-    mutationFn: ({ id, role, name }) => contractStore.sign(id, role, name),
+  return useMutation<SignatureReceipt, Error, SignContractInput>({
+    mutationFn: ({ id, role, name, otp }) => contractStore.sign(id, role, name, otp),
     onSuccess: () => {
       void contractStore.invalidateRentals();
     },
   });
+}
+
+export function useRequestSignatureOtp() {
+  return useMutation<SignatureOtp, Error, { id: string; role: SignatureRole }>({
+    mutationFn: ({ id, role }) => contractStore.requestSignatureOtp(id, role),
+  });
+}
+
+export function useContractEvidence(id: string | null) {
+  return useQuery({ ...contractStore.evidenceOptions(id ?? ""), enabled: Boolean(id) });
 }

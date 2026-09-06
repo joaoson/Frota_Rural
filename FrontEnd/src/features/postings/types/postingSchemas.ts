@@ -25,6 +25,15 @@ export const postingPhotoApiSchema = z.object({
   is_primary: z.boolean().nullish(),
 });
 
+// A resposta do upload é mais rica que a foto embutida no detalhe.
+export const uploadedPhotoApiSchema = z.object({
+  id: z.string(),
+  path: z.string(),
+  url: z.string(),
+  is_primary: z.boolean().nullish(),
+});
+export type UploadedPhotoApi = z.infer<typeof uploadedPhotoApiSchema>;
+
 export const postingDetailApiSchema = z.object({
   id: z.string(),
   hourly_rate: decimalString,
@@ -33,6 +42,7 @@ export const postingDetailApiSchema = z.object({
   location_lng: decimalString.nullish(),
   availability_start: z.string().nullish(),
   availability_end: z.string().nullish(),
+  max_reservation_days: z.number().nullish(),
   description: z.string().nullish(),
   status: z.string().nullish(),
   machine_brand: z.string().nullish(),
@@ -128,7 +138,10 @@ export type PostingEditFormValues = z.infer<typeof postingEditFormSchema>;
 export interface PostingWritePayload {
   machinery?: string;
   hourly_rate?: string;
+  location_cep?: string;
   location_address?: string;
+  location_lat?: number | null;
+  location_lng?: number | null;
   availability_start?: string | null;
   availability_end?: string | null;
   description?: string;

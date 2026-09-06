@@ -224,3 +224,10 @@ ml/data/**
 
 # Local image cache
 /media
+
+# Firebase service account (NUNCA versionar — dá acesso total ao bucket)
+# Padrões amplos de propósito: pegam também nomes digitados errado.
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json

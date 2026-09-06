@@ -27,6 +27,8 @@ export interface PostingDetail {
   longitude: number | null;
   availabilityStart: Date | null;
   availabilityEnd: Date | null;
+  /** Teto de dias por reserva; null quando o anúncio não limita. */
+  maxReservationDays: number | null;
   description: string | null;
   status: string | null;
   machineBrand: string | null;
@@ -49,4 +51,17 @@ export function postingMachineName(
 
 export function isPostingActive(status: string | null): boolean {
   return status === "active";
+}
+
+export interface UploadedPhoto {
+  id: string;
+  path: string;
+  url: string;
+  isPrimary: boolean;
+}
+
+export interface UploadPhotosResult {
+  uploaded: UploadedPhoto[];
+  /** Quantas falharam. O anúncio já existe, então a falha não é fatal. */
+  failed: number;
 }

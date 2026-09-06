@@ -101,6 +101,8 @@ export const userApiSchema = z.object({
   phone: z.string().nullish(),
   role: z.string(),
   address: z.string(),
+  city: z.string().nullish(),
+  state: z.string().nullish(),
   cep: z.string().nullish(),
   birth_date: z.string(),
   status: z.string().nullish(),

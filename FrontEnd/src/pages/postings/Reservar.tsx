@@ -1,21 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
-import { toast } from "sonner";
-import { useAuth } from "@/contexts/useAuth";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { contractStore, paymentStore, postingStore } from "@/app/container";
 import { toRentalDateTime } from "@/features/contracts/api/contractMapper";
-import { useCreateRental, useSignContract } from "@/features/contracts/hooks/useContracts";
-import type { Rental } from "@/features/contracts/types/rental";
-import { usePosting } from "@/features/postings/hooks/usePostings";
-import { LoadingState } from "@/shared/components/LoadingState";
-import { ErrorState } from "@/shared/components/ErrorState";
-import { BackLink } from "@/shared/components/BackLink";
-import { PageShell } from "@/shared/components/PageShell";
-import { HttpError } from "@/shared/http/errors";
+import type { PostingDetail } from "@/features/postings/types/posting";
+import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@/contexts/useAuth";
+import type { Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { ContratoData } from "@/features/contracts/types/contractDocument";
+
 
 const HORAS_POR_DIARIA = 8;
 // Taxa cobrada pela plataforma (5%)
 const TAXA_PLATAFORMA = 0.05;
+/** A entidade traz Date; os campos de data trabalham com YYYY-MM-DD. */
+const isoOuVazio = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
+
+const STATUS_RESERVA_ATIVA = new Set<Rental["status"]>(["pending", "active", "signed"]);
+
 
 type Etapa = 1 | 2 | 3;
 type FormaPagamento = "pix" | "cartao";
@@ -48,6 +53,168 @@ function calcularDiarias(inicio: string, fim: string): number {
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
 }
 
+function dataLocal(iso: string): Date {
+  const [ano, mes, dia] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function isoData(data: Date): string {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function adicionarDias(iso: string, dias: number): string {
+  const data = dataLocal(iso);
+  data.setDate(data.getDate() + dias);
+  return isoData(data);
+}
+
+function CalendarioDisponibilidade({
+  datasBloqueadas,
+  dataInicio,
+  dataFim,
+  minStartDate,
+  maxReservationDays,
+  onSelecionarData,
+  onLimparInicio,
+  onLimparFim,
+}: {
+  datasBloqueadas: Set<string>;
+  dataInicio: string;
+  dataFim: string;
+  minStartDate: string;
+  maxReservationDays: number | null;
+  onSelecionarData: (data: string) => void;
+  onLimparInicio: () => void;
+  onLimparFim: () => void;
+}) {
+  const [mesInicial, setMesInicial] = useState(() => {
+    const hoje = new Date();
+    return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  });
+  const meses = [0, 1].map((deslocamento) => new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1));
+  const podeVoltar = mesInicial > new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const moverMeses = (deslocamento: number) => {
+    const proximo = new Date(mesInicial.getFullYear(), mesInicial.getMonth() + deslocamento, 1);
+    const mesAtual = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    if (proximo >= mesAtual) setMesInicial(proximo);
+  };
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-sm">
+      <div className="border-b border-outline-variant/20 p-4 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-2xl font-black text-tertiary">
+              {dataInicio && dataFim ? `${calcularDiarias(dataInicio, dataFim)} diárias` : "Escolha o período"}
+            </p>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              {dataInicio ? formatarData(dataInicio) : "Check-in"} – {dataFim ? formatarData(dataFim) : "Check-out"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-outline-variant/50 bg-surface-container-low">
+            {[
+              { titulo: "CHECK-IN", data: dataInicio, limpar: onLimparInicio, ativo: !dataInicio || Boolean(dataInicio && !dataFim) },
+              { titulo: "CHECK-OUT", data: dataFim, limpar: onLimparFim, ativo: Boolean(dataInicio && dataFim) },
+            ].map(({ titulo, data, limpar, ativo }) => (
+              <div key={titulo} className={`min-w-36 border-r border-outline-variant/40 p-3 last:border-r-0 ${ativo ? "bg-surface-container-lowest ring-2 ring-inset ring-tertiary" : ""}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black tracking-wide text-tertiary">{titulo}</span>
+                  {data && (
+                    <button type="button" onClick={limpar} aria-label={`Limpar ${titulo.toLowerCase()}`} className="text-outline hover:text-tertiary">
+                      <MaterialIcon icon="close" size={17} />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-1 text-sm font-bold text-tertiary">{data ? formatarData(data) : "Selecionar"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-4 flex items-center gap-2 text-xs text-on-surface-variant">
+          <MaterialIcon icon="info" size={15} className="text-primary" />
+          Datas riscadas estão indisponíveis. Reservas incluem um dia antes e depois para limpeza e preparação.
+        </p>
+        {maxReservationDays && (
+          <p className="mt-2 flex items-center gap-2 text-xs font-bold text-primary">
+            <MaterialIcon icon="event" size={15} /> Máximo de {maxReservationDays} dias por reserva.
+          </p>
+        )}
+      </div>
+      <div className="p-4 sm:p-6">
+        <div className="mb-5 flex items-center justify-between">
+          <button type="button" onClick={() => moverMeses(-1)} disabled={!podeVoltar} aria-label="Mês anterior" className="rounded-full p-2 text-tertiary hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-25">
+            <MaterialIcon icon="chevron_left" size={25} />
+          </button>
+          <button type="button" onClick={() => moverMeses(1)} aria-label="Próximo mês" className="rounded-full p-2 text-tertiary hover:bg-surface-container">
+            <MaterialIcon icon="chevron_right" size={25} />
+          </button>
+        </div>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
+        {meses.map((mes) => {
+          const primeiroDia = new Date(mes.getFullYear(), mes.getMonth(), 1);
+          const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
+          const espacos = Array.from({ length: primeiroDia.getDay() });
+          return (
+            <div key={isoData(mes)}>
+              <p className="mb-5 text-center text-lg font-black capitalize text-tertiary">
+                {mes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </p>
+              <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-outline">
+                {["D", "S", "T", "Q", "Q", "S", "S"].map((dia, indice) => <span key={`${dia}-${indice}`}>{dia}</span>)}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {espacos.map((_, indice) => <span key={`vazio-${indice}`} />)}
+                {Array.from({ length: totalDias }, (_, indice) => {
+                  const data = new Date(mes.getFullYear(), mes.getMonth(), indice + 1);
+                  const iso = isoData(data);
+                  const bloqueada = datasBloqueadas.has(iso);
+                  const antesDoPrazo = iso < minStartDate;
+                  const selecionada = iso === dataInicio || iso === dataFim;
+                  const noIntervalo = Boolean(dataInicio && dataFim && iso > dataInicio && iso < dataFim);
+                  const excedeMaximo = Boolean(
+                    dataInicio && !dataFim && iso >= dataInicio && maxReservationDays && calcularDiarias(dataInicio, iso) > maxReservationDays,
+                  );
+                  const indisponivel = bloqueada || antesDoPrazo || excedeMaximo;
+                  return (
+                    <button
+                      type="button"
+                      key={iso}
+                      disabled={indisponivel}
+                      title={bloqueada ? "Indisponível: reserva ou limpeza" : antesDoPrazo ? "Data não disponível" : excedeMaximo ? `Máximo de ${maxReservationDays} dias por reserva` : "Selecionar data"}
+                      onClick={() => onSelecionarData(iso)}
+                      className={`flex aspect-square items-center justify-center rounded-full text-sm font-bold transition ${
+                        selecionada
+                          ? "bg-tertiary text-on-primary shadow-sm"
+                          : noIntervalo
+                            ? "rounded-none bg-primary/10 text-tertiary"
+                            : indisponivel
+                              ? "cursor-not-allowed text-outline/50 line-through"
+                              : "text-tertiary hover:bg-primary/10 hover:text-primary"
+                      }`}
+                    >
+                      {indice + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      </div>
+      <div className="flex justify-end border-t border-outline-variant/20 px-4 py-4 sm:px-6">
+        <button type="button" onClick={() => { onLimparInicio(); onLimparFim(); }} className="rounded-lg px-4 py-2 text-sm font-bold text-tertiary hover:bg-surface-container">
+          Limpar datas
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Stepper({ etapaAtual }: { etapaAtual: Etapa }) {
   return (
     <div className="flex items-center gap-2 sm:gap-4 mb-12 flex-wrap">
@@ -62,7 +229,7 @@ function Stepper({ etapaAtual }: { etapaAtual: Etapa }) {
                 ativa
                   ? "bg-primary text-on-primary"
                   : concluida
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-primary/15 text-primary dark:text-primary-bright"
                     : "bg-surface-container text-outline"
               }`}
             >
@@ -107,19 +274,111 @@ function TituloSecao({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Recibo do aceite eletrônico, exibido logo após a assinatura.
+ *
+ * Traz a evidência que o servidor acabou de gravar em registro imutável: o
+ * hash SHA-256 do documento aceito, o horário UTC, o IP de origem e o hash
+ * encadeado do registro. É o que a parte guarda como comprovante.
+ */
+function ReciboAssinatura({
+  recibo,
+  onConcluir,
+}: {
+  recibo: SignatureEvidence;
+  onConcluir: () => void;
+}) {
+  const linhas: { rotulo: string; valor: string; mono?: boolean }[] = [
+    { rotulo: "Assinado por", valor: recibo.signerName || recibo.signerEmail || "—" },
+    { rotulo: "E-mail", valor: recibo.signerEmail || "—" },
+    { rotulo: "Data e hora (UTC)", valor: formatarUtcCompleto(recibo.signedAt) },
+    { rotulo: "IP de origem", valor: recibo.ipAddress || "—" },
+    { rotulo: "Versão do documento", valor: recibo.documentVersion || "—" },
+    {
+      rotulo: "Posse do e-mail",
+      valor: recibo.otpVerified ? "Confirmada por código" : "Não confirmada por código",
+    },
+  ];
+
+  return (
+    <>
+      <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
+        <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <MaterialIcon icon="verified" className="text-primary" size={24} filled />
+        </div>
+        <div>
+          <div className="font-bold text-tertiary text-sm">Contrato assinado!</div>
+          <div className="text-xs text-on-surface-variant">
+            A reserva está efetivada e a evidência do aceite foi registrada.
+          </div>
+        </div>
+      </div>
+
+      <TituloSecao>Comprovante da Assinatura</TituloSecao>
+      <p className="text-sm text-on-surface-variant mb-5 leading-relaxed">
+        Guarde estes dados. Eles comprovam qual documento você aceitou, quando e de onde — a
+        evidência exigida para a assinatura eletrônica simples (MP nº 2.200-2/2001, art. 10, §2º,
+        e Lei nº 14.063/2020, art. 4º, I).
+      </p>
+
+      <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl divide-y divide-outline-variant/20 mb-6">
+        {linhas.map((linha) => (
+          <div key={linha.rotulo} className="flex justify-between items-baseline gap-4 px-5 py-3">
+            <span className="text-xs text-on-surface-variant shrink-0">{linha.rotulo}</span>
+            <span className="text-sm font-bold text-tertiary text-right break-words">{linha.valor}</span>
+          </div>
+        ))}
+        <div className="px-5 py-3">
+          <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+            Hash {recibo.hashAlgorithm.toUpperCase()} do documento assinado
+          </div>
+          <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+            {recibo.documentHash}
+          </div>
+        </div>
+        <div className="px-5 py-3">
+          <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+            Hash do registro (log encadeado)
+          </div>
+          <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+            {recibo.recordHash}
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onConcluir}
+        className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
+      >
+        <MaterialIcon icon="dashboard" size={20} /> Ir para o meu painel
+      </button>
+    </>
+  );
+}
+
+/** Timestamp exibido em UTC, que é como ele consta no registro de assinatura. */
+function formatarUtcCompleto(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ` +
+    `às ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
+  );
+}
+
 const Reservar = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { userId } = useAuth();
   const [createdRental, setCreatedRental] = useState<Rental | null>(null);
 
-  const postingQuery = usePosting(id ?? null);
-  const anuncio = postingQuery.data ?? null;
-  const loading = postingQuery.isLoading;
-  const erro = postingQuery.isError ? "Não foi possível carregar o anúncio." : null;
-
-  const createRental = useCreateRental();
-  const signContract = useSignContract();
+  const [anuncio, setAnuncio] = useState<PostingDetail | null>(null);
+  const [reservasExistentes, setReservasExistentes] = useState<Rental[]>([]);
+  const [carregandoDisponibilidade, setCarregandoDisponibilidade] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   const [etapa, setEtapa] = useState<Etapa>(1);
 
@@ -127,6 +386,12 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+
+  useEffect(() => {
+    const requestedStart = searchParams.get("inicio");
+    if (requestedStart && /^\d{4}-\d{2}-\d{2}$/.test(requestedStart)) setDataInicio(requestedStart);
+    if (searchParams.get("extensao") === "1") setObservacoes("Solicitação de extensão da locação anterior.");
+  }, [searchParams]);
 
   const minStartDate = useMemo(() => {
     const d = new Date();
@@ -137,17 +402,132 @@ const Reservar = () => {
   // Etapa 3 — assinatura
   const [aceitouTermos, setAceitouTermos] = useState(false);
   const [nomeAssinatura, setNomeAssinatura] = useState("");
+  // Documento real gerado pelo backend: é ele que a parte aceita e cujo hash é registrado.
+  const [contratoPreview, setContratoPreview] = useState<ContratoData | null>(null);
+  const [codigoOtp, setCodigoOtp] = useState("");
+  const [otpEnviadoPara, setOtpEnviadoPara] = useState<string | null>(null);
+  const [enviandoOtp, setEnviandoOtp] = useState(false);
+  const [assinando, setAssinando] = useState(false);
+  const [recibo, setRecibo] = useState<SignatureEvidence | null>(null);
 
   // Etapa 2 — pagamento
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("pix");
   const [processando, setProcessando] = useState(false);
+  const [retornoStripe] = useState(() => {
+    const busca = new URLSearchParams(window.location.search);
+    return { resultado: busca.get("pagamento"), locacaoId: busca.get("locacao") };
+  });
+  const [confirmandoPagamento, setConfirmandoPagamento] = useState(
+    () => retornoStripe.resultado === "sucesso" && !!retornoStripe.locacaoId,
+  );
+  const confirmacaoIniciada = useRef(false);
+  const [sucessoPagamento, setSucessoPagamento] = useState(false);
+  const [valorPago, setValorPago] = useState("");
+
+  useEffect(() => {
+    if (!sucessoPagamento) return;
+    const timer = window.setTimeout(() => setSucessoPagamento(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [sucessoPagamento]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (!id) return;
+    setLoading(true);
+    postingStore
+      .findById(id)
+      .then((data: PostingDetail) => {
+        setAnuncio(data);
+        setLoading(false);
+      })
+      .catch((erro: unknown) => {
+        console.error(erro);
+        setErro("Não foi possível carregar o anúncio.");
+        setLoading(false);
+      });
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setCarregandoDisponibilidade(true);
+    contractStore
+      .listByPosting(id)
+      .then((reservas: Rental[]) => setReservasExistentes(reservas.filter((reserva: Rental) => STATUS_RESERVA_ATIVA.has(reserva.status ?? ""))))
+      .catch((erro: unknown) => {
+        console.error("Erro ao carregar disponibilidade:", erro);
+        toast.error("Não foi possível carregar as datas indisponíveis.");
+      })
+      .finally(() => setCarregandoDisponibilidade(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (confirmacaoIniciada.current) return;
+    const { resultado, locacaoId } = retornoStripe;
+    if (!resultado || !locacaoId) return;
+    confirmacaoIniciada.current = true;
+
+    window.history.replaceState({}, "", window.location.pathname);
+
+    if (resultado === "cancelado") {
+      toast.info("Pagamento cancelado. As datas voltam a ficar disponíveis em alguns minutos.");
+      return;
+    }
+
+    let tentativas = 0;
+    const MAX_TENTATIVAS = 20;
+
+    const concluir = async () => {
+      let valorConfirmado = "";
+      try {
+        const rental = await contractStore.findRentalById(locacaoId);
+        if (rental) {
+          setCreatedRental(rental);
+          setDataInicio(isoOuVazio(rental.startDate));
+          setDataFim(isoOuVazio(rental.endDate));
+          valorConfirmado = (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          });
+        }
+      } catch (erro) {
+        console.error("Erro ao carregar a locação:", erro);
+      }
+      setConfirmandoPagamento(false);
+      setEtapa(3);
+      window.scrollTo(0, 0);
+      setValorPago(valorConfirmado);
+      setSucessoPagamento(true);
+      contractStore
+        .findContractDocument(locacaoId)
+        .then(setContratoPreview)
+        .catch((erro: unknown) => console.error("Erro ao carregar o contrato:", erro));
+    };
+
+    const verificar = async () => {
+      tentativas += 1;
+      try {
+        const { status } = await paymentStore.getStatus(locacaoId);
+        if (status === "approved") {
+          await concluir();
+          return;
+        }
+      } catch (erro) {
+        console.error("Erro ao consultar o pagamento:", erro);
+      }
+      if (tentativas >= MAX_TENTATIVAS) {
+        setConfirmandoPagamento(false);
+        toast.error("O pagamento ainda não foi confirmado. Atualize a página em instantes.");
+        return;
+      }
+      window.setTimeout(verificar, 700);
+    };
+
+    verificar();
+  }, [retornoStripe]);
 
   const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Maquinário";
   const valorDiaria = anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0;
+  const maxReservationDays = anuncio?.maxReservationDays ?? null;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
     const dias = calcularDiarias(dataInicio, dataFim);
@@ -155,6 +535,43 @@ const Reservar = () => {
     const tax = sub * TAXA_PLATAFORMA;
     return { diarias: dias, subtotal: sub, taxa: tax, total: sub + tax };
   }, [dataInicio, dataFim, valorDiaria]);
+
+  const datasBloqueadas = useMemo(() => {
+    const bloqueadas = new Set<string>();
+    reservasExistentes.forEach((reserva: Rental) => {
+      const inicio = adicionarDias(isoOuVazio(reserva.startDate), -1);
+      const fim = adicionarDias(isoOuVazio(reserva.endDate), 1);
+      for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+        bloqueadas.add(isoData(data));
+      }
+    });
+    return bloqueadas;
+  }, [reservasExistentes]);
+
+  const periodoEstaBloqueado = (inicio: string, fim: string) => {
+    if (!inicio || !fim) return false;
+    for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
+      if (datasBloqueadas.has(isoData(data))) return true;
+    }
+    return false;
+  };
+
+  const selecionarData = (data: string) => {
+    if (!dataInicio || dataFim) {
+      setDataInicio(data);
+      setDataFim("");
+      return;
+    }
+    if (data < dataInicio) {
+      setDataInicio(data);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, data)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
+      return;
+    }
+    setDataFim(data);
+  };
 
   const numeroContrato = `#CTR-${(id ?? "0000").slice(0, 4).toUpperCase()}`;
   const periodoTexto =
@@ -173,37 +590,59 @@ const Reservar = () => {
       toast.error("A data de fim deve ser igual ou posterior à data de início.");
       return;
     }
+    if (maxReservationDays && diarias > maxReservationDays) {
+      toast.error(`Este anúncio permite reservas de no máximo ${maxReservationDays} dias.`);
+      return;
+    }
+    if (periodoEstaBloqueado(dataInicio, dataFim)) {
+      toast.error("O período inclui uma data indisponível ou reservada para limpeza da máquina.");
+      return;
+    }
     setEtapa(2);
     window.scrollTo(0, 0);
   };
 
-  const pagar = () => {
+  const pagar = async () => {
     if (processando) return;
     setProcessando(true);
-    // Simula o processamento do pagamento 
-    setTimeout(async () => {
-      try {
-        const rental = await createRental.mutateAsync({
-          postings: id ?? "",
-          lessee: userId ?? "",
-          start_date: toRentalDateTime(dataInicio, "start"),
-          end_date: toRentalDateTime(dataFim, "end"),
-          total_price: total,
-          status: "pending",
-        });
-        setCreatedRental(rental);
-        setProcessando(false);
-        toast.success("Pagamento confirmado!");
-        setEtapa(3);
-        window.scrollTo(0, 0);
-      } catch (error) {
-        setProcessando(false);
-        toast.error(error instanceof HttpError ? error.message : "Erro ao criar locação.");
+    try {
+      const rental = await contractStore.createRental({
+        postings: id || "",
+        lessee: userId ?? "",
+        start_date: toRentalDateTime(dataInicio, "start"),
+        end_date: toRentalDateTime(dataFim, "end"),
+        total_price: total,
+        status: "pending",
+      });
+      const { url } = await paymentStore.createCheckout(rental.id);
+      window.location.href = url;
+    } catch (err: unknown) {
+      setProcessando(false);
+      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
+      if (httpStatus === 409) {
+        toast.error("O período escolhido já está reservado. Escolha outras datas.");
+      } else {
+        toast.error("Não foi possível iniciar o pagamento.");
       }
-    }, 1200);
+    }
+  };
+
+  const solicitarCodigo = async () => {
+    if (!createdRental || enviandoOtp) return;
+    setEnviandoOtp(true);
+    try {
+      const { sentTo } = await contractStore.requestSignatureOtp(createdRental.id, "locatario");
+      setOtpEnviadoPara(sentTo);
+      toast.success(`Código enviado para ${sentTo}.`);
+    } catch {
+      toast.error("Não foi possível enviar o código por e-mail.");
+    } finally {
+      setEnviandoOtp(false);
+    }
   };
 
   const assinarContrato = async () => {
+    if (assinando) return;
     if (!aceitouTermos) {
       toast.error("Você precisa aceitar os termos do contrato para continuar.");
       return;
@@ -212,23 +651,39 @@ const Reservar = () => {
       toast.error("Digite seu nome completo para assinar o contrato.");
       return;
     }
+    if (!createdRental) {
+      toast.error("Reserva não encontrada. Refaça o pagamento.");
+      return;
+    }
+    if (codigoOtp.trim().length !== 6) {
+      toast.error("Confirme seu e-mail: solicite o código e informe os 6 dígitos.");
+      return;
+    }
+
+    setAssinando(true);
     try {
-      if (createdRental) {
-        await signContract.mutateAsync({
-          id: createdRental.id,
-          role: "locatario",
-          name: nomeAssinatura,
-        });
-      }
+      const { evidence } = await contractStore.sign(
+        createdRental.id,
+        "locatario",
+        nomeAssinatura,
+        codigoOtp.trim(),
+      );
+      // Mostramos o recibo antes de sair da página: é a prova do que foi
+      // assinado, e ela fica guardada no contrato para consulta posterior.
+      setRecibo(evidence);
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
-      navigate("/dashboard-locatario");
-    } catch (error) {
-      toast.error(error instanceof HttpError ? error.message : "Erro ao assinar contrato.");
+      window.scrollTo(0, 0);
+    } catch (err) {
+      const mensagem =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+        "Erro ao assinar contrato.";
+      toast.error(mensagem);
+      setAssinando(false);
     }
   };
 
-  const resumoValores = useMemo(
-    () => (
+  // ── Resumo de valores 
+  const ResumoValores = () => (
     <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/20">
       <div className="flex justify-between items-center text-sm mb-3">
         <span className="text-on-surface-variant">
@@ -242,340 +697,508 @@ const Reservar = () => {
       </div>
       <div className="border-t border-outline-variant/30 mt-4 pt-4 flex justify-between items-end">
         <span className="text-[10px] uppercase font-bold text-outline tracking-widest">Total Apurado</span>
-        <span className="text-2xl font-black text-primary">{formatarReais(total)}</span>
+        <span className="text-2xl font-black text-primary dark:text-primary-bright">{formatarReais(total)}</span>
       </div>
     </div>
-    ),
-    [diarias, valorDiaria, subtotal, taxa, total],
   );
 
   return (
-    <PageShell width="wide">
-      <BackLink to={`/anuncio/${id}`}>Voltar ao anúncio</BackLink>
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar />
 
-      <h1 className="font-headline text-4xl font-black text-primary mb-2">Solicitar Reserva</h1>
-      <div className="h-1.5 w-20 bg-secondary-container mb-10 rounded-full" />
+      <AnimatePresence>
+        {sucessoPagamento && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-md px-6"
+            role="status"
+            aria-live="polite"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: -12 }}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-md rounded-3xl bg-surface-container-lowest border border-outline-variant/40 shadow-2xl px-10 py-12 text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.25, duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+                className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary dark:border-primary-bright flex items-center justify-center mx-auto mb-7"
+              >
+                <MaterialIcon icon="check" size={44} className="text-primary dark:text-primary-bright" filled />
+              </motion.div>
 
-      {loading && (
-        <LoadingState variant="text" label="Carregando reserva..." />
-      )}
+              <motion.h2
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.45, duration: 0.6 }}
+                className="font-headline text-3xl font-black text-primary dark:text-primary-bright mb-3"
+              >
+                Pagamento confirmado
+              </motion.h2>
 
-      {!loading && erro && (
-        <ErrorState message={erro} />
-      )}
+              {valorPago && (
+                <motion.p
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.6 }}
+                  className="font-headline text-4xl font-black text-tertiary mb-5"
+                >
+                  {valorPago}
+                </motion.p>
+              )}
 
-      {!loading && !erro && anuncio && (
-        <>
-          <Stepper etapaAtual={etapa} />
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.75, duration: 0.6 }}
+                className="text-on-surface-variant leading-relaxed mb-8"
+              >
+                As datas da máquina já foram reservadas em seu nome. O próximo passo é assinar o contrato de locação.
+              </motion.p>
 
-          {/* ════════ ETAPA 1 — DADOS DA RESERVA ════════ */}
-          {etapa === 1 && (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-              {/* Resumo */}
-              <CartaoPainel className="lg:col-span-2">
-                <TituloSecao>Resumo da Reserva</TituloSecao>
+              <motion.button
+                type="button"
+                onClick={() => setSucessoPagamento(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9, duration: 0.6 }}
+                className="w-full bg-primary text-on-primary font-bold py-4 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                Ir para a assinatura
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/20 mb-4">
-                  <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-3">
-                    Maquinário Selecionado
+      <div className="flex-1 pt-32 pb-20 max-w-[1100px] mx-auto px-6 w-full">
+        <Link
+          to={`/anuncio/${id}`}
+          className="text-sm font-bold text-primary dark:text-primary-bright hover:underline mb-8 inline-flex items-center gap-1"
+        >
+          <MaterialIcon icon="arrow_back" size={16} /> Voltar à busca
+        </Link>
+
+        <h1 className="font-headline text-4xl font-black text-primary dark:text-primary-bright mb-2">Solicitar Reserva</h1>
+        <div className="h-1.5 w-20 bg-secondary-container mb-10 rounded-full" />
+
+        {confirmandoPagamento && (
+          <div className="text-center py-20 bg-surface-container-low rounded-2xl border border-outline-variant/30">
+            <MaterialIcon icon="progress_activity" size={44} className="text-primary dark:text-primary-bright animate-spin mb-4" />
+            <p className="font-headline text-xl font-black text-primary dark:text-primary-bright mb-1">
+              Confirmando seu pagamento
+            </p>
+            <p className="text-on-surface-variant text-sm">
+              Isso leva alguns segundos. Não feche esta página.
+            </p>
+          </div>
+        )}
+
+        {loading && !confirmandoPagamento && (
+          <div className="text-center py-20">
+            <p className="text-on-surface-variant text-sm">Carregando reserva...</p>
+          </div>
+        )}
+
+        {!loading && erro && (
+          <div className="text-center py-20 bg-error-container rounded-2xl border border-error/20">
+            <p className="text-error font-bold mb-2">Erro ao carregar</p>
+            <p className="text-on-surface-variant text-sm">{erro}</p>
+          </div>
+        )}
+
+        {!loading && !erro && !confirmandoPagamento && anuncio && (
+          <>
+            <Stepper etapaAtual={etapa} />
+
+            {/* ════════ ETAPA 1 — DADOS DA RESERVA ════════ */}
+            {etapa === 1 && (
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                {/* Resumo */}
+                <CartaoPainel className="lg:col-span-2">
+                  <TituloSecao>Resumo da Reserva</TituloSecao>
+
+                  <div className="bg-surface-container-low rounded-xl p-5 border border-outline-variant/20 mb-4">
+                    <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-3">
+                      Maquinário Selecionado
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+                        <MaterialIcon icon="agriculture" className="text-primary dark:text-primary-bright" size={26} />
+                      </div>
+                      <div>
+                        <div className="font-bold text-tertiary">{titulo}</div>
+                        {anuncio.locationAddress && (
+                          <div className="text-xs text-on-surface-variant flex items-center gap-1">
+                            <MaterialIcon icon="location_on" size={13} /> {anuncio.locationAddress}
+                          </div>
+                        )}
+                        {anuncio.machineRenagroNumber && (
+                          <div className="text-[11px] text-outline font-medium tracking-wide mt-0.5">
+                            RENAGRO: {anuncio.machineRenagroNumber}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                      <MaterialIcon icon="agriculture" className="text-primary" size={26} />
+
+                  <ResumoValores />
+                </CartaoPainel>
+
+                {/* Formulário */}
+                <CartaoPainel className="lg:col-span-3">
+                  <TituloSecao>Confirme os dados da reserva</TituloSecao>
+
+                  <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/20 mb-6 flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+                      <MaterialIcon icon="agriculture" className="text-primary dark:text-primary-bright" size={24} />
                     </div>
                     <div>
-                      <div className="font-bold text-tertiary">{titulo}</div>
-                      {anuncio.locationAddress && (
-                        <div className="text-xs text-on-surface-variant flex items-center gap-1">
-                          <MaterialIcon icon="location_on" size={13} /> {anuncio.locationAddress}
-                        </div>
-                      )}
-                      {anuncio.machineRenagroNumber && (
-                        <div className="text-[11px] text-outline font-medium tracking-wide mt-0.5">
-                          RENAGRO: {anuncio.machineRenagroNumber}
-                        </div>
-                      )}
+                      <div className="font-bold text-primary dark:text-primary-bright">{titulo}</div>
+                      <div className="text-xs text-on-surface-variant">
+                        {[anuncio.locationAddress, anuncio.machineRenagroNumber && `Renagro ${anuncio.machineRenagroNumber}`]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {resumoValores}
-              </CartaoPainel>
+                  {carregandoDisponibilidade ? (
+                    <div className="mb-5 text-xs text-on-surface-variant">Carregando disponibilidade...</div>
+                  ) : (
+                    <CalendarioDisponibilidade
+                      datasBloqueadas={datasBloqueadas}
+                      dataInicio={dataInicio}
+                      dataFim={dataFim}
+                      minStartDate={minStartDate}
+                      maxReservationDays={maxReservationDays}
+                      onSelecionarData={selecionarData}
+                      onLimparInicio={() => { setDataInicio(""); setDataFim(""); }}
+                      onLimparFim={() => setDataFim("")}
+                    />
+                  )}
 
-              {/* Formulário */}
-              <CartaoPainel className="lg:col-span-3">
-                <TituloSecao>Confirme os dados da reserva</TituloSecao>
-
-                <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/20 mb-6 flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                    <MaterialIcon icon="agriculture" className="text-primary" size={24} />
-                  </div>
-                  <div>
-                    <div className="font-bold text-primary">{titulo}</div>
-                    <div className="text-xs text-on-surface-variant">
-                      {[anuncio.locationAddress, anuncio.machineRenagroNumber && `Renagro ${anuncio.machineRenagroNumber}`]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                      Data Início <span className="text-error">*</span>
+                  <div className="mb-7">
+                    <label htmlFor="observacoes-opcional" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                      Observações (opcional)
                     </label>
-                    <input
-                      type="date"
-                      value={dataInicio}
-                      min={minStartDate}
-                      onChange={(e) => setDataInicio(e.target.value)}
-                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    <textarea id="observacoes-opcional"
+                      rows={4}
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                      placeholder="Informe detalhes adicionais sobre a locação..."
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition resize-none"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                      Data Fim <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={dataFim}
-                      min={dataInicio || undefined}
-                      onChange={(e) => setDataFim(e.target.value)}
-                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                    />
-                  </div>
-                </div>
 
-                <div className="mb-7">
-                  <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                    Observações (opcional)
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    placeholder="Informe detalhes adicionais sobre a locação..."
-                    className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition resize-none"
-                  />
-                </div>
+                  <button
+                    onClick={avancarParaPagamento}
+                    className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
+                  >
+                    <MaterialIcon icon="arrow_forward" size={20} /> Avançar para Pagamento
+                  </button>
+                </CartaoPainel>
+              </div>
+            )}
 
-                <button
-                  onClick={avancarParaPagamento}
-                  className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
-                >
-                  <MaterialIcon icon="arrow_forward" size={20} /> Avançar para Pagamento
-                </button>
-              </CartaoPainel>
-            </div>
-          )}
+            {/* ════════ ETAPA 2 — PAGAMENTO ════════ */}
+            {etapa === 2 && (
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                {/* Processar pagamento */}
+                <CartaoPainel className="lg:col-span-2">
+                  <TituloSecao>Processar Pagamento</TituloSecao>
+                  <p className="text-sm text-on-surface-variant -mt-4 mb-5">Contratação de Aluguel</p>
+                  <ResumoValores />
+                </CartaoPainel>
 
-          {/* ════════ ETAPA 2 — PAGAMENTO ════════ */}
-          {etapa === 2 && (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-              {/* Processar pagamento */}
-              <CartaoPainel className="lg:col-span-2">
-                <TituloSecao>Processar Pagamento</TituloSecao>
-                <p className="text-sm text-on-surface-variant -mt-4 mb-5">Contratação de Aluguel</p>
-                {resumoValores}
-              </CartaoPainel>
+                {/* Forma de pagamento */}
+                <CartaoPainel className="lg:col-span-3">
+                  <TituloSecao>Forma de Pagamento</TituloSecao>
 
-              {/* Forma de pagamento */}
-              <CartaoPainel className="lg:col-span-3">
-                <TituloSecao>Forma de Pagamento</TituloSecao>
-
-                <div className="space-y-3 mb-7">
-                  {([
-                    { id: "pix", icone: "qr_code_2", titulo: "Pix", sub: "Aprovação Imediata" },
-                    { id: "cartao", icone: "credit_card", titulo: "Cartão de Crédito", sub: "Parcelamento em até 3x" },
-                  ] as const).map((opcao) => {
-                    const selecionada = formaPagamento === opcao.id;
-                    return (
-                      <button
-                         key={opcao.id}
-                        onClick={() => setFormaPagamento(opcao.id)}
-                        className={`w-full flex items-center gap-4 rounded-xl p-4 border-2 transition text-left ${
-                          selecionada
-                            ? "border-primary bg-primary/5"
-                            : "border-outline-variant/30 hover:border-outline-variant/60"
-                        }`}
-                      >
-                        <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                          <MaterialIcon icon={opcao.icone} className="text-tertiary" size={24} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-bold text-tertiary">{opcao.titulo}</div>
-                          <div className="text-xs text-on-surface-variant">{opcao.sub}</div>
-                        </div>
-                        <span
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                            selecionada ? "border-primary" : "border-outline/40"
+                  <div className="space-y-3 mb-7">
+                    {([
+                      { id: "pix", icone: "qr_code_2", titulo: "Pix", sub: "Aprovação Imediata" },
+                      { id: "cartao", icone: "credit_card", titulo: "Cartão de Crédito", sub: "Visa, Mastercard e outros" },
+                    ] as const).map((opcao) => {
+                      const selecionada = formaPagamento === opcao.id;
+                      return (
+                        <button
+                           key={opcao.id}
+                          onClick={() => setFormaPagamento(opcao.id)}
+                          className={`w-full flex items-center gap-4 rounded-xl p-4 border-2 transition text-left ${
+                            selecionada
+                              ? "border-primary bg-primary/5"
+                              : "border-outline-variant/30 hover:border-outline-variant/60"
                           }`}
                         >
-                          {selecionada && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                          <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+                            <MaterialIcon icon={opcao.icone} className="text-tertiary" size={24} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-bold text-tertiary">{opcao.titulo}</div>
+                            <div className="text-xs text-on-surface-variant">{opcao.sub}</div>
+                          </div>
+                          <span
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                              selecionada ? "border-primary" : "border-outline/40"
+                            }`}
+                          >
+                            {selecionada && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setEtapa(1);
-                      window.scrollTo(0, 0);
-                    }}
-                    className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40 hover:bg-surface-container-low transition"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    onClick={pagar}
-                    disabled={processando}
-                    className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
-                  >
-                    <MaterialIcon icon="lock" size={20} /> {processando ? "Processando..." : "Pagar e Avançar"}
-                  </button>
-                </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setEtapa(1);
+                        window.scrollTo(0, 0);
+                      }}
+                      className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40 hover:bg-surface-container-low transition"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={pagar}
+                      disabled={processando}
+                      className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70"
+                    >
+                      <MaterialIcon icon="lock" size={20} /> {processando ? "Processando..." : "Pagar e Avançar"}
+                    </button>
+                  </div>
 
-                <p className="text-xs text-on-surface-variant text-center mt-5">
-                  Após o pagamento, você seguirá para a assinatura do contrato.
-                </p>
-              </CartaoPainel>
-            </div>
-          )}
+                  <p className="text-xs text-on-surface-variant text-center mt-5">
+                    Após o pagamento, você seguirá para a assinatura do contrato.
+                  </p>
+                </CartaoPainel>
+              </div>
+            )}
 
-          {/* ════════ ETAPA 3 — ASSINATURA DO CONTRATO ════════ */}
-          {etapa === 3 && (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-              {/* Detalhes do contrato */}
-              <CartaoPainel className="lg:col-span-2">
-                <TituloSecao>Detalhes do Contrato</TituloSecao>
+            {/* ════════ ETAPA 3 — ASSINATURA DO CONTRATO ════════ */}
+            {etapa === 3 && (
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
+                {/* Detalhes do contrato */}
+                <CartaoPainel className="lg:col-span-2">
+                  <TituloSecao>Detalhes do Contrato</TituloSecao>
 
-                <dl className="divide-y divide-outline-variant/20">
-                  {[
-                    { rotulo: "Contrato", valor: numeroContrato },
-                    { rotulo: "Maquinário", valor: titulo },
-                    { rotulo: "Período", valor: periodoTexto },
-                    { rotulo: "Locador", valor: "João Silva" },
-                  ].map((item) => (
-                    <div key={item.rotulo} className="flex justify-between items-center py-4">
-                      <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">{item.rotulo}</dt>
-                      <dd className="font-bold text-tertiary text-sm text-right">{item.valor}</dd>
+                  <dl className="divide-y divide-outline-variant/20">
+                    {[
+                      { rotulo: "Contrato", valor: numeroContrato },
+                      { rotulo: "Maquinário", valor: titulo },
+                      { rotulo: "Período", valor: periodoTexto },
+                      { rotulo: "Locador", valor: "João Silva" },
+                    ].map((item) => (
+                      <div key={item.rotulo} className="flex justify-between items-center py-4">
+                        <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">{item.rotulo}</dt>
+                        <dd className="font-bold text-tertiary text-sm text-right">{item.valor}</dd>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center py-4">
+                      <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">Valor Total</dt>
+                      <dd className="font-black text-primary dark:text-primary-bright text-lg">{formatarReais(total)}</dd>
                     </div>
-                  ))}
-                  <div className="flex justify-between items-center py-4">
-                    <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">Valor Total</dt>
-                    <dd className="font-black text-primary text-lg">{formatarReais(total)}</dd>
-                  </div>
-                </dl>
-              </CartaoPainel>
+                  </dl>
+                </CartaoPainel>
 
-              {/* Assinatura */}
-              <CartaoPainel className="lg:col-span-3">
-                <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <MaterialIcon icon="check_circle" className="text-primary" size={24} filled />
-                  </div>
-                  <div>
-                    <div className="font-bold text-tertiary text-sm">Pagamento confirmado com sucesso!</div>
-                    <div className="text-xs text-on-surface-variant">
-                      Agora assine o contrato para efetivar a reserva.
+                {/* Assinatura */}
+                <CartaoPainel className="lg:col-span-3">
+                  {recibo ? (
+                    <ReciboAssinatura
+                      recibo={recibo}
+                      onConcluir={() => navigate("/dashboard-locatario")}
+                    />
+                  ) : (
+                  <>
+                  <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-5 mb-7 flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <MaterialIcon icon="check_circle" className="text-primary dark:text-primary-bright" size={24} filled />
+                    </div>
+                    <div>
+                      <div className="font-bold text-tertiary text-sm">Pagamento confirmado com sucesso!</div>
+                      <div className="text-xs text-on-surface-variant">
+                        Agora assine o contrato para efetivar a reserva.
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <TituloSecao>Assine o Contrato Digitalmente</TituloSecao>
-                <p className="text-sm text-on-surface-variant mb-5 leading-relaxed">
-                  Revise os termos do contrato de locação abaixo. Ao assinar, você concorda com as cláusulas e
-                  responsabilidades descritas.
-                </p>
+                  <TituloSecao>Assine o Contrato Digitalmente</TituloSecao>
+                  <p className="text-sm text-on-surface-variant mb-5 leading-relaxed">
+                    Revise os termos do contrato de locação abaixo. Ao assinar, você concorda com as cláusulas e
+                    responsabilidades descritas.
+                  </p>
 
-                {/* Prévia do contrato */}
-                <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-6 max-h-72 overflow-y-auto mb-6 text-sm text-on-surface-variant leading-relaxed space-y-3">
-                  <h3 className="font-headline font-bold text-tertiary text-base">
-                    Contrato de Locação de Maquinário Agrícola
-                  </h3>
-                  <p>
-                    <strong className="text-tertiary">Contrato nº {numeroContrato.replace("#", "")}</strong>
-                  </p>
-                  <p>
-                    Entre as partes: <strong className="text-tertiary">Locador:</strong> João Silva (CPF:
-                    000.000.000-00) e <strong className="text-tertiary">Locatário:</strong>{" "}
-                    {nomeAssinatura.trim() || "Locatário"} (CPF: 111.111.111-11).
-                  </p>
-                  <p>
-                    <strong className="text-tertiary">Objeto:</strong> Locação de {titulo}
-                    {anuncio.machineRenagroNumber && `, Renagro ${anuncio.machineRenagroNumber}`}
-                    {anuncio.machineUsagePurpose && `, para atividade de ${anuncio.machineUsagePurpose}`}, pelo
-                    período de {periodoTexto}.
-                  </p>
-                  <p>
-                    <strong className="text-tertiary">Valor:</strong> {formatarReais(total)}, incluindo diárias e taxa
-                    da plataforma.
-                  </p>
-                  <p>
-                    O equipamento será entregue livre de defeitos conhecidos. A operação deve ser realizada por
-                    operador habilitado, com credencial técnica válida (NR-31). Na devolução, o equipamento deve estar
-                    nas mesmas condições em que foi entregue, ressalvado o desgaste natural do uso regular.
-                  </p>
-                  <p>
-                    Este contrato é regido pelo Código de Defesa do Consumidor (Lei nº 8.078/1990) e pelo Código Civil
-                    Brasileiro (Lei nº 10.406/2002). A FrotaRural atua como intermediadora tecnológica e não é parte
-                    deste contrato.
-                  </p>
-                </div>
+                  {/* Prévia do contrato */}
+                  <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-6 max-h-72 overflow-y-auto mb-6 text-sm text-on-surface-variant leading-relaxed space-y-3">
+                    <h3 className="font-headline font-bold text-tertiary text-base">
+                      Contrato de Locação de Maquinário Agrícola
+                    </h3>
+                    <p>
+                      <strong className="text-tertiary">Contrato nº {numeroContrato.replace("#", "")}</strong>
+                    </p>
+                    {contratoPreview ? (
+                      <p>
+                        Entre as partes: <strong className="text-tertiary">Locador:</strong>{" "}
+                        {contratoPreview.locador.razao_social}
+                        {contratoPreview.locador.documento &&
+                          ` (${contratoPreview.locador.tipo_documento || "Documento"}: ${contratoPreview.locador.documento})`}{" "}
+                        e <strong className="text-tertiary">Locatário:</strong>{" "}
+                        {contratoPreview.locatario.razao_social}
+                        {contratoPreview.locatario.documento &&
+                          ` (${contratoPreview.locatario.tipo_documento || "Documento"}: ${contratoPreview.locatario.documento})`}
+                        .
+                      </p>
+                    ) : (
+                      <p className="text-outline">Carregando os dados das partes...</p>
+                    )}
+                    <p>
+                      <strong className="text-tertiary">Objeto:</strong> Locação de {titulo}
+                      {anuncio.machineRenagroNumber && `, Renagro ${anuncio.machineRenagroNumber}`}
+                      {anuncio.machineUsagePurpose && `, para atividade de ${anuncio.machineUsagePurpose}`}, pelo
+                      período de {periodoTexto}.
+                    </p>
+                    <p>
+                      <strong className="text-tertiary">Valor:</strong> {formatarReais(total)}, incluindo diárias e taxa
+                      da plataforma.
+                    </p>
+                    <p>
+                      O equipamento será entregue livre de defeitos conhecidos. A operação deve ser realizada por
+                      operador habilitado, com credencial técnica válida (NR-31). Na devolução, o equipamento deve estar
+                      nas mesmas condições em que foi entregue, ressalvado o desgaste natural do uso regular.
+                    </p>
+                    <p>
+                      Este contrato é regido pelo Código de Defesa do Consumidor (Lei nº 8.078/1990) e pelo Código Civil
+                      Brasileiro (Lei nº 10.406/2002). A FrotaRural atua como intermediadora tecnológica e não é parte
+                      deste contrato.
+                    </p>
+                    <p>
+                      A assinatura eletrônica simples tem validade entre as partes nos termos da MP nº 2.200-2/2001,
+                      art. 10, §2º, e da Lei nº 14.063/2020, art. 4º, I. Antes do aceite, você confirma a posse do
+                      seu e-mail por meio de um código. No aceite ficam registrados o hash do documento, a data e
+                      hora UTC, o seu IP e o seu identificador de usuário.
+                    </p>
+                    {contratoPreview?.evidencia && (
+                      <div className="pt-2 border-t border-outline-variant/30">
+                        <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+                          Hash {contratoPreview.evidencia.algoritmo_hash.toUpperCase()} deste documento
+                        </div>
+                        <div className="font-mono text-[11px] text-tertiary break-all leading-relaxed">
+                          {contratoPreview.evidencia.hash_documento_atual}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                {/* Aceite */}
-                <label className="flex items-start gap-3 bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 mb-6 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aceitouTermos}
-                    onChange={(e) => setAceitouTermos(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-primary shrink-0"
-                  />
-                  <span className="text-sm text-on-surface-variant leading-relaxed">
-                    Declaro que li e concordo com todos os termos e cláusulas do contrato de locação acima descrito.
-                  </span>
-                </label>
-
-                {/* Assinatura digital */}
-                <div className="mb-7">
-                  <label className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
-                    Nome Completo (Assinatura Digital)
+                  {/* Aceite */}
+                  <label className="flex items-start gap-3 bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 mb-6 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={aceitouTermos}
+                      onChange={(e) => setAceitouTermos(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 accent-primary shrink-0"
+                    />
+                    <span className="text-sm text-on-surface-variant leading-relaxed">
+                      Declaro que li e concordo com todos os termos e cláusulas do contrato de locação acima descrito.
+                    </span>
                   </label>
-                  <input
-                    type="text"
-                    value={nomeAssinatura}
-                    onChange={(e) => setNomeAssinatura(e.target.value)}
-                    placeholder="Digite seu nome completo"
-                    className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
-                  />
-                </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setEtapa(2);
-                      window.scrollTo(0, 0);
-                    }}
-                    className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40 hover:bg-surface-container-low transition"
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    onClick={assinarContrato}
-                    className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <MaterialIcon icon="draw" size={20} /> Assinar e Finalizar
-                  </button>
-                </div>
-              </CartaoPainel>
-            </div>
-          )}
-        </>
-      )}
-    </PageShell>
+                  {/* Assinatura digital */}
+                  <div className="mb-7">
+                    <label htmlFor="nome-completo-assinatura-digital" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                      Nome Completo (Assinatura Digital)
+                    </label>
+                    <input id="nome-completo-assinatura-digital"
+                      type="text"
+                      value={nomeAssinatura}
+                      onChange={(e) => setNomeAssinatura(e.target.value)}
+                      placeholder="Digite seu nome completo"
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    />
+                  </div>
+
+                  {/* Confirmação por e-mail: etapa obrigatória, prova a posse do endereço */}
+                  <div className="bg-surface-container-low border border-outline-variant/30 rounded-xl p-4 mb-7">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div>
+                        <div className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1">
+                          Confirmação por e-mail <span className="text-error">*</span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant leading-relaxed">
+                          Para assinar, confirme que o e-mail da sua conta é seu: solicite o código e
+                          informe os 6 dígitos abaixo.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={solicitarCodigo}
+                        disabled={enviandoOtp || !createdRental}
+                        className="shrink-0 px-4 py-2 rounded-lg text-xs font-bold text-primary border border-primary/40 hover:bg-primary/5 transition disabled:opacity-50"
+                      >
+                        {enviandoOtp ? "Enviando..." : otpEnviadoPara ? "Reenviar código" : "Enviar código"}
+                      </button>
+                    </div>
+                    {!otpEnviadoPara && (
+                      <p className="text-xs text-outline">
+                        Clique em <strong>Enviar código</strong> para receber os 6 dígitos no e-mail da
+                        sua conta.
+                      </p>
+                    )}
+                    {otpEnviadoPara && (
+                      <>
+                        <p className="text-xs text-on-surface-variant mb-2">
+                          Código enviado para <strong className="text-tertiary">{otpEnviadoPara}</strong>.
+                          Não recebeu? Verifique o spam ou reenvie.
+                        </p>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          value={codigoOtp}
+                          onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, ""))}
+                          placeholder="000000"
+                          className="w-40 bg-surface border border-outline-variant/40 rounded-lg px-4 py-2.5 text-sm text-tertiary tracking-[0.35em] font-bold placeholder:text-outline/60 placeholder:tracking-[0.35em] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setEtapa(2);
+                        window.scrollTo(0, 0);
+                      }}
+                      className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40 hover:bg-surface-container-low transition"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={assinarContrato}
+                      disabled={assinando || codigoOtp.trim().length !== 6}
+                      className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-4 rounded-lg font-bold hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <MaterialIcon icon="draw" size={20} />
+                      {assinando ? "Registrando assinatura..." : "Assinar e Finalizar"}
+                    </button>
+                  </div>
+                  </>
+                  )}
+                </CartaoPainel>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <Footer />
+    </div>
   );
 };
 

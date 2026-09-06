@@ -13,6 +13,8 @@ export interface UpdateProfileInput {
   email?: string;
   phone?: string;
   address?: string;
+  city?: string;
+  state?: string;
   cep?: string;
 }
 

@@ -1,9 +1,15 @@
-import type { PostingDetail, PostingListItem, PostingPhoto } from "../types/posting";
+import type {
+  PostingDetail,
+  PostingListItem,
+  PostingPhoto,
+  UploadedPhoto,
+} from "../types/posting";
 import type {
   PostingDetailApi,
   PostingEditFormValues,
   PostingFormValues,
   PostingListItemApi,
+  UploadedPhotoApi,
   PostingWritePayload,
 } from "../types/postingSchemas";
 
@@ -51,6 +57,7 @@ export function detailToDomain(dto: PostingDetailApi): PostingDetail {
     longitude: toNumber(dto.location_lng),
     availabilityStart: toDate(dto.availability_start),
     availabilityEnd: toDate(dto.availability_end),
+    maxReservationDays: dto.max_reservation_days ?? null,
     description: dto.description ?? null,
     status: dto.status ?? null,
     machineBrand: dto.machine_brand ?? null,
@@ -67,22 +74,32 @@ function toDateTime(date: string, time: string): string | null {
   return date ? `${date}T${time}` : null;
 }
 
-export function toWritePayload(values: PostingFormValues): PostingWritePayload {
+export function toWritePayload(
+  values: PostingFormValues,
+  coords?: { lat: number; lon: number } | null,
+): PostingWritePayload {
   return {
     machinery: values.machinery,
     hourly_rate: values.hourlyRate,
+    location_cep: values.cep || undefined,
     location_address: values.locationAddress,
+    ...toCoordinatesPayload(coords),
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),
     availability_end: toDateTime(values.availabilityEnd, "23:59:59"),
     description: values.description,
   };
 }
 
-export function toEditPayload(values: PostingEditFormValues): PostingWritePayload {
+export function toEditPayload(
+  values: PostingEditFormValues,
+  coords?: { lat: number; lon: number } | null,
+): PostingWritePayload {
   return {
     status: values.status,
     hourly_rate: values.hourlyRate,
+    location_cep: values.cep || undefined,
     location_address: values.locationAddress,
+    ...toCoordinatesPayload(coords),
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),
     availability_end: toDateTime(values.availabilityEnd, "23:59:59"),
     description: values.description,
@@ -91,4 +108,23 @@ export function toEditPayload(values: PostingEditFormValues): PostingWritePayloa
 
 export function toDateInput(value: Date | null): string {
   return value ? value.toISOString().split("T")[0] : "";
+}
+
+export function uploadedPhotoToDomain(dto: UploadedPhotoApi): UploadedPhoto {
+  return { id: dto.id, path: dto.path, url: dto.url, isPrimary: Boolean(dto.is_primary) };
+}
+
+/**
+ * Coordenadas no formato que a coluna aceita: `decimal(9,6)` rejeita a gravação
+ * inteira quando o Nominatim devolve mais casas. Sem coordenadas vai `null` —
+ * numa edição, omitir o campo deixaria o ponto antigo no endereço novo.
+ */
+export function toCoordinatesPayload(
+  coords: { lat: number; lon: number } | null | undefined,
+): { location_lat: number | null; location_lng: number | null } {
+  if (!coords) return { location_lat: null, location_lng: null };
+  return {
+    location_lat: Number(coords.lat.toFixed(6)),
+    location_lng: Number(coords.lon.toFixed(6)),
+  };
 }

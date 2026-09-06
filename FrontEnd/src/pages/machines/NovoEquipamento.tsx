@@ -145,19 +145,6 @@ const NovoEquipamento = () => {
           </FormField>
         </div>
 
-        <FormField
-          label="Horím. Inicial"
-          icon={<MaterialIcon icon="speed" size={14} />}
-          error={errors.initialHorimeter?.message}
-        >
-          <input
-            type="number"
-            placeholder="1250 h"
-            className={inputClass(Boolean(errors.initialHorimeter))}
-            {...form.register("initialHorimeter")}
-          />
-        </FormField>
-
         <FormField label="Especificações Técnicas">
           <textarea
             placeholder="Motor, plataforma, recursos adicionais..."

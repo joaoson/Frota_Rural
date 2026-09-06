@@ -12,6 +12,8 @@ export function toDomain(dto: UserApi): User {
     phone: dto.phone ?? null,
     role: dto.role,
     address: dto.address,
+    city: dto.city ?? null,
+    state: dto.state ?? null,
     cep: dto.cep ?? null,
     birthDate: dto.birth_date,
     status: dto.status ?? null,
@@ -27,6 +29,9 @@ export interface CreateUserPayload {
   phone: string;
   role: string;
   address: string;
+  // O contrato usa o par município/UF como foro.
+  city: string;
+  state: string;
   cep: string;
   password: string;
 }
@@ -40,6 +45,8 @@ export function toCreatePayload(values: SignupFormValues): CreateUserPayload {
     phone: `+55${clearSpecialChars(values.phone)}`,
     role: values.role,
     address: values.address,
+    city: values.city,
+    state: values.state,
     cep: clearSpecialChars(values.cep),
     password: values.password,
   };

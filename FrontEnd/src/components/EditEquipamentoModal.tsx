@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { validateMachineEdit } from "@/features/machines/types/machineSchemas";
 
+/**
+ * Campos editáveis de uma máquina. Não há horímetro aqui: ele é medido por
+ * locação (`initial_hour_meter`/`final_hour_meter` em Rentals), não é atributo
+ * do maquinário.
+ */
 export interface EquipamentoData {
   id: string;
   registroRenagro: string;
@@ -16,8 +21,6 @@ export interface EquipamentoData {
   modelo: string;
   anoFabricacao: string;
   finalidade: string;
-  horimetroInicial: string;
-  horimetroFinal: string;
   especificacoes: string;
 }
 
@@ -69,7 +72,9 @@ const EditEquipamentoModal = ({
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
-    onSave(form);
+    // O Renagro é UNIQUE no banco: sem normalizar, "br..." e "BR..." viram
+    // dois registros distintos para a mesma máquina.
+    onSave({ ...form, registroRenagro: form.registroRenagro.trim().toUpperCase() });
     onOpenChange(false);
   };
 
@@ -79,10 +84,10 @@ const EditEquipamentoModal = ({
         <DialogHeader className="px-8 pt-8 pb-0">
           <div className="flex items-center gap-3 mb-1">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <MaterialIcon icon="edit" size={20} className="text-primary" />
+              <MaterialIcon icon="edit" size={20} className="text-primary dark:text-primary-bright" />
             </div>
             <div>
-              <DialogTitle className="font-headline text-xl font-bold text-primary">
+              <DialogTitle className="font-headline text-xl font-bold text-primary dark:text-primary-bright">
                 Editar Equipamento
               </DialogTitle>
               <DialogDescription className="text-on-surface-variant text-xs mt-0.5">
@@ -96,8 +101,8 @@ const EditEquipamentoModal = ({
         <form onSubmit={handleSubmit} className="px-8 pb-8 pt-6 space-y-6" noValidate>
           {/* Renagro */}
           <div className="space-y-1.5">
-            <label className={labelClass}>Nº Registro Renagro *</label>
-            <input
+            <label htmlFor="no-registro-renagro" className={labelClass}>Nº Registro Renagro *</label>
+            <input id="no-registro-renagro"
               type="text"
               value={form.registroRenagro}
               onChange={(e) => handleChange("registroRenagro", e.target.value)}
@@ -117,8 +122,8 @@ const EditEquipamentoModal = ({
           {/* Marca / Modelo */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className={labelClass}>Marca *</label>
-              <input
+              <label htmlFor="marca" className={labelClass}>Marca *</label>
+              <input id="marca"
                 type="text"
                 value={form.marca}
                 onChange={(e) => handleChange("marca", e.target.value)}
@@ -129,8 +134,8 @@ const EditEquipamentoModal = ({
               {errors.marca && <p className="text-[11px] text-error font-medium mt-1">{errors.marca}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className={labelClass}>Modelo *</label>
-              <input
+              <label htmlFor="modelo" className={labelClass}>Modelo *</label>
+              <input id="modelo"
                 type="text"
                 value={form.modelo}
                 onChange={(e) => handleChange("modelo", e.target.value)}
@@ -145,8 +150,8 @@ const EditEquipamentoModal = ({
           {/* Ano / Finalidade */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className={labelClass}>Ano de Fabricação</label>
-              <input
+              <label htmlFor="ano-de-fabricacao" className={labelClass}>Ano de Fabricação</label>
+              <input id="ano-de-fabricacao"
                 type="number"
                 value={form.anoFabricacao}
                 onChange={(e) => handleChange("anoFabricacao", e.target.value)}
@@ -157,8 +162,8 @@ const EditEquipamentoModal = ({
               {errors.anoFabricacao && <p className="text-[11px] text-error font-medium mt-1">{errors.anoFabricacao}</p>}
             </div>
             <div className="space-y-1.5">
-              <label className={labelClass}>Finalidade de Uso</label>
-              <select
+              <label htmlFor="finalidade-de-uso" className={labelClass}>Finalidade de Uso</label>
+              <select id="finalidade-de-uso"
                 value={form.finalidade}
                 onChange={(e) => handleChange("finalidade", e.target.value)}
                 className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
@@ -171,42 +176,10 @@ const EditEquipamentoModal = ({
             </div>
           </div>
 
-          {/* Horímetros */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className={`${labelClass} flex items-center gap-1`}>
-                <MaterialIcon icon="speed" size={14} /> Horím. Inicial
-              </label>
-              <input
-                type="number"
-                value={form.horimetroInicial}
-                onChange={(e) => handleChange("horimetroInicial", e.target.value)}
-                onBlur={(e) => validateField("horimetroInicial", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.horimetroInicial ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                placeholder="1250 h"
-              />
-              {errors.horimetroInicial && <p className="text-[11px] text-error font-medium mt-1">{errors.horimetroInicial}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <label className={`${labelClass} flex items-center gap-1`}>
-                <MaterialIcon icon="speed" size={14} /> Horím. Final
-              </label>
-              <input
-                type="number"
-                value={form.horimetroFinal}
-                onChange={(e) => handleChange("horimetroFinal", e.target.value)}
-                onBlur={(e) => validateField("horimetroFinal", e.target.value)}
-                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.horimetroFinal ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
-                placeholder="1300 h"
-              />
-              {errors.horimetroFinal && <p className="text-[11px] text-error font-medium mt-1">{errors.horimetroFinal}</p>}
-            </div>
-          </div>
-
           {/* Especificações */}
           <div className="space-y-1.5">
-            <label className={labelClass}>Especificações Técnicas</label>
-            <textarea
+            <label htmlFor="especificacoes-tecnicas" className={labelClass}>Especificações Técnicas</label>
+            <textarea id="especificacoes-tecnicas"
               value={form.especificacoes}
               onChange={(e) => handleChange("especificacoes", e.target.value)}
               rows={3}

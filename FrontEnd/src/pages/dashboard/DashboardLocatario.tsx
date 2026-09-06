@@ -8,6 +8,9 @@ import {
 } from "@/features/dashboard/components/DashboardShell";
 import { RentalCard } from "@/features/dashboard/components/RentalCard";
 import { ReviewsSection } from "@/features/dashboard/components/ReviewsSection";
+import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
+import DashboardMachineSearch from "@/components/DashboardMachineSearch";
+import OperadoresPanel from "@/components/OperadoresPanel";
 import { useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
 import { rentalMachineName } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
@@ -57,6 +60,7 @@ const sidebarItems: readonly SidebarItem<Tab>[] = [
   { icon: "search", label: "Buscar Máquinas", tab: "buscar" },
   { icon: "event_available", label: "Minhas Locações", tab: "locacoes" },
   { icon: "description", label: "Contratos", tab: "contratos" },
+  { icon: "engineering", label: "Operadores", tab: "operadores" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
   { icon: "notifications", label: "Notificações", tab: "notificacoes" },
@@ -64,7 +68,17 @@ const sidebarItems: readonly SidebarItem<Tab>[] = [
   { icon: "logout", label: "Sair", tab: "sair" },
 ];
 
-type Tab = "dashboard" | "buscar" | "locacoes" | "contratos" | "avaliacoes" | "chat" | "notificacoes" | "conta" | "sair";
+type Tab =
+  | "dashboard"
+  | "buscar"
+  | "locacoes"
+  | "contratos"
+  | "operadores"
+  | "avaliacoes"
+  | "chat"
+  | "notificacoes"
+  | "conta"
+  | "sair";
 
 const DashboardLocatario = () => {
   const { userId, logout } = useAuth();
@@ -100,6 +114,8 @@ const DashboardLocatario = () => {
           currency: "BRL",
         }),
         contract: rental.contractNumber,
+        acceptedByLessor: rental.acceptedByLessor,
+        acceptedByLessee: rental.acceptedByLessee,
         image: machine2,
       })),
     [rentalsQuery.data],
@@ -154,6 +170,7 @@ const DashboardLocatario = () => {
         open: showReagendar === r.id,
         onToggle: () => setShowReagendar(showReagendar === r.id ? null : r.id),
       }}
+      analysisHref={`/dashboard-locatario/locacoes/${r.id}`}
       review={{
         buttonLabel: "Avaliar",
         title: "Avaliar Serviço",
@@ -304,35 +321,7 @@ const DashboardLocatario = () => {
       )}
 
       {/* Buscar */}
-      {tab === "buscar" && (
-        <div className="space-y-6">
-          <div>
-            <h1 className="font-headline text-3xl font-bold text-primary">Buscar Máquinas</h1>
-            <div className="h-1 w-16 bg-secondary-container mt-2" />
-            <p className="text-on-surface-variant text-sm mt-3">Encontre o equipamento ideal para sua safra</p>
-          </div>
-          <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Atividade</label>
-                <select className="w-full bg-surface-container border-none rounded-lg p-3.5 text-on-surface focus:ring-2 focus:ring-primary transition-shadow">
-                  <option>Todas</option><option>Plantio</option><option>Colheita</option><option>Pulverização</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Localização</label>
-                <input type="text" placeholder="Ex: Sorriso, MT" className="w-full bg-surface-container border-none rounded-lg p-3.5 text-on-surface focus:ring-2 focus:ring-primary transition-shadow" />
-              </div>
-              <div className="flex items-end">
-                <Link to="/buscar-maquinario" className="w-full bg-gradient-to-r from-primary to-primary-container text-on-primary py-3.5 rounded-lg font-bold text-center hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                  <MaterialIcon icon="search" size={18} /> Buscar
-                </Link>
-              </div>
-            </div>
-          </div>
-          <p className="text-on-surface-variant text-center py-12">Use os filtros acima ou <Link to="/buscar-maquinario" className="text-primary font-bold hover:underline">acesse a busca completa</Link></p>
-        </div>
-      )}
+      {tab === "buscar" && <DashboardMachineSearch />}
 
       {/* Locações */}
       {tab === "locacoes" && (
@@ -455,105 +444,9 @@ const DashboardLocatario = () => {
       )}
 
       {/* Chat */}
-      {tab === "chat" && (
-        <div className="space-y-6">
-          <div>
-            <h1 className="font-headline text-3xl font-bold text-primary">Mensagens</h1>
-            <div className="h-1 w-16 bg-secondary-container mt-2" />
-            <p className="text-on-surface-variant text-sm mt-3">Converse com seus locadores</p>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-240px)]">
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden flex flex-col shadow-sm">
-              <div className="p-4 border-b border-outline-variant/30">
-                <div className="relative">
-                  <MaterialIcon icon="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={18} />
-                  <input type="text" placeholder="Buscar conversa..." className="w-full bg-surface-container border-none rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface" />
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {[
-                  { name: "João Silva", initials: "JS", lastMsg: "Sim, tudo certo. Operador com NR-31.", time: "10:32", unread: 1, online: true },
-                  { name: "Ricardo Mendes", initials: "RM", lastMsg: "A colheitadeira estará pronta segunda.", time: "Ontem", unread: 0, online: false },
-                  { name: "Pedro Souza", initials: "PS", lastMsg: "Contrato assinado!", time: "20/01", unread: 0, online: false },
-                ].map((contact, i) => (
-                  <div key={i} className={`w-full p-4 flex items-center gap-3 hover:bg-surface-container-high transition-colors border-b border-outline-variant/20 ${i === 0 ? "bg-primary/5" : ""} group cursor-pointer`}>
-                    <div className="relative">
-                      <div className="w-11 h-11 bg-primary-container text-on-primary rounded-full flex items-center justify-center font-headline font-bold text-sm">{contact.initials}</div>
-                      {contact.online && <span className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-container-lowest" />}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-on-surface text-sm">{contact.name}</span>
-                        <span className="text-[11px] text-on-surface-variant">{contact.time}</span>
-                      </div>
-                      <p className="text-sm text-on-surface-variant truncate">{contact.lastMsg}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {contact.unread > 0 && (
-                        <span className="w-5 h-5 bg-primary text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center">{contact.unread}</span>
-                      )}
-                      <button onClick={(e) => { e.stopPropagation(); }} className="p-1.5 rounded-lg text-outline hover:text-primary hover:bg-surface-container transition-colors opacity-0 group-hover:opacity-100" title="Arquivar conversa">
-                        <MaterialIcon icon="archive" size={16} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); }} className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100" title="Excluir conversa">
-                        <MaterialIcon icon="close" size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden flex flex-col shadow-sm">
-              <div className="p-4 border-b border-outline-variant/30 bg-surface-container flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-primary-container text-on-primary rounded-full flex items-center justify-center font-bold text-sm">JS</div>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-primary rounded-full border-2 border-surface-container" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-on-surface text-sm">João Silva</div>
-                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full" /> Locador · Online
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-surface/50">
-                <div className="text-center">
-                  <span className="text-[11px] text-on-surface-variant bg-surface-container px-3 py-1 rounded-full">Hoje, 10:20</span>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-bold text-outline">10:20</span>
-                  <div className="bg-primary text-on-primary p-3.5 rounded-2xl rounded-tr-sm text-sm max-w-[75%] leading-relaxed font-medium shadow-sm">
-                    Bom dia, o trator está com a documentação do Renagro em dia?
-                  </div>
-                </div>
-                <div className="flex flex-col items-start gap-1">
-                  <span className="text-[10px] font-bold text-outline">10:25</span>
-                  <div className="bg-surface-container p-3.5 rounded-2xl rounded-tl-sm text-sm text-tertiary max-w-[75%] leading-relaxed font-medium shadow-sm">
-                    Sim, tudo certo. Operador com NR-31 também.
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-bold text-outline">10:32</span>
-                  <div className="bg-primary text-on-primary p-3.5 rounded-2xl rounded-tr-sm text-sm max-w-[75%] leading-relaxed font-medium shadow-sm">
-                    Ótimo! Vou confirmar a reserva então. Obrigada!
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 bg-surface-container-lowest border-t border-outline-variant/30 flex items-center gap-3">
-                <button className="text-outline hover:text-primary transition-colors p-2 rounded-lg hover:bg-surface-container">
-                  <MaterialIcon icon="attach_file" size={20} />
-                </button>
-                <input type="text" placeholder="Digite sua mensagem..." className="flex-1 bg-surface-container border-none rounded-full px-5 py-2.5 text-sm focus:ring-2 focus:ring-primary/50 text-on-surface" />
-                <button className="w-10 h-10 bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-primary/90 transition-colors shadow-sm">
-                  <MaterialIcon icon="send" size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {tab === "operadores" && <OperadoresPanel />}
+
+      {tab === "chat" && <ChatInboxPanel subtitle="Converse com seus locadores" />}
 
       {/* Notificações */}
       {tab === "notificacoes" && (

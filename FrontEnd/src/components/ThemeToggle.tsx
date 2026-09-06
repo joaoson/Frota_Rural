@@ -82,7 +82,7 @@ const ThemeToggle = ({ variant = "icon", className = "" }: ThemeToggleProps) => 
       onClick={() => applyTheme(nextTheme)}
       aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
       title={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
-      className={`group relative w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden text-on-surface-variant border border-outline-variant/40 bg-surface-container/60 hover:bg-surface-container-high hover:text-primary hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${className}`}
+      className={`group relative w-10 h-10 shrink-0 rounded-full flex items-center justify-center overflow-hidden text-on-surface-variant border border-outline-variant/40 bg-surface-container/60 hover:bg-surface-container-high hover:text-primary dark:hover:text-primary-bright hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${className}`}
     >
       <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-secondary-container/25 to-transparent" />
 

@@ -49,14 +49,6 @@ export const machineFormSchema = z
         return Number.isInteger(parsed) && parsed >= MIN_YEAR && parsed <= maxYear();
       }, `O ano deve ser entre ${MIN_YEAR} e ${maxYear()}.`),
     usagePurpose: z.string().trim().min(1, "Finalidade de uso é obrigatória."),
-    initialHorimeter: z
-      .string()
-      .trim()
-      .refine((value) => {
-        if (!value) return true;
-        const parsed = Number(value);
-        return !Number.isNaN(parsed) && parsed >= 0;
-      }, "O horímetro inicial deve ser um valor positivo."),
     technicalSpecifications: z.string().trim(),
   })
   .superRefine((values, ctx) => {
@@ -81,8 +73,7 @@ export interface CreateMachinePayload {
   usage_purpose?: string;
 }
 
-export const machineEditFormSchema = z
-  .object({
+export const machineEditFormSchema = z.object({
     registroRenagro: z
       .string()
       .trim()
@@ -98,29 +89,6 @@ export const machineEditFormSchema = z
       const parsed = Number(value);
       return Number.isInteger(parsed) && parsed >= MIN_YEAR && parsed <= maxYear();
     }, `O ano deve ser entre ${MIN_YEAR} e ${maxYear()}.`),
-    horimetroInicial: z.string().trim().refine((value) => {
-      if (!value) return true;
-      const parsed = Number(value);
-      return !Number.isNaN(parsed) && parsed >= 0;
-    }, "O horímetro inicial deve ser positivo."),
-    horimetroFinal: z.string().trim().refine((value) => {
-      if (!value) return true;
-      const parsed = Number(value);
-      return !Number.isNaN(parsed) && parsed >= 0;
-    }, "O horímetro final deve ser positivo."),
-  })
-  .superRefine((values, ctx) => {
-    if (
-      values.horimetroFinal &&
-      values.horimetroInicial &&
-      Number(values.horimetroFinal) <= Number(values.horimetroInicial)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "O horímetro final deve ser maior que o horímetro inicial.",
-        path: ["horimetroFinal"],
-      });
-    }
   });
 
 export function validateMachineEdit(values: unknown): Record<string, string> {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -23,6 +23,8 @@ import {
 } from "@/features/postings/hooks/usePostings";
 import { postingMachineName } from "@/features/postings/types/posting";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
+import MapaLocalizacao from "@/components/MapaLocalizacao";
+import type { Coordenadas } from "@/shared/http/GeocodingClient";
 import { HttpError } from "@/shared/http/errors";
 import { BackLink } from "@/shared/components/BackLink";
 import { PageShell } from "@/shared/components/PageShell";
@@ -42,8 +44,20 @@ const GerenciarAnuncio = () => {
   const { lookup } = useCepLookup();
 
   const form = usePostingEditForm();
+  const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const { errors } = form.formState;
   const posting = postingQuery.data;
+
+  const hoje = new Date().toISOString().split("T")[0];
+  const inicioGravado = toDateInput(posting?.availabilityStart ?? null);
+  const fimGravado = toDateInput(posting?.availabilityEnd ?? null);
+
+  /**
+   * Data mínima aceita num campo de disponibilidade. Em regra é hoje, como no
+   * Novo Anúncio; a exceção é a data já gravada — a maioria dos anúncios tem
+   * período vencido, e exigir data futura trancaria a edição deles.
+   */
+  const piso = (gravada: string) => (gravada && gravada < hoje ? gravada : hoje);
 
   useEffect(() => {
     if (!posting) return;
@@ -80,7 +94,7 @@ const GerenciarAnuncio = () => {
   const onSubmit = form.handleSubmit(async (values) => {
     if (!id) return;
     try {
-      await updatePosting.mutateAsync({ id, payload: toEditPayload(values) });
+      await updatePosting.mutateAsync({ id, payload: toEditPayload(values, coordenadas) });
       toast.success("Anúncio atualizado com sucesso.");
       navigate("/dashboard");
     } catch (error) {
@@ -165,12 +179,20 @@ const GerenciarAnuncio = () => {
                   {...form.register("locationAddress")}
                 />
               </FormField>
+
+              <MapaLocalizacao
+                endereco={form.watch("locationAddress")}
+                cep={form.watch("cep")}
+                coordenadas={coordenadas}
+                onCoordenadas={setCoordenadas}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-5">
               <FormField label="Disponível a partir de" error={errors.availabilityStart?.message}>
                 <input
                   type="date"
+                  min={piso(inicioGravado)}
                   className={inputClass(Boolean(errors.availabilityStart))}
                   {...form.register("availabilityStart")}
                 />
@@ -178,6 +200,11 @@ const GerenciarAnuncio = () => {
               <FormField label="Disponível até" error={errors.availabilityEnd?.message}>
                 <input
                   type="date"
+                  min={
+                    form.watch("availabilityStart") > piso(fimGravado)
+                      ? form.watch("availabilityStart")
+                      : piso(fimGravado)
+                  }
                   className={inputClass(Boolean(errors.availabilityEnd))}
                   {...form.register("availabilityEnd")}
                 />

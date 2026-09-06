@@ -8,7 +8,9 @@ export interface HttpRequest {
   path: string;
   query?: Record<string, QueryValue>;
   body?: unknown;
-  headers?: Record<string, string>;
+  // `undefined` remove o header da instância — é assim que o axios calcula
+  // o boundary de um multipart.
+  headers?: Record<string, string | undefined>;
   signal?: AbortSignal;
 }
 
