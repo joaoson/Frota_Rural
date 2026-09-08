@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'document_validation',
     'chat',
     'payments',
+    'pricing',
     'drf_spectacular',
 ]
 
