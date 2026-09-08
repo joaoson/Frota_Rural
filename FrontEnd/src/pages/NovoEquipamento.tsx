@@ -38,6 +38,8 @@ const NovoEquipamento = () => {
   const [renagroNumber, setRenagroNumber] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
+  const [powerCv, setPowerCv] = useState("");
+  const [hourMeter, setHourMeter] = useState("");
   const [usagePurpose, setUsagePurpose] = useState("Plantio");
   const [technicalSpecifications, setTechnicalSpecifications] = useState("");
 
@@ -78,6 +80,26 @@ const NovoEquipamento = () => {
         }
         break;
       }
+      // As faixas espelham as do serializer (machines/serializer.py). Barrar
+      // aqui dá o erro ao lado do campo, em vez de um 400 no envio.
+      case "powerCv": {
+        if (value) {
+          const cv = Number(value);
+          if (!Number.isInteger(cv) || cv < 20 || cv > 700) {
+            errorMsg = "A potência deve ser um número inteiro entre 20 e 700 cv.";
+          }
+        }
+        break;
+      }
+      case "hourMeter": {
+        if (value) {
+          const h = Number(value);
+          if (!Number.isInteger(h) || h < 0 || h > 60000) {
+            errorMsg = "O horímetro deve ser um número inteiro entre 0 e 60000 horas.";
+          }
+        }
+        break;
+      }
     }
     setErrors((prev) => ({ ...prev, [fieldName]: errorMsg }));
     return errorMsg;
@@ -94,6 +116,8 @@ const NovoEquipamento = () => {
       brand: validateField("brand", brandToSend),
       model: validateField("model", model),
       year: validateField("year", year),
+      powerCv: validateField("powerCv", powerCv),
+      hourMeter: validateField("hourMeter", hourMeter),
     };
 
     if (Object.values(errorsList).some((err) => err !== "")) {
@@ -114,6 +138,8 @@ const NovoEquipamento = () => {
         brand: brandToSend,
         model: model.trim(),
         year: year ? Number(year) : undefined,
+        power_cv: powerCv ? Number(powerCv) : undefined,
+        hour_meter: hourMeter ? Number(hourMeter) : undefined,
         technical_specifications: technicalSpecifications.trim(),
         usage_purpose: usagePurpose.trim(),
       });
@@ -124,6 +150,8 @@ const NovoEquipamento = () => {
       setOtherBrand("");
       setModel("");
       setYear("");
+      setPowerCv("");
+      setHourMeter("");
       setUsagePurpose("Plantio");
       setTechnicalSpecifications("");
       setErrors({});
@@ -291,6 +319,55 @@ const NovoEquipamento = () => {
                 <option>Colheita</option>
                 <option>Preparo de Solo</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label htmlFor="potencia-cv" className="text-[10px] font-bold uppercase tracking-widest text-outline">Potência (cv)</label>
+              <input id="potencia-cv"
+                name="power_cv"
+                type="number"
+                min={20}
+                max={700}
+                step={1}
+                placeholder="110"
+                value={powerCv}
+                onChange={(e) => {
+                  setPowerCv(e.target.value);
+                  if (errors.powerCv) validateField("powerCv", e.target.value);
+                }}
+                onBlur={(e) => validateField("powerCv", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.powerCv ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+              />
+              {errors.powerCv ? (
+                <p className="text-[11px] text-error font-medium mt-1">{errors.powerCv}</p>
+              ) : (
+                <p className="text-[11px] text-outline font-medium">Usada para sugerir o valor por hora do anúncio.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="horimetro" className="text-[10px] font-bold uppercase tracking-widest text-outline">Horímetro (horas)</label>
+              <input id="horimetro"
+                name="hour_meter"
+                type="number"
+                min={0}
+                max={60000}
+                step={1}
+                placeholder="4900"
+                value={hourMeter}
+                onChange={(e) => {
+                  setHourMeter(e.target.value);
+                  if (errors.hourMeter) validateField("hourMeter", e.target.value);
+                }}
+                onBlur={(e) => validateField("hourMeter", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.hourMeter ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+              />
+              {errors.hourMeter ? (
+                <p className="text-[11px] text-error font-medium mt-1">{errors.hourMeter}</p>
+              ) : (
+                <p className="text-[11px] text-outline font-medium">Leitura atual do painel. Sem ela, estimamos pela idade.</p>
+              )}
             </div>
           </div>
 

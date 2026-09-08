@@ -9,9 +9,13 @@ import {
 } from "@/components/ui/dialog.tsx";
 
 /**
- * Campos editáveis de uma máquina. Não há horímetro aqui: ele é medido por
- * locação (`initial_hour_meter`/`final_hour_meter` em Rentals), não é atributo
- * do maquinário.
+ * Campos editáveis de uma máquina.
+ *
+ * O horímetro aqui é o **acumulado da máquina**, atributo do maquinário — não
+ * confundir com `initial_hour_meter`/`final_hour_meter` de `Rentals`, que são
+ * as leituras de check-in e check-out de uma locação específica. Aqueles
+ * medem uma locação; este mede a vida da máquina, e é o que entra na curva de
+ * reparo da sugestão de preço.
  */
 export interface EquipamentoData {
   id: string;
@@ -19,6 +23,8 @@ export interface EquipamentoData {
   marca: string;
   modelo: string;
   anoFabricacao: string;
+  potenciaCv: string;
+  horimetro: string;
   finalidade: string;
   especificacoes: string;
 }
@@ -70,6 +76,25 @@ const EditEquipamentoModal = ({
       case "modelo":
         if (!value.trim()) errorMsg = "Modelo é obrigatório.";
         break;
+      // As faixas espelham as do serializer (machines/serializer.py).
+      case "potenciaCv": {
+        if (value) {
+          const cv = Number(value);
+          if (!Number.isInteger(cv) || cv < 20 || cv > 700) {
+            errorMsg = "A potência deve ser um número inteiro entre 20 e 700 cv.";
+          }
+        }
+        break;
+      }
+      case "horimetro": {
+        if (value) {
+          const h = Number(value);
+          if (!Number.isInteger(h) || h < 0 || h > 60000) {
+            errorMsg = "O horímetro deve ser um número inteiro entre 0 e 60000 horas.";
+          }
+        }
+        break;
+      }
       case "anoFabricacao": {
         if (value) {
           const y = Number(value);
@@ -100,6 +125,8 @@ const EditEquipamentoModal = ({
       marca: validateField("marca", form.marca),
       modelo: validateField("modelo", form.modelo),
       anoFabricacao: validateField("anoFabricacao", form.anoFabricacao),
+      potenciaCv: validateField("potenciaCv", form.potenciaCv),
+      horimetro: validateField("horimetro", form.horimetro),
     };
 
     if (Object.values(errorsList).some((err) => err !== "")) {
@@ -207,6 +234,44 @@ const EditEquipamentoModal = ({
                 <option>Colheita</option>
                 <option>Preparo de Solo</option>
               </select>
+            </div>
+          </div>
+
+          {/* Potência / Horímetro */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label htmlFor="potencia-cv" className={labelClass}>Potência (cv)</label>
+              <input id="potencia-cv"
+                type="number"
+                min={20}
+                max={700}
+                step={1}
+                value={form.potenciaCv}
+                onChange={(e) => handleChange("potenciaCv", e.target.value)}
+                onBlur={(e) => validateField("potenciaCv", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.potenciaCv ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                placeholder="110"
+              />
+              {errors.potenciaCv && <p className="text-[11px] text-error font-medium mt-1">{errors.potenciaCv}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="horimetro" className={labelClass}>Horímetro (horas)</label>
+              <input id="horimetro"
+                type="number"
+                min={0}
+                max={60000}
+                step={1}
+                value={form.horimetro}
+                onChange={(e) => handleChange("horimetro", e.target.value)}
+                onBlur={(e) => validateField("horimetro", e.target.value)}
+                className={`w-full bg-surface-container border rounded-lg px-4 py-3 text-sm focus:ring-2 focus:outline-none text-on-surface transition-shadow ${errors.horimetro ? "border-error focus:ring-error" : "border-transparent focus:ring-primary"}`}
+                placeholder="4900"
+              />
+              {errors.horimetro ? (
+                <p className="text-[11px] text-error font-medium mt-1">{errors.horimetro}</p>
+              ) : (
+                <p className="text-[11px] text-outline font-medium">Mantenha atualizado: entra no cálculo do valor sugerido.</p>
+              )}
             </div>
           </div>
 

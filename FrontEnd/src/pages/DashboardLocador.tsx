@@ -180,6 +180,8 @@ const DashboardLocador = () => {
       marca: "",
       modelo: "",
       anoFabricacao: "",
+      potenciaCv: "",
+      horimetro: "",
       finalidade: "Plantio",
       especificacoes: "",
     });
@@ -191,6 +193,8 @@ const DashboardLocador = () => {
       marca: m.brand,
       modelo: m.model,
       anoFabricacao: String(m.year),
+      potenciaCv: m.powerCv != null ? String(m.powerCv) : "",
+      horimetro: m.hourMeter != null ? String(m.hourMeter) : "",
       finalidade: m.purpose,
       especificacoes: m.specifications ?? "",
     });
@@ -293,6 +297,8 @@ const DashboardLocador = () => {
         year: m.year,
         status: m.status || "active",
         purpose: m.usage_purpose || "",
+        powerCv: m.power_cv ?? null,
+        hourMeter: m.hour_meter ?? null,
         specifications: m.technical_specifications ?? ""
       })));
 
@@ -986,6 +992,10 @@ const DashboardLocador = () => {
                     ? Number(data.anoFabricacao)
                     : undefined,
                   usage_purpose: data.finalidade,
+                  // String vazia significa "sem valor", não "zero": mandar null
+                  // limpa o campo, mandar 0 diria que a máquina é zero km.
+                  power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
+                  hour_meter: data.horimetro ? Number(data.horimetro) : null,
                   technical_specifications: data.especificacoes.trim(),
                 });
                 setSelectedEquipamento(data);
@@ -1001,6 +1011,8 @@ const DashboardLocador = () => {
                             ? Number(data.anoFabricacao)
                             : m.year,
                           purpose: data.finalidade,
+                          powerCv: data.potenciaCv ? Number(data.potenciaCv) : null,
+                          hourMeter: data.horimetro ? Number(data.horimetro) : null,
                           specifications: data.especificacoes,
                         }
                       : m,

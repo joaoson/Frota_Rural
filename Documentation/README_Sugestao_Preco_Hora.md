@@ -1,7 +1,18 @@
 # Sugestão de Valor/Hora por IA — Especificação do Algoritmo
 
-> Status: **proposta de design** (nenhum código implementado ainda).
+> Status: **implementado**. Este documento é a especificação; o código vive em
+> `BackEnd/pricing/` e os números abaixo são verificados por teste
+> (`pricing/tests.py::EngineTests::test_reproduz_o_exemplo_da_especificacao`).
 > Branch: `feature/sugestao-preco-hora-ia`.
+
+| Onde | O quê |
+|:---|:---|
+| `BackEnd/pricing/params.py` | Parâmetros por categoria, versionados (§3.3) |
+| `BackEnd/pricing/engine.py` | Cálculo determinístico, sem rede nem banco (§4) |
+| `BackEnd/pricing/research.py` | Pesquisa via Claude com busca na web (§3.1) |
+| `BackEnd/pricing/service.py` | Cache, fallbacks, ancoragem, persistência (§5, §11) |
+| `POST /api/pricing/suggest` | Endpoint, restrito ao dono da máquina (§8) |
+| `FrontEnd/src/components/SugestaoPrecoPanel.tsx` | Painel com a composição do custo |
 
 Quando o locador cria um anúncio, ele hoje digita `hourly_rate` no escuro. Este
 documento define como sugerir esse valor: uma IA pesquisa o preço de mercado da
@@ -203,9 +214,15 @@ RC(h)    = RF1 · V_novo · (h/1000)^RF2
 W_reparo = dRC/dh = RF1 · RF2 · V_novo · (h/1000)^(RF2−1) / 1000
 ```
 
-É isto que captura a intuição correta e contra-intuitiva: **máquina velha não é
-mais barata por hora** — ela vale menos (menos capital, menos depreciação) mas
-quebra muito mais. As duas forças se compensam parcialmente.
+É isto que captura a intuição correta e contra-intuitiva: **o custo por hora cai
+muito menos do que o valor da máquina**. Medido no motor: um trator que hoje vale
+38% do que valia ainda custa ~63% por hora. Capital e depreciação caem junto com
+o valor, mas a curva de reparo sobe e absorve boa parte da queda — a manutenção
+sai de ~4% para ~38% do custo horário.
+
+É a razão de o modelo somar componentes em vez de aplicar um percentual sobre o
+preço de mercado: o percentual subprecificaria toda máquina velha. Verificado em
+`test_custo_horario_cai_bem_menos_que_o_valor_da_maquina`.
 
 **Opcionais** (só se o anúncio incluir):
 
@@ -381,16 +398,16 @@ uma unidade de cobrança alternativa (R$/ha) no `Postings`.
 
 O algoritmo depende de três coisas que hoje não existem no banco:
 
-| Falta | Por que importa | Recomendação |
+| Campo | Situação | Observação |
 |:---|:---|:---|
-| **Horímetro acumulado da máquina** | Entra na curva de reparo (§4.3) e na avaliação do usado. Derivar de `Rentals` não serve: só conta as horas rodadas *na plataforma*, subestimando muito. | Adicionar `hour_meter` + `hour_meter_updated_at` em `machines`, informado no cadastro e atualizado a cada check-out. |
-| **Potência (cv)** | É o melhor normalizador de comparáveis e a base do consumo de diesel. | Adicionar `power_cv` em `machines`. Pode ser pré-preenchido pela própria IA a partir de marca/modelo. |
-| **Categoria como enum** | `usage_purpose` é texto livre; toda a tabela de parâmetros (§3.3) é indexada por categoria. | Adicionar `category` com domínio fechado, mantendo `usage_purpose` como está. |
-| **Flags de inclusão** | Tarifa com ou sem diesel/operador difere em 2×. Comparar anúncios sem isso é comparar coisas diferentes. | `includes_fuel`, `includes_operator` em `postings`. |
+| **Horímetro acumulado** | ✅ `machines.hour_meter` + `hour_meter_updated_at` | Declarado pelo locador. Ausente, é estimado por `idade × 700 h` e a resposta marca `horimetro_declarado: false`. |
+| **Potência (cv)** | ✅ `machines.power_cv` | Cai para a potência vinda da pesquisa quando não informada. |
+| **Categoria como enum** | ❌ ainda derivada | `params.category_for()` deduz de `usage_purpose` por palavra-chave, porque o campo é texto livre e os dados reais já divergem ("Colheita", "Colheita de Grãos"). Funciona, mas um enum tornaria a dedução desnecessária. |
+| **Flags de inclusão** | ❌ só no pedido | `includes_fuel`/`includes_operator` são parâmetros do endpoint, não colunas de `postings`. Enquanto não forem gravados, dois anúncios com escopos diferentes continuam comparáveis entre si na busca — e nos comparáveis internos do §5. |
 
-Enquanto não existirem, o algoritmo degrada com estimativas
-(`horas = idade × horas_típicas_ano`, potência vinda da pesquisa), com
-`confianca` rebaixada.
+`hour_meter_updated_at` é carimbado pelo servidor e só é re-carimbado quando a
+leitura muda de fato: um PATCH que reenvia o mesmo horímetro não pode rejuvenescer
+a data e fazer uma leitura de um ano atrás parecer recente.
 
 ---
 
@@ -428,10 +445,21 @@ R$ 210 em julho.
 
 ## 13. Decisões pendentes
 
-1. Quais categorias entram na v1? (sugestão: trator e pulverizador; colheitadeira
-   depois, junto com a discussão de R$/ha)
-2. Adicionamos os campos do §10 agora ou a v1 roda degradada com estimativas?
-3. Provedor de IA e orçamento por sugestão (com cache, a maioria dos anúncios não
-   dispara pesquisa nova).
-4. A sugestão aparece só na criação do anúncio ou também em "reprecificar" no
-   `GerenciarAnuncio`?
+Resolvidas na implementação:
+
+- **Campos do §10** — `hour_meter` e `power_cv` foram adicionados.
+- **Provedor** — Claude (`claude-opus-5`) com busca na web, atrás de cache de 90
+  dias por `(marca, modelo, ano)`. Sem `ANTHROPIC_API_KEY` o recurso apenas não
+  aparece; nada mais deixa de funcionar.
+- **Categorias** — as três (trator, colheitadeira, pulverizador) estão na tabela
+  de parâmetros. Colheitadeira produz números altos porém coerentes (§9.2).
+
+Em aberto:
+
+1. `includes_fuel`/`includes_operator` viram colunas de `postings`? Sem isso, a
+   busca compara tarifas de escopos diferentes.
+2. `usage_purpose` vira enum, tornando `category_for()` desnecessário?
+3. A sugestão aparece também em "reprecificar", no `GerenciarAnuncio`?
+4. Colheitadeira ganha unidade de cobrança por hectare (§9.2)?
+5. Quando houver histórico suficiente, recalibrar `D`, `U` e `m` a partir das
+   locações concluídas e subir `PARAMS_VERSION`.

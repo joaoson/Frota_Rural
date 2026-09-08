@@ -10,6 +10,10 @@ type CreateMachinePayload = {
   brand: string;
   model: string;
   year?: number;
+  /** Potência nominal em cv. Alimenta a sugestão de valor/hora do anúncio. */
+  power_cv?: number | null;
+  /** Horímetro acumulado, em horas de motor. */
+  hour_meter?: number | null;
   technical_specifications?: string;
   usage_purpose?: string;
 };
@@ -21,6 +25,10 @@ export type MachineListItem = {
   brand: string;
   model: string;
   year?: number | null;
+  power_cv?: number | null;
+  hour_meter?: number | null;
+  /** Carimbado pelo servidor; diz há quanto tempo a leitura é confiável. */
+  hour_meter_updated_at?: string | null;
   technical_specifications?: string | null;
   usage_purpose?: string | null;
   status?: string | null;

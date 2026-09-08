@@ -322,6 +322,51 @@ class EndpointTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_anuncio_criado_registra_o_preco_aceito(self):
+        """Fecha o ciclo de calibração: sem gravar o que o locador publicou de
+        fato, a sugestão nunca teria como ser corrigida por dados reais."""
+        self._auth(self.owner)
+        with patch('pricing.research.research_machine', return_value=RESEARCH):
+            suggestion_id = self.client.post(
+                '/api/pricing/suggest', {'machinery': str(self.machine.id)}, format='json'
+            ).json()['suggestion_id']
+
+        response = self.client.post('/api/postings/', {
+            'machinery': str(self.machine.id),
+            'hourly_rate': '210.00',
+            'location_address': 'Sorriso, MT',
+            'suggestion_id': suggestion_id,
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        # `suggestion_id` é write-only: não pode vazar na resposta do anúncio.
+        self.assertNotIn('suggestion_id', response.json())
+
+        registro = PricingSuggestions.objects.get(id=suggestion_id)
+        self.assertEqual(registro.accepted_hourly_rate, Decimal('210.00'))
+        self.assertEqual(str(registro.posting_id), response.json()['id'])
+
+    def test_sugestao_de_outra_maquina_nao_e_vinculada(self):
+        """O id vem do cliente; vinculá-lo sem conferir a máquina deixaria
+        qualquer anúncio sobrescrever o registro de aprendizado de outro."""
+        self._auth(self.owner)
+        outra = make_machine(self.owner, model='7200J')
+        with patch('pricing.research.research_machine', return_value=RESEARCH):
+            suggestion_id = self.client.post(
+                '/api/pricing/suggest', {'machinery': str(outra.id)}, format='json'
+            ).json()['suggestion_id']
+
+        response = self.client.post('/api/postings/', {
+            'machinery': str(self.machine.id),
+            'hourly_rate': '210.00',
+            'location_address': 'Sorriso, MT',
+            'suggestion_id': suggestion_id,
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+
+        registro = PricingSuggestions.objects.get(id=suggestion_id)
+        self.assertIsNone(registro.accepted_hourly_rate)
+        self.assertIsNone(registro.posting_id)
+
     def test_sem_dado_de_mercado_responde_422(self):
         self._auth(self.owner)
         with patch('pricing.research.research_machine', return_value=None):

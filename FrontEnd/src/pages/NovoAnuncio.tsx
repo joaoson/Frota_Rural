@@ -6,7 +6,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { machineService, type MachineListItem } from "@/services/MachineService/MachineService";
 import { coordenadasDoAnuncio, postingService } from "@/services/PostingService/PostingService";
+import { pricingService, type PricingSuggestion } from "@/services/PricingService/PricingService";
+import SugestaoPrecoPanel from "@/components/SugestaoPrecoPanel";
 import type { Coordenadas } from "@/services/GeocodingService";
+import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskCEP } from "@/utils/masks/maskCEP";
@@ -43,6 +46,13 @@ const NovoAnuncio = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
+
+  // Sugestão de valor/hora. `suggestionId` é guardado para o backend poder
+  // comparar depois o que foi sugerido com o que o locador de fato publicou —
+  // é esse par que permite calibrar o modelo com dados reais.
+  const [suggestion, setSuggestion] = useState<PricingSuggestion | null>(null);
+  const [suggestionId, setSuggestionId] = useState<string | null>(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
   // Mantém a lista atual acessível ao cleanup de desmontagem sem reexecutá-lo.
   const photosRef = useRef<SelectedPhoto[]>([]);
@@ -130,6 +140,35 @@ const NovoAnuncio = () => {
     return errorMsg;
   };
 
+  const requestSuggestion = async () => {
+    if (!machinery) {
+      validateField("machinery", machinery);
+      toast.error("Selecione o equipamento antes de pedir uma sugestão.");
+      return;
+    }
+    setLoadingSuggestion(true);
+    try {
+      const result = await pricingService.suggest({ machinery });
+      setSuggestion(result);
+      setSuggestionId(result.suggestion_id);
+    } catch (error) {
+      // 422 não é falha: é o backend dizendo que não achou dado confiável e
+      // preferiu não arriscar um número. A mensagem dele é mais útil que
+      // qualquer texto genérico nosso.
+      if (error instanceof AxiosError && error.response?.status === 422) {
+        toast.warning(
+          error.response.data?.error ??
+            "Não foi possível sugerir um valor para esta máquina.",
+        );
+      } else {
+        toast.error("Erro ao consultar a sugestão de preço. Tente novamente.");
+      }
+      setSuggestion(null);
+    } finally {
+      setLoadingSuggestion(false);
+    }
+  };
+
   const addFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
 
@@ -211,6 +250,7 @@ const NovoAnuncio = () => {
         availability_end: availabilityEnd ? `${availabilityEnd}T23:59:59Z` : undefined,
         max_reservation_days: maxReservationDays ? Number(maxReservationDays) : null,
         description: description || undefined,
+        suggestion_id: suggestionId ?? undefined,
       });
 
 
@@ -235,6 +275,8 @@ const NovoAnuncio = () => {
 
       setMachinery("");
       setHourlyRate("");
+      setSuggestion(null);
+      setSuggestionId(null);
       setCep("");
       setLocation("");
       setCoordenadas(null);
@@ -281,6 +323,10 @@ const NovoAnuncio = () => {
               value={machinery}
               onChange={(e) => {
                 setMachinery(e.target.value);
+                // A sugestão vale para uma máquina específica; trocar o
+                // equipamento sem descartá-la mostraria o preço da anterior.
+                setSuggestion(null);
+                setSuggestionId(null);
                 if (errors.machinery) validateField("machinery", e.target.value);
               }}
               onBlur={(e) => validateField("machinery", e.target.value)}
@@ -327,6 +373,31 @@ const NovoAnuncio = () => {
               required
             />
             {errors.hourlyRate && <p className="text-[11px] text-error font-medium mt-1">{errors.hourlyRate}</p>}
+            <p className="text-[11px] text-outline font-medium">
+              A plataforma fatura 8 h por dia de reserva — este é o valor por hora faturada, não por hora de horímetro.
+            </p>
+
+            {suggestion ? (
+              <SugestaoPrecoPanel
+                suggestion={suggestion}
+                onApply={(value) => {
+                  setHourlyRate(value);
+                  validateField("hourlyRate", value);
+                  toast.success("Valor aplicado. Você pode ajustá-lo antes de publicar.");
+                }}
+                onDismiss={() => setSuggestion(null)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={requestSuggestion}
+                disabled={loadingSuggestion || !machinery}
+                className="w-full border border-primary/40 text-primary dark:text-primary-bright font-bold py-2.5 rounded-lg text-sm hover:bg-primary/5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <MaterialIcon icon={loadingSuggestion ? "hourglass_top" : "auto_awesome"} size={16} />
+                {loadingSuggestion ? "Pesquisando o mercado..." : "Sugerir valor com base no mercado"}
+              </button>
+            )}
           </div>
 
           <div className="space-y-4">

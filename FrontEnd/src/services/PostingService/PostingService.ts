@@ -34,6 +34,11 @@ export type CreatePostingPayload = {
   max_reservation_days?: number | null;
   description?: string;
   status?: string;
+  /**
+   * Sugestão de preço que o locador viu ao criar o anúncio. Só de entrada: o
+   * backend usa o par (sugerido × publicado) para calibrar a precificação.
+   */
+  suggestion_id?: string;
 };
 
 /**
