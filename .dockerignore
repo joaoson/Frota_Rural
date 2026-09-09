@@ -12,3 +12,6 @@
 **/media
 Database/backups
 videos
+
+# Local credentials are supplied through the development bind mount.
+**/firebase-service-account*.json

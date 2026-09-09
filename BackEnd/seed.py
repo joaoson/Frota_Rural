@@ -16,9 +16,8 @@ from users.models import Users
 
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from api.models import (
-    Rentals, Messages, Reviews,
-)
+from api.models import Rentals, Reviews
+from chat.models import Messages
 from contracts.models import Contracts
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
@@ -132,7 +131,7 @@ for i, (brand, model, year, purpose, power_cv) in enumerate(machines_data):
     m = Machines.objects.create(
         id=uuid.uuid4(),
         owner=locadores[i % len(locadores)],
-        renagro_number=f"RENAGRO-{2024000 + i}",
+        renagro_number=f"BR{2024000 + i:010d}",
         brand=brand, model=model, year=year,
         power_cv=power_cv,
         hour_meter=hour_meter,
