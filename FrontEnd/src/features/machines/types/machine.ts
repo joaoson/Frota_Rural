@@ -5,6 +5,8 @@ export interface Machine {
   brand: string | null;
   model: string | null;
   year: number | null;
+  powerCv: number | null;
+  hourMeter: number | null;
   technicalSpecifications: string | null;
   usagePurpose: string | null;
   status: string | null;

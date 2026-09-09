@@ -136,6 +136,7 @@ export const postingEditFormSchema = z
 export type PostingEditFormValues = z.infer<typeof postingEditFormSchema>;
 
 export interface PostingWritePayload {
+  suggestion_id?: string;
   machinery?: string;
   hourly_rate?: string;
   location_cep?: string;

@@ -22,6 +22,8 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof MachineFormValues>> = {
   brand: "otherBrand",
   model: "model",
   year: "year",
+  power_cv: "powerCv",
+  hour_meter: "hourMeter",
   usage_purpose: "usagePurpose",
   technical_specifications: "technicalSpecifications",
 };
@@ -142,6 +144,17 @@ const NovoEquipamento = () => {
               <option>Colheita</option>
               <option>Preparo de Solo</option>
             </select>
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          <FormField label="Potência (cv)" error={errors.powerCv?.message} hint="Usada para sugerir o valor por hora do anúncio.">
+            <input type="number" min={20} max={700} step={1} placeholder="110"
+              className={inputClass(Boolean(errors.powerCv))} {...form.register("powerCv")} />
+          </FormField>
+          <FormField label="Horímetro (horas)" error={errors.hourMeter?.message} hint="Leitura atual do painel. Sem ela, estimamos pela idade.">
+            <input type="number" min={0} max={60000} step={1} placeholder="4900"
+              className={inputClass(Boolean(errors.hourMeter))} {...form.register("hourMeter")} />
           </FormField>
         </div>
 

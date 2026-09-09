@@ -9,6 +9,8 @@ export const MACHINE_FORM_DEFAULTS: MachineFormValues = {
   otherBrand: "",
   model: "",
   year: "",
+  powerCv: "",
+  hourMeter: "",
   usagePurpose: "Plantio",
   technicalSpecifications: "",
 };

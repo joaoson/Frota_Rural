@@ -9,6 +9,15 @@ function maxYear(): number {
   return new Date().getFullYear() + 1;
 }
 
+const powerCvField = z.string().trim().refine(
+  (value) => !value || (Number.isInteger(Number(value)) && Number(value) >= 20 && Number(value) <= 700),
+  "A potência deve ser um número inteiro entre 20 e 700 cv.",
+);
+const hourMeterField = z.string().trim().refine(
+  (value) => !value || (Number.isInteger(Number(value)) && Number(value) >= 0 && Number(value) <= 60000),
+  "O horímetro deve ser um número inteiro entre 0 e 60000 horas.",
+);
+
 export const machineApiSchema = z.object({
   id: z.string(),
   owner: z.string(),
@@ -16,6 +25,8 @@ export const machineApiSchema = z.object({
   brand: z.string().nullish(),
   model: z.string().nullish(),
   year: z.number().nullish(),
+  power_cv: z.number().nullish(),
+  hour_meter: z.number().nullish(),
   technical_specifications: z.string().nullish(),
   usage_purpose: z.string().nullish(),
   status: z.string().nullish(),
@@ -48,6 +59,8 @@ export const machineFormSchema = z
         const parsed = Number(value);
         return Number.isInteger(parsed) && parsed >= MIN_YEAR && parsed <= maxYear();
       }, `O ano deve ser entre ${MIN_YEAR} e ${maxYear()}.`),
+    powerCv: powerCvField,
+    hourMeter: hourMeterField,
     usagePurpose: z.string().trim().min(1, "Finalidade de uso é obrigatória."),
     technicalSpecifications: z.string().trim(),
   })
@@ -69,11 +82,15 @@ export interface CreateMachinePayload {
   brand?: string;
   model?: string;
   year?: number;
+  power_cv?: number | null;
+  hour_meter?: number | null;
   technical_specifications?: string;
   usage_purpose?: string;
 }
 
 export const machineEditFormSchema = z.object({
+    potenciaCv: powerCvField,
+    horimetro: hourMeterField,
     registroRenagro: z
       .string()
       .trim()

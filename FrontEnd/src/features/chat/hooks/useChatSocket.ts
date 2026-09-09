@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { sessionService } from "@/app/container";
+import { sessionService, tokenStore } from "@/app/container";
 import { useAuth } from "@/contexts/useAuth";
 
 import { toChatMessage, toChatThread, toUnreadCounts } from "../api/chatMapper";
@@ -46,7 +46,7 @@ function wsUrl(): string {
  * o WebSocket.
  */
 export function useChatSocket(handlers: ChatSocketHandlers) {
-  const { tokens, isAuthenticated, isLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading, logout } = useAuth();
   const [status, setStatus] = useState<SocketStatus>("closed");
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -93,8 +93,9 @@ export function useChatSocket(handlers: ChatSocketHandlers) {
   const connectRef = useRef<() => void>(() => {});
 
   const connect = useCallback(() => {
-    if (connecting.current || socketRef.current) return;
-    const token = tokens?.access;
+    if (isLoading || !isAuthenticated || connecting.current || socketRef.current) return;
+    // Refresh updates the shared token store, not the AuthContext snapshot.
+    const token = tokenStore.getAccessToken();
     if (!token) return;
 
     connecting.current = true;
@@ -193,7 +194,7 @@ export function useChatSocket(handlers: ChatSocketHandlers) {
       const delay = event.code === 4429 ? 30_000 : jitter;
       reconnectTimer.current = window.setTimeout(() => connectRef.current(), delay);
     };
-  }, [tokens?.access, logout, send, armSilenceTimer]);
+  }, [isLoading, isAuthenticated, logout, send, armSilenceTimer]);
 
   // Refs sincronizados em efeito, não durante o render: atualizar um ref no
   // corpo do componente quebra com renders concorrentes.

@@ -1,4 +1,7 @@
 import { useCallback, useState } from "react";
+import { useWatch } from "react-hook-form";
+import SugestaoPrecoPanel from "@/features/pricing/components/SugestaoPrecoPanel";
+import { usePricingSuggestion } from "@/features/pricing/hooks/usePricingSuggestion";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -37,6 +40,8 @@ const NovoAnuncio = () => {
   const machines = machinesQuery.data ?? [];
 
   const form = usePostingForm();
+  const machinery = useWatch({ control: form.control, name: "machinery" });
+  const pricing = usePricingSuggestion(machinery);
   const createPosting = useCreatePosting();
   const uploadPhotos = useUploadPostingPhotos();
   // Guardadas no anúncio para o mapa não geocodificar a cada exibição.
@@ -77,7 +82,10 @@ const NovoAnuncio = () => {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const postingId = await createPosting.mutateAsync(toWritePayload(values, coordenadas));
+      const postingId = await createPosting.mutateAsync({
+        ...toWritePayload(values, coordenadas),
+        suggestion_id: pricing.suggestionId,
+      });
 
       if (photoFiles.length > 0) {
         const { failed } = await uploadPhotos.mutateAsync({ postingId, files: photoFiles });
@@ -161,6 +169,34 @@ const NovoAnuncio = () => {
             {...form.register("hourlyRate")}
           />
         </FormField>
+
+        <div className="space-y-3">
+          <p className="text-[11px] text-outline font-medium">
+            A plataforma fatura 8 h por dia de reserva — este é o valor por hora faturada, não por hora de horímetro.
+          </p>
+          {pricing.suggestion ? (
+            <SugestaoPrecoPanel suggestion={pricing.suggestion}
+              onApply={(value) => {
+                form.setValue("hourlyRate", value, { shouldValidate: true, shouldDirty: true });
+                toast.success("Valor aplicado. Você pode ajustá-lo antes de publicar.");
+              }}
+              onDismiss={pricing.dismiss} />
+          ) : (
+            <button type="button" onClick={pricing.request}
+              disabled={pricing.isPending || !machinery || isBusy}
+              className="w-full border border-primary/40 text-primary dark:text-primary-bright font-bold py-2.5 rounded-lg text-sm hover:bg-primary/5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <MaterialIcon icon={pricing.isPending ? "hourglass_top" : "auto_awesome"} size={16} />
+              {pricing.isPending ? "Pesquisando o mercado..." : "Sugerir valor com base no mercado"}
+            </button>
+          )}
+          {pricing.error && (
+            <p role="status" className="text-sm text-on-surface-variant">
+              {pricing.error instanceof HttpError && pricing.error.status === 422
+                ? pricing.error.message
+                : "Erro ao consultar a sugestão de preço. Tente novamente."}
+            </p>
+          )}
+        </div>
 
         <div className="space-y-4">
           <FormField label="CEP">

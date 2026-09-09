@@ -1,3 +1,5 @@
+import { HttpPricingRepository } from "@/features/pricing/api/PricingRepository";
+import { PricingStore } from "@/features/pricing/api/PricingStore";
 import { HttpAuthRepository } from "@/features/auth/api/AuthRepository";
 import { AuthStore } from "@/features/auth/api/AuthStore";
 import { HttpContractRepository } from "@/features/contracts/api/ContractRepository";
@@ -63,6 +65,7 @@ const authRepository = new HttpAuthRepository(rawHttpClient);
 export const authStore = new AuthStore(authRepository, tokenStore, queryClient);
 
 const stores = {
+  pricing: new PricingStore(new HttpPricingRepository(httpClient)),
   machines: new MachineStore(new HttpMachineRepository(httpClient), queryClient),
   users: new UserStore(new HttpUserRepository(httpClient), queryClient),
   postings: new PostingStore(new HttpPostingRepository(httpClient), queryClient),
@@ -76,6 +79,7 @@ const stores = {
 } as const;
 
 export const {
+  pricing: pricingStore,
   machines: machineStore,
   users: userStore,
   postings: postingStore,
@@ -89,11 +93,5 @@ export const {
 } = stores;
 
 export function clearAllStores(): void {
-  machineStore.clear();
-  userStore.clear();
-  postingStore.clear();
-  moderationStore.clear();
-  documentStore.clear();
-  contractStore.clear();
-  reviewStore.clear();
+  Object.values(stores).forEach((store) => store.clear());
 }

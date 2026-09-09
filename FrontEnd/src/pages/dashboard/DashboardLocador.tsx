@@ -1,3 +1,4 @@
+import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -14,7 +15,7 @@ import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import AssinaturaContratoModal, {
   type PapelAssinatura,
 } from "@/components/AssinaturaContratoModal";
-import { documentStore, machineStore } from "@/app/container";
+import { documentStore } from "@/app/container";
 import { useCertifications, useOperatorLicenses } from "@/features/documents/hooks/useDocuments";
 import type { Certification, OperatorLicense } from "@/features/documents/types/document";
 import { useMachines } from "@/features/machines/hooks/useMachines";
@@ -143,6 +144,7 @@ const DashboardLocador = () => {
   const certificationsQuery = useCertifications({ userId: userId ?? undefined }, Boolean(userId));
 
   const createReview = useCreateReview();
+  const updateMachine = useUpdateMachine();
 
   const receivedReviews: Review[] = receivedQuery.data ?? [];
   const givenReviews: Review[] = givenQuery.data ?? [];
@@ -157,6 +159,9 @@ const DashboardLocador = () => {
         brand: m.brand,
         model: m.model,
         year: m.year,
+        powerCv: m.powerCv,
+        hourMeter: m.hourMeter,
+        specifications: m.technicalSpecifications,
         status: m.status ?? "active",
         purpose: m.usagePurpose ?? "",
       })),
@@ -206,6 +211,8 @@ const DashboardLocador = () => {
       marca: "",
       modelo: "",
       anoFabricacao: "",
+      potenciaCv: "",
+      horimetro: "",
       finalidade: "Plantio",
       especificacoes: "",
     });
@@ -217,8 +224,10 @@ const DashboardLocador = () => {
       marca: m.brand ?? "",
       modelo: m.model ?? "",
       anoFabricacao: m.year ? String(m.year) : "",
+      potenciaCv: m.powerCv != null ? String(m.powerCv) : "",
+      horimetro: m.hourMeter != null ? String(m.hourMeter) : "",
       finalidade: m.purpose ?? "",
-      especificacoes: "",
+      especificacoes: m.specifications ?? "",
     });
     setIsEditEquipamentoOpen(true);
   };
@@ -325,7 +334,7 @@ const DashboardLocador = () => {
         equipamento={selectedEquipamento}
         onSave={async (data) => {
           try {
-            await machineStore.update(data.id, {
+            await updateMachine.mutateAsync({ id: data.id, payload: {
               renagro_number: data.registroRenagro,
               brand: data.marca,
               model: data.modelo,
@@ -333,9 +342,11 @@ const DashboardLocador = () => {
                 ? Number(data.anoFabricacao)
                 : undefined,
               usage_purpose: data.finalidade,
-            });
+              power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
+              hour_meter: data.horimetro ? Number(data.horimetro) : null,
+              technical_specifications: data.especificacoes.trim(),
+            } });
             setSelectedEquipamento(data);
-            void machineStore.invalidateLists();
             toast.success("Equipamento atualizado com sucesso!");
             setIsEditEquipamentoOpen(false);
           } catch {

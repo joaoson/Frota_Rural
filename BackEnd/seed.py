@@ -100,36 +100,43 @@ print(f"[OK]{len(certifications)} Certifications created")
 
 
 # ── Machines (20) ──────────────────────────────────────────────────────────
+# Potência em cv aproximada de cada modelo, para os comparáveis da
+# precificação terem porte comparável e não misturarem 75 cv com 410 cv.
 machines_data = [
-    ("John Deere", "8R 410", 2022, "Plantio e cultivo"),
-    ("Case IH", "Magnum 380", 2021, "Preparo de solo"),
-    ("New Holland", "T7.315", 2023, "Colheita"),
-    ("Massey Ferguson", "MF 8737", 2020, "Plantio e cultivo"),
-    ("Valtra", "BH 224", 2022, "Preparo de solo"),
-    ("John Deere", "6155J", 2021, "Pulverização"),
-    ("Case IH", "Axial-Flow 8250", 2023, "Colheita"),
-    ("New Holland", "CR 10.90", 2022, "Colheita"),
-    ("Massey Ferguson", "MF 4292", 2019, "Plantio e cultivo"),
-    ("Valtra", "A134", 2020, "Preparo de solo"),
-    ("John Deere", "S790", 2023, "Colheita"),
-    ("Case IH", "Farmall 80", 2021, "Plantio e cultivo"),
-    ("New Holland", "TL 75E", 2020, "Pulverização"),
-    ("Massey Ferguson", "MF 6713", 2022, "Preparo de solo"),
-    ("Valtra", "BT 210", 2021, "Plantio e cultivo"),
-    ("John Deere", "5090E", 2019, "Pulverização"),
-    ("Case IH", "Puma 185", 2022, "Preparo de solo"),
-    ("New Holland", "T6.180", 2023, "Plantio e cultivo"),
-    ("Massey Ferguson", "MF 9895", 2021, "Colheita"),
-    ("Valtra", "BH 194", 2020, "Preparo de solo"),
+    ("John Deere", "8R 410", 2022, "Plantio e cultivo", 410),
+    ("Case IH", "Magnum 380", 2021, "Preparo de solo", 380),
+    ("New Holland", "T7.315", 2023, "Colheita", 315),
+    ("Massey Ferguson", "MF 8737", 2020, "Plantio e cultivo", 370),
+    ("Valtra", "BH 224", 2022, "Preparo de solo", 224),
+    ("John Deere", "6155J", 2021, "Pulverização", 155),
+    ("Case IH", "Axial-Flow 8250", 2023, "Colheita", 460),
+    ("New Holland", "CR 10.90", 2022, "Colheita", 653),
+    ("Massey Ferguson", "MF 4292", 2019, "Plantio e cultivo", 90),
+    ("Valtra", "A134", 2020, "Preparo de solo", 134),
+    ("John Deere", "S790", 2023, "Colheita", 543),
+    ("Case IH", "Farmall 80", 2021, "Plantio e cultivo", 80),
+    ("New Holland", "TL 75E", 2020, "Pulverização", 75),
+    ("Massey Ferguson", "MF 6713", 2022, "Preparo de solo", 132),
+    ("Valtra", "BT 210", 2021, "Plantio e cultivo", 210),
+    ("John Deere", "5090E", 2019, "Pulverização", 90),
+    ("Case IH", "Puma 185", 2022, "Preparo de solo", 185),
+    ("New Holland", "T6.180", 2023, "Plantio e cultivo", 180),
+    ("Massey Ferguson", "MF 9895", 2021, "Colheita", 500),
+    ("Valtra", "BH 194", 2020, "Preparo de solo", 194),
 ]
 
 machines = []
-for i, (brand, model, year, purpose) in enumerate(machines_data):
+for i, (brand, model, year, purpose, power_cv) in enumerate(machines_data):
+    # Horímetro coerente com a idade: ~700 h de motor por ano de uso.
+    hour_meter = max(0, (now.year - year)) * 700 + i * 25
     m = Machines.objects.create(
         id=uuid.uuid4(),
         owner=locadores[i % len(locadores)],
         renagro_number=f"RENAGRO-{2024000 + i}",
         brand=brand, model=model, year=year,
+        power_cv=power_cv,
+        hour_meter=hour_meter,
+        hour_meter_updated_at=now,
         technical_specifications=f"{brand} {model} - Motor de alta performance, {year}",
         usage_purpose=purpose,
         status="active",

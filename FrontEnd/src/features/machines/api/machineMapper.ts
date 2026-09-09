@@ -20,6 +20,8 @@ export function toDomain(dto: MachineApi): Machine {
     brand: dto.brand ?? null,
     model: dto.model ?? null,
     year: dto.year ?? null,
+    powerCv: dto.power_cv ?? null,
+    hourMeter: dto.hour_meter ?? null,
     technicalSpecifications: dto.technical_specifications ?? null,
     usagePurpose: dto.usage_purpose ?? null,
     status: dto.status ?? null,
@@ -41,6 +43,8 @@ export function toCreatePayload(
     brand,
     model: values.model,
     year: values.year ? Number(values.year) : undefined,
+    power_cv: values.powerCv ? Number(values.powerCv) : undefined,
+    hour_meter: values.hourMeter ? Number(values.hourMeter) : undefined,
     technical_specifications: values.technicalSpecifications,
     usage_purpose: values.usagePurpose,
   };

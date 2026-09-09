@@ -86,6 +86,8 @@ export function toHttpError(error: unknown): HttpError {
         return new ForbiddenError(message, error);
       case 404:
         return new NotFoundError(message, error);
+      case 422:
+        return new HttpError("unprocessable_entity", message ?? "Não foi possível processar os dados.", 422, error);
       case 409:
         return new ConflictError(message, error);
       default:

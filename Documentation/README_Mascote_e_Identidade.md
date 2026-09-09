@@ -228,3 +228,26 @@ Identical character identity in all six. No text, no outlines, no shadows.
 Valem as mesmas fronteiras da seção 6 — o corpo inteiro entra em onboarding,
 estado vazio e divulgação; **não entra** em contrato, assinatura, comprovante
 de pagamento nem mensagem de fraude.
+
+### 9.4 Personagem interativo — nova direção 3D
+
+A pedido do responsável pelo produto, a página inicial usa agora uma
+**capivara original com aparência de filme de animação 3D**, pelagem caramelo,
+macacão verde e lenço âmbar. Essa direção substitui as restrições de desenho
+flat e peão das seções anteriores para o personagem da página inicial.
+O ícone circular existente continua disponível.
+
+`FrontEnd/src/features/home/components/MascotCompanion.tsx` apresenta quatro poses de uma
+ilustração renderizada, com estilos em `MascotCompanion.css` e recurso local
+em `FrontEnd/public/mascot/capivara-3d-poses.png`. O prompt completo e o mapa
+da folha de poses estão em `FrontEnd/public/mascot/README.md`.
+
+- O ponteiro inclina suavemente a ilustração; sair retorna à posição neutra.
+- Clicar, tocar ou ativar com Enter/Espaço alterna celebração e piscadela por
+  1,8 segundo, retornando à pose da orientação selecionada.
+- Alugar, anunciar e conhecer o fluxo alteram pose, orientação e destino.
+- Foco visível, estado selecionado e regiões de anúncio acessíveis são mantidos.
+- Movimento reduzido desativa inclinação e deslocamento, mantendo as poses.
+- Não há animação contínua, som, chatbot ou chamada de API em execução.
+
+É uma ilustração 3D renderizada com interações CSS, não uma malha 3D articulada.

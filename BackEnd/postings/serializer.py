@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 from datetime import datetime, timezone as dt_timezone
@@ -13,6 +14,25 @@ from djangoapi import firebase_storage
 
 # created_at é nullable no banco; usado como piso para manter a ordenação estável.
 _EPOCH = datetime.min.replace(tzinfo=dt_timezone.utc)
+
+logger = logging.getLogger(__name__)
+
+
+def _link_pricing_suggestion(suggestion_id, posting):
+    """Registra na sugestão qual preço o locador de fato publicou.
+
+    Falhar aqui não pode derrubar a criação do anúncio: isto é telemetria de
+    calibração, e um anúncio válido não deve ser perdido porque o registro de
+    aprendizado não pôde ser gravado.
+    """
+    try:
+        from pricing.models import PricingSuggestions
+
+        PricingSuggestions.objects.filter(
+            id=suggestion_id, machinery_id=posting.machinery_id
+        ).update(posting=posting, accepted_hourly_rate=posting.hourly_rate)
+    except Exception:
+        logger.exception("Não foi possível vincular a sugestão %s", suggestion_id)
 
 
 def _sorted_photos(posting):
@@ -36,12 +56,19 @@ class PostingSerializer(serializers.ModelSerializer):
     )
     max_reservation_days = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
+    # Só de entrada: liga o anúncio à sugestão de preço que o locador viu ao
+    # criá-lo. É esse par (sugerido × publicado) que permite calibrar o modelo
+    # de precificação com dados reais em vez de estimativa. Nunca é devolvido
+    # nem afeta o anúncio.
+    suggestion_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+
     class Meta:
         model = Postings
         fields = [
             "id",
             "machinery",
             "hourly_rate",
+            "suggestion_id",
             "location_lat",
             "location_lng",
             "location_cep",
@@ -71,13 +98,17 @@ class PostingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         now = timezone.now()
+        suggestion_id = validated_data.pop("suggestion_id", None)
         validated_data.setdefault("status", "active")
-        return Postings.objects.create(
+        posting = Postings.objects.create(
             id=uuid.uuid4(),
             created_at=now,
             updated_at=now,
             **validated_data,
         )
+        if suggestion_id:
+            _link_pricing_suggestion(suggestion_id, posting)
+        return posting
 
     def update(self, instance, validated_data):
         validated_data["updated_at"] = timezone.now()
