@@ -31,6 +31,7 @@ class SuggestionResponseSerializer(serializers.Serializer):
     composicao = BreakdownItemSerializer(many=True)
     premissas = serializers.DictField()
     fontes = serializers.ListField(child=serializers.DictField())
+    search_suggestions_html = serializers.CharField(required=False, allow_null=True)
     confianca = serializers.CharField()
     origem = serializers.CharField()
     versao_parametros = serializers.CharField()

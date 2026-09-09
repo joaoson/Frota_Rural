@@ -1,22 +1,9 @@
-"""Pesquisa de mercado da máquina, via Claude com busca na web.
+"""Pesquisa de mercado com busca na web e extração estruturada.
 
-A IA aqui **não precifica**. Ela só levanta fatos — quanto vale o usado, quanto
-custa o equivalente novo, qual a potência — e devolve as fontes. Quem transforma
-isso em R$/hora é `engine.py`, de forma determinística e auditável.
-
-O fluxo tem dois passos porque cada um faz uma coisa só:
-
-1. **Pesquisa** — Claude com a ferramenta de busca, produzindo texto com fontes.
-2. **Extração** — o mesmo texto passado por um schema JSON estrito, sem
-   ferramenta nenhuma, garantindo que o que sai é parseável.
-
-Fazer os dois numa chamada só economizaria latência, mas misturaria busca com
-formatação e deixaria o resultado dependente do modelo se lembrar do formato no
-meio de uma cadeia de buscas.
-
-Nada aqui é obrigatório para o sistema funcionar: sem `ANTHROPIC_API_KEY`, ou
-com o pacote `anthropic` ausente, a pesquisa devolve `None` e a camada de cima
-cai para os comparáveis internos. Criar anúncio nunca depende disto.
+Groq é o padrão para testes com a cota do plano gratuito. Gemini e Claude
+permanecem disponíveis com PRICING_AI_PROVIDER=gemini ou anthropic. O provedor é
+explícito: uma falha ou cota esgotada nunca dispara um fallback pago.
+A IA coleta fatos e fontes; engine.py continua responsável pelo preço.
 """
 
 from __future__ import annotations
@@ -140,14 +127,20 @@ class MachineResearch:
     confidence: str
     matched_model: str | None
     sources: list
+    search_suggestions_html: str | None = None
 
     def as_dict(self):
         return asdict(self)
 
 
 def is_enabled():
-    """A pesquisa só roda com chave configurada e SDK instalado."""
-    if not os.getenv("ANTHROPIC_API_KEY"):
+    """A pesquisa só roda com a chave do provedor escolhido."""
+    provider = os.getenv("PRICING_AI_PROVIDER", "groq").strip().lower()
+    if provider == "groq":
+        return bool(os.getenv("GROQ_API_KEY", "").strip())
+    if provider == "gemini":
+        return bool(os.getenv("GEMINI_API_KEY", "").strip())
+    if provider != "anthropic" or not os.getenv("ANTHROPIC_API_KEY"):
         return False
     try:
         import anthropic  # noqa: F401
@@ -223,11 +216,26 @@ def research_machine(brand, model, year):
         return None
 
     try:
-        client = _client()
-        research_text = _run_search(client, brand, model, year)
-        if not research_text:
-            return None
-        data = _extract(client, research_text)
+        provider = os.getenv("PRICING_AI_PROVIDER", "groq").strip().lower()
+        if provider in {"groq", "gemini"}:
+            if provider == "groq":
+                from .groq import research_with_groq as run_research
+            else:
+                from .gemini import research_with_gemini as run_research
+
+            data = run_research(
+                RESEARCH_PROMPT.format(brand=brand, model=model, year=year),
+                EXTRACTION_PROMPT,
+                VALUATION_SCHEMA,
+            )
+            if data is None:
+                return None
+        else:
+            client = _client()
+            research_text = _run_search(client, brand, model, year)
+            if not research_text:
+                return None
+            data = _extract(client, research_text)
     except Exception:
         logger.exception("Falha na pesquisa de preço de %s %s %s", brand, model, year)
         return None
@@ -241,4 +249,5 @@ def research_machine(brand, model, year):
         confidence=data.get("confidence") or "baixa",
         matched_model=data.get("matched_model"),
         sources=data.get("sources") or [],
+        search_suggestions_html=data.get("search_suggestions_html"),
     )

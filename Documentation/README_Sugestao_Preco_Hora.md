@@ -9,7 +9,7 @@
 |:---|:---|
 | `BackEnd/pricing/params.py` | Parâmetros por categoria, versionados (§3.3) |
 | `BackEnd/pricing/engine.py` | Cálculo determinístico, sem rede nem banco (§4) |
-| `BackEnd/pricing/research.py` | Pesquisa via Claude com busca na web (§3.1) |
+| `BackEnd/pricing/research.py` | Seleção de provedor e pesquisa com busca na web (§3.1) |
 | `BackEnd/pricing/service.py` | Cache, fallbacks, ancoragem, persistência (§5, §11) |
 | `FrontEnd/src/features/pricing/api/` | Repository com HTTP injetado e store de sugestões |
 | `FrontEnd/src/features/pricing/hooks/usePricingSuggestion.ts` | Mutação explícita, descarte de respostas antigas e vínculo de auditoria |
@@ -450,8 +450,9 @@ R$ 210 em julho.
 Resolvidas na implementação:
 
 - **Campos do §10** — `hour_meter` e `power_cv` foram adicionados.
-- **Provedor** — Claude (`claude-opus-5`) com busca na web, atrás de cache de 90
-  dias por `(marca, modelo, ano)`. Sem `ANTHROPIC_API_KEY` o recurso apenas não
+- **Provedor** — Groq (`groq/compound` + `openai/gpt-oss-120b`) por padrão;
+  Gemini e Claude são alternativas explícitas. Cache de 90 dias por `(marca, modelo, ano)`.
+  Sem a chave do provedor escolhido (`GROQ_API_KEY` por padrão), o recurso não
   aparece; nada mais deixa de funcionar.
 - **Categorias** — as três (trator, colheitadeira, pulverizador) estão na tabela
   de parâmetros. Colheitadeira produz números altos porém coerentes (§9.2).
@@ -465,3 +466,14 @@ Em aberto:
 4. Colheitadeira ganha unidade de cobrança por hectare (§9.2)?
 5. Quando houver histórico suficiente, recalibrar `D`, `U` e `m` a partir das
    locações concluídas e subir `PARAMS_VERSION`.
+
+
+### Configuração gratuita de desenvolvimento
+
+O adaptador `BackEnd/pricing/groq.py` usa a busca web do Compound e depois
+extrai os fatos com GPT OSS pelo schema JSON. As fontes vêm dos resultados
+reais da busca, nunca de URLs inventadas durante a extração. Respostas
+incompletas ou sem fontes não viram sugestões. O adaptador Gemini segue a
+mesma separação, preservando também as sugestões de pesquisa do Google.
+Veja a configuração e as restrições de cada provedor no
+[guia Docker](../Devops/README.md#precificação-com-groq-gratuito).

@@ -90,3 +90,42 @@ docker compose exec backend python manage.py test --noinput
 docker compose exec frontend npm run build
 docker compose exec frontend npm test
 ```
+
+## Precificação com Groq gratuito
+
+1. Crie uma chave em [Groq Console](https://console.groq.com/keys) e mantenha
+   a conta no plano **Free**. Contas no plano Developer são cobradas por uso.
+2. Preencha o `.env` da raiz (não coloque a chave no frontend):
+
+   ```dotenv
+   PRICING_AI_PROVIDER=groq
+   GROQ_API_KEY=sua_chave
+   ```
+
+3. Recrie apenas o backend para carregar as variáveis do `.env`:
+
+   ```bash
+   docker compose up -d --no-deps --force-recreate backend
+   ```
+
+4. Entre como locador, abra **Novo Anúncio**, selecione um equipamento e clique
+   em **Sugerir valor com base no mercado**.
+
+Cada pesquisa sem cache usa duas chamadas: `groq/compound` pesquisa na web e
+`openai/gpt-oss-120b` extrai o JSON. Ambos constam no
+[plano gratuito](https://console.groq.com/docs/rate-limits); as cotas efetivas
+variam por conta e podem mudar. O adaptador não faz retries automáticos nem
+fallback para outro provedor. Respostas incompletas, sem fontes, cota esgotada
+ou chave ausente deixam o preço manual disponível. A precificação continua
+sendo calculada pelo motor determinístico do backend.
+
+### Outros provedores
+
+- Gemini: `PRICING_AI_PROVIDER=gemini`, `GEMINI_API_KEY` e
+  `GEMINI_MODEL=gemini-2.5-flash`. Em uma verificação real de setembro de 2026,
+  a API recusou esse modelo para novos usuários com HTTP 404. Não o use como
+  opção padrão para contas novas. Modelos mais recentes têm condições
+  diferentes para busca; confira os [preços do Google](https://ai.google.dev/gemini-api/docs/pricing)
+  antes de alterar o modelo. As sugestões de pesquisa do Google são exibidas
+  em iframe isolado, sem permissão para scripts ou acesso à origem do app.
+- Claude: `PRICING_AI_PROVIDER=anthropic` e `ANTHROPIC_API_KEY` (pago).

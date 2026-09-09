@@ -303,6 +303,22 @@ class EndpointTests(TestCase):
         self.assertTrue(body['fontes'])
         self.assertEqual(body['premissas']['categoria'], 'trator')
 
+    def test_google_search_attribution_survives_cache_and_api_response(self):
+        from dataclasses import replace
+
+        self._auth(self.owner)
+        widget = '<div>Google Search</div>'
+        result = replace(RESEARCH, search_suggestions_html=widget)
+        with patch('pricing.research.research_machine', return_value=result) as search:
+            first = self.client.post('/api/pricing/suggest', {'machinery': str(self.machine.id)}, format='json')
+            cached = self.client.post('/api/pricing/suggest', {'machinery': str(self.machine.id)}, format='json')
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(cached.status_code, 200)
+        self.assertEqual(first.json()['search_suggestions_html'], widget)
+        self.assertEqual(cached.json()['search_suggestions_html'], widget)
+        self.assertEqual(cached.json()['origem'], 'cache')
+        search.assert_called_once()
+
     def test_maquina_de_outro_locador_e_proibida(self):
         """Cada sugestão custa uma pesquisa paga: não pode ser disparada sobre
         a frota alheia."""

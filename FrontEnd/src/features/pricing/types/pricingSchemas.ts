@@ -20,6 +20,7 @@ export const pricingSuggestionSchema: z.ZodType<PricingSuggestion> = z.object({
     custo_antes_da_ancoragem: money,
   }),
   fontes: z.array(z.object({ url: z.string(), title: z.string().nullish() })),
+  search_suggestions_html: z.string().nullish(),
   confianca: z.enum(["alta", "media", "baixa"]),
   origem: z.enum(["pesquisa", "cache", "comparaveis"]),
   versao_parametros: z.string(),

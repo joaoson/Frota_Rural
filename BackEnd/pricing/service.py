@@ -67,6 +67,7 @@ class Suggestion:
     source: str
     params_version: str
     suggestion_id: uuid.UUID
+    search_suggestions_html: str | None = None
 
 
 def _normalize(value):
@@ -329,6 +330,7 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         source=source,
         params_version=result.params_version,
         suggestion_id=suggestion.id,
+        search_suggestions_html=data.get("search_suggestions_html"),
     )
 
 

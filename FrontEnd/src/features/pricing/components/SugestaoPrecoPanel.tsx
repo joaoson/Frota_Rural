@@ -131,6 +131,14 @@ const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPan
         ) : null}
       </details>
 
+      {suggestion.search_suggestions_html && (
+        <iframe title="Sugestões de pesquisa do Google"
+          srcDoc={suggestion.search_suggestions_html}
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          referrerPolicy="no-referrer"
+          className="w-full h-40 border-0 rounded-lg" />
+      )}
+
       <button
         type="button"
         onClick={() => onApply(suggestion.sugerido_brl_hora)}

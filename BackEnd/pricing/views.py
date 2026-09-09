@@ -84,6 +84,7 @@ def pricing_suggest(request):
             "composicao": suggestion.breakdown,
             "premissas": suggestion.assumptions,
             "fontes": suggestion.sources,
+            "search_suggestions_html": suggestion.search_suggestions_html,
             "confianca": suggestion.confidence,
             "origem": suggestion.source,
             "versao_parametros": suggestion.params_version,

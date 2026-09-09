@@ -34,6 +34,7 @@ export type PricingSuggestion = {
   composicao: BreakdownItem[];
   premissas: PricingAssumptions;
   fontes: { url: string; title?: string | null }[];
+  search_suggestions_html?: string | null;
   confianca: "alta" | "media" | "baixa";
   origem: "pesquisa" | "cache" | "comparaveis";
   versao_parametros: string;
