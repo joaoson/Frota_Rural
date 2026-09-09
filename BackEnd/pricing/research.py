@@ -94,6 +94,8 @@ Levante:
 dizendo a região e se incluem operador.
 
 Regras:
+- Somente ofertas de máquinas localizadas no Brasil. Descarte anúncios no exterior,
+  mesmo quando o site mostra um preço convertido automaticamente para reais.
 - Tudo em reais. Se encontrar preço em outra moeda, não converta: descarte.
 - Cite a URL de cada fonte usada.
 - Se não achar o modelo exato, use o mais próximo em porte e potência e diga \
@@ -101,6 +103,14 @@ qual foi usado.
 - Não estime por analogia solta e não invente número: dado que você não achou é \
 dado ausente. Confiança "baixa" com campos vazios é uma resposta melhor do que \
 um chute plausível."""
+
+# Compound Mini performs only one search. Keep the retrieval request focused;
+# detailed formatting and confidence rules belong in the extraction step.
+GROQ_RESEARCH_PROMPT = """Search the web for {brand} {model} machinery prices in Brazil: \
+used year {year} and new. Report advertised BRL prices, horsepower and source URLs. \
+Include hourly rental rates if found. Exclude overseas listings and converted \
+currencies; leave missing facts unknown. Identify any substitute model used."""
+
 
 EXTRACTION_PROMPT = """Extraia os dados da pesquisa abaixo para o schema.
 
@@ -223,8 +233,9 @@ def research_machine(brand, model, year):
             else:
                 from .gemini import research_with_gemini as run_research
 
+            prompt = GROQ_RESEARCH_PROMPT if provider == "groq" else RESEARCH_PROMPT
             data = run_research(
-                RESEARCH_PROMPT.format(brand=brand, model=model, year=year),
+                prompt.format(brand=brand, model=model, year=year),
                 EXTRACTION_PROMPT,
                 VALUATION_SCHEMA,
             )

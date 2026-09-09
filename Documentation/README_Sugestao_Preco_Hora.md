@@ -450,7 +450,7 @@ R$ 210 em julho.
 Resolvidas na implementação:
 
 - **Campos do §10** — `hour_meter` e `power_cv` foram adicionados.
-- **Provedor** — Groq (`groq/compound` + `openai/gpt-oss-120b`) por padrão;
+- **Provedor** — Groq (`groq/compound-mini` + `openai/gpt-oss-120b`) por padrão;
   Gemini e Claude são alternativas explícitas. Cache de 90 dias por `(marca, modelo, ano)`.
   Sem a chave do provedor escolhido (`GROQ_API_KEY` por padrão), o recurso não
   aparece; nada mais deixa de funcionar.

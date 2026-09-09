@@ -111,10 +111,14 @@ docker compose exec frontend npm test
 4. Entre como locador, abra **Novo Anúncio**, selecione um equipamento e clique
    em **Sugerir valor com base no mercado**.
 
-Cada pesquisa sem cache usa duas chamadas: `groq/compound` pesquisa na web e
+Cada pesquisa sem cache usa duas chamadas: `groq/compound-mini` pesquisa na web e
 `openai/gpt-oss-120b` extrai o JSON. Ambos constam no
 [plano gratuito](https://console.groq.com/docs/rate-limits); as cotas efetivas
-variam por conta e podem mudar. O adaptador não faz retries automáticos nem
+variam por conta e podem mudar. A busca usa uma única chamada de ferramenta e
+fixa `Groq-Model-Version: 2025-07-23` (busca básica). Em teste real, a busca
+avançada ultrapassou os limites internos do plano Free, gerando 429/413.
+A pesquisa básica pode encontrar menos dados; sem valores confiáveis o app
+continua sem sugerir um preço. O adaptador não faz retries automáticos nem
 fallback para outro provedor. Respostas incompletas, sem fontes, cota esgotada
 ou chave ausente deixam o preço manual disponível. A precificação continua
 sendo calculada pelo motor determinístico do backend.

@@ -26,10 +26,15 @@ def research_with_groq(prompt, extraction_prompt, schema):
     headers = {"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"}
     # Free-plan quotas are enforced by Groq. Never retry or switch providers.
     with httpx.Client(timeout=120.0) as http:
-        message = _message(http.post(ENDPOINT, headers=headers, json={
-            "model": "groq/compound",
+        # Basic search avoids the large internal contexts of advanced search,
+        # which can exceed the free plan's underlying model token limits.
+        message = _message(http.post(ENDPOINT, headers={
+            **headers, "Groq-Model-Version": "2025-07-23",
+        }, json={
+            "model": "groq/compound-mini",
             "messages": [{"role": "user", "content": prompt}],
             "search_settings": {"country": "brazil"},
+            "compound_custom": {"tools": {"enabled_tools": ["web_search"]}},
             "max_completion_tokens": 4000,
         }))
         if message is None:

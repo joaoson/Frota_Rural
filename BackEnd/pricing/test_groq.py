@@ -53,7 +53,10 @@ class GroqResearchTests(SimpleTestCase):
         self.assertEqual(result.sources, [SOURCE])
         self.assertIsNone(result.search_suggestions_html)
         first, second = [json.loads(request.content) for request in requests]
-        self.assertEqual(first['model'], 'groq/compound')
+        self.assertEqual(first['model'], 'groq/compound-mini')
+        self.assertEqual(requests[0].headers['Groq-Model-Version'], '2025-07-23')
+        self.assertNotIn('Groq-Model-Version', requests[1].headers)
+        self.assertEqual(first['compound_custom']['tools']['enabled_tools'], ['web_search'])
         self.assertEqual(first['search_settings'], {'country': 'brazil'})
         self.assertIn('John Deere', first['messages'][0]['content'])
         self.assertEqual(second['model'], 'openai/gpt-oss-120b')
