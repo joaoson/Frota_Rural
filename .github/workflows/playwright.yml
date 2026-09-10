@@ -1,0 +1,66 @@
+name: Frontend tests
+on:
+  push:
+    branches: [develop, main, 'codex/**']
+  pull_request:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playwright-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-tests:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: http://localhost:5173
+      E2E_API_URL: http://localhost:8000/api/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: FrontEnd/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: FrontEnd
+        run: npm ci
+      - name: Install browser dependencies
+        working-directory: FrontEnd
+        run: npx playwright install --with-deps
+      - name: Start isolated Docker stack
+        run: docker compose up --build -d
+      - name: Wait for frontend and backend
+        run: |
+          curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:5173/ > /dev/null
+          curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:8000/api/schema/swagger-ui/ > /dev/null
+      - name: Check frontend and browser test types
+        working-directory: FrontEnd
+        run: |
+          npm run lint
+          npm run build
+          npm run test:e2e:typecheck
+          npm test
+      - name: Test Chromium, Firefox and WebKit
+        working-directory: FrontEnd
+        run: npm run test:e2e
+      - name: Capture container logs
+        if: always()
+        run: docker compose logs --no-color > FrontEnd/docker-e2e.log
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            FrontEnd/playwright-report/
+            FrontEnd/test-results/
+            FrontEnd/docker-e2e.log
+          retention-days: 14
+      - name: Stop test stack
+        if: always()
+        run: docker compose down -v
