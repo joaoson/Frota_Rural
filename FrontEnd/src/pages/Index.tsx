@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import MascotCompanion from "@/components/MascotCompanion";
 import heroBg from "@/assets/hero-bg.jpg";
 import machine1 from "@/assets/machine-1.jpg";
 import machine2 from "@/assets/machine-2.jpg";
@@ -44,7 +45,8 @@ const Index = () => {
           <img src={heroBg} alt="Campo agrícola ao pôr do sol" className="w-full h-full object-cover opacity-20 grayscale-[0.5]" width={1920} height={1080} />
           <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background" />
         </div>
-        <div className="max-w-[1200px] mx-auto px-6 relative z-10">
+        <div className="w-full max-w-[1200px] mx-auto px-6 relative z-10 grid lg:grid-cols-[1.35fr_1fr] items-center gap-12 lg:gap-16">
+          <div>
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -74,6 +76,8 @@ const Index = () => {
               Anuncie sua Frota
             </Link>
           </motion.div>
+          </div>
+          <MascotCompanion />
         </div>
       </header>
 

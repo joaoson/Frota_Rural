@@ -1,0 +1,38 @@
+.frota-companion { width: 100%; max-width: 420px; justify-self: center; overflow: hidden; border: 1px solid var(--outline-variant); border-radius: 28px; background: var(--surface-container-lowest); color: var(--on-surface); }
+.frota-companion__eyebrow { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 22px 16px 0; font-size: 10px; font-weight: 800; letter-spacing: .16em; color: var(--on-surface-variant); }
+.frota-companion__eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: var(--secondary-container); }
+.frota-companion__stage { position: relative; display: flex; flex-direction: column; align-items: center; padding-top: 14px; isolation: isolate; }
+.frota-companion__sun { position: absolute; z-index: -1; width: 206px; height: 206px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #ffe7b4, #ead8b2); top: 75px; opacity: .65; }
+.frota-companion__hello { padding: 7px 14px; border-radius: 12px 12px 12px 2px; background: var(--surface-container); color: var(--on-surface-variant); font-size: 12px; font-weight: 600; }
+.frota-companion__character { display: block; width: 290px; height: 290px; max-width: 100%; cursor: pointer; border: 0; border-radius: 36px; background: transparent; -webkit-tap-highlight-color: transparent; }
+.frota-companion__parallax { width: 290px; max-width: 100%; transition: transform 160ms ease-out; }
+.frota-companion__sprite { display: block; width: 100%; height: 100%; background-image: url('/mascot/capivara-3d-poses.png'); background-size: 200% 200%; background-position: 0 0; background-repeat: no-repeat; transition: transform 280ms cubic-bezier(.22, 1, .36, 1); }
+.frota-companion[data-pose="curious"] .frota-companion__sprite { background-position: 0 100%; }
+.frota-companion[data-pose="proud"] .frota-companion__sprite,
+.frota-companion[data-pose="wink"] .frota-companion__sprite { background-position: 100% 100%; }
+.frota-companion[data-pose="happy"] .frota-companion__sprite { background-position: 100% 0; transform: translateY(-6px) rotate(-3deg); }
+.frota-companion__character:active .frota-companion__sprite { transform: scale(.97); }
+.frota-companion__hint { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--on-surface-variant); margin: -3px 0 18px; }
+.frota-companion__guidance { border-top: 1px solid var(--outline-variant); padding: 18px 22px 22px; }
+.frota-companion__choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.frota-companion__choices button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; flex: 1; padding: 8px; border: 1px solid var(--outline-variant); border-radius: 10px; font-size: 10px; font-weight: 700; white-space: nowrap; cursor: pointer; background: transparent; color: var(--on-surface-variant); transition: background-color 160ms ease, color 160ms ease; }
+.frota-companion__choices button[aria-pressed="true"] { background: var(--secondary-container); color: var(--secondary-container-foreground); border-color: var(--secondary-container); }
+.frota-companion__copy { min-height: 125px; padding-top: 18px; }
+.frota-companion__copy h2 { font-family: var(--font-headline); font-size: 19px; font-weight: 800; line-height: 1.25; letter-spacing: -.035em; margin-bottom: 9px; }
+.frota-companion__copy p { font-size: 12px; line-height: 1.65; color: var(--on-surface-variant); }
+.frota-companion__link { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 12px; font-weight: 800; color: var(--on-surface); }
+.frota-companion button:focus-visible, .frota-companion a:focus-visible { outline: 3px solid var(--secondary-container); outline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) {
+  .frota-companion__character:hover .frota-companion__sprite { transform: translateY(-4px); }
+  .frota-companion__link:hover { text-decoration: underline; text-underline-offset: 4px; }
+}
+.frota-companion[data-keyboard="true"] * { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .frota-companion *, .frota-companion *::before, .frota-companion *::after { transition: none !important; animation: none !important; }
+  .frota-companion .frota-companion__parallax, .frota-companion .frota-companion__sprite { transform: none !important; }
+}
+@media (max-width: 380px) {
+  .frota-companion__guidance { padding: 16px; }
+  .frota-companion__choices button { font-size: 10px; padding: 7px 5px; }
+  .frota-companion__choices svg { display: none; }
+}
