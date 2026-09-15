@@ -276,7 +276,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+# pt-br também traduz as mensagens embutidas do Django e do DRF ("Este campo é
+# obrigatório."), que chegam ao cliente no `errors` do corpo de erro.
+LANGUAGE_CODE = "pt-br"
 
 TIME_ZONE = "UTC"
 
