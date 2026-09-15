@@ -4,6 +4,8 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from chat.enums import ReportResolution
+
 
 class Messages(models.Model):
     """Uma mensagem 1:1.
@@ -73,8 +75,11 @@ class Messages(models.Model):
             ),
         ]
 
+    def __str__(self) -> str:
+        return f"Mensagem {self.id} de {self.sender_id} para {self.receiver_id}"
+
     @property
-    def hidden(self):
+    def hidden(self) -> bool:
         return self.hidden_at is not None
 
 
@@ -85,20 +90,15 @@ class MessageReports(models.Model):
     denúncia do *usuário* (e sua resolução), não a decisão administrativa avulsa.
     """
 
-    RESOLUTION_DISMISSED = "dismissed"
-    RESOLUTION_UPHELD = "upheld"
-    RESOLUTION_CHOICES = [
-        (RESOLUTION_DISMISSED, "Arquivada"),
-        (RESOLUTION_UPHELD, "Procedente"),
-    ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     message = models.ForeignKey(Messages, models.CASCADE, related_name="reports")
     reported_by = models.ForeignKey(
         "users.Users", models.SET_NULL, blank=True, null=True, related_name="message_reports"
     )
     reason = models.TextField()
-    resolution = models.CharField(max_length=20, choices=RESOLUTION_CHOICES, blank=True, null=True)
+    resolution = models.CharField(
+        max_length=20, choices=ReportResolution.choices, blank=True, null=True
+    )
     resolution_note = models.TextField(blank=True, null=True)
     resolved_by = models.ForeignKey(
         "users.Users",
@@ -118,3 +118,6 @@ class MessageReports(models.Model):
                 fields=["message", "reported_by"], name="message_reports_unique_reporter"
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"Denúncia da mensagem {self.message_id} ({self.resolution or 'pendente'})"

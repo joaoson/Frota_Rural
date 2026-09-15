@@ -2,16 +2,15 @@ import json
 import uuid
 from datetime import date, timedelta
 
-from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
-from rentals.models import Rentals
 from machines.models import Machines
 from postings.models import Postings
+from rentals.models import Rentals
 from users.models import Users
 
 from .models import MessageReports, Messages
@@ -96,24 +95,21 @@ class ConstraintTests(TestCase):
         self.w = build_world()
 
     def _msg(self, **kw):
-        base = dict(sender=self.w["lessee"], receiver=self.w["owner"], content="oi")
+        base = {"sender": self.w["lessee"], "receiver": self.w["owner"], "content": "oi"}
         base.update(kw)
         return Messages.objects.create(**base)
 
     def test_exactly_one_scope_enforced(self):
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                self._msg(rental=self.w["rental"], posting=self.w["posting"])
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                self._msg()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._msg(rental=self.w["rental"], posting=self.w["posting"])
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._msg()
 
     def test_client_id_unique_per_sender(self):
         cid = uuid.uuid4()
         self._msg(rental=self.w["rental"], client_id=cid)
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                self._msg(rental=self.w["rental"], client_id=cid)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            self._msg(rental=self.w["rental"], client_id=cid)
 
 
 class ChatApiTests(TestCase):
@@ -127,7 +123,6 @@ class ChatApiTests(TestCase):
         self.client = Client(enforce_csrf_checks=True)
 
     def auth(self, user):
-        self.client.credentials = None
         token = str(AccessToken.for_user(user))
         return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
 
@@ -297,7 +292,8 @@ class ChatApiTests(TestCase):
                 sent_at=timezone.now() + timedelta(seconds=i),
             )
         tid = format_thread_id("rental", w["rental"].id, w["lessee"].id, w["owner"].id)
-        seen, cursor = [], None
+        seen: list[str] = []
+        cursor = None
         while True:
             url = f"/api/chat/threads/{tid}/messages?limit=50"
             if cursor:

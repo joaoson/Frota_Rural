@@ -97,6 +97,13 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 disallow_untyped_calls = false
 
+# O Channels não tem stubs: consumer e middleware herdam de classes `Any` e usam
+# o decorator `database_sync_to_async`, que o mypy vê como não tipado.
+[[tool.mypy.overrides]]
+module = ["chat.consumers", "chat.middleware", "djangoapi.asgi"]
+disallow_subclassing_any = false
+disallow_untyped_decorators = false
+
 [[tool.mypy.overrides]]
 module = [
     "channels.*",
