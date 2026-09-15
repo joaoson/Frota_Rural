@@ -1,5 +1,7 @@
 import uuid
+
 from django.db import models
+
 from users.models import Users
 
 
@@ -13,3 +15,6 @@ class PasswordResets(models.Model):
 
     class Meta:
         db_table = "password_resets"
+
+    def __str__(self) -> str:
+        return f"Redefinição de senha de {self.user_id} (usado: {self.used})"

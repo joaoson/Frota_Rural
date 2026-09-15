@@ -109,7 +109,7 @@ def _build_reset_email_html(reset_url: str, timeout: int) -> str:
             </td>
           </tr>
         </table>
-        
+
       </td>
     </tr>
   </table>

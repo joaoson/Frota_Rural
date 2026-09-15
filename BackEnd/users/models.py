@@ -1,11 +1,21 @@
 import uuid
-from django.db import models
+from typing import TYPE_CHECKING, Any
+
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.db import models
+
+from users.enums import UserRole, UserStatus
+
+# `BaseUserManager` é genérico só nos stubs; em runtime a classe não aceita
+# subscrição, e este módulo é importado antes do monkeypatch do `common`.
+if TYPE_CHECKING:
+    _UsersManagerBase = BaseUserManager["Users"]
+else:
+    _UsersManagerBase = BaseUserManager
 
 
-# Create your models here.
-class UsersManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
+class UsersManager(_UsersManagerBase):
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> "Users":
         if not email:
             raise ValueError("Email is required")
         user = self.model(email=email, **extra_fields)
@@ -21,7 +31,7 @@ class Users(AbstractBaseUser):
     email = models.CharField(unique=True, max_length=255)
     # password field provided by AbstractBaseUser
     phone = models.CharField(max_length=20, blank=True, null=True)
-    role = models.TextField()
+    role = models.TextField(choices=UserRole.choices)
     address = models.TextField()
     # Município e UF chegam do cadastro em campos próprios; o contrato depende
     # deles e antes só conseguia adivinhá-los relendo o texto livre de address.
@@ -29,7 +39,7 @@ class Users(AbstractBaseUser):
     state = models.CharField(max_length=2, blank=True, null=True)
     cep = models.CharField(max_length=9, blank=True, null=True)
     birth_date = models.DateField()
-    status = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=50, choices=UserStatus.choices, blank=True, null=True)
     # Operadores cadastrados de dentro do painel pertencem a quem os criou.
     # Sem esse vínculo o locatário não teria como listar "os seus" operadores:
     # a tabela users é global e o papel sozinho não diz de quem é a equipe.
@@ -49,5 +59,7 @@ class Users(AbstractBaseUser):
     objects = UsersManager()
 
     class Meta:
-        # managed = False
         db_table = "users"
+
+    def __str__(self) -> str:
+        return f"{self.name} <{self.email}>"
