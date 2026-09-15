@@ -8,10 +8,9 @@ from .views import (
 
 urlpatterns = [
     ## REVIEWS
-    path('reviews/', reviews_list, name='reviews_list'),
-    path('reviews/<uuid:pk>', review_detail, name='review_detail'),
-
+    path("reviews/", reviews_list, name="reviews_list"),
+    path("reviews/<uuid:pk>", review_detail, name="review_detail"),
     ## RENTALS
-    path('rentals/', rentals_list, name='rentals_list'),
-    path('rentals/<uuid:pk>', rental_detail, name='rental_detail'),
+    path("rentals/", rentals_list, name="rentals_list"),
+    path("rentals/<uuid:pk>", rental_detail, name="rental_detail"),
 ]

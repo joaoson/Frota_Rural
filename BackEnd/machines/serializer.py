@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import Machines
 
+
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machines

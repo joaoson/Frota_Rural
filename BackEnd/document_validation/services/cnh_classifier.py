@@ -18,7 +18,6 @@ MODEL_PATH = ML_DIR / "models" / "cnh_classifier.keras"
 
 
 class CnhClassifier:
-
     @staticmethod
     def _check_setup():
         if not ML_PYTHON.exists():

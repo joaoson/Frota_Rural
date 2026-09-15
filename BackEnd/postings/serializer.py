@@ -4,10 +4,7 @@ from datetime import datetime, timezone as dt_timezone
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import (
-    Postings,
-    PostingsPhotos
-)
+from .models import Postings, PostingsPhotos
 from djangoapi import firebase_storage
 
 
@@ -19,6 +16,7 @@ def _sorted_photos(posting):
     """Capa primeiro, depois as demais na ordem de envio."""
     photos = list(posting.postingsphotos_set.all())
     return sorted(photos, key=lambda p: (not p.is_primary, p.created_at or _EPOCH))
+
 
 class PostingPhotoUrlSerializer(serializers.Serializer):
     """Foto do anúncio no formato embutido em `PostingDetailSerializer.photos`."""
@@ -83,13 +81,17 @@ class PostingSerializer(serializers.ModelSerializer):
         validated_data["updated_at"] = timezone.now()
         return super().update(instance, validated_data)
 
-class PostingListSerializer(serializers.ModelSerializer):
 
-    machine_brand         = serializers.CharField(source="machinery.brand",         default=None, read_only=True)
-    machine_model         = serializers.CharField(source="machinery.model",         default=None, read_only=True)
-    machine_usage_purpose = serializers.CharField(source="machinery.usage_purpose", default=None, read_only=True)
-    machine_year          = serializers.IntegerField(source="machinery.year",       allow_null=True, read_only=True)
-    primary_photo_url     = serializers.SerializerMethodField()
+class PostingListSerializer(serializers.ModelSerializer):
+    machine_brand = serializers.CharField(source="machinery.brand", default=None, read_only=True)
+    machine_model = serializers.CharField(source="machinery.model", default=None, read_only=True)
+    machine_usage_purpose = serializers.CharField(
+        source="machinery.usage_purpose", default=None, read_only=True
+    )
+    machine_year = serializers.IntegerField(
+        source="machinery.year", allow_null=True, read_only=True
+    )
+    primary_photo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Postings
@@ -118,24 +120,44 @@ class PostingListSerializer(serializers.ModelSerializer):
             return None
         return firebase_storage.public_url(photos[0].image_url)
 
+
 class PostingDetailSerializer(serializers.ModelSerializer):
-    machine_brand                    = serializers.CharField(source="machinery.brand",                    default=None, read_only=True)
-    machine_model                    = serializers.CharField(source="machinery.model",                    default=None, read_only=True)
-    machine_year                     = serializers.IntegerField(source="machinery.year",                  allow_null=True, read_only=True)
-    machine_usage_purpose            = serializers.CharField(source="machinery.usage_purpose",            default=None, read_only=True)
-    machine_technical_specifications = serializers.CharField(source="machinery.technical_specifications", default=None, read_only=True)
-    machine_renagro_number           = serializers.CharField(source="machinery.renagro_number",           default=None, read_only=True)
-    photos                           = serializers.SerializerMethodField()
+    machine_brand = serializers.CharField(source="machinery.brand", default=None, read_only=True)
+    machine_model = serializers.CharField(source="machinery.model", default=None, read_only=True)
+    machine_year = serializers.IntegerField(
+        source="machinery.year", allow_null=True, read_only=True
+    )
+    machine_usage_purpose = serializers.CharField(
+        source="machinery.usage_purpose", default=None, read_only=True
+    )
+    machine_technical_specifications = serializers.CharField(
+        source="machinery.technical_specifications", default=None, read_only=True
+    )
+    machine_renagro_number = serializers.CharField(
+        source="machinery.renagro_number", default=None, read_only=True
+    )
+    photos = serializers.SerializerMethodField()
 
     class Meta:
         model = Postings
         fields = [
-            "id", "hourly_rate",
-            "location_cep", "location_address", "location_lat", "location_lng",
-            "availability_start", "availability_end", "max_reservation_days",
-            "description", "status",
-            "machine_brand", "machine_model", "machine_year",
-            "machine_usage_purpose", "machine_technical_specifications", "machine_renagro_number",
+            "id",
+            "hourly_rate",
+            "location_cep",
+            "location_address",
+            "location_lat",
+            "location_lng",
+            "availability_start",
+            "availability_end",
+            "max_reservation_days",
+            "description",
+            "status",
+            "machine_brand",
+            "machine_model",
+            "machine_year",
+            "machine_usage_purpose",
+            "machine_technical_specifications",
+            "machine_renagro_number",
             "photos",
         ]
 
@@ -148,6 +170,7 @@ class PostingDetailSerializer(serializers.ModelSerializer):
             }
             for p in _sorted_photos(obj)
         ]
+
 
 class PostingPhotoSerializer(serializers.ModelSerializer):
     """Foto vinculada a um anúncio, no formato devolvido pelo endpoint de upload."""

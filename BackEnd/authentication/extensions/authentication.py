@@ -4,6 +4,7 @@ from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidTok
 from rest_framework_simplejwt.settings import api_settings
 from users.models import Users
 
+
 class AppJWTAuthentication(JWTAuthentication):
     """
     Extends JWTAuthentication to resolve the authenticated user from the
@@ -17,20 +18,14 @@ class AppJWTAuthentication(JWTAuthentication):
         try:
             user_id = validated_token[api_settings.USER_ID_CLAIM]  # 'user_id' claim
         except KeyError as exc:
-            raise InvalidToken(
-                _('Token contained no recognizable user identification')
-            ) from exc
+            raise InvalidToken(_("Token contained no recognizable user identification")) from exc
 
         try:
             user = Users.objects.get(id=user_id)
         except Users.DoesNotExist as exc:
-            raise AuthenticationFailed(
-                _('User not found'), code='user_not_found'
-            ) from exc
+            raise AuthenticationFailed(_("User not found"), code="user_not_found") from exc
 
-        if user.status in ('suspended', 'banned'):
-            raise AuthenticationFailed(
-                _('User account is disabled.'), code='user_inactive'
-            )
+        if user.status in ("suspended", "banned"):
+            raise AuthenticationFailed(_("User account is disabled."), code="user_inactive")
 
         return user

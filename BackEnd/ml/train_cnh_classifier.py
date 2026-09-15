@@ -56,13 +56,15 @@ def main():
     train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
     val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
 
-    data_augmentation = keras.Sequential([
-        layers.RandomFlip("horizontal"),
-        layers.RandomRotation(0.15),
-        layers.RandomZoom(0.15),
-        layers.RandomBrightness(0.2),
-        layers.RandomContrast(0.2),
-    ])
+    data_augmentation = keras.Sequential(
+        [
+            layers.RandomFlip("horizontal"),
+            layers.RandomRotation(0.15),
+            layers.RandomZoom(0.15),
+            layers.RandomBrightness(0.2),
+            layers.RandomContrast(0.2),
+        ]
+    )
 
     base_model = keras.applications.MobileNetV2(
         weights="imagenet",
@@ -116,6 +118,7 @@ def main():
     print(f"\n[RESULTADO] Acurácia de validação: {val_acc:.2%}")
     print(f"[RESULTADO] Loss de validação: {val_loss:.4f}")
     print(f"[SALVO] Modelo salvo em: {MODEL_PATH}")
+
 
 if __name__ == "__main__":
     main()

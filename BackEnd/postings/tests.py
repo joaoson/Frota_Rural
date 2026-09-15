@@ -51,9 +51,7 @@ class PostingPhotoUploadTests(TestCase):
             "postings.views.firebase_storage.upload_image",
             return_value=f"postings/{self.posting.id}/abc.jpg",
         ) as upload:
-            response = self.client.post(
-                self.url, {"image": self._image(), "is_primary": "true"}
-            )
+            response = self.client.post(self.url, {"image": self._image(), "is_primary": "true"})
 
         self.assertEqual(response.status_code, 201)
         upload.assert_called_once()
@@ -80,12 +78,8 @@ class PostingPhotoUploadTests(TestCase):
             is_primary=True,
             created_at=timezone.now(),
         )
-        with patch(
-            "postings.views.firebase_storage.upload_image", return_value="postings/new.jpg"
-        ):
-            response = self.client.post(
-                self.url, {"image": self._image(), "is_primary": "true"}
-            )
+        with patch("postings.views.firebase_storage.upload_image", return_value="postings/new.jpg"):
+            response = self.client.post(self.url, {"image": self._image(), "is_primary": "true"})
 
         self.assertEqual(response.status_code, 201)
         old.refresh_from_db()
@@ -105,9 +99,7 @@ class PostingPhotoUploadTests(TestCase):
 
     def test_rejects_file_over_5mb(self):
         with patch("postings.views.firebase_storage.upload_image") as upload:
-            response = self.client.post(
-                self.url, {"image": self._image(size=5 * 1024 * 1024 + 1)}
-            )
+            response = self.client.post(self.url, {"image": self._image(size=5 * 1024 * 1024 + 1)})
         self.assertEqual(response.status_code, 400)
         self.assertIn("excede o", response.json()["error"])
         upload.assert_not_called()

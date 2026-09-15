@@ -5,10 +5,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import uuid
-from .models import (
-    Postings,
-    PostingsPhotos
-)
+from .models import Postings, PostingsPhotos
 from api.schemas import ErrorResponseSerializer
 from .serializer import (
     PostingDetailSerializer,
@@ -20,15 +17,18 @@ from djangoapi import firebase_storage
 
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiExample,
+    OpenApiResponse,
+    OpenApiParameter,
+)
+
 
 # Create your views here.
 def _postings_queryset():
-    return (
-        Postings.objects.all()
-        .select_related("machinery")
-        .prefetch_related("postingsphotos_set")
-    )
+    return Postings.objects.all().select_related("machinery").prefetch_related("postingsphotos_set")
 
 
 POSTING_NOT_FOUND = OpenApiResponse(description="Anúncio não encontrado.")
@@ -40,7 +40,7 @@ POSTING_INVALID = OpenApiResponse(
 
 @extend_schema_view(
     get=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Listar anúncios",
         description=(
             "Retorna os anúncios de locação com a foto principal e os dados da máquina já embutidos.\n\n"
@@ -48,23 +48,27 @@ POSTING_INVALID = OpenApiResponse(
             "disponibilidade do anúncio; anúncios sem data definida aparecem em qualquer busca."
         ),
         parameters=[
-            OpenApiParameter('machinery', type=str, description='Filtrar pela máquina anunciada'),
-            OpenApiParameter('status', type=str, description='Status do anúncio (active, draft)'),
-            OpenApiParameter('available_from', type=str, description='Disponível a partir de (YYYY-MM-DD)'),
-            OpenApiParameter('available_until', type=str, description='Disponível até (YYYY-MM-DD)'),
+            OpenApiParameter("machinery", type=str, description="Filtrar pela máquina anunciada"),
+            OpenApiParameter("status", type=str, description="Status do anúncio (active, draft)"),
+            OpenApiParameter(
+                "available_from", type=str, description="Disponível a partir de (YYYY-MM-DD)"
+            ),
+            OpenApiParameter(
+                "available_until", type=str, description="Disponível até (YYYY-MM-DD)"
+            ),
         ],
         responses={200: PostingListSerializer(many=True)},
     ),
     post=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Criar anúncio",
         description="Publica uma máquina já cadastrada para locação, com valor por hora, localização e janela de disponibilidade.",
         request=PostingSerializer,
         responses={201: PostingSerializer, 400: POSTING_INVALID},
         examples=[
             OpenApiExample(
-                'Novo Anúncio de Máquina',
-                summary='Colocar uma máquina disponível para locação',
+                "Novo Anúncio de Máquina",
+                summary="Colocar uma máquina disponível para locação",
                 value={
                     "machinery": "123e4567-e89b-12d3-a456-426614174000",
                     "hourly_rate": "180.50",
@@ -73,9 +77,9 @@ POSTING_INVALID = OpenApiResponse(
                     "location_address": "Fazenda São Jorge, Castro - PR",
                     "availability_start": "2026-09-01T00:00:00Z",
                     "availability_end": "2026-12-31T23:59:59Z",
-                    "status": "active"
+                    "status": "active",
                 },
-                request_only=True
+                request_only=True,
             )
         ],
     ),
@@ -96,15 +100,14 @@ def postings_list(request):
         if available_from:
             # Exclui máquinas cuja disponibilidade TERMINOU antes da data de início informada
             qs = qs.filter(
-                Q(availability_end__isnull=True) |
-                Q(availability_end__date__gte=available_from)
+                Q(availability_end__isnull=True) | Q(availability_end__date__gte=available_from)
             )
         available_until = request.query_params.get("available_until")
         if available_until:
             # Exclui máquinas que só COMEÇAM depois da data de fim informada
             qs = qs.filter(
-                Q(availability_start__isnull=True) |
-                Q(availability_start__date__lte=available_until)
+                Q(availability_start__isnull=True)
+                | Q(availability_start__date__lte=available_until)
             )
         serializer = PostingListSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -124,26 +127,26 @@ def postings_list(request):
 
 @extend_schema_view(
     get=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Consultar anúncio",
         description="Retorna o anúncio com os dados completos da máquina, incluindo as especificações técnicas.",
         responses={200: PostingDetailSerializer, 404: POSTING_NOT_FOUND},
     ),
     put=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Substituir anúncio",
         request=PostingSerializer,
         responses={200: PostingSerializer, 400: POSTING_INVALID, 404: POSTING_NOT_FOUND},
     ),
     patch=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Atualizar anúncio parcialmente",
         description="Usado para ajustar preço, disponibilidade ou status (ex.: pausar o anúncio) sem reenviar todos os campos.",
         request=PostingSerializer,
         responses={200: PostingSerializer, 400: POSTING_INVALID, 404: POSTING_NOT_FOUND},
     ),
     delete=extend_schema(
-        tags=['Anúncios'],
+        tags=["Anúncios"],
         summary="Excluir anúncio",
         responses={
             204: OpenApiResponse(description="Anúncio excluído."),
@@ -204,18 +207,28 @@ def posting_detail(request, pk):
 
 
 @extend_schema(
-    tags=['Anúncios'],
+    tags=["Anúncios"],
     summary="Enviar foto do anúncio",
     description=(
         "Envia uma foto para o anúncio via `multipart/form-data`. Marque `is_primary` como `true` "
         "para usá-la como imagem de capa nas listagens."
     ),
-    request={"multipart/form-data": {"type": "object", "properties": {"image": {"type": "string", "format": "binary"}, "is_primary": {"type": "boolean"}}}},
+    request={
+        "multipart/form-data": {
+            "type": "object",
+            "properties": {
+                "image": {"type": "string", "format": "binary"},
+                "is_primary": {"type": "boolean"},
+            },
+        }
+    },
     responses={
         201: PostingPhotoSerializer,
-        400: OpenApiResponse(response=ErrorResponseSerializer, description="Nenhum arquivo enviado."),
+        400: OpenApiResponse(
+            response=ErrorResponseSerializer, description="Nenhum arquivo enviado."
+        ),
         404: POSTING_NOT_FOUND,
-    }
+    },
 )
 @api_view(["POST"])
 def posting_photos(request, pk):
@@ -259,12 +272,7 @@ def posting_photos(request, pk):
     if image_file.size > MAX_PHOTO_BYTES:
         megabytes = image_file.size / (1024 * 1024)
         return Response(
-            {
-                "error": (
-                    f"'{image_file.name}' tem {megabytes:.1f}MB e excede o "
-                    "máximo de 5MB."
-                )
-            },
+            {"error": (f"'{image_file.name}' tem {megabytes:.1f}MB e excede o máximo de 5MB.")},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -284,7 +292,9 @@ def posting_photos(request, pk):
     # Só uma foto por anúncio pode ser a capa.
     with transaction.atomic():
         if is_primary:
-            PostingsPhotos.objects.filter(postings=posting, is_primary=True).update(is_primary=False)
+            PostingsPhotos.objects.filter(postings=posting, is_primary=True).update(
+                is_primary=False
+            )
         photo = PostingsPhotos.objects.create(
             id=uuid.uuid4(),
             postings=posting,

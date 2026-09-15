@@ -25,41 +25,39 @@ _recent_sends = defaultdict(deque)
 
 
 def check_rate_limit(user_id):
-    limit = getattr(settings, 'CHAT_RATE_LIMIT_MESSAGES', 20)
-    window = getattr(settings, 'CHAT_RATE_LIMIT_WINDOW_SECONDS', 10)
+    limit = getattr(settings, "CHAT_RATE_LIMIT_MESSAGES", 20)
+    window = getattr(settings, "CHAT_RATE_LIMIT_WINDOW_SECONDS", 10)
     now = time.monotonic()
     bucket = _recent_sends[str(user_id)]
     while bucket and now - bucket[0] > window:
         bucket.popleft()
     if len(bucket) >= limit:
-        raise ThreadError(
-            'Muitas mensagens em pouco tempo. Aguarde alguns segundos.', status=429
-        )
+        raise ThreadError("Muitas mensagens em pouco tempo. Aguarde alguns segundos.", status=429)
     bucket.append(now)
 
 
 def create_message(*, sender, receiver_id, scope, scope_id, content, client_id, thread_id):
     """-> (payload: dict, created: bool). `created=False` é replay idempotente."""
-    max_len = getattr(settings, 'CHAT_MAX_MESSAGE_LENGTH', 4000)
-    content = (content or '').strip()
+    max_len = getattr(settings, "CHAT_MAX_MESSAGE_LENGTH", 4000)
+    content = (content or "").strip()
     if not content:
-        raise ThreadError('A mensagem não pode ficar em branco.', status=400)
+        raise ThreadError("A mensagem não pode ficar em branco.", status=400)
     if len(content) > max_len:
-        raise ThreadError(f'A mensagem excede {max_len} caracteres.', status=400)
+        raise ThreadError(f"A mensagem excede {max_len} caracteres.", status=400)
 
     existing = Messages.objects.filter(sender=sender, client_id=client_id).first()
     if existing is not None:
         return serialize_message(existing, thread_id=thread_id), False
 
     fields = {
-        'sender': sender,
-        'receiver_id': receiver_id,
-        'content': content,
-        'client_id': client_id,
-        'sent_at': timezone.now(),
-        'flagged_for_moderation': should_flag(content),
-        'rental_id': scope_id if scope == 'rental' else None,
-        'posting_id': scope_id if scope == 'posting' else None,
+        "sender": sender,
+        "receiver_id": receiver_id,
+        "content": content,
+        "client_id": client_id,
+        "sent_at": timezone.now(),
+        "flagged_for_moderation": should_flag(content),
+        "rental_id": scope_id if scope == "rental" else None,
+        "posting_id": scope_id if scope == "posting" else None,
     }
 
     try:
@@ -90,35 +88,45 @@ def fan_out_message(thread_id, payload, participant_ids):
     # apareceria com Redis: o InMemoryChannelLayer deixaria passar um UUID ou
     # datetime cru, o msgpack do channels_redis não.
     json.dumps(payload)
-    _send(group_name(thread_id), {
-        'type': 'chat.message.new',
-        'thread_id': thread_id,
-        'message': payload,
-    })
+    _send(
+        group_name(thread_id),
+        {
+            "type": "chat.message.new",
+            "thread_id": thread_id,
+            "message": payload,
+        },
+    )
     for uid in participant_ids:
-        _send(user_group_name(uid), {'type': 'chat.thread.touch', 'thread_id': thread_id})
+        _send(user_group_name(uid), {"type": "chat.thread.touch", "thread_id": thread_id})
 
 
 def fan_out_read(thread_id, reader_id, up_to_iso, message_ids):
-    _send(group_name(thread_id), {
-        'type': 'chat.message.read',
-        'thread_id': thread_id,
-        'reader_id': str(reader_id),
-        'up_to': up_to_iso,
-        'message_ids': [str(m) for m in message_ids][:500],
-    })
+    _send(
+        group_name(thread_id),
+        {
+            "type": "chat.message.read",
+            "thread_id": thread_id,
+            "reader_id": str(reader_id),
+            "up_to": up_to_iso,
+            "message_ids": [str(m) for m in message_ids][:500],
+        },
+    )
 
 
 def fan_out_hidden(thread_id, message_id):
-    _send(group_name(thread_id), {
-        'type': 'chat.message.hidden',
-        'thread_id': thread_id,
-        'message_id': str(message_id),
-    })
+    _send(
+        group_name(thread_id),
+        {
+            "type": "chat.message.hidden",
+            "thread_id": thread_id,
+            "message_id": str(message_id),
+        },
+    )
 
 
 def push_unread(user_id):
     from .selectors import unread_counts
+
     counts = unread_counts(user_id)
-    _send(user_group_name(user_id), {'type': 'chat.unread.updated', **counts})
+    _send(user_group_name(user_id), {"type": "chat.unread.updated", **counts})
     return counts

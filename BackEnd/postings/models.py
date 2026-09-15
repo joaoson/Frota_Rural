@@ -4,7 +4,7 @@ from django.db import models
 # Create your models here.
 class Postings(models.Model):
     id = models.UUIDField(primary_key=True)
-    machinery = models.ForeignKey('machines.Machines', models.DO_NOTHING)
+    machinery = models.ForeignKey("machines.Machines", models.DO_NOTHING)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
     location_lat = models.DecimalField(max_digits=10, decimal_places=8, blank=True, null=True)
     location_lng = models.DecimalField(max_digits=11, decimal_places=8, blank=True, null=True)
@@ -23,7 +23,7 @@ class Postings(models.Model):
 
     class Meta:
         # managed = False
-        db_table = 'postings'
+        db_table = "postings"
 
 
 class PostingsPhotos(models.Model):
@@ -35,4 +35,4 @@ class PostingsPhotos(models.Model):
 
     class Meta:
         # managed = False
-        db_table = 'postings_photos'
+        db_table = "postings_photos"

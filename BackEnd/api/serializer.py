@@ -8,8 +8,8 @@ from api.models import Rentals, Reviews
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    reviewer_name = serializers.CharField(source='reviewer.name', read_only=True)
-    reviewee_name = serializers.CharField(source='reviewee.name', read_only=True)
+    reviewer_name = serializers.CharField(source="reviewer.name", read_only=True)
+    reviewee_name = serializers.CharField(source="reviewee.name", read_only=True)
 
     class Meta:
         model = Reviews
@@ -75,7 +75,9 @@ class RentalSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
-    @extend_schema_field(serializers.CharField(help_text='Número legível do contrato, ex.: #CTR-08E8'))
+    @extend_schema_field(
+        serializers.CharField(help_text="Número legível do contrato, ex.: #CTR-08E8")
+    )
     def get_contract_number(self, obj):
         try:
             return f"#CTR-{str(obj.id)[:4].upper()}"
@@ -123,13 +125,17 @@ class RentalSerializer(serializers.ModelSerializer):
         if not start_date or not end_date or not posting:
             return attrs
         if end_date < start_date:
-            raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
+            raise serializers.ValidationError(
+                {"end_date": "A data de fim deve ser posterior à data de início."}
+            )
 
         max_reservation_days = posting.max_reservation_days
         total_days = (end_date.date() - start_date.date()).days + 1
         if max_reservation_days and total_days > max_reservation_days:
             raise serializers.ValidationError(
-                {"end_date": f"Este anúncio permite reservas de no máximo {max_reservation_days} dias."}
+                {
+                    "end_date": f"Este anúncio permite reservas de no máximo {max_reservation_days} dias."
+                }
             )
 
         # A requested range cannot touch an existing reservation's cleaning buffer.
@@ -143,7 +149,9 @@ class RentalSerializer(serializers.ModelSerializer):
             conflicting_rentals = conflicting_rentals.exclude(pk=self.instance.pk)
         if conflicting_rentals.exists():
             raise serializers.ValidationError(
-                {"non_field_errors": "O período selecionado conflita com uma reserva ou com o intervalo de limpeza da máquina."}
+                {
+                    "non_field_errors": "O período selecionado conflita com uma reserva ou com o intervalo de limpeza da máquina."
+                }
             )
 
         return attrs

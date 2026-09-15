@@ -2,11 +2,12 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 
+
 # Create your models here.
 class UsersManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
-            raise ValueError('Email is required')
+            raise ValueError("Email is required")
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -33,20 +34,20 @@ class Users(AbstractBaseUser):
     # Sem esse vínculo o locatário não teria como listar "os seus" operadores:
     # a tabela users é global e o papel sozinho não diz de quem é a equipe.
     employer = models.ForeignKey(
-        'self',
+        "self",
         models.SET_NULL,
         blank=True,
         null=True,
-        related_name='operators',
-        db_column='employer_id',
+        related_name="operators",
+        db_column="employer_id",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['name', 'document', 'role', 'address', 'birth_date']
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["name", "document", "role", "address", "birth_date"]
     objects = UsersManager()
 
     class Meta:
         # managed = False
-        db_table = 'users'
+        db_table = "users"

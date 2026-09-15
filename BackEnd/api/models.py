@@ -14,13 +14,16 @@ from django.db import models
 # For auto date in created_at, field should equal to models.DateTimeField(auto_now_add=True)
 # For auto date in updated_at, field should equal to models.DateTimeField(auto_now=True)
 
+
 # TODO: CONFORME FOR AVANÇANDO NO PROJETO, CRIAR APPS PARA MODULARIZAR TUDO E NÃO CRIAR MAIS TUDO DENTRO DE API
 # TODO: A IDEIA É QUE ESSA PASTA API DEIXE DE EXISTIR E FIQUE TUDO MODULARIZADO
 class Rentals(models.Model):
     id = models.UUIDField(primary_key=True)
-    postings = models.ForeignKey('postings.Postings', models.DO_NOTHING)
-    lessee = models.ForeignKey('users.Users', models.DO_NOTHING)
-    operator = models.ForeignKey('users.Users', models.DO_NOTHING, related_name='rentals_operator_set', blank=True, null=True)
+    postings = models.ForeignKey("postings.Postings", models.DO_NOTHING)
+    lessee = models.ForeignKey("users.Users", models.DO_NOTHING)
+    operator = models.ForeignKey(
+        "users.Users", models.DO_NOTHING, related_name="rentals_operator_set", blank=True, null=True
+    )
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -32,19 +35,21 @@ class Rentals(models.Model):
 
     class Meta:
         # managed = False
-        db_table = 'rentals'
+        db_table = "rentals"
 
 
 class Reviews(models.Model):
     id = models.UUIDField(primary_key=True)
     rental = models.ForeignKey(Rentals, models.DO_NOTHING)
-    reviewer = models.ForeignKey('users.Users', models.DO_NOTHING)
-    reviewee = models.ForeignKey('users.Users', models.DO_NOTHING, related_name='reviews_reviewee_set')
+    reviewer = models.ForeignKey("users.Users", models.DO_NOTHING)
+    reviewee = models.ForeignKey(
+        "users.Users", models.DO_NOTHING, related_name="reviews_reviewee_set"
+    )
     rating = models.IntegerField()
     comment = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         # managed = False
-        db_table = 'reviews'
-        unique_together = (('rental', 'reviewer'),)
+        db_table = "reviews"
+        unique_together = (("rental", "reviewer"),)

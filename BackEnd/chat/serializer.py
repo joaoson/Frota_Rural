@@ -13,7 +13,7 @@ from .threads import format_thread_id
 def serialize_user(user):
     if user is None:
         return None
-    return {'id': str(user.id), 'name': user.name, 'role': user.role}
+    return {"id": str(user.id), "name": user.name, "role": user.role}
 
 
 def serialize_message(message, thread_id=None, reveal_hidden=False):
@@ -25,27 +25,28 @@ def serialize_message(message, thread_id=None, reveal_hidden=False):
     """
     hidden = message.hidden_at is not None
     if thread_id is None:
-        scope = 'rental' if message.rental_id else 'posting'
+        scope = "rental" if message.rental_id else "posting"
         scope_id = message.rental_id or message.posting_id
         thread_id = format_thread_id(scope, scope_id, message.sender_id, message.receiver_id)
     return {
-        'id': str(message.id),
-        'thread_id': thread_id,
-        'sender_id': str(message.sender_id),
-        'receiver_id': str(message.receiver_id),
-        'content': None if (hidden and not reveal_hidden) else message.content,
-        'sent_at': message.sent_at.isoformat().replace('+00:00', 'Z') if message.sent_at else None,
-        'read_at': message.read_at.isoformat().replace('+00:00', 'Z') if message.read_at else None,
-        'flagged_for_moderation': bool(message.flagged_for_moderation),
-        'hidden': hidden,
-        'client_id': str(message.client_id) if message.client_id else None,
+        "id": str(message.id),
+        "thread_id": thread_id,
+        "sender_id": str(message.sender_id),
+        "receiver_id": str(message.receiver_id),
+        "content": None if (hidden and not reveal_hidden) else message.content,
+        "sent_at": message.sent_at.isoformat().replace("+00:00", "Z") if message.sent_at else None,
+        "read_at": message.read_at.isoformat().replace("+00:00", "Z") if message.read_at else None,
+        "flagged_for_moderation": bool(message.flagged_for_moderation),
+        "hidden": hidden,
+        "client_id": str(message.client_id) if message.client_id else None,
     }
 
 
 # --- Entrada ---------------------------------------------------------------
 
+
 class ResolveThreadSerializer(serializers.Serializer):
-    scope = serializers.ChoiceField(choices=['rental', 'posting'])
+    scope = serializers.ChoiceField(choices=["rental", "posting"])
     scope_id = serializers.UUIDField()
     peer_id = serializers.UUIDField(required=False)
 
@@ -64,6 +65,7 @@ class ReportMessageSerializer(serializers.Serializer):
 
 
 # --- Saída (apenas para o schema OpenAPI) ----------------------------------
+
 
 class ChatUserSerializer(serializers.Serializer):
     id = serializers.UUIDField()

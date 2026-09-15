@@ -19,9 +19,12 @@ from users.models import Users
 
 # --- CONTRACTS ---
 
+
 @api_view(["GET"])
 def contracts_list(request):
-    qs = Contracts.objects.all().select_related("rental__lessee", "rental__postings__machinery__owner")
+    qs = Contracts.objects.all().select_related(
+        "rental__lessee", "rental__postings__machinery__owner"
+    )
     serializer = ContractSerializer(qs, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -47,7 +50,9 @@ def _signature_block(signatures):
     datas = {"locador": "—", "locatario": "—"}
     for signature in signatures:
         if signature.role in datas:
-            datas[signature.role] = timezone.localtime(signature.signed_at).strftime("%d/%m/%Y às %H:%M")
+            datas[signature.role] = timezone.localtime(signature.signed_at).strftime(
+                "%d/%m/%Y às %H:%M"
+            )
     return {"data_locador": datas["locador"], "data_locatario": datas["locatario"]}
 
 
@@ -124,9 +129,7 @@ def contract_evidence(request, pk):
             },
             "cadeia_integra": intact,
             "inconsistencias": problems,
-            "assinaturas": ContractSignatureSerializer(
-                contract.signatures.all(), many=True
-            ).data,
+            "assinaturas": ContractSignatureSerializer(contract.signatures.all(), many=True).data,
             "fundamento_legal": (
                 "Assinatura eletrônica simples, com validade entre as partes nos termos "
                 "da MP nº 2.200-2/2001, art. 10, §2º, e da Lei nº 14.063/2020, art. 4º, I."
@@ -258,7 +261,6 @@ def sign_contract(request, pk):
             {"error": "Esta parte já assinou o contrato."},
             status=status.HTTP_409_CONFLICT,
         )
-
 
     # Quem a plataforma espera naquele papel. A conferência vem antes do OTP:
     # do contrário uma parte errada queimaria o código enviado à parte certa.

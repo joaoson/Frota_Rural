@@ -11,18 +11,18 @@ from rest_framework import serializers
 class MessageResponseSerializer(serializers.Serializer):
     """Resposta de sucesso sem corpo de recurso."""
 
-    message = serializers.CharField(help_text='Descrição legível do resultado da operação.')
+    message = serializers.CharField(help_text="Descrição legível do resultado da operação.")
 
 
 class ErrorResponseSerializer(serializers.Serializer):
     """Resposta de erro tratado pela regra de negócio."""
 
-    error = serializers.CharField(help_text='Descrição legível do motivo da falha.')
+    error = serializers.CharField(help_text="Descrição legível do motivo da falha.")
 
 
 SIGNATURE_ROLE_CHOICES = [
-    ('locador', 'Locador (dono do maquinário)'),
-    ('locatario', 'Locatário (produtor que aluga)'),
+    ("locador", "Locador (dono do maquinário)"),
+    ("locatario", "Locatário (produtor que aluga)"),
 ]
 
 
@@ -31,7 +31,7 @@ class ContractSignatureSerializer(serializers.Serializer):
 
     role = serializers.ChoiceField(
         choices=SIGNATURE_ROLE_CHOICES,
-        help_text='Parte que está assinando. Qualquer valor diferente de `locatario` é tratado como locador.',
+        help_text="Parte que está assinando. Qualquer valor diferente de `locatario` é tratado como locador.",
     )
     name = serializers.CharField(
         required=False,
@@ -53,7 +53,9 @@ class _ContractDocumentDataSerializer(serializers.Serializer):
 
 class _ContractPartySerializer(serializers.Serializer):
     razao_social = serializers.CharField()
-    tipo_documento = serializers.CharField(help_text='`CPF` ou `CNPJ`, inferido pelo tamanho do documento.')
+    tipo_documento = serializers.CharField(
+        help_text="`CPF` ou `CNPJ`, inferido pelo tamanho do documento."
+    )
     documento = serializers.CharField()
     endereco_completo = serializers.CharField()
     representante_nome = serializers.CharField()
@@ -81,5 +83,5 @@ class ContractDocumentSerializer(serializers.Serializer):
     anuncio = serializers.DictField(child=serializers.CharField())
     assinatura = serializers.DictField(
         child=serializers.CharField(),
-        help_text='Data em que cada parte assinou, ou `—` quando a assinatura ainda não ocorreu.',
+        help_text="Data em que cada parte assinou, ou `—` quando a assinatura ainda não ocorreu.",
     )

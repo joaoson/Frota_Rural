@@ -16,6 +16,7 @@ GENESIS_HASH = "0" * 64
 
 # --- Canonicalização e hash do documento ---
 
+
 def canonical_document(document):
 
     return json.dumps(
@@ -34,6 +35,7 @@ def document_hash(document):
 
 # --- Metadados da requisição ---
 
+
 def client_ip(request):
     """IP de origem, respeitando o proxy reverso à frente da aplicação."""
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
@@ -50,35 +52,59 @@ def client_user_agent(request):
 
 # --- Encadeamento imutável ---
 
-def record_fingerprint(*, contract_id, role, signer_id, signer_email, signer_name,
-                       doc_hash, document_version, signed_at, ip_address,
-                       user_agent, otp_verified, previous_hash):
+
+def record_fingerprint(
+    *,
+    contract_id,
+    role,
+    signer_id,
+    signer_email,
+    signer_name,
+    doc_hash,
+    document_version,
+    signed_at,
+    ip_address,
+    user_agent,
+    otp_verified,
+    previous_hash,
+):
     """Hash que sela o registro inteiro, incluindo o hash do registro anterior.
 
     É esse encadeamento que transforma a tabela em um log verificável: para
     forjar um aceite é preciso recalcular todos os registros seguintes, e a
     verificação (``verify_chain``) detecta qualquer divergência.
     """
-    payload = canonical_document({
-        "contract_id": str(contract_id),
-        "role": role,
-        "signer_id": str(signer_id) if signer_id else "",
-        "signer_email": signer_email,
-        "signer_name": signer_name,
-        "document_hash": doc_hash,
-        "document_version": document_version,
-        "signed_at": signed_at.isoformat(),
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-        "otp_verified": bool(otp_verified),
-        "previous_hash": previous_hash,
-    })
+    payload = canonical_document(
+        {
+            "contract_id": str(contract_id),
+            "role": role,
+            "signer_id": str(signer_id) if signer_id else "",
+            "signer_email": signer_email,
+            "signer_name": signer_name,
+            "document_hash": doc_hash,
+            "document_version": document_version,
+            "signed_at": signed_at.isoformat(),
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "otp_verified": bool(otp_verified),
+            "previous_hash": previous_hash,
+        }
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @transaction.atomic
-def record_signature(*, contract, document, role, signer=None, signer_name="",
-                     signer_email="", request=None, otp_verified=False):
+def record_signature(
+    *,
+    contract,
+    document,
+    role,
+    signer=None,
+    signer_name="",
+    signer_email="",
+    request=None,
+    otp_verified=False,
+):
 
     from contracts.models import ContractSignatures
 
@@ -87,7 +113,6 @@ def record_signature(*, contract, document, role, signer=None, signer_name="",
     ip_address = client_ip(request) if request is not None else ""
     user_agent = client_user_agent(request) if request is not None else ""
     version = document.get("contrato", {}).get("versao_documento", "")
-
 
     previous = (
         ContractSignatures.objects.select_for_update()

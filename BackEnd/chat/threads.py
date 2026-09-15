@@ -18,11 +18,11 @@ ChatConsumer chamam as mesmas funções.
 import hashlib
 import uuid
 
-SCOPE_RENTAL = 'rental'
-SCOPE_POSTING = 'posting'
+SCOPE_RENTAL = "rental"
+SCOPE_POSTING = "posting"
 VALID_SCOPES = (SCOPE_RENTAL, SCOPE_POSTING)
 
-ROLE_ADMIN = 'admin'
+ROLE_ADMIN = "admin"
 
 
 class ThreadError(Exception):
@@ -36,33 +36,33 @@ class ThreadError(Exception):
 
 def format_thread_id(scope, scope_id, user_a, user_b):
     if scope not in VALID_SCOPES:
-        raise ThreadError('Identificador de conversa inválido.')
+        raise ThreadError("Identificador de conversa inválido.")
     lo, hi = sorted([str(user_a), str(user_b)])
     if lo == hi:
-        raise ThreadError('Identificador de conversa inválido.')
-    return f'{scope}:{scope_id}:{lo}:{hi}'
+        raise ThreadError("Identificador de conversa inválido.")
+    return f"{scope}:{scope_id}:{lo}:{hi}"
 
 
 def parse_thread_id(thread_id):
     """-> (scope, scope_id: UUID, lo: UUID, hi: UUID). Levanta ThreadError."""
-    parts = (thread_id or '').split(':')
+    parts = (thread_id or "").split(":")
     if len(parts) != 4:
-        raise ThreadError('Identificador de conversa inválido.')
+        raise ThreadError("Identificador de conversa inválido.")
     scope, scope_id, lo, hi = parts
     if scope not in VALID_SCOPES:
-        raise ThreadError('Identificador de conversa inválido.')
+        raise ThreadError("Identificador de conversa inválido.")
     try:
         scope_uuid = uuid.UUID(scope_id)
         lo_uuid = uuid.UUID(lo)
         hi_uuid = uuid.UUID(hi)
     except (ValueError, AttributeError, TypeError) as exc:
-        raise ThreadError('Identificador de conversa inválido.') from exc
+        raise ThreadError("Identificador de conversa inválido.") from exc
     if str(lo_uuid) == str(hi_uuid):
-        raise ThreadError('Identificador de conversa inválido.')
+        raise ThreadError("Identificador de conversa inválido.")
     # Recusa uma chave que não esteja na forma canônica: senão o mesmo par de
     # usuários geraria dois thread_ids diferentes e dois grupos de fan-out.
     if sorted([str(lo_uuid), str(hi_uuid)]) != [str(lo_uuid), str(hi_uuid)]:
-        raise ThreadError('Identificador de conversa inválido.')
+        raise ThreadError("Identificador de conversa inválido.")
     return scope, scope_uuid, lo_uuid, hi_uuid
 
 
@@ -72,16 +72,17 @@ def group_name(thread_id):
     Grupos do Channels aceitam só [a-zA-Z0-9._-] e ~100 chars; o thread_id tem
     dois-pontos e é longo demais, então vai hasheado.
     """
-    return 'chat.' + hashlib.sha256(thread_id.encode()).hexdigest()[:32]
+    return "chat." + hashlib.sha256(thread_id.encode()).hexdigest()[:32]
 
 
 def user_group_name(user_id):
-    return 'chat.user.' + uuid.UUID(str(user_id)).hex
+    return "chat.user." + uuid.UUID(str(user_id)).hex
 
 
 # --------------------------------------------------------------------------
 # Participantes
 # --------------------------------------------------------------------------
+
 
 def rental_participants(rental):
     """{lessee, dono do maquinário, operador (se houver)}."""
@@ -95,14 +96,14 @@ def rental_participants(rental):
 
 
 def _rental_owner_id(rental):
-    posting = getattr(rental, 'postings', None)
-    machinery = getattr(posting, 'machinery', None) if posting else None
-    return getattr(machinery, 'owner_id', None) if machinery else None
+    posting = getattr(rental, "postings", None)
+    machinery = getattr(posting, "machinery", None) if posting else None
+    return getattr(machinery, "owner_id", None) if machinery else None
 
 
 def posting_owner_id(posting):
-    machinery = getattr(posting, 'machinery', None)
-    return getattr(machinery, 'owner_id', None) if machinery else None
+    machinery = getattr(posting, "machinery", None)
+    return getattr(machinery, "owner_id", None) if machinery else None
 
 
 def load_scope(scope, scope_id):
@@ -112,17 +113,17 @@ def load_scope(scope, scope_id):
 
     if scope == SCOPE_RENTAL:
         try:
-            return Rentals.objects.select_related('postings__machinery').get(id=scope_id)
+            return Rentals.objects.select_related("postings__machinery").get(id=scope_id)
         except Rentals.DoesNotExist as exc:
-            raise ThreadError('Locação não encontrada.', status=404) from exc
+            raise ThreadError("Locação não encontrada.", status=404) from exc
     try:
-        return Postings.objects.select_related('machinery').get(id=scope_id)
+        return Postings.objects.select_related("machinery").get(id=scope_id)
     except Postings.DoesNotExist as exc:
-        raise ThreadError('Anúncio não encontrado.', status=404) from exc
+        raise ThreadError("Anúncio não encontrado.", status=404) from exc
 
 
 def is_admin(user):
-    return getattr(user, 'role', None) == ROLE_ADMIN
+    return getattr(user, "role", None) == ROLE_ADMIN
 
 
 def can_read(user, scope, scope_obj, participants):
@@ -131,15 +132,15 @@ def can_read(user, scope, scope_obj, participants):
         return True  # moderação enxerga qualquer thread
 
     if str(user.id) not in participants:
-        raise ThreadError('Você não participa desta conversa.', status=403)
+        raise ThreadError("Você não participa desta conversa.", status=403)
 
     if scope == SCOPE_RENTAL:
         if not participants.issubset(rental_participants(scope_obj)):
-            raise ThreadError('Você não participa desta conversa.', status=403)
+            raise ThreadError("Você não participa desta conversa.", status=403)
     else:
         owner_id = posting_owner_id(scope_obj)
         if not owner_id or str(owner_id) not in participants:
-            raise ThreadError('Você não participa desta conversa.', status=403)
+            raise ThreadError("Você não participa desta conversa.", status=403)
     return True
 
 
@@ -150,22 +151,20 @@ def can_write(user, scope, scope_obj, participants, thread_has_messages):
     # Admin é read-only no chat: evita que a moderação injete mensagem numa
     # thread que ela mesma está julgando.
     if is_admin(user):
-        raise ThreadError('Você não pode enviar mensagens nesta conversa.', status=403)
+        raise ThreadError("Você não pode enviar mensagens nesta conversa.", status=403)
 
     if scope == SCOPE_POSTING:
         owner_id = posting_owner_id(scope_obj)
         if not thread_has_messages:
             if str(user.id) == str(owner_id):
                 raise ThreadError(
-                    'Só o interessado pode iniciar a conversa sobre um anúncio.', status=403
+                    "Só o interessado pode iniciar a conversa sobre um anúncio.", status=403
                 )
-            if (scope_obj.status or '').lower() != 'active':
-                raise ThreadError(
-                    'Este anúncio não está disponível para contato.', status=403
-                )
-    elif (scope_obj.status or '').lower() == 'cancelled':
+            if (scope_obj.status or "").lower() != "active":
+                raise ThreadError("Este anúncio não está disponível para contato.", status=403)
+    elif (scope_obj.status or "").lower() == "cancelled":
         # Locação cancelada vira somente leitura; o histórico continua acessível.
-        raise ThreadError('Você não pode enviar mensagens nesta conversa.', status=403)
+        raise ThreadError("Você não pode enviar mensagens nesta conversa.", status=403)
 
     return True
 

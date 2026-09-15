@@ -21,21 +21,21 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(dotenv_path=str(BASE_DIR / '.env'))
+load_dotenv(dotenv_path=str(BASE_DIR / ".env"))
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-local-development-only')
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-local-development-only")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
+DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if host.strip()
 ]
 
@@ -46,39 +46,39 @@ INSTALLED_APPS = [
     # Precisa vir antes de staticfiles: o app `daphne` substitui o comando
     # `runserver` por um servidor ASGI. O runserver do Django 6.0 ainda e
     # WSGI-only, entao sem isto o WebSocket simplesmente nao sobe em dev.
-    'daphne',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'channels',
-    'rest_framework',
-    'corsheaders',
-    'api',
-    'contracts',
-    'users',
-    'authentication',
-    'postings',
-    'machines',
-    'administration',
-    'document_validation',
-    'chat',
-    'payments',
-    'drf_spectacular',
+    "daphne",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "channels",
+    "rest_framework",
+    "corsheaders",
+    "api",
+    "contracts",
+    "users",
+    "authentication",
+    "postings",
+    "machines",
+    "administration",
+    "document_validation",
+    "chat",
+    "payments",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Add this at the VERY TOP
-    'django.middleware.common.CommonMiddleware', # Must be after CorsMiddleware
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",  # Add this at the VERY TOP
+    "django.middleware.common.CommonMiddleware",  # Must be after CorsMiddleware
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 # Only allow your specific frontend URL
@@ -92,27 +92,27 @@ CORS_ALLOWED_ORIGINS = [
 # If you want to allow cookies/sessions to be sent (like for login)
 CORS_ALLOW_CREDENTIALS = True
 
-ROOT_URLCONF = 'djangoapi.urls'
+ROOT_URLCONF = "djangoapi.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'djangoapi.wsgi.application'
-ASGI_APPLICATION = 'djangoapi.asgi.application'
+WSGI_APPLICATION = "djangoapi.wsgi.application"
+ASGI_APPLICATION = "djangoapi.asgi.application"
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # O Channels usa o Redis apenas como barramento efemero entre processos ASGI.
 # O Postgres continua sendo a unica fonte de verdade das mensagens.
@@ -121,95 +121,98 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 # runserver atende tudo em um unico processo. Com mais de um worker o fan-out
 # entre processos simplesmente nao acontece -- por isso a checagem abaixo
 # recusa `memory` fora do DEBUG.
-CHANNEL_LAYER_BACKEND = os.getenv('CHANNEL_LAYER_BACKEND', 'redis').lower()
+CHANNEL_LAYER_BACKEND = os.getenv("CHANNEL_LAYER_BACKEND", "redis").lower()
 
-if CHANNEL_LAYER_BACKEND == 'memory':
+if CHANNEL_LAYER_BACKEND == "memory":
     if not DEBUG:
         raise ImproperlyConfigured(
-            'CHANNEL_LAYER_BACKEND=memory so e permitido com DJANGO_DEBUG=true.'
+            "CHANNEL_LAYER_BACKEND=memory so e permitido com DJANGO_DEBUG=true."
         )
-    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 else:
     CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {'hosts': [REDIS_URL], 'capacity': 1000, 'expiry': 10},
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL], "capacity": 1000, "expiry": 10},
         }
     }
 
-AUTH_USER_MODEL = 'users.Users'
+AUTH_USER_MODEL = "users.Users"
 
 ## SETTING THE AUTHENTICATION
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
-        'rest_framework.authentication.SessionAuthentication',
-        'authentication.extensions.authentication.AppJWTAuthentication',
+        "rest_framework.authentication.SessionAuthentication",
+        "authentication.extensions.authentication.AppJWTAuthentication",
     ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Frota Rural API',
-    'DESCRIPTION': (
-        'Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na '
-        'conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).\n\n'
-        '## Autenticação\n\n'
-        'A API usa **JWT (Bearer token)**. Para testar os endpoints protegidos por aqui:\n\n'
-        '1. Chame `POST /api/login` com e-mail e senha.\n'
-        '2. Copie o valor de `access` da resposta.\n'
-        '3. Clique em **Authorize** (canto superior direito) e cole o token.\n\n'
-        'O token de acesso expira em 15 minutos; use `POST /api/login/refresh` para renová-lo.'
+    "TITLE": "Frota Rural API",
+    "DESCRIPTION": (
+        "Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na "
+        "conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).\n\n"
+        "## Autenticação\n\n"
+        "A API usa **JWT (Bearer token)**. Para testar os endpoints protegidos por aqui:\n\n"
+        "1. Chame `POST /api/login` com e-mail e senha.\n"
+        "2. Copie o valor de `access` da resposta.\n"
+        "3. Clique em **Authorize** (canto superior direito) e cole o token.\n\n"
+        "O token de acesso expira em 15 minutos; use `POST /api/login/refresh` para renová-lo."
     ),
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
-    'CONTACT': {'name': 'Equipe Frota Rural', 'url': 'https://github.com/joaoson/Frota_Rural'},
-    'SERVERS': [
-        {'url': 'http://127.0.0.1:8000', 'description': 'Ambiente local de desenvolvimento'},
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "CONTACT": {"name": "Equipe Frota Rural", "url": "https://github.com/joaoson/Frota_Rural"},
+    "SERVERS": [
+        {"url": "http://127.0.0.1:8000", "description": "Ambiente local de desenvolvimento"},
     ],
-    'SORT_OPERATIONS': False,
+    "SORT_OPERATIONS": False,
     # `validation_status` aparece com dois conjuntos de opções: o do model (inclui
     # `pending`) e o da decisão do administrador. Sem os nomes explícitos o
     # drf-spectacular gera componentes com sufixo aleatório (ValidationStatusDe3Enum).
-    'ENUM_NAME_OVERRIDES': {
-        'ValidationStatusEnum': 'document_validation.serializer.VALIDATION_STATUS_CHOICES',
-        'ReviewDecisionEnum': 'document_validation.serializer.REVIEW_DECISION_CHOICES',
+    "ENUM_NAME_OVERRIDES": {
+        "ValidationStatusEnum": "document_validation.serializer.VALIDATION_STATUS_CHOICES",
+        "ReviewDecisionEnum": "document_validation.serializer.REVIEW_DECISION_CHOICES",
     },
-    'SWAGGER_UI_SETTINGS': {
-        'persistAuthorization': True,
-        'displayRequestDuration': True,
-        'docExpansion': 'none',
-        'filter': True,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "docExpansion": "none",
+        "filter": True,
     },
     # Ordem em que os grupos aparecem no Swagger UI. Cada view declara sua tag
     # via `@extend_schema(tags=[...])`; sem isso o drf-spectacular agruparia
     # tudo sob o primeiro segmento do path ('api').
-    'TAGS': [
-        {'name': 'Autenticação', 'description': 'Login, refresh, logout e recuperação de senha.'},
-        {'name': 'Usuários', 'description': 'Cadastro, consulta e manutenção de contas.'},
-        {'name': 'Maquinário', 'description': 'Equipamentos cadastrados pelos locadores.'},
-        {'name': 'Anúncios', 'description': 'Publicação de maquinário disponível para locação.'},
-        {'name': 'Locações', 'description': 'Reservas e ciclo de vida das locações.'},
-        {'name': 'Contratos', 'description': 'Geração e assinatura dos contratos de locação.'},
-        {'name': 'Avaliações', 'description': 'Reputação de locadores e locatários.'},
-        {'name': 'Mensagens', 'description': 'Chat entre locadores, locatários e operadores.'},
-        {'name': 'Documentos', 'description': 'CNHs, certificações e validação por Machine Learning.'},
-        {'name': 'Administração', 'description': 'Moderação de usuários e anúncios.'},
+    "TAGS": [
+        {"name": "Autenticação", "description": "Login, refresh, logout e recuperação de senha."},
+        {"name": "Usuários", "description": "Cadastro, consulta e manutenção de contas."},
+        {"name": "Maquinário", "description": "Equipamentos cadastrados pelos locadores."},
+        {"name": "Anúncios", "description": "Publicação de maquinário disponível para locação."},
+        {"name": "Locações", "description": "Reservas e ciclo de vida das locações."},
+        {"name": "Contratos", "description": "Geração e assinatura dos contratos de locação."},
+        {"name": "Avaliações", "description": "Reputação de locadores e locatários."},
+        {"name": "Mensagens", "description": "Chat entre locadores, locatários e operadores."},
+        {
+            "name": "Documentos",
+            "description": "CNHs, certificações e validação por Machine Learning.",
+        },
+        {"name": "Administração", "description": "Moderação de usuários e anúncios."},
     ],
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'CHECK_USER_IS_ACTIVE': False,  # Users model has no is_active field
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "CHECK_USER_IS_ACTIVE": False,  # Users model has no is_active field
 }
 
 # Database
@@ -219,11 +222,11 @@ SIMPLE_JWT = {
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get('DB_NAME'),
-        "USER": os.environ.get('DB_USER', 'postgres'),
-        "PASSWORD": os.environ.get('DB_PASSWORD'),
-        "HOST": os.environ.get('DB_HOST', 'localhost'),
-        "PORT": os.environ.get('DB_PORT', '5432'),
+        "NAME": os.environ.get("DB_NAME"),
+        "USER": os.environ.get("DB_USER", "postgres"),
+        "PASSWORD": os.environ.get("DB_PASSWORD"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
@@ -233,16 +236,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -250,9 +253,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -262,22 +265,22 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Password Reset
 PASSWORD_RESET_TIMEOUT = 3600
 
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 # Resend (transactional email)
-RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-RESEND_SUPPORT_EMAIL = os.getenv('RESEND_SUPPORT_EMAIL', 'onboarding@resend.dev')
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_SUPPORT_EMAIL = os.getenv("RESEND_SUPPORT_EMAIL", "onboarding@resend.dev")
 
-STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
-STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
 # --- Assinatura eletrônica de contratos ---
 # Exigir confirmação por e-mail (OTP) antes do aceite. Ligado por padrão: a
@@ -286,17 +289,19 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
 # aceite muito mais difícil de contestar.
 # Só desligue em ambiente de desenvolvimento sem envio de e-mail configurado —
 # com o envio indisponível e a exigência ligada, ninguém consegue assinar.
-CONTRACT_SIGNATURE_REQUIRE_OTP = os.getenv('CONTRACT_SIGNATURE_REQUIRE_OTP', 'true').lower() == 'true'
-CONTRACT_OTP_TTL_SECONDS = int(os.getenv('CONTRACT_OTP_TTL_SECONDS', '600'))
-CONTRACT_OTP_MAX_ATTEMPTS = int(os.getenv('CONTRACT_OTP_MAX_ATTEMPTS', '5'))
+CONTRACT_SIGNATURE_REQUIRE_OTP = (
+    os.getenv("CONTRACT_SIGNATURE_REQUIRE_OTP", "true").lower() == "true"
+)
+CONTRACT_OTP_TTL_SECONDS = int(os.getenv("CONTRACT_OTP_TTL_SECONDS", "600"))
+CONTRACT_OTP_MAX_ATTEMPTS = int(os.getenv("CONTRACT_OTP_MAX_ATTEMPTS", "5"))
 
 # Firebase Storage (fotos de anúncios e demais mídias enviadas por usuários)
 # FIREBASE_STORAGE_BUCKET: ex. "frota-rural.firebasestorage.app"
 # FIREBASE_CREDENTIALS_FILE: caminho do JSON da service account (fora do git)
-FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET', '')
+FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET", "")
 
 # Caminho relativo é resolvido a partir de BackEnd/, não do diretório de execução.
-_firebase_credentials = os.getenv('FIREBASE_CREDENTIALS_FILE', 'firebase-service-account.json')
+_firebase_credentials = os.getenv("FIREBASE_CREDENTIALS_FILE", "firebase-service-account.json")
 FIREBASE_CREDENTIALS_FILE = str(
     Path(_firebase_credentials)
     if os.path.isabs(_firebase_credentials)
@@ -306,8 +311,8 @@ FIREBASE_CREDENTIALS_FILE = str(
 # Moderação do chat: mensagens com estas palavras entram na fila da moderação,
 # mas continuam sendo entregues (flag suave, não bloqueio).
 CHAT_BANNED_WORDS = [
-    w.strip().lower() for w in os.getenv('CHAT_BANNED_WORDS', '').split(',') if w.strip()
+    w.strip().lower() for w in os.getenv("CHAT_BANNED_WORDS", "").split(",") if w.strip()
 ]
-CHAT_MAX_MESSAGE_LENGTH = int(os.getenv('CHAT_MAX_MESSAGE_LENGTH', '4000'))
-CHAT_RATE_LIMIT_MESSAGES = int(os.getenv('CHAT_RATE_LIMIT_MESSAGES', '20'))
-CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv('CHAT_RATE_LIMIT_WINDOW_SECONDS', '10'))
+CHAT_MAX_MESSAGE_LENGTH = int(os.getenv("CHAT_MAX_MESSAGE_LENGTH", "4000"))
+CHAT_RATE_LIMIT_MESSAGES = int(os.getenv("CHAT_RATE_LIMIT_MESSAGES", "20"))
+CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "10"))

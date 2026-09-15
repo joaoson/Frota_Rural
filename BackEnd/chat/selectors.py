@@ -62,11 +62,11 @@ class _Row:
 
 def inbox_page(user_id, limit=20, offset=0, scope=None):
     """-> (threads_raw: list[dict], total: int). Sem hidratar peer/label."""
-    scope_filter = ''
-    params = {'me': str(user_id), 'limit': limit, 'offset': offset}
+    scope_filter = ""
+    params = {"me": str(user_id), "limit": limit, "offset": offset}
     if scope in (SCOPE_RENTAL, SCOPE_POSTING):
-        scope_filter = 'WHERE scope = %(scope)s'
-        params['scope'] = scope
+        scope_filter = "WHERE scope = %(scope)s"
+        params["scope"] = scope
 
     with connection.cursor() as cur:
         cur.execute(_INBOX_SQL.format(scope_filter=scope_filter), params)
@@ -78,25 +78,50 @@ def inbox_page(user_id, limit=20, offset=0, scope=None):
     total = rows[0][15]
     out = []
     for r in rows:
-        (scope_v, scope_id, peer_lo, peer_hi, _last, unread,
-         mid, sender_id, receiver_id, content, sent_at, read_at,
-         hidden_at, flagged, client_id, _t) = r
+        (
+            scope_v,
+            scope_id,
+            peer_lo,
+            peer_hi,
+            _last,
+            unread,
+            mid,
+            sender_id,
+            receiver_id,
+            content,
+            sent_at,
+            read_at,
+            hidden_at,
+            flagged,
+            client_id,
+            _t,
+        ) = r
         thread_id = format_thread_id(scope_v, scope_id, peer_lo, peer_hi)
-        out.append({
-            'thread_id': thread_id,
-            'scope': scope_v,
-            'scope_id': scope_id,
-            'peer_lo': peer_lo,
-            'peer_hi': peer_hi,
-            'unread_count': unread,
-            'last_message_obj': _Row({
-                'id': mid, 'sender_id': sender_id, 'receiver_id': receiver_id,
-                'content': content, 'sent_at': sent_at, 'read_at': read_at,
-                'hidden_at': hidden_at, 'flagged_for_moderation': flagged,
-                'client_id': client_id, 'rental_id': scope_id if scope_v == 'rental' else None,
-                'posting_id': scope_id if scope_v == 'posting' else None,
-            }),
-        })
+        out.append(
+            {
+                "thread_id": thread_id,
+                "scope": scope_v,
+                "scope_id": scope_id,
+                "peer_lo": peer_lo,
+                "peer_hi": peer_hi,
+                "unread_count": unread,
+                "last_message_obj": _Row(
+                    {
+                        "id": mid,
+                        "sender_id": sender_id,
+                        "receiver_id": receiver_id,
+                        "content": content,
+                        "sent_at": sent_at,
+                        "read_at": read_at,
+                        "hidden_at": hidden_at,
+                        "flagged_for_moderation": flagged,
+                        "client_id": client_id,
+                        "rental_id": scope_id if scope_v == "rental" else None,
+                        "posting_id": scope_id if scope_v == "posting" else None,
+                    }
+                ),
+            }
+        )
     return out, total
 
 
@@ -113,6 +138,6 @@ def unread_counts(user_id):
         WHERE receiver_id = %(me)s AND read_at IS NULL
     """
     with connection.cursor() as cur:
-        cur.execute(sql, {'me': str(user_id)})
+        cur.execute(sql, {"me": str(user_id)})
         total, threads = cur.fetchone()
-    return {'unread_total': total or 0, 'unread_threads': threads or 0}
+    return {"unread_total": total or 0, "unread_threads": threads or 0}

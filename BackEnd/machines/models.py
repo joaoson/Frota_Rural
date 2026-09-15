@@ -1,9 +1,10 @@
 from django.db import models
 
+
 # Create your models here.
 class Machines(models.Model):
     id = models.UUIDField(primary_key=True)
-    owner = models.ForeignKey('users.Users', models.DO_NOTHING)
+    owner = models.ForeignKey("users.Users", models.DO_NOTHING)
     renagro_number = models.CharField(unique=True, max_length=100, blank=True, null=True)
     brand = models.CharField(max_length=100, blank=True, null=True)
     model = models.CharField(max_length=100, blank=True, null=True)
@@ -16,4 +17,4 @@ class Machines(models.Model):
 
     class Meta:
         # managed = False
-        db_table = 'machines'
+        db_table = "machines"

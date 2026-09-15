@@ -11,5 +11,5 @@ class AppJWTScheme(SimpleJWTScheme):
     no way to send a Bearer token.
     """
 
-    target_class = 'authentication.extensions.authentication.AppJWTAuthentication'
-    name = 'jwtAuth'
+    target_class = "authentication.extensions.authentication.AppJWTAuthentication"
+    name = "jwtAuth"

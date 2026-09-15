@@ -1,5 +1,3 @@
-
-
 import re
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -185,7 +183,9 @@ def build_contract_document(contract):
         },
         "locador": {
             **_parte(lessor),
-            "endereco_equipamento": posting.location_address or getattr(lessor, "address", "") or "",
+            "endereco_equipamento": posting.location_address
+            or getattr(lessor, "address", "")
+            or "",
         },
         "locatario": {
             **_parte(lessee),

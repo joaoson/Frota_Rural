@@ -19,7 +19,7 @@ USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado 
 
 
 @extend_schema(
-    tags=['Usuários'],
+    tags=["Usuários"],
     summary="Criar um novo usuário",
     description="Endpoint para cadastro de novos usuários na plataforma. O usuário pode ter diferentes papéis (locador, locatario, operador).",
     request=UserSerializer,
@@ -31,9 +31,9 @@ USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado 
     },
     examples=[
         OpenApiExample(
-            'Perfil: Locatário (Produtor Rural)',
-            summary='Exemplo de cadastro de um produtor que alugará máquinas',
-            description='Um agricultor se cadastrando com CPF para locar colheitadeiras.',
+            "Perfil: Locatário (Produtor Rural)",
+            summary="Exemplo de cadastro de um produtor que alugará máquinas",
+            description="Um agricultor se cadastrando com CPF para locar colheitadeiras.",
             value={
                 "name": "José Almeida",
                 "document": "12345678909",
@@ -41,14 +41,14 @@ USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado 
                 "password_hash": "senha_segura_123",
                 "phone": "+5541999999999",
                 "role": "locatario",
-                "status": "active"
+                "status": "active",
             },
-            request_only=True
+            request_only=True,
         ),
         OpenApiExample(
-            'Perfil: Locador (Empresa de Frota)',
-            summary='Exemplo de cadastro de um dono de frota agrícola',
-            description='Uma empresa de maquinário se cadastrando com CNPJ.',
+            "Perfil: Locador (Empresa de Frota)",
+            summary="Exemplo de cadastro de um dono de frota agrícola",
+            description="Uma empresa de maquinário se cadastrando com CNPJ.",
             value={
                 "name": "Tratores & Cia LTDA",
                 "document": "12345678000199",
@@ -56,17 +56,20 @@ USER_CONFLICT = OpenApiResponse(description="E-mail ou documento já cadastrado 
                 "password_hash": "senha_forte_456",
                 "phone": "+5511988888888",
                 "role": "locador",
-                "status": "active"
+                "status": "active",
             },
-            request_only=True
-        )
-    ]
+            request_only=True,
+        ),
+    ],
 )
-@api_view(['POST'])
+@api_view(["POST"])
 def create_user(request):
-    document = request.data.get('document')
-    if document and Users.objects.filter(document=document, status='banned').exists():
-        return Response({'error': 'Cadastro bloqueado: documento vinculado a conta banida.'}, status=status.HTTP_403_FORBIDDEN)
+    document = request.data.get("document")
+    if document and Users.objects.filter(document=document, status="banned").exists():
+        return Response(
+            {"error": "Cadastro bloqueado: documento vinculado a conta banida."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
@@ -74,36 +77,40 @@ def create_user(request):
             serializer.save()
         except IntegrityError as e:
             error_msg = str(e).lower()
-            if 'email' in error_msg:
-                return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-            if 'document' in error_msg:
-                return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-            return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+            if "email" in error_msg:
+                return Response(
+                    {"email": ["Este e-mail já está em uso."]}, status=status.HTTP_409_CONFLICT
+                )
+            if "document" in error_msg:
+                return Response(
+                    {"document": ["Este documento já está cadastrado."]},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            return Response({"error": "Dados em conflito."}, status=status.HTTP_409_CONFLICT)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @extend_schema(
-    tags=['Usuários'],
+    tags=["Usuários"],
     summary="Listar usuários",
     description="Retorna a lista completa de usuários cadastrados no sistema.",
-    responses={200: UserSerializer(many=True)}
+    responses={200: UserSerializer(many=True)},
 )
-@api_view(['GET'])
+@api_view(["GET"])
 def get_users(request):
     users = Users.objects.all()
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data)
 
+
 @extend_schema(
-    tags=['Usuários'],
+    tags=["Usuários"],
     summary="Buscar usuário por e-mail",
     description="Retorna os detalhes de um usuário específico utilizando o e-mail como chave de busca.",
-    responses={
-        200: UserSerializer,
-        404: OpenApiResponse(description="Usuário não encontrado")
-    }
+    responses={200: UserSerializer, 404: OpenApiResponse(description="Usuário não encontrado")},
 )
-@api_view(['GET'])
+@api_view(["GET"])
 def get_user_by_email(request, email):
     try:
         user = Users.objects.get(email=email)
@@ -112,14 +119,15 @@ def get_user_by_email(request, email):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+
 @extend_schema_view(
     get=extend_schema(
-        tags=['Usuários'],
+        tags=["Usuários"],
         summary="Consultar usuário",
         responses={200: UserSerializer, 404: USER_NOT_FOUND},
     ),
     put=extend_schema(
-        tags=['Usuários'],
+        tags=["Usuários"],
         summary="Substituir usuário",
         request=UserSerializer,
         responses={
@@ -130,7 +138,7 @@ def get_user_by_email(request, email):
         },
     ),
     patch=extend_schema(
-        tags=['Usuários'],
+        tags=["Usuários"],
         summary="Atualizar usuário parcialmente",
         description="Atualiza apenas os campos enviados, como telefone ou endereço.",
         request=UserSerializer,
@@ -142,81 +150,89 @@ def get_user_by_email(request, email):
         },
     ),
     delete=extend_schema(
-        tags=['Usuários'],
+        tags=["Usuários"],
         summary="Excluir usuário",
         responses={204: OpenApiResponse(description="Usuário excluído."), 404: USER_NOT_FOUND},
     ),
 )
-@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
 def user_detail(request, pk):
     try:
         user = Users.objects.get(pk=pk)
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
+    if request.method == "GET":
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    elif request.method == 'PUT':
+    elif request.method == "PUT":
         serializer = UserSerializer(user, data=request.data)
         if serializer.is_valid():
             try:
                 serializer.save()
             except IntegrityError as e:
                 error_msg = str(e).lower()
-                if 'email' in error_msg:
-                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-                if 'document' in error_msg:
-                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+                if "email" in error_msg:
+                    return Response(
+                        {"email": ["Este e-mail já está em uso."]}, status=status.HTTP_409_CONFLICT
+                    )
+                if "document" in error_msg:
+                    return Response(
+                        {"document": ["Este documento já está cadastrado."]},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                return Response({"error": "Dados em conflito."}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    elif request.method == 'PATCH':
+    elif request.method == "PATCH":
         serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             try:
                 serializer.save()
             except IntegrityError as e:
                 error_msg = str(e).lower()
-                if 'email' in error_msg:
-                    return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-                if 'document' in error_msg:
-                    return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-                return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+                if "email" in error_msg:
+                    return Response(
+                        {"email": ["Este e-mail já está em uso."]}, status=status.HTTP_409_CONFLICT
+                    )
+                if "document" in error_msg:
+                    return Response(
+                        {"document": ["Este documento já está cadastrado."]},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                return Response({"error": "Dados em conflito."}, status=status.HTTP_409_CONFLICT)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    elif request.method == 'DELETE':
+    elif request.method == "DELETE":
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
+
 @extend_schema(
-    tags=['Usuários'],
+    tags=["Usuários"],
     summary="Alterar senha do usuário",
     description="Permite que o usuário autenticado atualize sua própria senha, fornecendo a senha atual e a nova.",
     request=ChangePasswordSerializer,
     responses={
         204: OpenApiResponse(description="Senha alterada com sucesso"),
         400: OpenApiResponse(description="Senha atual incorreta ou dados inválidos"),
-        404: OpenApiResponse(description="Usuário não encontrado")
+        404: OpenApiResponse(description="Usuário não encontrado"),
     },
     examples=[
         OpenApiExample(
-            'Troca de Senha Padrão',
-            summary='Exemplo de payload para troca de senha',
-            value={
-                "current_password": "senha_antiga_123",
-                "new_password": "nova_senha_segura_456"
-            },
-            request_only=True
+            "Troca de Senha Padrão",
+            summary="Exemplo de payload para troca de senha",
+            value={"current_password": "senha_antiga_123", "new_password": "nova_senha_segura_456"},
+            request_only=True,
         )
-    ]
+    ],
 )
-@api_view(['POST'])
+@api_view(["POST"])
 def change_password(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -227,13 +243,13 @@ def change_password(request, pk):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    if not user.check_password(serializer.validated_data['current_password']):
+    if not user.check_password(serializer.validated_data["current_password"]):
         return Response(
-            {'error': 'Senha atual incorreta.'},
+            {"error": "Senha atual incorreta."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    user.set_password(serializer.validated_data['new_password'])
+    user.set_password(serializer.validated_data["new_password"])
     user.save()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -244,33 +260,33 @@ def change_password(request, pk):
 # os endpoints abaixo filtram por `request.user`: não existe leitura ou escrita
 # na equipe de outra pessoa, mesmo conhecendo o id do operador.
 
-OPERATOR_NOT_FOUND = OpenApiResponse(
-    description="Operador não encontrado na sua equipe."
-)
+OPERATOR_NOT_FOUND = OpenApiResponse(description="Operador não encontrado na sua equipe.")
 
 
 def _operator_queryset(request):
-    return Users.objects.filter(employer=request.user, role='operador')
+    return Users.objects.filter(employer=request.user, role="operador")
 
 
 def _conflict_from_integrity_error(exc):
     error_msg = str(exc).lower()
-    if 'email' in error_msg:
-        return Response({'email': ['Este e-mail já está em uso.']}, status=status.HTTP_409_CONFLICT)
-    if 'document' in error_msg:
-        return Response({'document': ['Este documento já está cadastrado.']}, status=status.HTTP_409_CONFLICT)
-    return Response({'error': 'Dados em conflito.'}, status=status.HTTP_409_CONFLICT)
+    if "email" in error_msg:
+        return Response({"email": ["Este e-mail já está em uso."]}, status=status.HTTP_409_CONFLICT)
+    if "document" in error_msg:
+        return Response(
+            {"document": ["Este documento já está cadastrado."]}, status=status.HTTP_409_CONFLICT
+        )
+    return Response({"error": "Dados em conflito."}, status=status.HTTP_409_CONFLICT)
 
 
 @extend_schema_view(
     get=extend_schema(
-        tags=['Operadores'],
+        tags=["Operadores"],
         summary="Listar os operadores da minha equipe",
         description="Retorna os operadores cadastrados pelo usuário autenticado, em ordem alfabética.",
         responses={200: OperatorSerializer(many=True)},
     ),
     post=extend_schema(
-        tags=['Operadores'],
+        tags=["Operadores"],
         summary="Cadastrar um operador na minha equipe",
         description=(
             "Cria uma conta com papel `operador` já vinculada ao usuário autenticado. "
@@ -285,17 +301,17 @@ def _conflict_from_integrity_error(exc):
         },
     ),
 )
-@api_view(['GET', 'POST'])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def operators(request):
-    if request.method == 'GET':
-        serializer = OperatorSerializer(_operator_queryset(request).order_by('name'), many=True)
+    if request.method == "GET":
+        serializer = OperatorSerializer(_operator_queryset(request).order_by("name"), many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    document = request.data.get('document')
-    if document and Users.objects.filter(document=document, status='banned').exists():
+    document = request.data.get("document")
+    if document and Users.objects.filter(document=document, status="banned").exists():
         return Response(
-            {'error': 'Cadastro bloqueado: documento vinculado a conta banida.'},
+            {"error": "Cadastro bloqueado: documento vinculado a conta banida."},
             status=status.HTTP_403_FORBIDDEN,
         )
 
@@ -313,12 +329,12 @@ def operators(request):
 
 @extend_schema_view(
     get=extend_schema(
-        tags=['Operadores'],
+        tags=["Operadores"],
         summary="Consultar um operador da minha equipe",
         responses={200: OperatorSerializer, 404: OPERATOR_NOT_FOUND},
     ),
     patch=extend_schema(
-        tags=['Operadores'],
+        tags=["Operadores"],
         summary="Atualizar um operador da minha equipe",
         description="Atualiza apenas os campos enviados. Papel e vínculo não são editáveis.",
         request=OperatorSerializer,
@@ -330,7 +346,7 @@ def operators(request):
         },
     ),
     delete=extend_schema(
-        tags=['Operadores'],
+        tags=["Operadores"],
         summary="Desvincular um operador da minha equipe",
         description=(
             "Remove o vínculo sem apagar a conta: o histórico de locações em que o "
@@ -342,7 +358,7 @@ def operators(request):
         },
     ),
 )
-@api_view(['GET', 'PATCH', 'DELETE'])
+@api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def operator_detail(request, pk):
     try:
@@ -350,10 +366,10 @@ def operator_detail(request, pk):
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
+    if request.method == "GET":
         return Response(OperatorSerializer(operator).data, status=status.HTTP_200_OK)
 
-    if request.method == 'PATCH':
+    if request.method == "PATCH":
         serializer = OperatorSerializer(operator, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -364,5 +380,5 @@ def operator_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     operator.employer = None
-    operator.save(update_fields=['employer'])
+    operator.save(update_fields=["employer"])
     return Response(status=status.HTTP_204_NO_CONTENT)

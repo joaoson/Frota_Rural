@@ -14,29 +14,35 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
-BASE_PATH = 'api/'
+BASE_PATH = "api/"
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path(BASE_PATH, include('api.urls')),
-    path(BASE_PATH, include('contracts.urls')),
-    path(BASE_PATH, include('administration.urls')),
-    path(BASE_PATH, include('users.urls')),
-    path(BASE_PATH, include('postings.urls')),
-    path(BASE_PATH, include('machines.urls')),
-    path(BASE_PATH, include('authentication.urls')),
-    path(BASE_PATH, include('document_validation.urls')),
-    path(BASE_PATH, include('chat.urls')),
-    path(BASE_PATH, include('payments.urls')),
-
+    path("admin/", admin.site.urls),
+    path(BASE_PATH, include("api.urls")),
+    path(BASE_PATH, include("contracts.urls")),
+    path(BASE_PATH, include("administration.urls")),
+    path(BASE_PATH, include("users.urls")),
+    path(BASE_PATH, include("postings.urls")),
+    path(BASE_PATH, include("machines.urls")),
+    path(BASE_PATH, include("authentication.urls")),
+    path(BASE_PATH, include("document_validation.urls")),
+    path(BASE_PATH, include("chat.urls")),
+    path(BASE_PATH, include("payments.urls")),
     # OpenAPI 3 documentation with Swagger UI
-    path(f'{BASE_PATH}schema/', SpectacularAPIView.as_view(), name='schema'),
-    path(f'{BASE_PATH}schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path(f'{BASE_PATH}schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path(f"{BASE_PATH}schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        f"{BASE_PATH}schema/swagger-ui/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
+    path(
+        f"{BASE_PATH}schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"
+    ),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
