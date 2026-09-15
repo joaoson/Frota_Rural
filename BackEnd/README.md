@@ -130,6 +130,25 @@ O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em
    - Abra seu navegador e vá para `http://127.0.0.1:8000/`
    - Para popular o banco de dados, é possível executar o arquivo `seed.py`
 
+## Qualidade de código e testes
+
+As ferramentas de desenvolvimento ficam em um arquivo de dependências separado, fora da imagem Docker:
+
+```bash
+pip install -r docs/requirements-dev.txt
+```
+
+A configuração de `ruff` (lint + formatter) e `mypy` (tipagem estrita, com os plugins do Django e do DRF) está em `pyproject.toml`. Antes de abrir um PR, os quatro comandos abaixo precisam passar:
+
+```bash
+ruff check .
+ruff format --check .
+mypy .
+CHANNEL_LAYER_BACKEND=memory DJANGO_DEBUG=true python manage.py test
+```
+
+Os testes rodam sem Redis local graças ao channel layer em memória, que o `settings.py` só aceita com `DJANGO_DEBUG=true`.
+
 ## Machine Learning — Classificador de CNH
 
 O projeto inclui um classificador de imagem baseado em TensorFlow que verifica se um arquivo enviado pelo usuário é uma CNH (Carteira Nacional de Habilitação) ou não. Usa transfer learning com MobileNetV2.

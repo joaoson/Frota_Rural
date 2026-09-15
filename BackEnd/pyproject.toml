@@ -1,0 +1,107 @@
+[project]
+name = "frota-rural-backend"
+version = "1.0.0"
+requires-python = ">=3.13"
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+# Mesma versão da imagem em Devops/docker/backend/Dockerfile.
+target-version = "py313"
+line-length = 100
+extend-exclude = ["**/migrations/**", "venv", "ml/venv", "media"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "DJ",  # flake8-django
+    "ANN", # flake8-annotations
+    "TC",  # flake8-type-checking
+    "RUF", # regras próprias do ruff
+    "PL",  # pylint
+    "T20", # print
+]
+ignore = [
+    "E501",    # comprimento de linha fica a cargo do formatter
+    "DJ001",   # null=True em CharField já existe no schema; mudar exige migração de dados
+    "RUF001",  # texto em português usa º, –, ’ de propósito
+    "RUF002",
+    "RUF003",
+    "RUF012",  # atributos de classe mutáveis são o idioma do DRF/Django (Meta.fields etc.)
+    "PLR0913", # services com muitos argumentos keyword-only são intencionais
+    "PLC0415", # import tardio é usado para quebrar ciclos entre apps
+    "TC001",   # anotações precisam dos tipos em runtime (drf-spectacular / Django)
+    "TC002",
+    "TC003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests.py" = ["ANN", "PLR2004"]
+"**/tests/**" = ["ANN", "PLR2004"]
+"seed.py" = ["T20", "E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "administration",
+    "api",
+    "authentication",
+    "chat",
+    "common",
+    "contracts",
+    "djangoapi",
+    "document_validation",
+    "machines",
+    "payments",
+    "postings",
+    "rentals",
+    "reviews",
+    "users",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# Mypy — tipagem estrita com os plugins do Django e do DRF
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["^venv/", "^ml/", "/migrations/"]
+warn_unreachable = true
+
+[tool.django-stubs]
+django_settings_module = "djangoapi.settings"
+
+[[tool.mypy.overrides]]
+module = ["*.migrations.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["*.tests", "*.tests.*", "seed"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+module = [
+    "channels.*",
+    "channels_redis.*",
+    "corsheaders.*",
+    "daphne.*",
+    "firebase_admin.*",
+    "google.*",
+    "resend.*",
+    "stripe.*",
+]
+ignore_missing_imports = true
