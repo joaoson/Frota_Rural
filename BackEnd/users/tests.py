@@ -87,7 +87,7 @@ class OperatorTeamTests(TestCase):
         self.assertEqual(self.create_operator().status_code, 201)
         response = self.create_operator(document="55566677788")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("email", response.json())
+        self.assertEqual(response.json()["errors"]["email"], ["Este e-mail já está em uso."])
 
     def test_list_returns_only_my_team(self):
         self.create_operator()
