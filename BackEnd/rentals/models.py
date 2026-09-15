@@ -1,5 +1,7 @@
 from django.db import models
 
+from rentals.enums import RentalStatus
+
 
 class Rentals(models.Model):
     id = models.UUIDField(primary_key=True)
@@ -17,9 +19,12 @@ class Rentals(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     initial_hour_meter = models.IntegerField(blank=True, null=True)
     final_hour_meter = models.IntegerField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)
+    status = models.TextField(choices=RentalStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "rentals"
+
+    def __str__(self) -> str:
+        return f"Locação {self.id}"

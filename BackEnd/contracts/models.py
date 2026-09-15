@@ -1,4 +1,9 @@
+from typing import Any, NoReturn
+
 from django.db import models
+from django.utils import timezone
+
+from contracts.enums import ContractStatus, SignatureRole
 
 
 class Contracts(models.Model):
@@ -7,11 +12,14 @@ class Contracts(models.Model):
     document_url = models.CharField(max_length=1024, blank=True, null=True)
     accepted_by_lessor = models.BooleanField(blank=True, null=True)
     accepted_by_lessee = models.BooleanField(blank=True, null=True)
-    status = models.TextField(blank=True, null=True)  # This field type is a guess.
+    status = models.TextField(choices=ContractStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         db_table = "contracts"
+
+    def __str__(self) -> str:
+        return f"#CTR-{str(self.rental_id)[:4].upper()}"
 
 
 class ImmutableRecordError(Exception):
@@ -36,7 +44,7 @@ class ContractSignatures(models.Model):
     signer = models.ForeignKey("users.Users", models.DO_NOTHING, blank=True, null=True)
     signer_name = models.CharField(max_length=255, blank=True)
     signer_email = models.CharField(max_length=255, blank=True)
-    role = models.CharField(max_length=20)  # 'locador' ou 'locatario'
+    role = models.CharField(max_length=20, choices=SignatureRole.choices)
 
     # O que foi aceito: hash do documento exato + versão do modelo.
     document_version = models.CharField(max_length=20, blank=True)
@@ -62,20 +70,20 @@ class ContractSignatures(models.Model):
             models.Index(fields=["contract", "signed_at"]),
         ]
 
-    def save(self, *args, **kwargs):
+    def __str__(self) -> str:
+        return f"{self.role} @ {self.signed_at.isoformat()} ({self.document_hash[:12]})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if not self._state.adding:
             raise ImmutableRecordError(
                 "Evidências de assinatura são append-only e não podem ser alteradas."
             )
-        return super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
-    def delete(self, *args, **kwargs):
+    def delete(self, *args: Any, **kwargs: Any) -> NoReturn:
         raise ImmutableRecordError(
             "Evidências de assinatura são append-only e não podem ser removidas."
         )
-
-    def __str__(self):
-        return f"{self.role} @ {self.signed_at.isoformat()} ({self.document_hash[:12]})"
 
 
 class ContractSignatureOtps(models.Model):
@@ -87,7 +95,7 @@ class ContractSignatureOtps(models.Model):
 
     id = models.UUIDField(primary_key=True)
     contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="signature_otps")
-    role = models.CharField(max_length=20)
+    role = models.CharField(max_length=20, choices=SignatureRole.choices)
     email = models.CharField(max_length=255)
     code_hash = models.CharField(max_length=64)
     attempts = models.IntegerField(default=0)
@@ -102,12 +110,13 @@ class ContractSignatureOtps(models.Model):
             models.Index(fields=["contract", "role", "-created_at"]),
         ]
 
-    @property
-    def is_expired(self):
-        from django.utils import timezone
+    def __str__(self) -> str:
+        return f"OTP {self.role} ({self.email})"
 
+    @property
+    def is_expired(self) -> bool:
         return timezone.now() >= self.expires_at
 
     @property
-    def is_usable(self):
+    def is_usable(self) -> bool:
         return self.consumed_at is None and not self.is_expired

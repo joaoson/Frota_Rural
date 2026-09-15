@@ -1,8 +1,8 @@
 from django.urls import path
 
-from .views import rental_detail, rentals_list
+from rentals.views import RentalDetailView, RentalListView
 
 urlpatterns = [
-    path("rentals/", rentals_list, name="rentals_list"),
-    path("rentals/<uuid:pk>", rental_detail, name="rental_detail"),
+    path("rentals/", RentalListView.as_view(), name="rentals_list"),
+    path("rentals/<uuid:pk>", RentalDetailView.as_view(), name="rental_detail"),
 ]

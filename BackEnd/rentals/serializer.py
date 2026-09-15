@@ -1,27 +1,75 @@
-import uuid
-from datetime import timedelta
+from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.utils import timezone
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from contracts.models import Contracts
 from rentals.models import Rentals
 
 
-class RentalSerializer(serializers.ModelSerializer):
+class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
+    """Campos da locação que o cliente pode gravar.
+
+    Aqui fica só a validação que depende do próprio payload. A checagem de
+    conflito com outras reservas consulta o banco e mora no `RentalService`.
+    """
+
+    class Meta:
+        model = Rentals
+        fields = [
+            "postings",
+            "lessee",
+            "operator",
+            "start_date",
+            "end_date",
+            "total_price",
+            "initial_hour_meter",
+            "final_hour_meter",
+            "status",
+        ]
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        posting = attrs.get("postings", getattr(self.instance, "postings", None))
+        if start_date is None or end_date is None or posting is None:
+            return attrs
+
+        if end_date < start_date:
+            raise serializers.ValidationError(
+                {"end_date": "A data de fim deve ser posterior à data de início."}
+            )
+
+        max_days = posting.max_reservation_days
+        total_days = (end_date.date() - start_date.date()).days + 1
+        if max_days and total_days > max_days:
+            raise serializers.ValidationError(
+                {"end_date": f"Este anúncio permite reservas de no máximo {max_days} dias."}
+            )
+        return attrs
+
+
+class RentalFilterSerializer(serializers.Serializer[Any]):
+    """Query params aceitos na listagem de locações."""
+
+    postings = serializers.UUIDField(required=False, help_text="ID do anúncio.")
+    lessee = serializers.UUIDField(required=False, help_text="ID do locatário.")
+    lessor = serializers.UUIDField(required=False, help_text="ID do locador dono do maquinário.")
+
+
+class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     lessee_name = serializers.CharField(source="lessee.name", read_only=True)
     lessor_name = serializers.CharField(source="postings.machinery.owner.name", read_only=True)
     machine_brand = serializers.CharField(source="postings.machinery.brand", read_only=True)
     machine_model = serializers.CharField(source="postings.machinery.model", read_only=True)
-    contract_number = serializers.SerializerMethodField(read_only=True)
+    contract_number = serializers.SerializerMethodField()
     # Estado do aceite eletrônico, para a tela saber qual parte ainda falta
     # assinar. `rentals.status` sozinho não distingue "o locador assinou" de
     # "o locatário assinou": ambos deixam o aluguel em `active`.
-    contract_id = serializers.SerializerMethodField(read_only=True)
-    contract_status = serializers.SerializerMethodField(read_only=True)
-    accepted_by_lessor = serializers.SerializerMethodField(read_only=True)
-    accepted_by_lessee = serializers.SerializerMethodField(read_only=True)
+    contract_id = serializers.SerializerMethodField()
+    contract_status = serializers.SerializerMethodField()
+    accepted_by_lessor = serializers.SerializerMethodField()
+    accepted_by_lessee = serializers.SerializerMethodField()
 
     class Meta:
         model = Rentals
@@ -48,85 +96,32 @@ class RentalSerializer(serializers.ModelSerializer):
             "accepted_by_lessor",
             "accepted_by_lessee",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-    @extend_schema_field(
-        serializers.CharField(help_text="Número legível do contrato, ex.: #CTR-08E8")
-    )
-    def get_contract_number(self, obj):
-        try:
-            return f"#CTR-{str(obj.id)[:4].upper()}"
-        except Exception:
-            return ""
+        read_only_fields = fields
 
     @staticmethod
-    def _contract(obj):
+    def _contract(obj: Rentals) -> Contracts | None:
         """Contrato do aluguel, ou None enquanto ele ainda não foi criado."""
         try:
             return obj.contracts
         except ObjectDoesNotExist:
             return None
 
-    def get_contract_id(self, obj):
+    def get_contract_number(self, obj: Rentals) -> str:
+        """Número legível do contrato, ex.: #CTR-08E8."""
+        return f"#CTR-{str(obj.id)[:4].upper()}"
+
+    def get_contract_id(self, obj: Rentals) -> str | None:
         contract = self._contract(obj)
         return str(contract.id) if contract else None
 
-    def get_contract_status(self, obj):
+    def get_contract_status(self, obj: Rentals) -> str | None:
         contract = self._contract(obj)
         return contract.status if contract else None
 
-    def get_accepted_by_lessor(self, obj):
+    def get_accepted_by_lessor(self, obj: Rentals) -> bool:
         contract = self._contract(obj)
         return bool(contract.accepted_by_lessor) if contract else False
 
-    def get_accepted_by_lessee(self, obj):
+    def get_accepted_by_lessee(self, obj: Rentals) -> bool:
         contract = self._contract(obj)
         return bool(contract.accepted_by_lessee) if contract else False
-
-    def create(self, validated_data):
-        now = timezone.now()
-        validated_data.setdefault("id", uuid.uuid4())
-        validated_data.setdefault("created_at", now)
-        validated_data.setdefault("updated_at", now)
-        validated_data.setdefault("status", "pending")
-        return Rentals.objects.create(**validated_data)
-
-    def validate(self, attrs):
-        """Keep a day free before and after each rental for machine turnaround."""
-        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
-        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
-        posting = attrs.get("postings", getattr(self.instance, "postings", None))
-
-        if not start_date or not end_date or not posting:
-            return attrs
-        if end_date < start_date:
-            raise serializers.ValidationError(
-                {"end_date": "A data de fim deve ser posterior à data de início."}
-            )
-
-        max_reservation_days = posting.max_reservation_days
-        total_days = (end_date.date() - start_date.date()).days + 1
-        if max_reservation_days and total_days > max_reservation_days:
-            raise serializers.ValidationError(
-                {
-                    "end_date": f"Este anúncio permite reservas de no máximo {max_reservation_days} dias."
-                }
-            )
-
-        # A requested range cannot touch an existing reservation's cleaning buffer.
-        conflicting_rentals = Rentals.objects.filter(
-            postings=posting,
-            status__in=["pending", "active", "signed"],
-            start_date__lte=end_date + timedelta(days=1),
-            end_date__gte=start_date - timedelta(days=1),
-        )
-        if self.instance:
-            conflicting_rentals = conflicting_rentals.exclude(pk=self.instance.pk)
-        if conflicting_rentals.exists():
-            raise serializers.ValidationError(
-                {
-                    "non_field_errors": "O período selecionado conflita com uma reserva ou com o intervalo de limpeza da máquina."
-                }
-            )
-
-        return attrs

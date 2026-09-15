@@ -1,45 +1,47 @@
-import uuid
+from uuid import UUID
 
-from django.utils import timezone
-from drf_spectacular.utils import (
-    OpenApiExample,
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from contracts.models import Contracts
-from rentals.models import Rentals
-from rentals.serializer import RentalSerializer
+from common.schemas import error_response, error_responses
+from rentals.serializer import (
+    RentalFilterSerializer,
+    RentalInputSerializer,
+    RentalOutputSerializer,
+)
+from rentals.services import RentalService
 
-RENTAL_NOT_FOUND = OpenApiResponse(description="Locação não encontrada.")
-INVALID_DATA = OpenApiResponse(description="Dados inválidos ou em conflito.")
+TAGS = ["Locações"]
+RENTAL_NOT_FOUND = error_response(404, "Locação não encontrada.")
+INVALID_RENTAL = error_response(
+    400, "Dados inválidos, período acima do limite do anúncio ou em conflito com outra reserva."
+)
 
 
-@extend_schema_view(
-    get=extend_schema(
-        tags=["Locações"],
+class RentalListView(APIView):
+    @extend_schema(
+        tags=TAGS,
         summary="Listar locações",
-        description="Retorna as locações (reservas), com filtros opcionais por locatário ou por locador dono do maquinário.",
-        parameters=[
-            OpenApiParameter("lessee", type=str, description="Filtrar pelo ID do locatário"),
-            OpenApiParameter("lessor", type=str, description="Filtrar pelo ID do locador"),
-        ],
-        responses={200: RentalSerializer(many=True)},
-    ),
-    post=extend_schema(
-        tags=["Locações"],
+        description="Retorna as locações (reservas), com filtros opcionais por anúncio, locatário ou locador dono do maquinário.",
+        parameters=[RentalFilterSerializer],
+        responses={200: RentalOutputSerializer(many=True), **error_responses(400)},
+    )
+    def get(self, request: Request) -> Response:
+        rentals = RentalService.list(request.query_params)
+        return Response(RentalOutputSerializer(rentals, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Criar locação (reserva)",
         description=(
-            "Cria a reserva de um anúncio e, junto com ela, o contrato correspondente com status "
-            "`pending_signatures`. Não é necessário criar o contrato em uma chamada separada."
+            "Cria a reserva de um anúncio e, na mesma transação, o contrato correspondente com "
+            "status `pending_signatures`. Não é necessário criar o contrato em uma chamada separada."
         ),
-        request=RentalSerializer,
-        responses={201: RentalSerializer, 400: INVALID_DATA},
+        request=RentalInputSerializer,
+        responses={201: RentalOutputSerializer, 400: INVALID_RENTAL},
         examples=[
             OpenApiExample(
                 "Nova Reserva de Trator",
@@ -54,93 +56,52 @@ INVALID_DATA = OpenApiResponse(description="Dados inválidos ou em conflito.")
                 request_only=True,
             )
         ],
-    ),
-)
-@api_view(["GET", "POST"])
-def rentals_list(request):
-    if request.method == "GET":
-        qs = Rentals.objects.all().select_related(
-            "lessee", "postings__machinery__owner", "contracts"
-        )
-        posting_id = request.query_params.get("postings")
-        if posting_id:
-            qs = qs.filter(postings_id=posting_id)
-        lessee_id = request.query_params.get("lessee")
-        if lessee_id:
-            qs = qs.filter(lessee_id=lessee_id)
-        lessor_id = request.query_params.get("lessor")
-        if lessor_id:
-            qs = qs.filter(postings__machinery__owner_id=lessor_id)
-        serializer = RentalSerializer(qs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    serializer = RentalSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    rental = serializer.save()
-
-    # Automatically create matching Contract
-    Contracts.objects.create(
-        id=uuid.uuid4(),
-        rental=rental,
-        accepted_by_lessor=False,
-        accepted_by_lessee=False,
-        status="pending_signatures",
-        created_at=timezone.now(),
     )
+    def post(self, request: Request) -> Response:
+        rental = RentalService.create(request.data)
+        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_201_CREATED)
 
-    return Response(RentalSerializer(rental).data, status=status.HTTP_201_CREATED)
 
-
-@extend_schema_view(
-    get=extend_schema(
-        tags=["Locações"],
+class RentalDetailView(APIView):
+    @extend_schema(
+        tags=TAGS,
         summary="Consultar locação",
-        responses={200: RentalSerializer, 404: RENTAL_NOT_FOUND},
-    ),
-    put=extend_schema(
-        tags=["Locações"],
+        responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        rental = RentalService.get(pk)
+        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Substituir locação",
-        request=RentalSerializer,
-        responses={200: RentalSerializer, 400: INVALID_DATA, 404: RENTAL_NOT_FOUND},
-    ),
-    patch=extend_schema(
-        tags=["Locações"],
+        request=RentalInputSerializer,
+        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
+    )
+    def put(self, request: Request, pk: UUID) -> Response:
+        rental = RentalService.update(pk, request.data)
+        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Atualizar locação parcialmente",
         description="Usado principalmente para avançar o status da locação (ex.: `active`, `completed`, `cancelled`).",
-        request=RentalSerializer,
-        responses={200: RentalSerializer, 400: INVALID_DATA, 404: RENTAL_NOT_FOUND},
-    ),
-    delete=extend_schema(
-        tags=["Locações"],
+        request=RentalInputSerializer,
+        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
+    )
+    def patch(self, request: Request, pk: UUID) -> Response:
+        rental = RentalService.update(pk, request.data, partial=True)
+        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Excluir locação",
-        responses={204: OpenApiResponse(description="Locação excluída."), 404: RENTAL_NOT_FOUND},
-    ),
-)
-@api_view(["GET", "PUT", "PATCH", "DELETE"])
-def rental_detail(request, pk):
-    try:
-        rental = Rentals.objects.select_related("contracts").get(pk=pk)
-    except Rentals.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == "GET":
-        return Response(RentalSerializer(rental).data, status=status.HTTP_200_OK)
-
-    if request.method == "PUT":
-        serializer = RentalSerializer(rental, data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    if request.method == "PATCH":
-        serializer = RentalSerializer(rental, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    rental.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+        responses={
+            204: None,
+            404: RENTAL_NOT_FOUND,
+            409: error_response(409, "Existem registros dependentes (ex.: contrato)."),
+        },
+    )
+    def delete(self, request: Request, pk: UUID) -> Response:
+        RentalService.delete(pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)
