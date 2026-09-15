@@ -4,9 +4,9 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from api.models import Rentals
+from rentals.models import Rentals
 from contracts.models import Contracts
-from api.schemas import ErrorResponseSerializer, MessageResponseSerializer
+from common.schemas import ErrorResponseSerializer, MessageResponseSerializer
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users

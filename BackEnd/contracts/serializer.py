@@ -2,7 +2,7 @@ import uuid
 from django.utils import timezone
 from rest_framework import serializers
 
-from api.serializer import RentalSerializer
+from rentals.serializer import RentalSerializer
 from contracts.models import ContractSignatures, Contracts
 
 

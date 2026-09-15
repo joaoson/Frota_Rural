@@ -3,7 +3,7 @@ from django.db import models
 
 class Contracts(models.Model):
     id = models.UUIDField(primary_key=True)
-    rental = models.OneToOneField("api.Rentals", models.DO_NOTHING)
+    rental = models.OneToOneField("rentals.Rentals", models.DO_NOTHING)
     document_url = models.CharField(max_length=1024, blank=True, null=True)
     accepted_by_lessor = models.BooleanField(blank=True, null=True)
     accepted_by_lessee = models.BooleanField(blank=True, null=True)

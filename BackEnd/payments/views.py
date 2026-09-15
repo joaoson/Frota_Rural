@@ -8,8 +8,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from api.models import Rentals
-from api.schemas import ErrorResponseSerializer
+from rentals.models import Rentals
+from common.schemas import ErrorResponseSerializer
 
 from .availability import periodos_ocupados, tem_conflito
 from .models import Payments

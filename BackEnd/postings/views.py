@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import uuid
 from .models import Postings, PostingsPhotos
-from api.schemas import ErrorResponseSerializer
+from common.schemas import ErrorResponseSerializer
 from .serializer import (
     PostingDetailSerializer,
     PostingListSerializer,

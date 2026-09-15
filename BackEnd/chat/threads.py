@@ -108,7 +108,7 @@ def posting_owner_id(posting):
 
 def load_scope(scope, scope_id):
     """Carrega Rentals/Postings já com os joins que a autorização precisa."""
-    from api.models import Rentals
+    from rentals.models import Rentals
     from postings.models import Postings
 
     if scope == SCOPE_RENTAL:

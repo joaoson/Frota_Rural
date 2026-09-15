@@ -2,7 +2,7 @@ from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from api.schemas import ErrorResponseSerializer
+from common.schemas import ErrorResponseSerializer
 from .models import OperatorLicense, Certification
 from .serializer import (
     CertificationSerializer,

@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     "corsheaders",
     "common",
     "api",
+    "rentals",
+    "reviews",
     "contracts",
     "users",
     "authentication",

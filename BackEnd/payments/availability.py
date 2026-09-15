@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from api.models import Rentals
+from rentals.models import Rentals
 
 STATUS_OCUPADOS = ("active", "signed", "completed", "closed")
 STATUS_PROVISORIOS = ("pending", "awaiting_payment")

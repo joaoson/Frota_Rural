@@ -9,7 +9,7 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
-from api.models import Rentals
+from rentals.models import Rentals
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users

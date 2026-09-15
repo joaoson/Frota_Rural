@@ -20,7 +20,7 @@ class Messages(models.Model):
     receiver = models.ForeignKey(
         "users.Users", models.DO_NOTHING, related_name="messages_receiver_set"
     )
-    rental = models.ForeignKey("api.Rentals", models.DO_NOTHING, blank=True, null=True)
+    rental = models.ForeignKey("rentals.Rentals", models.DO_NOTHING, blank=True, null=True)
     posting = models.ForeignKey(
         "postings.Postings",
         models.DO_NOTHING,

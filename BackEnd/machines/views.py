@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Machines
-from api.schemas import ErrorResponseSerializer
+from common.schemas import ErrorResponseSerializer
 from .serializer import MachineSerializer
 from drf_spectacular.utils import (
     extend_schema,
