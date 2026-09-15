@@ -107,10 +107,7 @@ export default function AssinaturaContratoModal({
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (e) {
-      const mensagem =
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Não foi possível enviar o código por e-mail.";
-      toast.error(mensagem);
+      toast.error(e instanceof HttpError ? e.message : "Não foi possível enviar o código por e-mail.");
     } finally {
       setEnviandoOtp(false);
     }
