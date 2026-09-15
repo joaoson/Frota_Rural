@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "channels",
     "rest_framework",
     "corsheaders",
+    "common",
     "api",
     "contracts",
     "users",
@@ -148,6 +149,8 @@ REST_FRAMEWORK = {
         "authentication.extensions.authentication.AppJWTAuthentication",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Todo erro sai como {"code", "message", "errors"}.
+    "EXCEPTION_HANDLER": "common.exception_handler.api_exception_handler",
 }
 
 SPECTACULAR_SETTINGS = {
