@@ -1,10 +1,15 @@
 from django.urls import path
 
-from .views import criar_checkout, ocupacao, status_pagamento, webhook
+from payments.views import (
+    PostingOccupancyView,
+    RentalCheckoutView,
+    RentalPaymentStatusView,
+    StripeWebhookView,
+)
 
 urlpatterns = [
-    path("rentals/<uuid:pk>/checkout", criar_checkout, name="criar_checkout"),
-    path("rentals/<uuid:pk>/payment", status_pagamento, name="status_pagamento"),
-    path("postings/<uuid:pk>/ocupacao", ocupacao, name="ocupacao"),
-    path("payments/webhook", webhook, name="stripe_webhook"),
+    path("rentals/<uuid:pk>/checkout", RentalCheckoutView.as_view(), name="criar_checkout"),
+    path("rentals/<uuid:pk>/payment", RentalPaymentStatusView.as_view(), name="status_pagamento"),
+    path("postings/<uuid:pk>/ocupacao", PostingOccupancyView.as_view(), name="ocupacao"),
+    path("payments/webhook", StripeWebhookView.as_view(), name="stripe_webhook"),
 ]
