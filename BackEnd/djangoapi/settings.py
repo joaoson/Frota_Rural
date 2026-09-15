@@ -175,12 +175,20 @@ SPECTACULAR_SETTINGS = {
         {"url": "http://127.0.0.1:8000", "description": "Ambiente local de desenvolvimento"},
     ],
     "SORT_OPERATIONS": False,
-    # `validation_status` aparece com dois conjuntos de opções: o do model (inclui
-    # `pending`) e o da decisão do administrador. Sem os nomes explícitos o
-    # drf-spectacular gera componentes com sufixo aleatório (ValidationStatusDe3Enum).
+    # Vários campos se chamam `status` (ou `role`) com conjuntos de opções
+    # diferentes. Sem os nomes explícitos o drf-spectacular gera componentes com
+    # sufixo aleatório (StatusDe3Enum). Cada entrada aponta para o TextChoices.
     "ENUM_NAME_OVERRIDES": {
-        "ValidationStatusEnum": "document_validation.serializer.VALIDATION_STATUS_CHOICES",
-        "ReviewDecisionEnum": "document_validation.serializer.REVIEW_DECISION_CHOICES",
+        "ValidationStatusEnum": "document_validation.enums.ValidationStatus",
+        "ReviewDecisionEnum": "document_validation.enums.ReviewDecision",
+        "LicenseCategoryEnum": "document_validation.enums.LicenseCategory",
+        "LicenseSituationEnum": "document_validation.enums.LicenseSituation",
+        "MachineStatusEnum": "machines.enums.MachineStatus",
+        "PostingStatusEnum": "postings.enums.PostingStatus",
+        "RentalStatusEnum": "rentals.enums.RentalStatus",
+        "ContractStatusEnum": "contracts.enums.ContractStatus",
+        "SignatureRoleEnum": "contracts.enums.SignatureRole",
+        "PaymentStatusEnum": "payments.enums.PaymentStatus",
     },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
