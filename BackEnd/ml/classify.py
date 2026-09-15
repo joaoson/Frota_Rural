@@ -1,13 +1,13 @@
 import json
-import sys
 import os
 import pathlib
+import sys
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 import numpy as np
-from PIL import Image
 import tensorflow as tf
+from PIL import Image
 
 IMG_SIZE = (224, 224)
 BASE_DIR = pathlib.Path(__file__).resolve().parent

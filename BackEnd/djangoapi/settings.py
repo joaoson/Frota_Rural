@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -126,6 +127,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # recusa `memory` fora do DEBUG.
 CHANNEL_LAYER_BACKEND = os.getenv("CHANNEL_LAYER_BACKEND", "redis").lower()
 
+CHANNEL_LAYERS: dict[str, dict[str, Any]]
 if CHANNEL_LAYER_BACKEND == "memory":
     if not DEBUG:
         raise ImproperlyConfigured(
@@ -189,6 +191,14 @@ SPECTACULAR_SETTINGS = {
         "ContractStatusEnum": "contracts.enums.ContractStatus",
         "SignatureRoleEnum": "contracts.enums.SignatureRole",
         "PaymentStatusEnum": "payments.enums.PaymentStatus",
+        "UserRoleEnum": "users.enums.UserRole",
+        "SignupRoleEnum": "users.serializer.SELF_SIGNUP_ROLES",
+        "UserStatusEnum": "users.enums.UserStatus",
+        "ThreadScopeEnum": "chat.enums.ThreadScope",
+        "ReportResolutionEnum": "chat.enums.ReportResolution",
+        "ModerationDecisionEnum": "chat.enums.ModerationDecision",
+        "ModerationQueueStatusEnum": "administration.enums.ModerationQueueStatus",
+        "ModerationQueueSourceEnum": "administration.enums.ModerationQueueSource",
     },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,

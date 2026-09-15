@@ -5,24 +5,26 @@ Run: python manage.py shell < seed.py
 
 import os
 import uuid
+
 import django
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 django.setup()
 
-from document_validation.models import OperatorLicense, Certification
-from machines.models import Machines
-from postings.models import Postings, PostingsPhotos
-from users.models import Users
-
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from decimal import Decimal
-from chat.models import Messages
-from rentals.models import Rentals
-from reviews.models import Reviews
-from contracts.models import Contracts
+
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
+
+from chat.models import Messages
+from contracts.models import Contracts
+from document_validation.models import Certification
+from machines.models import Machines
+from postings.models import Postings, PostingsPhotos
+from rentals.models import Rentals
+from reviews.models import Reviews
+from users.models import Users
 
 now = timezone.now()
 
@@ -458,7 +460,7 @@ messages = []
 for i in range(20):
     sender = locatarios[i % len(locatarios)]
     receiver = locadores[i % len(locadores)]
-    m = Messages.objects.create(
+    msg = Messages.objects.create(
         id=uuid.uuid4(),
         sender=sender,
         receiver=receiver,
@@ -467,7 +469,7 @@ for i in range(20):
         sent_at=now - timedelta(hours=200 - i * 10),
         flagged_for_moderation=(i == 15),
     )
-    messages.append(m)
+    messages.append(msg)
 print(f"[OK]{len(messages)} Messages created")
 
 

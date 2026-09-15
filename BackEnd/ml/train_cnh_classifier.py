@@ -107,7 +107,7 @@ def main():
 
     print(f"\n[INFO] Iniciando treino ({EPOCHS} epochs, patience={PATIENCE})...\n")
 
-    history = model.fit(
+    model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=EPOCHS,

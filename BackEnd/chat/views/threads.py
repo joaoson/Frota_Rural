@@ -44,6 +44,7 @@ class ThreadListView(ChatAPIView):
     @extend_schema(
         tags=TAGS,
         summary="Lista as conversas do usuário (inbox)",
+        operation_id="chat_threads_list",
         parameters=[InboxFilterSerializer],
         responses={200: ThreadPageOutputSerializer, **error_responses(400)},
     )
@@ -56,6 +57,7 @@ class ThreadDetailView(ChatAPIView):
     @extend_schema(
         tags=TAGS,
         summary="Busca uma conversa pelo thread_id",
+        operation_id="chat_threads_retrieve",
         description=(
             "O inbox é derivado da tabela de mensagens, então uma conversa recém-"
             "aberta (zero mensagens) não aparece em GET /chat/threads/. Este "
