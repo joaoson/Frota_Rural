@@ -1,51 +1,42 @@
-from django.db import IntegrityError
-from drf_spectacular.utils import (
-    OpenApiExample,
-    OpenApiParameter,
-    OpenApiResponse,
-    extend_schema,
-    extend_schema_view,
-)
+from uuid import UUID
+
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from common.schemas import ErrorResponseSerializer
-from reviews.models import Reviews
-from reviews.serializer import ReviewSerializer
+from common.schemas import error_response, error_responses
+from reviews.serializer import (
+    ReviewFilterSerializer,
+    ReviewInputSerializer,
+    ReviewOutputSerializer,
+)
+from reviews.services import ReviewService
 
-REVIEW_NOT_FOUND = OpenApiResponse(description="Avaliação não encontrada.")
-INVALID_DATA = OpenApiResponse(description="Dados inválidos ou em conflito.")
+TAGS = ["Avaliações"]
+REVIEW_NOT_FOUND = error_response(404, "Avaliação não encontrada.")
+INVALID_REVIEW = error_response(400, "Dados inválidos ou avaliação já existente para esta locação.")
 
 
-def _reviews_queryset():
-    return Reviews.objects.all().select_related("reviewer", "reviewee")
-
-
-@extend_schema_view(
-    get=extend_schema(
-        tags=["Avaliações"],
+class ReviewListView(APIView):
+    @extend_schema(
+        tags=TAGS,
         summary="Listar avaliações",
         description="Retorna as avaliações registradas, com filtros opcionais por avaliador, avaliado ou locação.",
-        parameters=[
-            OpenApiParameter("reviewee", type=str, description="ID do usuário avaliado"),
-            OpenApiParameter("reviewer", type=str, description="ID do usuário que avaliou"),
-            OpenApiParameter("rental", type=str, description="ID da locação"),
-        ],
-        responses={200: ReviewSerializer(many=True)},
-    ),
-    post=extend_schema(
-        tags=["Avaliações"],
+        parameters=[ReviewFilterSerializer],
+        responses={200: ReviewOutputSerializer(many=True), **error_responses(400)},
+    )
+    def get(self, request: Request) -> Response:
+        reviews = ReviewService.list(request.query_params)
+        return Response(ReviewOutputSerializer(reviews, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Criar avaliação",
-        description="Registra a avaliação de uma das partes ao final de uma locação. Cada locação aceita uma avaliação por avaliador.",
-        request=ReviewSerializer,
-        responses={
-            201: ReviewSerializer,
-            400: OpenApiResponse(
-                response=ErrorResponseSerializer,
-                description="Dados inválidos ou avaliação já existente para esta locação.",
-            ),
-        },
+        description="Registra a avaliação (1 a 5) de uma das partes ao final de uma locação. Cada locação aceita uma avaliação por avaliador.",
+        request=ReviewInputSerializer,
+        responses={201: ReviewOutputSerializer, 400: INVALID_REVIEW, **error_responses(409)},
         examples=[
             OpenApiExample(
                 "Avaliação 5 estrelas",
@@ -60,100 +51,62 @@ def _reviews_queryset():
                 request_only=True,
             )
         ],
-    ),
-)
-@api_view(["GET", "POST"])
-def reviews_list(request):
-    if request.method == "GET":
-        qs = _reviews_queryset().order_by("-created_at", "-id")
-        reviewee_id = request.query_params.get("reviewee")
-        if reviewee_id:
-            qs = qs.filter(reviewee_id=reviewee_id)
-        reviewer_id = request.query_params.get("reviewer")
-        if reviewer_id:
-            qs = qs.filter(reviewer_id=reviewer_id)
-        rental_id = request.query_params.get("rental")
-        if rental_id:
-            qs = qs.filter(rental_id=rental_id)
-
-        serializer = ReviewSerializer(qs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    serializer = ReviewSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        serializer.save()
-    except IntegrityError:
-        return Response(
-            {
-                "error": "Dados inválidos ou em conflito (ex.: avaliação já existe para este aluguel)."
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
+    )
+    def post(self, request: Request) -> Response:
+        review = ReviewService.create(request.data)
+        return Response(ReviewOutputSerializer(review).data, status=status.HTTP_201_CREATED)
 
 
-@extend_schema_view(
-    get=extend_schema(
-        tags=["Avaliações"],
+class ReviewDetailView(APIView):
+    @extend_schema(
+        tags=TAGS,
         summary="Consultar avaliação",
-        responses={200: ReviewSerializer, 404: REVIEW_NOT_FOUND},
-    ),
-    put=extend_schema(
-        tags=["Avaliações"],
+        responses={200: ReviewOutputSerializer, 404: REVIEW_NOT_FOUND},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        review = ReviewService.get(pk)
+        return Response(ReviewOutputSerializer(review).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Substituir avaliação",
-        request=ReviewSerializer,
-        responses={200: ReviewSerializer, 400: INVALID_DATA, 404: REVIEW_NOT_FOUND},
-    ),
-    patch=extend_schema(
-        tags=["Avaliações"],
+        request=ReviewInputSerializer,
+        responses={
+            200: ReviewOutputSerializer,
+            400: INVALID_REVIEW,
+            404: REVIEW_NOT_FOUND,
+            **error_responses(409),
+        },
+    )
+    def put(self, request: Request, pk: UUID) -> Response:
+        review = ReviewService.update(pk, request.data)
+        return Response(ReviewOutputSerializer(review).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Atualizar avaliação parcialmente",
         description="Útil para corrigir apenas a nota ou o comentário.",
-        request=ReviewSerializer,
-        responses={200: ReviewSerializer, 400: INVALID_DATA, 404: REVIEW_NOT_FOUND},
-    ),
-    delete=extend_schema(
-        tags=["Avaliações"],
+        request=ReviewInputSerializer,
+        responses={
+            200: ReviewOutputSerializer,
+            400: INVALID_REVIEW,
+            404: REVIEW_NOT_FOUND,
+            **error_responses(409),
+        },
+    )
+    def patch(self, request: Request, pk: UUID) -> Response:
+        review = ReviewService.update(pk, request.data, partial=True)
+        return Response(ReviewOutputSerializer(review).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
         summary="Excluir avaliação",
         responses={
-            204: OpenApiResponse(description="Avaliação excluída."),
+            204: None,
             404: REVIEW_NOT_FOUND,
-            409: OpenApiResponse(
-                response=ErrorResponseSerializer,
-                description="A avaliação não pode ser excluída por estar referenciada em outro registro.",
-            ),
+            409: error_response(409, "A avaliação está referenciada em outro registro."),
         },
-    ),
-)
-@api_view(["GET", "PUT", "PATCH", "DELETE"])
-def review_detail(request, pk):
-    try:
-        review = _reviews_queryset().get(pk=pk)
-    except Reviews.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == "GET":
-        return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
-
-    if request.method in ("PUT", "PATCH"):
-        serializer = ReviewSerializer(review, data=request.data, partial=request.method == "PATCH")
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            serializer.save()
-        except IntegrityError:
-            return Response(
-                {"error": "Dados inválidos ou em conflito."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    try:
-        review.delete()
-    except IntegrityError:
-        return Response(
-            {"error": "Não é possível excluir esta avaliação."},
-            status=status.HTTP_409_CONFLICT,
-        )
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    )
+    def delete(self, request: Request, pk: UUID) -> Response:
+        ReviewService.delete(pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)

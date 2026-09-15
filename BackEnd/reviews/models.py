@@ -15,3 +15,6 @@ class Reviews(models.Model):
     class Meta:
         db_table = "reviews"
         unique_together = (("rental", "reviewer"),)
+
+    def __str__(self) -> str:
+        return f"Avaliação {self.rating}/5 da locação {self.rental_id}"
