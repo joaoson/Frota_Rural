@@ -19,7 +19,10 @@ class ValidationErrorBodyTests(SimpleTestCase):
     def test_field_and_non_field_errors(self):
         response = handle(
             exceptions.ValidationError(
-                {"email": ["Este e-mail já está em uso."], "non_field_errors": ["Período em conflito."]}
+                {
+                    "email": ["Este e-mail já está em uso."],
+                    "non_field_errors": ["Período em conflito."],
+                }
             )
         )
 
@@ -86,9 +89,19 @@ class ApiExceptionBodyTests(SimpleTestCase):
     def test_default_english_messages_are_translated(self):
         cases = [
             (Http404(), 404, "not_found", "Recurso não encontrado."),
-            (DjangoPermissionDenied(), 403, "permission_denied", "Você não tem permissão para executar esta ação."),
+            (
+                DjangoPermissionDenied(),
+                403,
+                "permission_denied",
+                "Você não tem permissão para executar esta ação.",
+            ),
             (exceptions.NotAuthenticated(), 401, "not_authenticated", "Autenticação necessária."),
-            (exceptions.MethodNotAllowed("DELETE"), 405, "method_not_allowed", "Método \"DELETE\" não permitido."),
+            (
+                exceptions.MethodNotAllowed("DELETE"),
+                405,
+                "method_not_allowed",
+                'Método "DELETE" não permitido.',
+            ),
         ]
         for exc, status_code, code, message in cases:
             with self.subTest(exc=type(exc).__name__):

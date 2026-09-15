@@ -1,7 +1,8 @@
 from django.db import models
 
+from machines.enums import MachineStatus
 
-# Create your models here.
+
 class Machines(models.Model):
     id = models.UUIDField(primary_key=True)
     owner = models.ForeignKey("users.Users", models.DO_NOTHING)
@@ -11,10 +12,12 @@ class Machines(models.Model):
     year = models.IntegerField(blank=True, null=True)
     technical_specifications = models.TextField(blank=True, null=True)
     usage_purpose = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=50, choices=MachineStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        # managed = False
         db_table = "machines"
+
+    def __str__(self) -> str:
+        return " ".join(filter(None, [self.brand, self.model])) or str(self.id)

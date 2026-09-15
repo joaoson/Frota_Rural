@@ -13,7 +13,9 @@ class ErrorResponseSerializer(serializers.Serializer[Any]):
         help_text="Código estável, legível por máquina (ex.: `validation_error`, `not_found`)."
     )
     message = serializers.CharField(help_text="Descrição do erro em PT-BR, pronta para exibição.")
-    errors = serializers.DictField(
+    # O metaclass do DRF remove os campos declarados dos atributos da classe, então
+    # este campo não sobrescreve `Serializer.errors` em runtime — só para o mypy.
+    errors = serializers.DictField(  # type: ignore[assignment]
         child=serializers.ListField(child=serializers.CharField()),
         help_text=(
             "Mensagens por campo. Vazio fora de erro de validação; erros sem campo "
