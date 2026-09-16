@@ -8,7 +8,7 @@ import {
 } from "../types/reviewSchemas";
 import { toDomain } from "./reviewMapper";
 
-const COLLECTION_PATH = "reviews/";
+const COLLECTION_PATH = "reviews";
 
 export interface ReviewFilter {
   revieweeId?: string;

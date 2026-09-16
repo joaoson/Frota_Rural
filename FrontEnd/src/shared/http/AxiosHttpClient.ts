@@ -14,7 +14,7 @@ import {
   UnexpectedError,
 } from "./errors";
 
-export const DEFAULT_BASE_URL = "http://localhost:8000/api/";
+export const DEFAULT_BASE_URL = "http://localhost:8000/api";
 
 // Erros de regra de negócio sem campo associado. O backend já os resume em
 // `message`; mantê-los fora de `fieldErrors` evita que um formulário tente

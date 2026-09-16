@@ -67,11 +67,11 @@ export class HttpModerationRepository implements ModerationRepository {
     });
     return response.data?.message ?? "Anúncio reprovado.";
   }
-  /** Fila de mensagens sinalizadas. `admin/chat/messages/` leva barra final. */
+  /** Fila de mensagens sinalizadas. */
   async listFlaggedMessages(status = "pending"): Promise<FlaggedMessage[]> {
     const response = await this.http.send<unknown>({
       method: "GET",
-      path: "admin/chat/messages/",
+      path: "admin/chat/messages",
       query: { status },
     });
     return flaggedPageApiSchema.parse(response.data).results.map(toFlaggedMessage);
