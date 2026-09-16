@@ -12,13 +12,13 @@ from document_validation.views import (
 )
 
 urlpatterns = [
-    path("documents/upload/", DocumentUploadView.as_view(), name="upload_document"),
+    path("documents/upload", DocumentUploadView.as_view(), name="upload_document"),
     path(
-        "operator-licenses/validate-document/",
+        "operator-licenses/validate-document",
         CnhValidationView.as_view(),
         name="validate_cnh_document",
     ),
-    path("operator-licenses/", OperatorLicenseListView.as_view(), name="operator_licenses_list"),
+    path("operator-licenses", OperatorLicenseListView.as_view(), name="operator_licenses_list"),
     path(
         "operator-licenses/<uuid:pk>/review",
         OperatorLicenseReviewView.as_view(),
@@ -29,7 +29,7 @@ urlpatterns = [
         OperatorLicenseDetailView.as_view(),
         name="operator_license_detail",
     ),
-    path("certifications/", CertificationListView.as_view(), name="certifications_list"),
+    path("certifications", CertificationListView.as_view(), name="certifications_list"),
     path(
         "certifications/<uuid:pk>/review",
         CertificationReviewView.as_view(),

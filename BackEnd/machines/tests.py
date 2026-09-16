@@ -36,7 +36,7 @@ class MachineApiTests(TestCase):
         }
 
     def post(self, body):
-        return self.client.post("/api/machines/", body, content_type="application/json")
+        return self.client.post("/api/machines", body, content_type="application/json")
 
     def test_create_normalizes_renagro_and_defaults_status(self):
         response = self.post(self.payload())
@@ -72,7 +72,7 @@ class MachineApiTests(TestCase):
         )
 
     def test_invalid_filter_is_a_400_not_a_500(self):
-        response = self.client.get("/api/machines/?owner=abc")
+        response = self.client.get("/api/machines?owner=abc")
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("owner", response.json()["errors"])
@@ -83,7 +83,7 @@ class MachineApiTests(TestCase):
         Machines.objects.create(id=uuid.uuid4(), owner=self.owner, brand="Valtra")
         Machines.objects.create(id=uuid.uuid4(), owner=other, brand="John Deere")
 
-        response = self.client.get(f"/api/machines/?owner={self.owner.id}&brand=john deere")
+        response = self.client.get(f"/api/machines?owner={self.owner.id}&brand=john deere")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()), 1)

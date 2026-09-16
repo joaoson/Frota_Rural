@@ -55,7 +55,7 @@ class RentalApiTests(TestCase):
         }
 
     def post(self, body):
-        return self.client.post("/api/rentals/", body, content_type="application/json")
+        return self.client.post("/api/rentals", body, content_type="application/json")
 
     def test_create_also_creates_a_pending_contract(self):
         response = self.post(self.payload())
@@ -120,7 +120,7 @@ class RentalApiTests(TestCase):
         self.assertIn("status", response.json()["errors"])
 
     def test_invalid_filter_is_a_400(self):
-        response = self.client.get("/api/rentals/?lessee=abc")
+        response = self.client.get("/api/rentals?lessee=abc")
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("lessee", response.json()["errors"])
@@ -129,8 +129,8 @@ class RentalApiTests(TestCase):
         self.post(self.payload())
         other_owner = make_user("locador", 3)
 
-        mine = self.client.get(f"/api/rentals/?lessor={self.owner.id}").json()
-        theirs = self.client.get(f"/api/rentals/?lessor={other_owner.id}").json()
+        mine = self.client.get(f"/api/rentals?lessor={self.owner.id}").json()
+        theirs = self.client.get(f"/api/rentals?lessor={other_owner.id}").json()
 
         self.assertEqual(len(mine), 1)
         self.assertEqual(theirs, [])

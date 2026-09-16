@@ -60,7 +60,7 @@ class ThreadDetailView(ChatAPIView):
         operation_id="chat_threads_retrieve",
         description=(
             "O inbox é derivado da tabela de mensagens, então uma conversa recém-"
-            "aberta (zero mensagens) não aparece em GET /chat/threads/. Este "
+            "aberta (zero mensagens) não aparece em GET /chat/threads. Este "
             "endpoint existe para abrir uma conversa por link direto sem que o "
             "cliente precise interpretar o thread_id."
         ),

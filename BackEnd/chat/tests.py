@@ -167,7 +167,7 @@ class ChatApiTests(TestCase):
         r = self.resolve(w["lessee"], "posting", w["posting"].id)
         tid = r.json()["thread_id"]
         self.assertEqual(
-            self.client.get("/api/chat/threads/", **self.auth(w["lessee"])).json()["count"], 0
+            self.client.get("/api/chat/threads", **self.auth(w["lessee"])).json()["count"], 0
         )
 
         got = self.client.get(f"/api/chat/threads/{tid}", **self.auth(w["lessee"]))
@@ -275,7 +275,7 @@ class ChatApiTests(TestCase):
         Messages.objects.create(
             sender=w["lessee"], receiver=w["owner"], posting=w["posting"], content="sobre o anuncio"
         )
-        r = self.client.get("/api/chat/threads/", **self.auth(w["lessee"]))
+        r = self.client.get("/api/chat/threads", **self.auth(w["lessee"]))
         self.assertEqual(r.status_code, 200)
         data = r.json()
         self.assertEqual(data["count"], 3, "locação com operador gera duas threads pareadas")
@@ -401,13 +401,13 @@ class ChatApiTests(TestCase):
         MessageReports.objects.create(message=m, reported_by=w["lessee"], reason="ruim")
         Messages.objects.filter(id=m.id).update(flagged_for_moderation=True)
 
-        q = self.client.get("/api/admin/chat/messages/", **self.auth(w["admin"]))
+        q = self.client.get("/api/admin/chat/messages", **self.auth(w["admin"]))
         self.assertEqual(q.status_code, 200)
         self.assertEqual(q.json()["count"], 1)
         self.assertEqual(q.json()["results"][0]["source"], "report")
 
         self.assertEqual(
-            self.client.get("/api/admin/chat/messages/", **self.auth(w["lessee"])).status_code, 403
+            self.client.get("/api/admin/chat/messages", **self.auth(w["lessee"])).status_code, 403
         )
 
         r = self.client.put(

@@ -96,6 +96,12 @@ CORS_ALLOWED_ORIGINS = [
 # If you want to allow cookies/sessions to be sent (like for login)
 CORS_ALLOW_CREDENTIALS = True
 
+# Nenhuma rota da API termina com barra. O APPEND_SLASH so *acrescenta* barra ao
+# path que nao casou, entao aqui ele nunca ajudaria: serviria apenas para
+# esconder chamada fora do padrao -- e, em escrita, o 301 refaz a chamada como
+# GET e perde o corpo.
+APPEND_SLASH = False
+
 ROOT_URLCONF = "djangoapi.urls"
 
 TEMPLATES = [

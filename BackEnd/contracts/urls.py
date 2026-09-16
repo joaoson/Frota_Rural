@@ -9,7 +9,7 @@ from contracts.views import (
 )
 
 urlpatterns = [
-    path("contracts/", ContractListView.as_view(), name="contracts_list"),
+    path("contracts", ContractListView.as_view(), name="contracts_list"),
     path("contracts/<uuid:pk>", ContractDetailView.as_view(), name="contract_detail"),
     # Assinatura eletrônica
     path("contracts/<uuid:pk>/sign", ContractSignView.as_view(), name="sign_contract"),

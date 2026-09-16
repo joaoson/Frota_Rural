@@ -40,7 +40,7 @@ class PostingPhotoUploadTests(TestCase):
             created_at=timezone.now(),
             updated_at=timezone.now(),
         )
-        self.url = f"/api/postings/{self.posting.id}/photos/"
+        self.url = f"/api/postings/{self.posting.id}/photos"
 
     def _image(self, name="foto.jpg", content_type="image/jpeg", size=64):
         return SimpleUploadedFile(name, b"x" * size, content_type=content_type)
@@ -134,7 +134,7 @@ class PostingPhotoUploadTests(TestCase):
 
     def test_unknown_posting_returns_404(self):
         response = self.client.post(
-            f"/api/postings/{uuid.uuid4()}/photos/", {"image": self._image()}
+            f"/api/postings/{uuid.uuid4()}/photos", {"image": self._image()}
         )
         self.assertEqual(response.status_code, 404)
 
@@ -188,11 +188,11 @@ class PostingPhotoSerializationTests(TestCase):
         legacy = "https://storage.example.com/postings/legado.jpg"
         self._photo(legacy, True)
 
-        response = self.client.get("/api/postings/")
+        response = self.client.get("/api/postings")
         item = next(p for p in response.json() if p["id"] == str(self.posting.id))
         self.assertEqual(item["primary_photo_url"], legacy)
 
     def test_list_returns_null_when_there_are_no_photos(self):
-        response = self.client.get("/api/postings/")
+        response = self.client.get("/api/postings")
         item = next(p for p in response.json() if p["id"] == str(self.posting.id))
         self.assertIsNone(item["primary_photo_url"])

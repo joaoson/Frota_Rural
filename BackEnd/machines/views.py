@@ -37,7 +37,7 @@ class MachineListView(APIView):
         summary="Cadastrar máquina",
         description=(
             "Cadastra uma máquina no inventário do locador. A máquina existe independentemente "
-            "de anúncio: publicá-la para locação é um passo separado, em `/api/postings/`."
+            "de anúncio: publicá-la para locação é um passo separado, em `/api/postings`."
         ),
         request=MachineInputSerializer,
         responses={201: MachineOutputSerializer, **error_responses(400, 409)},

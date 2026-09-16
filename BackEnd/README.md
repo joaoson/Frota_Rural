@@ -209,7 +209,7 @@ Saída (JSON):
 O endereço base da API é:
 
 ```
-http://127.0.0.1:8000/api/
+http://127.0.0.1:8000/api
 ```
 
 Você pode ver todas as rotas no arquivo djangoapi/urls.py.

@@ -50,7 +50,7 @@ class ReviewApiTests(TestCase):
         }
 
     def post(self, body):
-        return self.client.post("/api/reviews/", body, content_type="application/json")
+        return self.client.post("/api/reviews", body, content_type="application/json")
 
     def test_create_returns_names(self):
         response = self.post(self.payload())
@@ -79,8 +79,8 @@ class ReviewApiTests(TestCase):
     def test_list_filters_by_reviewee(self):
         self.post(self.payload())
 
-        mine = self.client.get(f"/api/reviews/?reviewee={self.owner.id}").json()
-        none = self.client.get(f"/api/reviews/?reviewee={self.lessee.id}").json()
+        mine = self.client.get(f"/api/reviews?reviewee={self.owner.id}").json()
+        none = self.client.get(f"/api/reviews?reviewee={self.lessee.id}").json()
 
         self.assertEqual(len(mine), 1)
         self.assertEqual(none, [])

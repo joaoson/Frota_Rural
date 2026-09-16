@@ -51,7 +51,7 @@ class OperatorLicenseTests(TestCase):
         }
 
     def post(self, body):
-        return self.client.post("/api/operator-licenses/", body, content_type="application/json")
+        return self.client.post("/api/operator-licenses", body, content_type="application/json")
 
     def review(self, license_id, body):
         return self.client.patch(
@@ -103,13 +103,13 @@ class OperatorLicenseTests(TestCase):
         OperatorLicense.objects.update(validation_status="approved")
         self.post(self.payload(cnh_number="99999999999"))
 
-        response = self.client.get("/api/operator-licenses/?validation_status=pending")
+        response = self.client.get("/api/operator-licenses?validation_status=pending")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual([item["cnh_number"] for item in response.json()], ["99999999999"])
 
     def test_invalid_filter_is_a_400(self):
-        response = self.client.get("/api/operator-licenses/?validation_status=talvez")
+        response = self.client.get("/api/operator-licenses?validation_status=talvez")
 
         self.assertEqual(response.status_code, 400)
 
@@ -118,7 +118,7 @@ class CertificationTests(TestCase):
     def test_create_and_reject_with_note(self):
         user = make_user()
         created = self.client.post(
-            "/api/certifications/",
+            "/api/certifications",
             {
                 "user": str(user.id),
                 "issuing_organization": "SENAR",
@@ -156,7 +156,7 @@ class DocumentFileTests(TestCase):
     def test_upload_saves_the_file_and_returns_its_url(self):
         with override_settings(MEDIA_ROOT=self.media_root):
             response = self.client.post(
-                "/api/documents/upload/",
+                "/api/documents/upload",
                 {"file": SimpleUploadedFile("cnh.pdf", b"%PDF", content_type="application/pdf")},
             )
 
@@ -167,7 +167,7 @@ class DocumentFileTests(TestCase):
 
     def test_upload_rejects_unsupported_type(self):
         response = self.client.post(
-            "/api/documents/upload/",
+            "/api/documents/upload",
             {"file": SimpleUploadedFile("nota.txt", b"x", content_type="text/plain")},
         )
 
@@ -178,7 +178,7 @@ class DocumentFileTests(TestCase):
         )
 
     def test_upload_without_file(self):
-        response = self.client.post("/api/documents/upload/", {})
+        response = self.client.post("/api/documents/upload", {})
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["message"], "Nenhum arquivo enviado.")
@@ -187,7 +187,7 @@ class DocumentFileTests(TestCase):
         result = {"is_valid": True, "confidence": "high", "score": 0.97}
         with patch("document_validation.services.CnhClassifier.classify", return_value=result):
             response = self.client.post(
-                "/api/operator-licenses/validate-document/",
+                "/api/operator-licenses/validate-document",
                 {"file": SimpleUploadedFile("cnh.jpg", b"x", content_type="image/jpeg")},
             )
 
@@ -200,7 +200,7 @@ class DocumentFileTests(TestCase):
             side_effect=FileNotFoundError("Modelo não encontrado."),
         ):
             response = self.client.post(
-                "/api/operator-licenses/validate-document/",
+                "/api/operator-licenses/validate-document",
                 {"file": SimpleUploadedFile("cnh.jpg", b"x", content_type="image/jpeg")},
             )
 

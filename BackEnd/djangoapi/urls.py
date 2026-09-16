@@ -37,14 +37,12 @@ urlpatterns = [
     path(BASE_PATH, include("chat.urls")),
     path(BASE_PATH, include("payments.urls")),
     # OpenAPI 3 documentation with Swagger UI
-    path(f"{BASE_PATH}schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(f"{BASE_PATH}schema", SpectacularAPIView.as_view(), name="schema"),
     path(
-        f"{BASE_PATH}schema/swagger-ui/",
+        f"{BASE_PATH}schema/swagger-ui",
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
-    path(
-        f"{BASE_PATH}schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"
-    ),
+    path(f"{BASE_PATH}schema/redoc", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
 ]

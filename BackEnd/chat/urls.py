@@ -12,7 +12,7 @@ from chat.views import (
 
 urlpatterns = [
     path("chat/threads/resolve", ThreadResolveView.as_view(), name="chat_resolve_thread"),
-    path("chat/threads/", ThreadListView.as_view(), name="chat_list_threads"),
+    path("chat/threads", ThreadListView.as_view(), name="chat_list_threads"),
     path("chat/unread", UnreadCountView.as_view(), name="chat_unread"),
     # thread_id vai como um único segmento url-encoded pelo cliente; <str:> casa
     # com tudo menos '/', e os dois-pontos da chave são pchar válido.
