@@ -15,7 +15,8 @@ import {
   useUploadDocument,
 } from "@/features/documents/hooks/useDocuments";
 import type { CertificationFormValues } from "@/features/documents/types/documentSchemas";
-import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { applyFieldErrors } from "@/shared/http/applyFieldErrors";
+import { HttpError } from "@/shared/http/errors";
 import { BackLink } from "@/shared/components/BackLink";
 import { PageShell } from "@/shared/components/PageShell";
 import { FileDropzone } from "@/shared/components/FileDropzone";
@@ -83,21 +84,10 @@ const CertificationUpload = () => {
       );
       navigate("/dashboard");
     } catch (error) {
-      if (error instanceof BadRequestError && error.hasFieldErrors) {
-        let placed = false;
-        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
-          const formField = API_FIELD_TO_FORM[apiField];
-          const message = messages[0];
-          if (formField && message) {
-            form.setError(formField, { type: "server", message });
-            placed = true;
-          }
-        }
-        if (placed) return;
-      }
+      if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
         error instanceof HttpError
-          ? error.message
+          ? (error.firstFieldError()?.message ?? error.message)
           : isEditing
             ? "Erro ao atualizar certificação. Verifique os dados e tente novamente."
             : "Erro ao cadastrar certificação. Verifique os dados e tente novamente.",

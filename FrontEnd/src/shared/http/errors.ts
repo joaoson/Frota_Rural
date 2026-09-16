@@ -3,6 +3,9 @@ export type FieldErrors = Record<string, string[]>;
 /**
  * Corpo único de erro do backend:
  * {"code": "validation_error", "message": "Dados inválidos.", "errors": {campo: ["msg"]}}
+ *
+ * Erro aninhado chega com a chave pontuada (`photos.1.url`), e erro de regra de
+ * negócio sem campo vem em `errors.non_field_errors`, repetido em `message`.
  */
 export interface ApiErrorBody {
   code: string;
@@ -14,6 +17,12 @@ export interface HttpErrorDetails {
   // `code` estável devolvido pelo backend (ex.: "invalid_credentials", "already_signed")
   apiCode?: string;
   fieldErrors?: FieldErrors;
+  nonFieldErrors?: string[];
+}
+
+export interface FieldError {
+  field: string;
+  message: string;
 }
 
 export class HttpError extends Error {
@@ -21,6 +30,8 @@ export class HttpError extends Error {
   readonly status?: number;
   readonly apiCode?: string;
   readonly fieldErrors: FieldErrors;
+  // Erros de regra de negócio sem campo associado (`non_field_errors`).
+  readonly nonFieldErrors: string[];
 
   constructor(
     code: string,
@@ -35,11 +46,27 @@ export class HttpError extends Error {
     this.status = status;
     this.apiCode = details.apiCode;
     this.fieldErrors = details.fieldErrors ?? {};
+    this.nonFieldErrors = details.nonFieldErrors ?? [];
   }
 
   // Primeira mensagem registrada quando existem vários erros para um campo
   firstErrorFor(field: string): string | undefined {
     return this.fieldErrors[field]?.[0];
+  }
+
+  /**
+   * Primeiro erro de campo, na ordem em que o backend mandou.
+   *
+   * Serve de mensagem para quem não tem onde pendurar o erro: campo que a tela
+   * não mapeia, campo preenchido pelo servidor (`user`, `owner`, `status`) ou
+   * chave pontuada de um serializer aninhado. Sem isto sobraria o `message`
+   * genérico ("Dados inválidos."), que não diz o que está errado.
+   */
+  firstFieldError(): FieldError | undefined {
+    for (const [field, messages] of Object.entries(this.fieldErrors)) {
+      if (messages.length > 0) return { field, message: messages[0] };
+    }
+    return undefined;
   }
 
   get hasFieldErrors(): boolean {
@@ -49,8 +76,8 @@ export class HttpError extends Error {
 
 // 400. Erros por campo em `fieldErrors`; erro geral (sem campo) em `message`.
 export class BadRequestError extends HttpError {
-  constructor(message: string, fieldErrors: FieldErrors = {}, cause?: unknown, apiCode?: string) {
-    super("bad_request", message, 400, cause, { apiCode, fieldErrors });
+  constructor(message = "Dados inválidos.", cause?: unknown, details?: HttpErrorDetails) {
+    super("bad_request", message, 400, cause, details);
   }
 }
 

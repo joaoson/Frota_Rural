@@ -21,7 +21,8 @@ import {
 } from "@/features/documents/types/documentSchemas";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { masked } from "@/shared/lib/maskedRegister";
-import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { applyFieldErrors } from "@/shared/http/applyFieldErrors";
+import { HttpError } from "@/shared/http/errors";
 import { maskDocument } from "@/shared/utils/masks/maskDocument";
 import { maskRG } from "@/shared/utils/masks/maskRG";
 import { BackLink } from "@/shared/components/BackLink";
@@ -63,6 +64,10 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
   issuing_state: "issuingState",
   issuing_authority: "issuingAuthority",
   situation: "situation",
+  acc: "acc",
+  ear: "ear",
+  medical_restrictions: "medicalRestrictions",
+  observations: "observations",
   points: "points",
 };
 
@@ -143,21 +148,10 @@ const CNHUpload = () => {
       toast.success(isEditing ? "CNH atualizada com sucesso." : "CNH cadastrada com sucesso.");
       navigate("/dashboard");
     } catch (error) {
-      if (error instanceof BadRequestError && error.hasFieldErrors) {
-        let placed = false;
-        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
-          const formField = API_FIELD_TO_FORM[apiField];
-          const message = messages[0];
-          if (formField && message) {
-            form.setError(formField, { type: "server", message });
-            placed = true;
-          }
-        }
-        if (placed) return;
-      }
+      if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
         error instanceof HttpError
-          ? error.message
+          ? (error.firstFieldError()?.message ?? error.message)
           : isEditing
             ? "Erro ao atualizar CNH. Verifique os dados e tente novamente."
             : "Erro ao cadastrar CNH. Verifique os dados e tente novamente.",
