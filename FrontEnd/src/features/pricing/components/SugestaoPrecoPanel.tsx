@@ -77,7 +77,7 @@ const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPan
       <div className="space-y-1.5">
         <p className="text-[10px] font-bold uppercase tracking-widest text-outline">Como chegamos nesse valor</p>
         {suggestion.composicao.map((item) => {
-          const share = total > 0 ? Number(item.brl_hora) / total : 0;
+          const share = total > 0 ? Math.abs(Number(item.brl_hora)) / total : 0;
           return (
             <div key={item.chave} className="flex items-center gap-3 text-xs">
               <span className="flex-1 text-on-surface-variant">{item.item}</span>

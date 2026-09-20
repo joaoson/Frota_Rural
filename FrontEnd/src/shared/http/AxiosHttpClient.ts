@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 
+import { getApiBaseUrl } from "./apiUrls";
 import type { HttpClient, HttpRequest, HttpResponse } from "./HttpClient";
 import {
   BadRequestError,
@@ -14,13 +15,13 @@ import {
   UnexpectedError,
 } from "./errors";
 
-export const DEFAULT_BASE_URL = "http://localhost:8000/api/";
+export { DEFAULT_BASE_URL } from "./apiUrls";
 
 export function createAxiosInstance(baseURL?: string): AxiosInstance {
   return axios.create({
     // withCredentials é obrigatório pois refresh token vive num cookie httpOnly
     // com path=/api/login e só é enviado se as credenciais acompanharem
-    baseURL: baseURL ?? import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL,
+    baseURL: getApiBaseUrl(baseURL),
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
   });

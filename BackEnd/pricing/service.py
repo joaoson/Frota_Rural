@@ -14,11 +14,13 @@ com um número inventado é pior do que deixar o locador digitar o dele.
 
 from __future__ import annotations
 
+import json
 import logging
+import math
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from statistics import median
 
 from django.utils import timezone
@@ -46,6 +48,7 @@ MIN_COMPARABLES_FOR_WEIGHT = 5
 # Faixas de semelhança para um anúncio contar como comparável.
 COMPARABLE_YEAR_SPAN = 3
 COMPARABLE_POWER_SPAN = 0.20
+MAX_MONEY_VALUE = Decimal("99999999.99")
 
 
 class SuggestionUnavailable(Exception):
@@ -83,9 +86,23 @@ def _cached_valuation(brand, model, year):
     return None
 
 
-def _store_valuation(brand, model, year, result):
+def _positive_number(value):
+    """Descarta números inválidos antes de usá-los como sinais de preço."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _valid_rates(rates):
+    return [number for rate in rates if (number := _positive_number(rate)) is not None]
+
+
+def _store_valuation(brand, model, year, payload):
     now = timezone.now()
-    payload = result.as_dict()
     MachineValuations.objects.update_or_create(
         brand=_normalize(brand),
         model=_normalize(model),
@@ -96,13 +113,13 @@ def _store_valuation(brand, model, year, result):
         create_defaults={
             "id": uuid.uuid4(),
             "payload": payload,
-            "confidence": result.confidence,
+            "confidence": payload["confidence"],
             "researched_at": now,
             "expires_at": now + timedelta(days=VALUATION_TTL_DAYS),
         },
         defaults={
             "payload": payload,
-            "confidence": result.confidence,
+            "confidence": payload["confidence"],
             "researched_at": now,
             "expires_at": now + timedelta(days=VALUATION_TTL_DAYS),
         },
@@ -139,7 +156,9 @@ def _comparable_postings(machine):
             high = machine.power_cv * (1 + COMPARABLE_POWER_SPAN)
             if not (low <= other.power_cv <= high):
                 continue
-        rates.append(float(posting.hourly_rate))
+        rate = _positive_number(posting.hourly_rate)
+        if rate is not None:
+            rates.append(rate)
     return rates
 
 
@@ -150,6 +169,8 @@ def _anchor(cost_rate, market_rates, internal_rates, confidence):
     acumula anúncios, a própria base vira a melhor fonte de preço e a
     dependência da pesquisa externa cai.
     """
+    market_rates = _valid_rates(market_rates)
+    internal_rates = _valid_rates(internal_rates)
     market = median(market_rates) if market_rates else None
     internal = median(internal_rates) if internal_rates else None
 
@@ -170,7 +191,10 @@ def _anchor(cost_rate, market_rates, internal_rates, confidence):
     if internal is not None and weights["interno"]:
         total += internal * weights["interno"]
         used += weights["interno"]
-    return Decimal(str(total / used)).quantize(Decimal("0.01"))
+    anchored = total / used
+    if not math.isfinite(anchored) or not (0 < anchored <= float(MAX_MONEY_VALUE)):
+        raise SuggestionUnavailable("As tarifas encontradas não permitem sugerir um valor válido.")
+    return Decimal(str(anchored)).quantize(Decimal("0.01"))
 
 
 def _machine_age(machine):
@@ -210,12 +234,11 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
             raise SuggestionUnavailable(
                 "Não foi possível pesquisar o valor de mercado desta máquina."
             )
-        _store_valuation(machine.brand, machine.model, machine.year, result)
         data = result.as_dict()
         source = "pesquisa"
 
-    used_value = data.get("used_value_brl")
-    new_value = data.get("new_value_brl")
+    used_value = _positive_number(data.get("used_value_brl"))
+    new_value = _positive_number(data.get("new_value_brl"))
     confidence = data.get("confidence") or "baixa"
 
     if not data.get("sources"):
@@ -247,7 +270,7 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
                 includes_operator=includes_operator,
             )
         )
-    except PricingError as exc:
+    except (PricingError, InvalidOperation, OverflowError, TypeError, ValueError) as exc:
         raise SuggestionUnavailable(str(exc)) from exc
 
     if not result.within_sanity_band:
@@ -258,20 +281,47 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         )
 
     # --- Ancoragem -----------------------------------------------------------
+    observed_rates = [
+        {**rate, "value": value}
+        for rate in (data.get("observed_rates_brl_hour") or [])
+        if isinstance(rate, dict)
+        and (value := _positive_number(rate.get("value"))) is not None
+    ]
     market_rates = [
         rate["value"]
-        for rate in (data.get("observed_rates_brl_hour") or [])
-        if rate.get("value")
+        for rate in observed_rates
         # Tarifa com operador não é comparável com uma sem, e o dobro do preço
         # entraria na mediana como se fosse a mesma coisa.
-        and bool(rate.get("includes_operator")) == includes_operator
+        if bool(rate.get("includes_operator")) == includes_operator
     ]
     internal_rates = _comparable_postings(machine)
     anchored = _anchor(result.suggested_brl_hour, market_rates, internal_rates, confidence)
 
+    # O motor valida o custo antes da margem. A mistura com anúncios externos
+    # precisa respeitar a mesma banda: um sinal inválido não pode desfazer o
+    # guarda-corpo depois de o cálculo determinístico ter passado por ele.
+    margin = Decimal(str(1 + P.params_for(category).margin))
+    valuation = Decimal(str(used_value))
+    minimum = (valuation * Decimal(str(P.SANITY_MIN_RATIO)) * margin).quantize(Decimal("0.01"))
+    maximum = (valuation * Decimal(str(P.SANITY_MAX_RATIO)) * margin).quantize(Decimal("0.01"))
+    if not minimum <= anchored <= maximum:
+        raise SuggestionUnavailable("As tarifas encontradas estão fora da faixa plausível para esta máquina.")
+
     band = Decimal(str(P.SUGGESTION_BAND))
     range_min = (anchored * (1 - band)).quantize(Decimal("0.01"))
     range_max = (anchored * (1 + band)).quantize(Decimal("0.01"))
+    if range_max > MAX_MONEY_VALUE:
+        raise SuggestionUnavailable("A faixa de preços encontrada excede o valor permitido.")
+
+    # Só guarda insumos válidos; JSONField no PostgreSQL também recusa NaN e
+    # infinito em campos auxiliares, como potência e faixa de valor do usado.
+    payload = {**data, "observed_rates_brl_hour": observed_rates}
+    try:
+        json.dumps(payload, allow_nan=False)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SuggestionUnavailable("A pesquisa retornou dados numéricos inválidos.") from exc
+    if source == "pesquisa":
+        _store_valuation(machine.brand, machine.model, machine.year, payload)
 
     # A taxa da plataforma é somada por fora (payments.pricing), então o locador
     # precisa ver os dois números: o que recebe e o que o locatário paga.
@@ -284,6 +334,13 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         {"chave": item.key, "item": item.label, "brl_hora": str(item.brl_per_billed_hour)}
         for item in result.breakdown
     ]
+    adjustment = anchored - sum(item.brl_per_billed_hour for item in result.breakdown)
+    if adjustment:
+        breakdown.append({
+            "chave": "ajuste_mercado",
+            "item": "Ajuste de mercado e arredondamento",
+            "brl_hora": str(adjustment),
+        })
     assumptions = {
         "categoria": category,
         "idade_anos": age_years,

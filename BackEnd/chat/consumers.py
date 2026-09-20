@@ -68,6 +68,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
+            # A close before accept becomes HTTP 403 in ASGI servers; browsers
+            # only see 1006 and cannot trigger the client's one-refresh retry.
+            protocols = self.scope.get('subprotocols') or []
+            await self.accept(subprotocol='bearer' if 'bearer' in protocols else None)
             await self.close(code=4401)
             return
         self.user = user

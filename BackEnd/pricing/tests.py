@@ -233,6 +233,47 @@ class ServiceTests(TestCase):
         self.assertEqual(suggestion.assumptions['tarifas_mercado_encontradas'], 0)
         self.assertEqual(suggestion.suggested_hourly_rate, Decimal('192.15'))
 
+    def test_tarifas_invalidas_nao_alteram_preco_nem_contaminam_cache(self):
+        invalid_rates = [-1000, 0, float('nan'), float('inf'), float('-inf'), True, '250', None]
+        research = MachineResearch(**{
+            **RESEARCH.as_dict(),
+            'observed_rates_brl_hour': [
+                {'value': value, 'region': None, 'includes_operator': False}
+                for value in invalid_rates
+            ] + [{'value': 250, 'region': 'MT', 'includes_operator': False}],
+        })
+        with patch('pricing.research.research_machine', return_value=research) as provider:
+            suggestion = build_suggestion(self.machine)
+            cached_suggestion = build_suggestion(self.machine)
+
+        self.assertEqual(suggestion.suggested_hourly_rate, Decimal('218.18'))
+        self.assertEqual(cached_suggestion.suggested_hourly_rate, suggestion.suggested_hourly_rate)
+        self.assertEqual(suggestion.assumptions['tarifas_mercado_encontradas'], 1)
+        self.assertEqual(provider.call_count, 1)
+        self.assertEqual(len(MachineValuations.objects.get().payload['observed_rates_brl_hour']), 1)
+        self.assertEqual(
+            sum(Decimal(item['brl_hora']) for item in suggestion.breakdown),
+            suggestion.suggested_hourly_rate,
+        )
+
+    def test_ajuste_de_mercado_negativo_fecha_composicao_e_registro(self):
+        research = MachineResearch(**{
+            **RESEARCH.as_dict(),
+            'observed_rates_brl_hour': [
+                {'value': 150, 'region': 'MT', 'includes_operator': False},
+            ],
+        })
+        with patch('pricing.research.research_machine', return_value=research):
+            suggestion = build_suggestion(self.machine)
+        self.assertEqual(suggestion.suggested_hourly_rate, Decimal('173.18'))
+        adjustment = next(item for item in suggestion.breakdown if item['chave'] == 'ajuste_mercado')
+        self.assertLess(Decimal(adjustment['brl_hora']), 0)
+        self.assertEqual(
+            sum(Decimal(item['brl_hora']) for item in suggestion.breakdown),
+            suggestion.suggested_hourly_rate,
+        )
+        self.assertEqual(PricingSuggestions.objects.get().breakdown, suggestion.breakdown)
+
 
 class ComparablesTests(TestCase):
     def setUp(self):
@@ -272,6 +313,22 @@ class ComparablesTests(TestCase):
         with patch('pricing.research.research_machine', return_value=RESEARCH):
             suggestion = build_suggestion(self.machine)
         self.assertEqual(suggestion.assumptions['comparaveis_internos'], 0)
+
+    def test_tarifas_internas_nao_positivas_nao_contam_na_amostra(self):
+        for i, rate in enumerate([-1000, -1000, 0, 0, 300]):
+            self._make_comparable(rate, i)
+        with patch('pricing.research.research_machine', return_value=RESEARCH):
+            suggestion = build_suggestion(self.machine)
+        self.assertEqual(suggestion.assumptions['comparaveis_internos'], 1)
+        self.assertEqual(suggestion.suggested_hourly_rate, Decimal('192.15'))
+
+    def test_ancoragem_interna_nao_ultrapassa_banda_de_sanidade(self):
+        for i in range(5):
+            self._make_comparable(1000000, i)
+        with patch('pricing.research.research_machine', return_value=RESEARCH):
+            with self.assertRaises(SuggestionUnavailable):
+                build_suggestion(self.machine)
+        self.assertEqual(PricingSuggestions.objects.count(), 0)
 
 
 class EndpointTests(TestCase):
@@ -391,3 +448,51 @@ class EndpointTests(TestCase):
             )
         self.assertEqual(response.status_code, 422)
         self.assertIn('error', response.json())
+
+    def test_avaliacao_nao_finita_responde_422_sem_persistir(self):
+        self._auth(self.owner)
+        for field in ('used_value_brl', 'new_value_brl'):
+            for value in (float('nan'), float('inf'), float('-inf')):
+                with self.subTest(field=field, value=value):
+                    research = MachineResearch(**{**RESEARCH.as_dict(), field: value})
+                    with patch('pricing.research.research_machine', return_value=research):
+                        response = self.client.post('/api/pricing/suggest', {
+                            'machinery': str(self.machine.id),
+                        }, format='json')
+                    self.assertEqual(response.status_code, 422)
+        self.assertEqual(MachineValuations.objects.count(), 0)
+        self.assertEqual(PricingSuggestions.objects.count(), 0)
+
+    def test_tarifa_pesquisada_absurda_responde_422_sem_persistir(self):
+        self._auth(self.owner)
+        for value in (1000000, 1e308):
+            with self.subTest(value=value):
+                research = MachineResearch(**{
+                    **RESEARCH.as_dict(),
+                    'observed_rates_brl_hour': [
+                        {'value': value, 'region': 'MT', 'includes_operator': False},
+                    ],
+                })
+                with patch('pricing.research.research_machine', return_value=research):
+                    response = self.client.post('/api/pricing/suggest', {
+                        'machinery': str(self.machine.id),
+                    }, format='json')
+                self.assertEqual(response.status_code, 422)
+        self.assertEqual(MachineValuations.objects.count(), 0)
+        self.assertEqual(PricingSuggestions.objects.count(), 0)
+
+    def test_dados_auxiliares_nao_finitos_respondem_422_sem_persistir(self):
+        self._auth(self.owner)
+        for fields in (
+            {'power_cv': float('nan')},
+            {'used_value_range_brl': [340000, float('inf')]},
+        ):
+            with self.subTest(fields=fields):
+                research = MachineResearch(**{**RESEARCH.as_dict(), **fields})
+                with patch('pricing.research.research_machine', return_value=research):
+                    response = self.client.post('/api/pricing/suggest', {
+                        'machinery': str(self.machine.id),
+                    }, format='json')
+                self.assertEqual(response.status_code, 422)
+        self.assertEqual(MachineValuations.objects.count(), 0)
+        self.assertEqual(PricingSuggestions.objects.count(), 0)

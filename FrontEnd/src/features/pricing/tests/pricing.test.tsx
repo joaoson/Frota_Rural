@@ -7,6 +7,7 @@ import { PricingStore } from "../api/PricingStore";
 import { usePricingSuggestion } from "../hooks/usePricingSuggestion";
 import type { PricingSuggestion } from "../types/pricing";
 import type { HttpClient } from "@/shared/http/HttpClient";
+import { pricingSuggestionSchema } from "../types/pricingSchemas";
 
 const { suggest } = vi.hoisted(() => ({ suggest: vi.fn() }));
 vi.mock("@/app/container", () => ({ pricingStore: { suggest } }));
@@ -40,6 +41,18 @@ function deferred<T>() {
 }
 
 describe("pricing through the new architecture", () => {
+  it("accepts a market discount while rejecting negative operating costs", () => {
+    const discounted = { ...fixture, composicao: [
+      ...fixture.composicao,
+      { chave: "ajuste_mercado", item: "Ajuste ao mercado", brl_hora: "-12.00" },
+    ] };
+    expect(pricingSuggestionSchema.parse(discounted).composicao.at(-1)?.brl_hora).toBe("-12.00");
+    expect(pricingSuggestionSchema.safeParse({ ...fixture, composicao: [
+      { chave: "capital", item: "Capital", brl_hora: "-12.00" },
+    ] }).success).toBe(false);
+    expect(pricingSuggestionSchema.safeParse({ ...fixture, sugerido_brl_hora: "-1.00" }).success).toBe(false);
+  });
+
   it("sends the machine and validates the real response shape through store/repository/client", async () => {
     const send = vi.fn().mockResolvedValue({ status: 200, data: fixture });
     const store = new PricingStore(new HttpPricingRepository({ send } as HttpClient));

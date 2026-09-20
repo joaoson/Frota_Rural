@@ -47,7 +47,8 @@ class MachineSerializer(serializers.ModelSerializer):
         """
         renagro = data.get("renagro_number")
         if isinstance(renagro, str):
-            data = {**data.items()} if hasattr(data, "getlist") else {**data}
+            # Preserve QueryDict's form semantics and leave request.data intact.
+            data = data.copy()
             data["renagro_number"] = renagro.strip().upper()
         return super().to_internal_value(data)
 

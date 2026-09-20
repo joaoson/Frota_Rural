@@ -32,7 +32,10 @@ e não abre conexão ao voltar à aba depois de logout. Todos os stores registra
 participam de `clearAllStores`. Também foi removido o export não utilizado de
 `buttonVariants`, que impedia o lint de `develop` de passar.
 
-## Validação
+## Validação original
+
+A revisão posterior, com correções e testes adicionais para o merge em
+`develop`, está em [README_Merge_Readiness.md](README_Merge_Readiness.md).
 
 - `npm ci`, `npm run lint`, `npm run build` e `npm test` em `FrontEnd`.
 - 15 testes frontend: contrato HTTP e resposta 422, campos numéricos, resposta

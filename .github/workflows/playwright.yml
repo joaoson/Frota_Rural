@@ -46,6 +46,11 @@ jobs:
           npm run build
           npm run test:e2e:typecheck
           npm test
+      - name: Check backend and run regression tests
+        run: |
+          docker compose exec -T backend python manage.py check
+          docker compose exec -T backend python manage.py makemigrations --check --dry-run
+          docker compose exec -T backend python manage.py test --noinput
       - name: Test Chromium, Firefox and WebKit
         working-directory: FrontEnd
         run: npm run test:e2e

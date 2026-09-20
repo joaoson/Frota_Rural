@@ -53,3 +53,19 @@ it("does not reconnect on visibility changes after logout", async () => {
   act(() => document.dispatchEvent(new Event("visibilitychange")));
   expect(TestSocket.instances).toHaveLength(0);
 });
+
+it("logs out after a second rejected token even when both handshakes were accepted", async () => {
+  renderHook(() => useChatSocket({}));
+  await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
+  act(() => {
+    TestSocket.instances[0].onopen?.();
+    TestSocket.instances[0].onclose?.({ code: 4401 });
+  });
+  await waitFor(() => expect(TestSocket.instances).toHaveLength(2));
+  act(() => {
+    TestSocket.instances[1].onopen?.();
+    TestSocket.instances[1].onclose?.({ code: 4401 });
+  });
+  expect(state.refresh).toHaveBeenCalledTimes(1);
+  expect(state.logout).toHaveBeenCalledTimes(1);
+});

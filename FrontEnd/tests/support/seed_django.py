@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "djangoapi.settings")
 import django
@@ -20,6 +20,7 @@ from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from pricing.models import PricingSuggestions
 from users.models import Users
+from rest_framework_simplejwt.tokens import AccessToken
 
 if not settings.DEBUG:
     raise RuntimeError("Playwright fixtures require DJANGO_DEBUG=true")
@@ -50,13 +51,18 @@ with transaction.atomic():
         for name, role in [("owner", "locador"), ("renter", "locatario")]:
             uid = identity(name)
             email = f"pw-{name}-{namespace.hex}@example.test"
-            Users.objects.create(
+            user = Users.objects.create(
                 id=uid, name=f"Playwright {name}", email=email,
                 password=hashed_password, document=f"PW{uid.hex[:18]}",
                 role=role, address="Castro, PR", birth_date=date(1990, 1, 1),
                 city="Castro", state="PR", status="active",
             )
-            accounts[name] = {"id": str(uid), "email": email, "password": password}
+            expired_access = AccessToken.for_user(user)
+            expired_access.set_exp(lifetime=timedelta(seconds=-1))
+            accounts[name] = {
+                "id": str(uid), "email": email, "password": password,
+                "expiredAccess": str(expired_access),
+            }
         machines = []
         for index, model in enumerate(["6110J", "6125J"]):
             machine = Machines.objects.create(

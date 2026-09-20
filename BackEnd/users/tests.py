@@ -49,9 +49,7 @@ class OperatorTeamTests(TestCase):
         )
 
     def test_requires_authentication(self):
-        # DRF responde 403 (e não 401) porque SessionAuthentication vem primeiro
-        # em DEFAULT_AUTHENTICATION_CLASSES e não emite WWW-Authenticate.
-        self.assertEqual(self.client.get('/api/users/operators').status_code, 403)
+        self.assertEqual(self.client.get('/api/users/operators').status_code, 401)
 
     def test_create_links_operator_to_the_caller(self):
         response = self.create_operator()

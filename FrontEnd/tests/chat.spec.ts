@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test, expect, loginViaAPI, isolateExternalServices } from './support/fixtures';
+import { test, expect, loginViaAPI, isolateExternalServices, apiURL } from './support/fixtures';
 
 function watchSubscription(page: Page, threadId: string) {
   let subscribed = false;
@@ -16,6 +16,19 @@ function watchSubscription(page: Page, threadId: string) {
   });
   return { subscribed: () => subscribed, sent: () => messagesSent };
 }
+
+test('delivers the authentication close code to browsers for an expired token', async ({ page, data }) => {
+  await page.goto('/login');
+  const socketURL = new URL(apiURL);
+  socketURL.protocol = socketURL.protocol === 'https:' ? 'wss:' : 'ws:';
+  socketURL.pathname = '/ws/chat';
+  const code = await page.evaluate(({ url, token }) => new Promise<number>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Socket did not close')), 10_000);
+    const socket = new WebSocket(url, ['bearer', token]);
+    socket.onclose = event => { window.clearTimeout(timer); resolve(event.code); };
+  }), { url: socketURL.href, token: data.owner.expiredAccess });
+  expect(code).toBe(4401);
+});
 
 test('two users exchange messages over WebSocket without duplicates and retain history after reload', async ({ page, browser, baseURL, data }) => {
   const renterContext = await browser.newContext({ baseURL, locale: 'pt-BR', serviceWorkers: 'block' });

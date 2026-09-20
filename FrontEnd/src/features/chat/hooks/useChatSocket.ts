@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { sessionService, tokenStore } from "@/app/container";
 import { useAuth } from "@/contexts/useAuth";
+import { getApiBaseUrl, resolveWebSocketBaseUrl } from "@/shared/http/apiUrls";
 
 import { toChatMessage, toChatThread, toUnreadCounts } from "../api/chatMapper";
 import type { ChatMessage, ChatThread, UnreadCounts } from "../types/chat";
@@ -30,10 +31,9 @@ const SILENCE_TIMEOUT_MS = 60_000;
 const STABLE_MS = 5_000;
 
 function wsUrl(): string {
-  const explicit = import.meta.env.VITE_WS_BASE_URL as string | undefined;
-  if (explicit) return `${explicit.replace(/\/$/, "")}/ws/chat`;
-  const api = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8000/api/";
-  const base = api.replace(/\/?api\/?$/, "").replace(/^http/, "ws");
+  const base = resolveWebSocketBaseUrl(
+    import.meta.env.VITE_WS_BASE_URL, getApiBaseUrl(), window.location.origin, import.meta.env.DEV,
+  );
   return `${base}/ws/chat`;
 }
 
@@ -107,7 +107,6 @@ export function useChatSocket(handlers: ChatSocketHandlers) {
     socket.onopen = () => {
       connecting.current = false;
       openedAt.current = Date.now();
-      refreshedOnce.current = false;
       setStatus("open");
       const threads = Array.from(desiredThreads.current);
       threads.forEach((thread_id) => send({ type: "thread.subscribe", thread_id }));
@@ -125,6 +124,9 @@ export function useChatSocket(handlers: ChatSocketHandlers) {
       } catch {
         return;
       }
+      // A rejected token is accepted then immediately closed with 4401 so the
+      // browser receives the code. Only a server message proves authorization.
+      refreshedOnce.current = false;
       const h = handlersRef.current;
       switch (data.type) {
         case "message.new":

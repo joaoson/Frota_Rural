@@ -145,8 +145,9 @@ AUTH_USER_MODEL = 'users.Users'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
-        'rest_framework.authentication.SessionAuthentication',
+        # JWT first preserves 401 for expired bearer tokens so clients refresh.
         'authentication.extensions.authentication.AppJWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }

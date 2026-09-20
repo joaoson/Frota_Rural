@@ -333,25 +333,20 @@ const DashboardLocador = () => {
         onOpenChange={setIsEditEquipamentoOpen}
         equipamento={selectedEquipamento}
         onSave={async (data) => {
-          try {
-            await updateMachine.mutateAsync({ id: data.id, payload: {
-              renagro_number: data.registroRenagro,
-              brand: data.marca,
-              model: data.modelo,
-              year: data.anoFabricacao
-                ? Number(data.anoFabricacao)
-                : undefined,
-              usage_purpose: data.finalidade,
-              power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
-              hour_meter: data.horimetro ? Number(data.horimetro) : null,
-              technical_specifications: data.especificacoes.trim(),
-            } });
-            setSelectedEquipamento(data);
-            toast.success("Equipamento atualizado com sucesso!");
-            setIsEditEquipamentoOpen(false);
-          } catch {
-            toast.error("Não foi possível atualizar o equipamento.");
-          }
+          await updateMachine.mutateAsync({ id: data.id, payload: {
+            renagro_number: data.registroRenagro,
+            brand: data.marca,
+            model: data.modelo,
+            year: data.anoFabricacao
+              ? Number(data.anoFabricacao)
+              : undefined,
+            usage_purpose: data.finalidade,
+            power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
+            hour_meter: data.horimetro ? Number(data.horimetro) : null,
+            technical_specifications: data.especificacoes.trim(),
+          } });
+          setSelectedEquipamento(data);
+          toast.success("Equipamento atualizado com sucesso!");
         }}
       />
 

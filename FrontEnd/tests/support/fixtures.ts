@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { test as base, expect, type BrowserContext, type Page } from '@playwright/test';
 
-export type Account = { id: string; email: string; password: string };
+export type Account = { id: string; email: string; password: string; expiredAccess: string };
 export type Seed = {
   owner: Account; renter: Account; machines: [string, string]; posting: string; threadId: string;
 };
@@ -59,7 +59,9 @@ export async function loginViaUI(page: Page, account: Account) {
 }
 
 export async function loginViaAPI(context: BrowserContext, account: Account) {
-  const response = await context.request.post(`${apiURL}login`, { data: account });
+  const response = await context.request.post(`${apiURL}login`, {
+    data: { email: account.email, password: account.password },
+  });
   expect(response.status()).toBe(200);
   return (await response.json() as { access: string }).access;
 }

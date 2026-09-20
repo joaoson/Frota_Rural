@@ -2,6 +2,14 @@ import { z } from "zod";
 import type { PricingSuggestion } from "./pricing";
 
 const money = z.string().refine((value) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0);
+const breakdownItem = z.object({
+  chave: z.string(),
+  item: z.string(),
+  brl_hora: z.string().refine((value) => value.trim() !== "" && Number.isFinite(Number(value))),
+}).refine((value) => value.chave === "ajuste_mercado" || Number(value.brl_hora) >= 0, {
+  message: "Somente o ajuste de mercado pode reduzir o preço.",
+  path: ["brl_hora"],
+});
 export const pricingSuggestionSchema: z.ZodType<PricingSuggestion> = z.object({
   suggestion_id: z.string(),
   sugerido_brl_hora: money,
@@ -9,7 +17,7 @@ export const pricingSuggestionSchema: z.ZodType<PricingSuggestion> = z.object({
   custo_brl_hora: money,
   locatario_paga_brl_hora: money,
   equivalente_diaria_brl: money,
-  composicao: z.array(z.object({ chave: z.string(), item: z.string(), brl_hora: money })),
+  composicao: z.array(breakdownItem),
   premissas: z.object({
     categoria: z.string(), idade_anos: z.number(), horimetro: z.number(),
     horimetro_declarado: z.boolean(), potencia_cv: z.number().nullable(),

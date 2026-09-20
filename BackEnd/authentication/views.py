@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.conf import settings
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenVerifyView
 from rest_framework.response import Response
@@ -64,6 +64,7 @@ class VerifyTokenView(TokenVerifyView):
     ]
 )
 @api_view(['POST'])
+@authentication_classes([])
 def login(request):
     serializer = LoginSerializer(data=request.data)
     if not serializer.is_valid():
@@ -107,6 +108,7 @@ def login(request):
     responses={204: OpenApiResponse(description="Logout efetuado com sucesso.")}
 )
 @api_view(['POST'])
+@authentication_classes([])
 def logout(request):
     response = Response(status=status.HTTP_204_NO_CONTENT)
     response.delete_cookie('refresh_token', path='/api/login')
@@ -126,6 +128,7 @@ def logout(request):
     }
 )
 @api_view(['POST'])
+@authentication_classes([])
 def refresh_token(request):
     raw = request.COOKIES.get('refresh_token')
     if not raw:

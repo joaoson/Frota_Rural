@@ -63,21 +63,20 @@ const NovoAnuncio = () => {
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
-    setPhotoFiles((prev) => {
-      const next = [...prev];
-      for (const file of Array.from(files)) {
-        if (!ACCEPT_TYPES.includes(file.type)) {
-          toast.error("Use apenas JPG ou PNG.");
-          continue;
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          toast.error(`"${file.name}" excede 5MB.`);
-          continue;
-        }
-        next.push(file);
+    // FileDropzone clears its input before deferred state updaters run.
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      if (!ACCEPT_TYPES.includes(file.type)) {
+        toast.error("Use apenas JPG ou PNG.");
+        continue;
       }
-      return next;
-    });
+      if (file.size > MAX_FILE_BYTES) {
+        toast.error(`"${file.name}" excede 5MB.`);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length > 0) setPhotoFiles((prev) => [...prev, ...accepted]);
   }, []);
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -282,8 +281,7 @@ const NovoAnuncio = () => {
             </ul>
           ) : null}
           <p className="text-[10px] text-outline leading-relaxed">
-            O backend ainda não expõe endpoint para fotos; elas são validadas aqui e poderão ser
-            enviadas quando a API estiver pronta.
+            As fotos serão enviadas após a publicação do anúncio.
           </p>
         </FormField>
 
