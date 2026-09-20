@@ -177,15 +177,17 @@ uma cobrança real.
 
 ## Supabase e escopo desta entrega
 
-A configuração de PostgreSQL remoto está implementada e foi validada localmente
-com um schema separado. **A conexão com o projeto Supabase ainda aguarda a URL
-do session pooler no arquivo local `.env.supabase`.** Configuração pronta não
-significa banco remoto conectado ou migrations remotas aplicadas.
+A conexão com o projeto Supabase foi verificada pelo session pooler com TLS.
+**As 46 migrations foram aplicadas e o backend Docker está conectado ao banco
+remoto.** Existem 26 tabelas no schema privado `frota_rural`, nenhuma no schema
+`public` e nenhuma migration pendente. As verificações da API em execução
+passaram. Os usuários, anúncios e aluguéis locais não foram copiados.
 
 O [guia Supabase](../Devops/SUPABASE.md) explica a configuração de TLS, o schema
 privado `frota_rural`, a verificação sem exposição de senhas e as migrations
-explícitas. A configuração padrão continua usando PostgreSQL e Redis locais no
-Docker. Autenticação, armazenamento de arquivos e Groq mantêm suas integrações.
+explícitas. O ambiente em execução usa o override Supabase; a configuração padrão
+continua disponível para retornar ao PostgreSQL local. Redis permanece no Docker.
+Autenticação, armazenamento de arquivos e Groq mantêm suas integrações.
 
 T06 cria de 2 a 12 reservas de uma vez. Esta entrega não inclui geração infinita
 por agendador, cobrança automática, edição/cancelamento da série inteira ou

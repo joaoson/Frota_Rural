@@ -128,10 +128,15 @@ override preserve the existing local Docker/Groq workflow. Hosted startup
 migrations are disabled. The connection verifier only reads database metadata
 and omits passwords and driver errors containing connection details.
 
-**Live Supabase status:** awaiting the user's session-pooler URL in the local
-`.env.supabase` file. No remote connection, schema creation or migration is
-claimed by the local verification. Follow the
-[Supabase setup guide](../Devops/SUPABASE.md) for the remaining steps.
+**Live Supabase status:** connected through the session pooler with TLS. The user
+prepared the private schema; all 46 Django migrations were then applied to the
+empty schema. The running Docker backend now uses Supabase, with 26 tables in
+`frota_rural`, none in `public`, and no pending migrations. Neither `anon` nor
+`authenticated` can read the application tables. Frontend and public listings
+requests returned HTTP 200; an anonymous private rentals request returned 401.
+Groq remains configured. Existing local users, listings and rentals were not
+copied. See the [Supabase setup guide](../Devops/SUPABASE.md) for startup and
+switching back to local development.
 
 ### Current verification
 
@@ -148,7 +153,7 @@ configuration changes. External payments and AI responses remain simulated.
 | Fresh migrations into an isolated private PostgreSQL schema | Passed locally: 26 private tables, zero public tables; temporary database removed |
 | Default and Supabase Compose configuration | Passed locally; default stays on local PostgreSQL/Redis, override disables hosted startup migrations |
 | Merge simulation against current `develop` and whitespace checks | Passed; latest fetched `origin/develop` is already an ancestor, with no conflicts |
-| Live Supabase connection and remote migrations | Awaiting local connection URL; not executed |
+| Live Supabase connection and remote migrations | Passed: TLS, 46 applied migrations, 26 private tables, no pending migrations, running API smoke checks passed |
 
 Focused reproduction on the local Docker stack:
 

@@ -91,7 +91,8 @@ docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compo
 docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compose.supabase.yaml up --build -d redis backend frontend
 ```
 
-O override desativa migrations automáticas, monta o script de startup atualizado,
+O override desativa migrations automáticas, monta e executa o script de startup
+atualizado via `/bin/sh` (sem depender de permissão de execução no checkout),
 remove a dependência do PostgreSQL local e mantém Redis no Docker para o chat.
 Se a imagem ainda não existe, execute
 `docker compose build backend` antes dos comandos `run`. Alterações em

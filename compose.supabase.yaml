@@ -7,6 +7,8 @@ services:
     # Also protect first startup when an older local image is reused.
     volumes:
       - ./Devops/docker/backend/entrypoint.sh:/entrypoint.sh:ro
+    # Git checkouts may mount this script without an executable file mode.
+    command: ["/bin/sh", "/entrypoint.sh"]
     env_file:
       - path: .env.supabase
         required: true
