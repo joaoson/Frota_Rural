@@ -15,13 +15,13 @@ from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
-from dotenv import load_dotenv
+from .database import database_config, load_environment
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(dotenv_path=str(BASE_DIR / '.env'))
+# Process environment > BackEnd/.env > root .env.
+load_environment(BASE_DIR)
 
 
 # Quick-start development settings - unsuitable for production
@@ -217,17 +217,7 @@ SIMPLE_JWT = {
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-## THIS NEEDS CHANGING DEPENDING ON YOUR LOCAL INSTACE OF POSTGRESQL
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get('DB_NAME'),
-        "USER": os.environ.get('DB_USER', 'postgres'),
-        "PASSWORD": os.environ.get('DB_PASSWORD'),
-        "HOST": os.environ.get('DB_HOST', 'localhost'),
-        "PORT": os.environ.get('DB_PORT', '5432'),
-    }
-}
+DATABASES = {'default': database_config()}
 
 
 # Password validation

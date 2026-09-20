@@ -47,11 +47,14 @@ you. The GitHub Actions workflow starts its own stack with an empty database.
   be retried; changing equipment clears the previous suggestion.
 - Two isolated browser contexts subscribe to a real chat thread, exchange messages
   over WebSocket, avoid duplicate optimistic bubbles, and reload persisted history.
+- Recurrence reuses a historical rental, previews current prices, creates fresh
+  unsigned reservations, survives an idempotent retry, and rejects occupied dates
+  without creating a partial series. Scheduling does not initiate checkout.
 
 ## Test data and cleanup
 
 Each test that needs data gets two unique temporary accounts, two machines, one
-posting and an initial message. The helper runs `support/seed_django.py` inside
+posting, a completed historical rental and an initial message. The helper runs `support/seed_django.py` inside
 Docker; no test-only HTTP endpoint is added to the application. Fixtures are
 removed in teardown even when assertions fail. Existing demo accounts and
 announcements are not reset. Each retry and browser gets fresh records.

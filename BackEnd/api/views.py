@@ -1,16 +1,20 @@
 import uuid
+from decimal import Decimal
 
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from api.models import Rentals, Reviews
 from api.serializer import RentalSerializer, ReviewSerializer
+from postings.models import Postings
+from payments.pricing import calcular_total
 from contracts.models import Contracts
-from contracts.serializer import ContractSerializer
 from api.schemas import ContractDocumentSerializer, ContractSignatureSerializer, ErrorResponseSerializer
 from contracts.serializer import ContractSerializer
 
@@ -175,6 +179,9 @@ def review_detail(request, pk):
 
 # --- RENTALS ---
 
+def _rentals_for_user(user):
+    return Rentals.objects.filter(Q(lessee=user) | Q(postings__machinery__owner=user))
+
 @extend_schema_view(
     get=extend_schema(
         tags=['Locações'],
@@ -212,9 +219,10 @@ def review_detail(request, pk):
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def rentals_list(request):
     if request.method == "GET":
-        qs = Rentals.objects.all().select_related("lessee", "postings__machinery__owner", "contracts")
+        qs = _rentals_for_user(request.user).select_related("lessee", "postings__machinery__owner", "contracts")
         posting_id = request.query_params.get("postings")
         if posting_id:
             qs = qs.filter(postings_id=posting_id)
@@ -230,18 +238,27 @@ def rentals_list(request):
     serializer = RentalSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    rental = serializer.save()
-    
-    # Automatically create matching Contract
-    Contracts.objects.create(
-        id=uuid.uuid4(),
-        rental=rental,
-        accepted_by_lessor=False,
-        accepted_by_lessee=False,
-        status="pending_signatures",
-        created_at=timezone.now()
-    )
+    if serializer.validated_data['lessee'].pk != request.user.pk:
+        return Response({'lessee': 'Você só pode criar reservas em seu próprio nome.'}, status=403)
+    if serializer.validated_data.get('status', 'pending') != 'pending':
+        return Response({'status': 'Novas reservas precisam aguardar o pagamento.'}, status=400)
+    if any(field in serializer.validated_data for field in ('initial_hour_meter', 'final_hour_meter')):
+        return Response({'detail': 'Leituras de horímetro não fazem parte de uma nova reserva.'}, status=400)
+
+    with transaction.atomic():
+        posting = Postings.objects.select_for_update().select_related('machinery').get(pk=serializer.validated_data['postings'].pk)
+        serializer.validated_data['postings'] = posting
+        # Recheck after locking: a recurrence or another rental may have won
+        # the same dates since the initial serializer validation.
+        serializer.validate(serializer.validated_data)
+        total = calcular_total(Rentals(**serializer.validated_data))
+        if not total.is_finite() or total <= 0 or total > Decimal('99999999.99'):
+            return Response({'detail': 'O anúncio precisa ter um preço válido para a reserva.'}, status=400)
+        rental = serializer.save(total_price=total, status='pending')
+        Contracts.objects.create(
+            id=uuid.uuid4(), rental=rental, accepted_by_lessor=False,
+            accepted_by_lessee=False, status="pending_signatures", created_at=timezone.now(),
+        )
     
     return Response(RentalSerializer(rental).data, status=status.HTTP_201_CREATED)
 
@@ -261,42 +278,74 @@ def rentals_list(request):
     patch=extend_schema(
         tags=['Locações'],
         summary='Atualizar locação parcialmente',
-        description='Usado principalmente para avançar o status da locação (ex.: `active`, `completed`, `cancelled`).',
+        description=(
+            'O locatário pode ajustar datas e operador antes do pagamento. As partes podem cancelar '
+            'uma reserva pendente sem pagamento; o locador pode registrar leituras e concluir uma '
+            'locação confirmada após o término. Pagamento e assinatura controlam os estados active e signed.'
+        ),
         request=RentalSerializer,
         responses={200: RentalSerializer, 400: INVALID_DATA, 404: RENTAL_NOT_FOUND},
     ),
     delete=extend_schema(
         tags=['Locações'],
         summary='Excluir locação',
-        responses={204: OpenApiResponse(description='Locação excluída.'), 404: RENTAL_NOT_FOUND},
+        responses={409: OpenApiResponse(description='Use o cancelamento para preservar o histórico.'), 404: RENTAL_NOT_FOUND},
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
 def rental_detail(request, pk):
     try:
-        rental = Rentals.objects.select_related("contracts").get(pk=pk)
+        rental = _rentals_for_user(request.user).select_related("contracts", "postings__machinery").get(pk=pk)
     except Rentals.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
         return Response(RentalSerializer(rental).data, status=status.HTTP_200_OK)
 
-    if request.method == "PUT":
-        serializer = RentalSerializer(rental, data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    if request.method == 'DELETE':
+        return Response({'detail': 'Cancele a reserva para preservar seu histórico e contrato.'}, status=409)
 
-    if request.method == "PATCH":
-        serializer = RentalSerializer(rental, data=request.data, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    with transaction.atomic():
+        posting = Postings.objects.select_for_update().select_related('machinery').get(pk=rental.postings_id)
+        rental = _rentals_for_user(request.user).select_for_update().get(pk=pk)
+        rental.postings = posting
+        for field, current in [('lessee', rental.lessee_id), ('postings', rental.postings_id)]:
+            if field in request.data and str(request.data[field]) != str(current):
+                return Response({field: 'Este vínculo não pode ser alterado após a criação.'}, status=400)
+        if 'total_price' in request.data:
+            return Response({'total_price': 'O valor é calculado pelo servidor.'}, status=400)
 
-    rental.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
+        next_status = request.data.get('status', rental.status)
+        if next_status != rental.status:
+            cancellable = rental.status == 'pending' and not rental.payments.exclude(status='expired').exists()
+            completable = (request.user.pk == posting.machinery.owner_id
+                           and rental.status in ('active', 'signed') and rental.end_date <= timezone.now())
+            if not ((next_status == 'cancelled' and cancellable) or (next_status == 'completed' and completable)):
+                return Response({'status': 'Esta alteração exige o fluxo de pagamento ou assinatura correspondente.'}, status=409)
+
+        if any(field in request.data for field in ('start_date', 'end_date', 'operator')):
+            if request.user.pk != rental.lessee_id:
+                return Response({'detail': 'Somente o locatário pode alterar os dados de uma reserva pendente.'}, status=403)
+            if rental.status != 'pending' or rental.payments.exclude(status='expired').exists():
+                return Response({'detail': 'Uma reserva em pagamento ou confirmada não pode ter seus dados alterados.'}, status=409)
+        if any(field in request.data for field in ('initial_hour_meter', 'final_hour_meter')):
+            if request.user.pk != posting.machinery.owner_id or rental.status not in ('active', 'signed'):
+                return Response({'detail': 'Somente o locador pode registrar leituras de uma reserva confirmada.'}, status=403)
+
+        serializer = RentalSerializer(rental, data=request.data, partial=request.method == 'PATCH')
+        serializer.is_valid(raise_exception=True)
+        save_fields = {'updated_at': timezone.now()}
+        if any(field in serializer.validated_data for field in ('start_date', 'end_date')):
+            candidate = Rentals(postings=posting,
+                                start_date=serializer.validated_data.get('start_date', rental.start_date),
+                                end_date=serializer.validated_data.get('end_date', rental.end_date))
+            total = calcular_total(candidate)
+            if not total.is_finite() or total <= 0 or total > Decimal('99999999.99'):
+                return Response({'detail': 'O anúncio precisa ter um preço válido para a reserva.'}, status=400)
+            save_fields['total_price'] = total
+        serializer.save(**save_fields)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 # --- CONTRACTS ---
 
 @extend_schema(

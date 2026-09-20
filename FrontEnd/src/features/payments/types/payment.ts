@@ -1,4 +1,4 @@
-export type PaymentState = "pending" | "approved" | "expired";
+export type PaymentState = "pending" | "approved" | "expired" | "requires_review";
 
 export interface CheckoutSession {
   /** URL hospedada do Stripe para onde o navegador é redirecionado. */

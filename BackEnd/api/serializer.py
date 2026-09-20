@@ -72,8 +72,11 @@ class RentalSerializer(serializers.ModelSerializer):
             "contract_status",
             "accepted_by_lessor",
             "accepted_by_lessee",
+            "recurrence",
+            "recurrence_index",
+            "reservation_expires_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "recurrence", "recurrence_index", "reservation_expires_at"]
 
     @extend_schema_field(serializers.CharField(help_text='Número legível do contrato, ex.: #CTR-08E8'))
     def get_contract_number(self, obj):
@@ -107,11 +110,14 @@ class RentalSerializer(serializers.ModelSerializer):
         return bool(contract.accepted_by_lessee) if contract else False
 
     def create(self, validated_data):
+        from payments.availability import MINUTOS_DE_RESERVA
+
         now = timezone.now()
         validated_data.setdefault("id", uuid.uuid4())
         validated_data.setdefault("created_at", now)
         validated_data.setdefault("updated_at", now)
         validated_data.setdefault("status", "pending")
+        validated_data.setdefault("reservation_expires_at", now + timedelta(minutes=MINUTOS_DE_RESERVA))
         return Rentals.objects.create(**validated_data)
 
     def validate(self, attrs):
@@ -125,6 +131,20 @@ class RentalSerializer(serializers.ModelSerializer):
         if end_date < start_date:
             raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
 
+        if self.instance and not any(field in attrs for field in ('start_date', 'end_date', 'postings')):
+            # Cancellation and meter updates must still work if an expired hold
+            # has since been taken by another renter.
+            return attrs
+        if not self.instance or any(field in attrs for field in ('start_date', 'end_date')):
+            if posting.status != 'active' or posting.machinery.status != 'active':
+                raise serializers.ValidationError({'postings': 'O anúncio e a máquina precisam estar ativos.'})
+            if start_date <= timezone.now():
+                raise serializers.ValidationError({'start_date': 'Escolha uma data futura.'})
+            if (posting.availability_start and start_date < posting.availability_start) or (
+                posting.availability_end and end_date > posting.availability_end
+            ):
+                raise serializers.ValidationError({'start_date': 'O período está fora da disponibilidade do anúncio.'})
+
         max_reservation_days = posting.max_reservation_days
         total_days = (end_date.date() - start_date.date()).days + 1
         if max_reservation_days and total_days > max_reservation_days:
@@ -133,15 +153,9 @@ class RentalSerializer(serializers.ModelSerializer):
             )
 
         # A requested range cannot touch an existing reservation's cleaning buffer.
-        conflicting_rentals = Rentals.objects.filter(
-            postings=posting,
-            status__in=["pending", "active", "signed"],
-            start_date__lte=end_date + timedelta(days=1),
-            end_date__gte=start_date - timedelta(days=1),
-        )
-        if self.instance:
-            conflicting_rentals = conflicting_rentals.exclude(pk=self.instance.pk)
-        if conflicting_rentals.exists():
+        from payments.availability import tem_conflito
+
+        if tem_conflito(posting.pk, start_date, end_date, ignorar=getattr(self.instance, 'pk', None)):
             raise serializers.ValidationError(
                 {"non_field_errors": "O período selecionado conflita com uma reserva ou com o intervalo de limpeza da máquina."}
             )

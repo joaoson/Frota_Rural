@@ -2,11 +2,12 @@ import uuid
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.emailing.email import send_contract_signature_otp_email
@@ -15,21 +16,29 @@ from contracts.contract_document import build_contract_document
 from contracts.models import ContractSignatureOtps, Contracts
 from contracts.serializer import ContractSerializer, ContractSignatureSerializer
 from users.models import Users
+from api.models import Rentals
+from postings.models import Postings
+from payments.availability import tem_conflito
 
 
 # --- CONTRACTS ---
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def contracts_list(request):
-    qs = Contracts.objects.all().select_related("rental__lessee", "rental__postings__machinery__owner")
+    qs = _contracts_for_user(request.user).select_related("rental__lessee", "rental__postings__machinery__owner")
     serializer = ContractSerializer(qs, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-def _get_contract(pk):
+def _contracts_for_user(user):
+    return Contracts.objects.filter(Q(rental__lessee=user) | Q(rental__postings__machinery__owner=user))
+
+
+def _get_contract(pk, user):
     """Aceita tanto o id do contrato quanto o id do aluguel."""
     return (
-        Contracts.objects.filter(Q(pk=pk) | Q(rental_id=pk))
+        _contracts_for_user(user).filter(Q(pk=pk) | Q(rental_id=pk))
         .select_related("rental__lessee", "rental__postings__machinery__owner")
         .first()
     )
@@ -76,8 +85,9 @@ def _evidence_block(signatures):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def contract_detail(request, pk):
-    contract = _get_contract(pk)
+    contract = _get_contract(pk, request.user)
     if not contract:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -98,6 +108,7 @@ def contract_detail(request, pk):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def contract_evidence(request, pk):
     """Trilha de auditoria completa do aceite eletrônico.
 
@@ -105,7 +116,7 @@ def contract_evidence(request, pk):
     qual documento foi aceito (hash + versão), por quem, quando, de onde — e a
     conferência do encadeamento que atesta que nada foi alterado depois.
     """
-    contract = _get_contract(pk)
+    contract = _get_contract(pk, request.user)
     if not contract:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -137,13 +148,14 @@ def contract_evidence(request, pk):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def request_signature_otp(request, pk):
     """Envia por e-mail um código de uso único a ser informado no aceite.
 
     Prova de posse do endereço cadastrado. Exigido no aceite por padrão
     (``CONTRACT_SIGNATURE_REQUIRE_OTP``), então esta etapa antecede a assinatura.
     """
-    contract = _get_contract(pk)
+    contract = _get_contract(pk, request.user)
     if not contract:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -239,11 +251,20 @@ def _consume_otp(contract, role, code):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
 def sign_contract(request, pk):
     """Registra o aceite de uma parte junto de toda a evidência do momento."""
-    contract = _get_contract(pk)
-    if not contract:
+    reference = _get_contract(pk, request.user)
+    if not reference:
         return Response(status=status.HTTP_404_NOT_FOUND)
+    # Same lock order as checkout and all reservation mutations. Locking the
+    # contract also serializes both parties so neither acceptance gets lost.
+    posting = Postings.objects.select_for_update(of=('self', 'machinery')).select_related('machinery__owner').get(pk=reference.rental.postings_id)
+    rental = Rentals.objects.select_for_update().get(pk=reference.rental_id)
+    rental.postings = posting
+    contract = Contracts.objects.select_for_update().get(pk=reference.pk)
+    contract.rental = rental
 
     role = request.data.get("role")
     if role not in ("locador", "locatario"):
@@ -258,6 +279,11 @@ def sign_contract(request, pk):
             {"error": "Esta parte já assinou o contrato."},
             status=status.HTTP_409_CONFLICT,
         )
+
+    if rental.status not in ('active', 'signed') or not rental.payments.filter(status='approved').exists():
+        return Response({'error': 'Confirme o pagamento desta reserva antes de assinar o contrato.'}, status=409)
+    if tem_conflito(posting.pk, rental.start_date, rental.end_date, ignorar=rental.pk):
+        return Response({'error': 'As datas desta reserva não estão mais disponíveis.'}, status=409)
 
 
     # Quem a plataforma espera naquele papel. A conferência vem antes do OTP:

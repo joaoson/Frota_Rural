@@ -47,6 +47,9 @@ interface RentalCardProps {
   detailsOpen: boolean;
   onToggleDetails: () => void;
   reschedule?: ReschedulePanel;
+  onScheduleRecurrence?: () => void;
+  paymentAction?: React.ReactNode;
+  recurrenceIndex?: number | null;
   /** Quando presente, "Analisar" vira link para a análise da locação. */
   analysisHref?: string;
 }
@@ -82,10 +85,13 @@ export function RentalCard({
   onToggleDetails,
   reschedule,
   analysisHref,
+  onScheduleRecurrence,
+  paymentAction,
+  recurrenceIndex,
 }: RentalCardProps) {
   const badge = rentalStatusBadge(rental.status);
   const isOpenStage = rental.status === "pending" || rental.status === "active";
-  const isClosedStage = rental.status === "completed" || rental.status === "cancelled";
+  const isClosedStage = rental.status === "completed" || rental.status === "cancelled" || rental.status === "closed";
 
   return (
     <div className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
@@ -113,7 +119,10 @@ export function RentalCard({
           </Field>
         </div>
 
+        {recurrenceIndex != null && <p className="mb-3 text-xs font-bold text-primary">Reserva recorrente · Ocorrência {recurrenceIndex}</p>}
         <div className="flex flex-wrap gap-2">
+          {onScheduleRecurrence && <button type="button" onClick={onScheduleRecurrence} className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20"><MaterialIcon icon="event_repeat" size={14} /> Programar recorrência</button>}
+          {paymentAction}
           {rental.status === "pending" && (
             <button className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors">
               Recusar

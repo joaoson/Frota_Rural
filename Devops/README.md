@@ -16,7 +16,12 @@ Serviços disponíveis:
 | Swagger UI | http://localhost:8000/api/schema/swagger-ui/ |
 | PostgreSQL | `localhost:5432` |
 
-O backend executa `migrate` antes de iniciar. Para carregar dados de desenvolvimento em um banco novo (execute uma vez):
+O backend executa `migrate` antes de iniciar quando usa o banco local padrão.
+Conexões externas exigem migrations explícitas. Para conectar somente o banco ao
+Supabase, mantendo Docker, Redis, autenticação e Groq, siga o
+[guia Supabase](SUPABASE.md).
+
+Para carregar dados de desenvolvimento em um banco local novo (execute uma vez):
 
 ```bash
 docker compose exec backend python seed.py

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-python manage.py migrate --noinput
+python manage.py migrate_on_startup
 
 # Em dev, `runserver` ja e ASGI (o app `daphne` vem primeiro em INSTALLED_APPS e
 # substitui o comando) e mantem o autoreload que o bind mount espera. O

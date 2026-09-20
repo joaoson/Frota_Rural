@@ -5,6 +5,10 @@ export interface Rental {
   postingId: string;
   lesseeId: string;
   operatorId: string | null;
+  recurrenceId?: string | null;
+  reservationExpiresAt?: Date | null;
+  createdAt?: Date | null;
+  recurrenceIndex?: number | null;
   lessorName: string | null;
   lesseeName: string | null;
   machineBrand: string | null;
@@ -19,6 +23,14 @@ export interface Rental {
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
   contractStatus: string | null;
+}
+
+/** Visão pública da disponibilidade, sem dados pessoais da locação. */
+export interface RentalOccupancy {
+  id: string;
+  startDate: Date;
+  endDate: Date;
+  status: string;
 }
 
 const ENCERRADOS = ["completed", "cancelled", "closed"];

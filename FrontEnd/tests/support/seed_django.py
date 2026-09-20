@@ -14,8 +14,10 @@ from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from api.models import Rentals, RentalRecurrence
 from chat.models import Messages
 from chat.threads import format_thread_id
+from contracts.models import Contracts
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from pricing.models import PricingSuggestions
@@ -39,6 +41,12 @@ with transaction.atomic():
         if any(not u.email.endswith(f"-{namespace.hex}@example.test") for u in users):
             raise RuntimeError("Refusing to delete users not owned by this fixture")
         Messages.objects.filter(Q(sender_id__in=user_ids) | Q(receiver_id__in=user_ids)).delete()
+        # Only records owned by this fixture are removed. Source rentals and
+        # generated series protect each other until the occurrence link is cleared.
+        Rentals.objects.filter(lessee_id=renter_id).update(recurrence=None)
+        RentalRecurrence.objects.filter(lessee_id=renter_id).delete()
+        Contracts.objects.filter(rental__lessee_id=renter_id).delete()
+        Rentals.objects.filter(lessee_id=renter_id).delete()
         PricingSuggestions.objects.filter(machinery__owner_id=owner_id).delete()
         PostingsPhotos.objects.filter(postings__machinery__owner_id=owner_id).delete()
         Postings.objects.filter(machinery__owner_id=owner_id).delete()
@@ -79,7 +87,21 @@ with transaction.atomic():
         )
         Messages.objects.create(posting=posting, sender_id=renter_id, receiver_id=owner_id,
                                 content="Conversa de teste iniciada.")
+        source_start = (timezone.now() - timedelta(days=40)).replace(
+            hour=8, minute=0, second=0, microsecond=0,
+        )
+        source = Rentals.objects.create(
+            id=identity("source-rental"), postings=posting, lessee_id=renter_id,
+            start_date=source_start, end_date=source_start + timedelta(days=1, hours=10),
+            total_price="4321.00", status="completed", initial_hour_meter=1000,
+            final_hour_meter=1016, created_at=source_start - timedelta(days=1),
+        )
+        Contracts.objects.create(
+            id=identity("source-contract"), rental=source, status="signed",
+            accepted_by_lessor=True, accepted_by_lessee=True, created_at=source_start,
+        )
         print(json.dumps({**accounts, "machines": machines, "posting": str(posting.id),
-                          "threadId": format_thread_id("posting", posting.id, owner_id, renter_id)}))
+                          "threadId": format_thread_id("posting", posting.id, owner_id, renter_id),
+                          "sourceRental": str(source.id)}))
     else:
         raise ValueError("Expected create or delete")

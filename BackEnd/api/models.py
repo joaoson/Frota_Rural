@@ -6,6 +6,8 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 
+import uuid
+
 from django.db import models
 
 # if id = models.UUIDField(primary_key=True), JSON request needs to contain an ID field.
@@ -29,10 +31,51 @@ class Rentals(models.Model):
     status = models.TextField(blank=True, null=True)  # This field type is a guess.
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    recurrence = models.ForeignKey(
+        'RentalRecurrence', models.PROTECT, related_name='rentals', blank=True, null=True,
+    )
+    recurrence_index = models.PositiveSmallIntegerField(blank=True, null=True)
+    reservation_expires_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         # managed = False
         db_table = 'rentals'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['recurrence', 'recurrence_index'], name='unique_recurrence_occurrence',
+            ),
+        ]
+
+
+class RentalRecurrence(models.Model):
+    """A finite set of new reservations; never an automatic payment mandate."""
+
+    class Frequency(models.TextChoices):
+        WEEKLY = 'weekly', 'Semanal'
+        BIWEEKLY = 'biweekly', 'Quinzenal'
+        MONTHLY = 'monthly', 'Mensal'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source_rental = models.ForeignKey(Rentals, models.PROTECT, related_name='scheduled_recurrences')
+    lessee = models.ForeignKey('users.Users', models.PROTECT)
+    first_start_date = models.DateField()
+    frequency = models.CharField(max_length=10, choices=Frequency.choices)
+    occurrences = models.PositiveSmallIntegerField()
+    idempotency_key = models.UUIDField()
+    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'rental_recurrences'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lessee', 'idempotency_key'], name='unique_lessee_recurrence_request',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(occurrences__gte=2, occurrences__lte=12),
+                name='recurrence_occurrences_between_2_12',
+            ),
+        ]
 
 
 class Reviews(models.Model):

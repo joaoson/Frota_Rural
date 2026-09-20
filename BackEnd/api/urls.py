@@ -1,4 +1,5 @@
 from django.urls import path
+from .recurrence_views import recurrence_create, recurrence_preview
 from .views import (
     reviews_list,
     review_detail,
@@ -14,4 +15,6 @@ urlpatterns = [
     ## RENTALS
     path('rentals/', rentals_list, name='rentals_list'),
     path('rentals/<uuid:pk>', rental_detail, name='rental_detail'),
+    path('rentals/<uuid:pk>/recurrence/preview', recurrence_preview, name='rental_recurrence_preview'),
+    path('rentals/<uuid:pk>/recurrence', recurrence_create, name='rental_recurrence_create'),
 ]

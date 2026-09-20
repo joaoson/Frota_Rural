@@ -7,6 +7,7 @@ import { test as base, expect, type BrowserContext, type Page } from '@playwrigh
 export type Account = { id: string; email: string; password: string; expiredAccess: string };
 export type Seed = {
   owner: Account; renter: Account; machines: [string, string]; posting: string; threadId: string;
+  sourceRental: string;
 };
 export const apiURL = process.env.E2E_API_URL ?? 'http://localhost:8001/api/';
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));

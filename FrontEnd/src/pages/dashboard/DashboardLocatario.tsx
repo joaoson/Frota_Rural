@@ -12,7 +12,9 @@ import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import DashboardMachineSearch from "@/components/DashboardMachineSearch";
 import OperadoresPanel from "@/components/OperadoresPanel";
 import { useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
-import { rentalMachineName } from "@/features/contracts/types/rental";
+import { RentalRecurrenceDialog } from "@/features/contracts/components/RentalRecurrenceDialog";
+import { RentalPaymentButton } from "@/features/payments/components/RentalPaymentButton";
+import { rentalMachineName, type Rental } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import {
   useCreateReview,
@@ -86,6 +88,8 @@ const DashboardLocatario = () => {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [showReagendar, setShowReagendar] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
+  const [recurrenceSource, setRecurrenceSource] = useState<Rental | null>(null);
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [showAvaliar, setShowAvaliar] = useState<string | null>(null);
 
   const userQuery = useUser(userId);
@@ -102,6 +106,8 @@ const DashboardLocatario = () => {
     () =>
       (rentalsQuery.data ?? []).map((rental) => ({
         id: rental.id,
+        source: rental,
+        recurrenceIndex: rental.recurrenceIndex,
         owner: rental.lessorName ?? "Locador",
         machine: rentalMachineName(rental),
         period:
@@ -125,8 +131,8 @@ const DashboardLocatario = () => {
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "active");
-  const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled");
+  const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "awaiting_payment" || r.status === "active" || r.status === "signed" || r.status === "validating");
+  const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled" || r.status === "closed");
 
   const submitReview = async () => {
     if (!userId) return;
@@ -158,6 +164,9 @@ const DashboardLocatario = () => {
     <RentalCard
       key={r.id}
       rental={r}
+      recurrenceIndex={r.recurrenceIndex}
+      onScheduleRecurrence={() => { setRecurrenceSource(r.source); setRecurrenceOpen(true); }}
+      paymentAction={(r.status === "pending" || r.status === "awaiting_payment") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
       counterparty={{
         label: "Locador",
         name: r.owner,
@@ -498,6 +507,7 @@ const DashboardLocatario = () => {
           avatarClassName="bg-tertiary-container text-on-tertiary"
         />
       )}
+      {recurrenceSource && <RentalRecurrenceDialog key={recurrenceSource.id} source={recurrenceSource} open={recurrenceOpen} onOpenChange={(open) => { setRecurrenceOpen(open); if (!open) setTab("locacoes"); }} />}
     </DashboardShell>
   );
 };

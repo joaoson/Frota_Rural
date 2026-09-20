@@ -7,7 +7,7 @@ export const checkoutSessionApiSchema = z.object({
 
 // `rental_status` acompanha o pagamento: é ele que libera a locação.
 export const paymentStatusApiSchema = z.object({
-  status: z.enum(["pending", "approved", "expired"]),
+  status: z.enum(["pending", "approved", "expired", "requires_review"]),
   amount: z.string(),
   rental_status: z.string(),
 });

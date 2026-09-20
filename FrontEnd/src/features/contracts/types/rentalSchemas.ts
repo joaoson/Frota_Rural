@@ -5,6 +5,9 @@ export const rentalApiSchema = z.object({
   postings: z.string(),
   lessee: z.string(),
   operator: z.string().nullish(),
+  recurrence: z.string().nullish(),
+  reservation_expires_at: z.string().nullish(),
+  recurrence_index: z.number().int().positive().nullish(),
   start_date: z.string(),
   end_date: z.string(),
   total_price: z.string().nullish(),
@@ -25,6 +28,12 @@ export const rentalApiSchema = z.object({
 });
 export type RentalApi = z.infer<typeof rentalApiSchema>;
 export const rentalListApiSchema = z.array(rentalApiSchema);
+export const rentalOccupancyApiSchema = z.object({
+  ocupados: z.array(z.object({
+    id: z.string(), start_date: z.iso.datetime({ offset: true }),
+    end_date: z.iso.datetime({ offset: true }), status: z.string(),
+  })),
+});
 
 export const contractApiSchema = z.object({
   id: z.string(),

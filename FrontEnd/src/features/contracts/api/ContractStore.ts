@@ -4,11 +4,14 @@ import type { ContratoData } from "../types/contractDocument";
 import type {
   ContractEvidence,
   Rental,
+  RentalOccupancy,
   SignatureOtp,
   SignatureReceipt,
 } from "../types/rental";
 import type { CreateRentalPayload, SignatureRole } from "../types/rentalSchemas";
 import type { ContractRepository, RentalFilter } from "./ContractRepository";
+
+import type { RecurrenceInput, CreateRecurrenceInput, RecurrencePreview, RecurrenceCreated } from "../types/recurrence";
 
 export const contractKeys = {
   all: ["contracts"] as const,
@@ -49,6 +52,10 @@ export class ContractStore {
     return this.repository.listByPosting(postingId);
   }
 
+  listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]> {
+    return this.repository.listOccupancyByPosting(postingId);
+  }
+
   findRentalById(id: string): Promise<Rental> {
     return this.repository.findRentalById(id);
   }
@@ -59,6 +66,16 @@ export class ContractStore {
 
   createRental(payload: CreateRentalPayload): Promise<Rental> {
     return this.repository.createRental(payload);
+  }
+
+  previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview> {
+    return this.repository.previewRecurrence(id, payload);
+  }
+
+  async createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated> {
+    const result = await this.repository.createRecurrence(id, payload);
+    void this.invalidateRentals();
+    return result;
   }
 
   sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {

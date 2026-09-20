@@ -2,3 +2,4 @@ FrontEnd/.env
 .claude
 videos/
 .env
+.env.supabase

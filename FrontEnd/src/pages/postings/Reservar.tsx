@@ -9,7 +9,7 @@ import type { PostingDetail } from "@/features/postings/types/posting";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
-import type { Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { RentalOccupancy, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 
 
@@ -18,8 +18,6 @@ const HORAS_POR_DIARIA = 8;
 const TAXA_PLATAFORMA = 0.05;
 /** A entidade traz Date; os campos de data trabalham com YYYY-MM-DD. */
 const isoOuVazio = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
-
-const STATUS_RESERVA_ATIVA = new Set<Rental["status"]>(["pending", "active", "signed"]);
 
 
 type Etapa = 1 | 2 | 3;
@@ -375,7 +373,7 @@ const Reservar = () => {
   const [createdRental, setCreatedRental] = useState<Rental | null>(null);
 
   const [anuncio, setAnuncio] = useState<PostingDetail | null>(null);
-  const [reservasExistentes, setReservasExistentes] = useState<Rental[]>([]);
+  const [reservasExistentes, setReservasExistentes] = useState<RentalOccupancy[]>([]);
   const [carregandoDisponibilidade, setCarregandoDisponibilidade] = useState(true);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -421,6 +419,7 @@ const Reservar = () => {
     () => retornoStripe.resultado === "sucesso" && !!retornoStripe.locacaoId,
   );
   const confirmacaoIniciada = useRef(false);
+  const [pagamentoEmRevisao, setPagamentoEmRevisao] = useState(false);
   const [sucessoPagamento, setSucessoPagamento] = useState(false);
   const [valorPago, setValorPago] = useState("");
 
@@ -451,8 +450,8 @@ const Reservar = () => {
     if (!id) return;
     setCarregandoDisponibilidade(true);
     contractStore
-      .listByPosting(id)
-      .then((reservas: Rental[]) => setReservasExistentes(reservas.filter((reserva: Rental) => STATUS_RESERVA_ATIVA.has(reserva.status ?? ""))))
+      .listOccupancyByPosting(id)
+      .then(setReservasExistentes)
       .catch((erro: unknown) => {
         console.error("Erro ao carregar disponibilidade:", erro);
         toast.error("Não foi possível carregar as datas indisponíveis.");
@@ -466,9 +465,15 @@ const Reservar = () => {
     if (!resultado || !locacaoId) return;
     confirmacaoIniciada.current = true;
 
-    window.history.replaceState({}, "", window.location.pathname);
+    const clearPaymentReturn = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("pagamento");
+      url.searchParams.delete("locacao");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    };
 
     if (resultado === "cancelado") {
+      clearPaymentReturn();
       toast.info("Pagamento cancelado. As datas voltam a ficar disponíveis em alguns minutos.");
       return;
     }
@@ -507,7 +512,20 @@ const Reservar = () => {
       tentativas += 1;
       try {
         const { status } = await paymentStore.getStatus(locacaoId);
+        if (status === "requires_review") {
+          clearPaymentReturn();
+          setConfirmandoPagamento(false);
+          setPagamentoEmRevisao(true);
+          return;
+        }
+        if (status === "expired") {
+          clearPaymentReturn();
+          setConfirmandoPagamento(false);
+          toast.error("O pagamento expirou. Confira suas reservas em Minhas Locações.");
+          return;
+        }
         if (status === "approved") {
+          clearPaymentReturn();
           await concluir();
           return;
         }
@@ -538,7 +556,7 @@ const Reservar = () => {
 
   const datasBloqueadas = useMemo(() => {
     const bloqueadas = new Set<string>();
-    reservasExistentes.forEach((reserva: Rental) => {
+    reservasExistentes.forEach((reserva) => {
       const inicio = adicionarDias(isoOuVazio(reserva.startDate), -1);
       const fim = adicionarDias(isoOuVazio(reserva.endDate), 1);
       for (let data = dataLocal(inicio); data <= dataLocal(fim); data.setDate(data.getDate() + 1)) {
@@ -788,6 +806,14 @@ const Reservar = () => {
         <h1 className="font-headline text-4xl font-black text-primary dark:text-primary-bright mb-2">Solicitar Reserva</h1>
         <div className="h-1.5 w-20 bg-secondary-container mb-10 rounded-full" />
 
+        {pagamentoEmRevisao && (
+          <div role="alert" className="rounded-2xl border border-secondary-container/50 bg-secondary-container/20 p-6">
+            <h2 className="font-headline text-xl font-bold">Pagamento em análise</h2>
+            <p className="mt-3 text-sm">Seu pagamento foi recebido, mas a reserva precisa de revisão porque as datas não puderam ser confirmadas. Entre em contato com o suporte e informe o código da reserva {retornoStripe.locacaoId}. Não efetue outro pagamento para esta reserva enquanto aguarda a análise.</p>
+            <Link to="/dashboard-locatario" className="mt-4 inline-block font-bold text-primary underline">Voltar às minhas locações</Link>
+          </div>
+        )}
+
         {confirmandoPagamento && (
           <div className="text-center py-20 bg-surface-container-low rounded-2xl border border-outline-variant/30">
             <MaterialIcon icon="progress_activity" size={44} className="text-primary dark:text-primary-bright animate-spin mb-4" />
@@ -813,7 +839,7 @@ const Reservar = () => {
           </div>
         )}
 
-        {!loading && !erro && !confirmandoPagamento && anuncio && (
+        {!loading && !erro && !confirmandoPagamento && !pagamentoEmRevisao && anuncio && (
           <>
             <Stepper etapaAtual={etapa} />
 
