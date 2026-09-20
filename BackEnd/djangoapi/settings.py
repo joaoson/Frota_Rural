@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'chat',
     'payments',
     'pricing',
+    'notifications',
     'drf_spectacular',
 ]
 
@@ -89,6 +90,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
 ]
+configured_frontend_origin = os.getenv('FRONTEND_URL', '').rstrip('/')
+if configured_frontend_origin and configured_frontend_origin not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(configured_frontend_origin)
 
 # If you want to allow cookies/sessions to be sent (like for login)
 CORS_ALLOW_CREDENTIALS = True

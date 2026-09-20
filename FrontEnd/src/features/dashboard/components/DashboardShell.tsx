@@ -22,15 +22,6 @@ export interface SidebarItem<Tab extends string> {
   tab: Tab;
 }
 
-interface NotificationItem {
-  id: number;
-  icon: string;
-  title: string;
-  desc: string;
-  time: string;
-  unread: boolean;
-}
-
 interface DashboardShellProps<Tab extends string> {
   items: readonly SidebarItem<Tab>[];
   tab: Tab;
@@ -41,7 +32,6 @@ interface DashboardShellProps<Tab extends string> {
   accountName: React.ReactNode;
   accountRole: React.ReactNode;
   avatarClassName?: string;
-  notifications: NotificationItem[];
   children: React.ReactNode;
 }
 
@@ -55,7 +45,6 @@ export function DashboardShell<Tab extends string>({
   accountName,
   accountRole,
   avatarClassName = "bg-primary-container text-on-primary",
-  notifications,
   children,
 }: DashboardShellProps<Tab>) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -158,7 +147,7 @@ export function DashboardShell<Tab extends string>({
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <NotificationPopover notifications={notifications} />
+            <NotificationPopover />
           </div>
         </header>
 

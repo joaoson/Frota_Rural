@@ -50,6 +50,8 @@ you. The GitHub Actions workflow starts its own stack with an empty database.
 - Recurrence reuses a historical rental, previews current prices, creates fresh
   unsigned reservations, survives an idempotent retry, and rejects occupied dates
   without creating a partial series. Scheduling does not initiate checkout.
+- Notifications reach both parties, refresh automatically, link to the rental,
+  preserve read/dismiss actions after reload and reject another recipient's ID.
 
 ## Test data and cleanup
 
@@ -58,6 +60,25 @@ posting, a completed historical rental and an initial message. The helper runs `
 Docker; no test-only HTTP endpoint is added to the application. Fixtures are
 removed in teardown even when assertions fail. Existing demo accounts and
 announcements are not reset. Each retry and browser gets fresh records.
+
+The fixture script refuses a hosted database. When the main backend is connected
+to Supabase, use a separate local backend container and a separate Vite process:
+
+```bash
+# From the repository root; the existing local db/redis services must be running.
+docker compose --env-file .env -f compose.yaml run --no-deps -d --name frota-e2e-backend --publish 8002:8000 -e DATABASE_URL= -e DB_SCHEMA= -e RUN_MIGRATIONS=false -e FRONTEND_URL=http://localhost:5175 backend python manage.py runserver 0.0.0.0:8000
+docker exec frota-e2e-backend python manage.py migrate --noinput
+# From FrontEnd, in a separate terminal:
+VITE_API_BASE_URL=http://localhost:8002/api/ VITE_WS_BASE_URL=ws://localhost:8002 npm run dev -- --port 5175
+# Run the suite against those local services:
+E2E_BASE_URL=http://localhost:5175 E2E_API_URL=http://localhost:8002/api/ E2E_BACKEND_CONTAINER=frota-e2e-backend npm run test:e2e
+```
+
+`E2E_BACKEND_CONTAINER` selects the container used for fixture creation and
+cleanup. It does not change the database of an already running container. Stop
+and remove only that temporary container when finished; keep data volumes.
+While both backends exist, select containers explicitly with `docker exec`:
+Compose service selection can resolve to the temporary one-off container.
 
 AI requests are blocked by a context-level route by default; individual pricing
 tests supply deterministic success or error responses. A browser success test

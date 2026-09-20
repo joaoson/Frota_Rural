@@ -1,4 +1,5 @@
-import { Link } from "react-router";
+import { useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
@@ -89,12 +90,20 @@ export function RentalCard({
   paymentAction,
   recurrenceIndex,
 }: RentalCardProps) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === `#locacao-${rental.id}`) {
+      cardRef.current?.scrollIntoView?.({ block: "center" });
+      cardRef.current?.focus({ preventScroll: true });
+    }
+  }, [rental.id, hash]);
   const badge = rentalStatusBadge(rental.status);
   const isOpenStage = rental.status === "pending" || rental.status === "active";
   const isClosedStage = rental.status === "completed" || rental.status === "cancelled" || rental.status === "closed";
 
   return (
-    <div className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+    <div ref={cardRef} id={`locacao-${rental.id}`} tabIndex={-1} className="scroll-mt-20 focus:outline-2 focus:outline-primary bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
       <div className="absolute left-0 top-0 bottom-0 w-2 bg-secondary-container" />
       <div className="ml-4 p-6">
         <div className="flex justify-between items-start mb-4">
@@ -174,7 +183,7 @@ export function RentalCard({
             </h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <DetailRow label="Contrato">
-                <span className="text-on-surface font-bold">{rental.contract}</span>
+                <span className="text-on-surface font-bold">{rental.contract ?? "Ainda não disponível"}</span>
               </DetailRow>
               <DetailRow label={counterparty.label}>
                 <span className="text-on-surface font-bold">{counterparty.name}</span>

@@ -35,6 +35,7 @@ urlpatterns = [
     path(BASE_PATH, include('chat.urls')),
     path(BASE_PATH, include('payments.urls')),
     path(BASE_PATH, include('pricing.urls')),
+    path(BASE_PATH, include('notifications.urls')),
 
     # OpenAPI 3 documentation with Swagger UI
     path(f'{BASE_PATH}schema/', SpectacularAPIView.as_view(), name='schema'),

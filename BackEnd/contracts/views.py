@@ -19,6 +19,7 @@ from users.models import Users
 from api.models import Rentals
 from postings.models import Postings
 from payments.availability import tem_conflito
+from notifications.events import notify_rental_event
 
 
 # --- CONTRACTS ---
@@ -344,6 +345,11 @@ def sign_contract(request, pk):
 
     contract.rental.save()
     contract.save()
+    notify_rental_event(
+        rental, f'contract_signed_{role}', event_key=f'contract:{contract.pk}:signed:{role}', contract=contract,
+    )
+    if contract.status == 'signed':
+        notify_rental_event(rental, 'contract_completed', event_key=f'contract:{contract.pk}:completed', contract=contract)
 
     payload = ContractSerializer(contract).data
     payload["signature_evidence"] = ContractSignatureSerializer(signature).data

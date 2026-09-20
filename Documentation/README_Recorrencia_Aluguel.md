@@ -178,10 +178,12 @@ uma cobrança real.
 ## Supabase e escopo desta entrega
 
 A conexão com o projeto Supabase foi verificada pelo session pooler com TLS.
-**As 46 migrations foram aplicadas e o backend Docker está conectado ao banco
-remoto.** Existem 26 tabelas no schema privado `frota_rural`, nenhuma no schema
+**As 47 migrations, incluindo T05, foram aplicadas e o backend Docker está conectado ao banco
+remoto.** Existem 27 tabelas no schema privado `frota_rural`, nenhuma no schema
 `public` e nenhuma migration pendente. As verificações da API em execução
-passaram. Os usuários, anúncios e aluguéis locais não foram copiados.
+passaram. Os usuários, anúncios e aluguéis locais não foram copiados. O
+[seed de demonstração](../Devops/SEED.md) foi aplicado separadamente, incluindo
+histórico fictício para experimentar a recorrência e notificações iniciais.
 
 O [guia Supabase](../Devops/SUPABASE.md) explica a configuração de TLS, o schema
 privado `frota_rural`, a verificação sem exposição de senhas e as migrations

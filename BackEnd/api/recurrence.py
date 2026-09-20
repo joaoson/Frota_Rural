@@ -15,6 +15,7 @@ from payments.availability import INTERVALO_DE_LIMPEZA, MINUTOS_DE_RESERVA, tem_
 from payments.pricing import calcular_total
 from postings.models import Postings
 from users.models import Users
+from notifications.events import notify_rental_event
 
 
 class RecurrenceConflict(APIException):
@@ -165,10 +166,11 @@ def create_recurrence(source_id, user, data):
             status='pending', created_at=now, updated_at=now,
             reservation_expires_at=now + timedelta(minutes=MINUTOS_DE_RESERVA), **row,
         )
-        Contracts.objects.create(
+        contract = Contracts.objects.create(
             id=uuid.uuid4(), rental=rental, accepted_by_lessor=False,
             accepted_by_lessee=False, status='pending_signatures', created_at=now,
         )
+        notify_rental_event(rental, 'recurrence_created', event_key=f'rental:{rental.pk}:created', contract=contract)
     return series
 
 

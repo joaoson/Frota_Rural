@@ -1,10 +1,11 @@
 import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
+import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/useAuth";
 import { useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
-import { rentalMachineName } from "@/features/contracts/types/rental";
+import { rentalMachineName, rentalHasContract } from "@/features/contracts/types/rental";
 import { situacaoAssinatura } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import { AccountSection } from "@/features/dashboard/components/AccountSection";
@@ -78,33 +79,6 @@ const ratingsData = [
   { month: "Fev", rating: 4.9 },
 ];
 
-const NOTIFICATIONS = [
-  {
-    id: 1,
-    icon: "description",
-    title: "Contrato aguardando assinatura",
-    desc: "Fazenda Aurora · Trator Valtra BH194",
-    time: "Agora",
-    unread: true,
-  },
-  {
-    id: 2,
-    icon: "event_available",
-    title: "Nova solicitação de reserva",
-    desc: "Fazenda São João · Colheitadeira JD S700",
-    time: "2h atrás",
-    unread: true,
-  },
-  {
-    id: 3,
-    icon: "star",
-    title: "Nova avaliação recebida",
-    desc: "Fazenda Boa Vista avaliou com 5 estrelas",
-    time: "Ontem",
-    unread: false,
-  },
-];
-
 const sidebarItems = [
   { icon: "dashboard", label: "Dashboard", tab: "dashboard" },
   { icon: "agriculture", label: "Minha frota", tab: "frota" },
@@ -124,7 +98,10 @@ type Tab = (typeof sidebarItems)[number]["tab"];
 const DashboardLocador = () => {
   const { userId, logout } = useAuth();
 
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tab: Tab = sidebarItems.find((item) => item.tab === requestedTab)?.tab ?? "dashboard";
+  const setTab = (next: Tab) => setSearchParams({ tab: next });
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<string | null>(null);
 
@@ -196,12 +173,14 @@ const DashboardLocador = () => {
           style: "currency",
           currency: "BRL",
         }),
-        contract: r.contractNumber,
+        contract: rentalHasContract(r) ? r.contractNumber : null,
+        hasContract: rentalHasContract(r),
         acceptedByLessor: r.acceptedByLessor,
         acceptedByLessee: r.acceptedByLessee,
       })),
     [rentalsQuery.data],
   );
+  const contracts = rentals.filter((rental) => rental.hasContract);
   const [assinando, setAssinando] = useState<{ id: string; papel: PapelAssinatura } | null>(null);
   const [isEditEquipamentoOpen, setIsEditEquipamentoOpen] = useState(false);
   const [selectedEquipamento, setSelectedEquipamento] =
@@ -235,14 +214,14 @@ const DashboardLocador = () => {
   const activeRentals = useMemo(
     () =>
       rentals.filter(
-        (r) => r.status === "pending" || r.status === "active",
+        (r) => ["pending", "awaiting_payment", "active", "signed", "validating"].includes(r.status ?? ""),
       ),
     [rentals],
   );
   const pastRentals = useMemo(
     () =>
       rentals.filter(
-        (r) => r.status === "completed" || r.status === "cancelled",
+        (r) => ["completed", "cancelled", "closed"].includes(r.status ?? ""),
       ),
     [rentals],
   );
@@ -326,7 +305,6 @@ const DashboardLocador = () => {
       initials={user ? getInitials(user.name) : "…"}
       accountName={user?.name ?? "…"}
       accountRole={<span className="capitalize">{user?.role ?? "…"}</span>}
-      notifications={NOTIFICATIONS}
     >
       <EditEquipamentoModal
         open={isEditEquipamentoOpen}
@@ -1164,7 +1142,8 @@ const DashboardLocador = () => {
               </button>
             ))}
           </div>
-          {rentals.map((c) => (
+          {contracts.length === 0 && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
+          {contracts.map((c) => (
             <div
               key={c.id}
               className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
@@ -1276,111 +1255,7 @@ const DashboardLocador = () => {
       ) : null}
 
       {/* Notificações */}
-      {tab === "notificacoes" ? (
-        <div className="space-y-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="font-headline text-3xl font-bold text-primary">
-                Notificações
-              </h1>
-              <div className="h-1 w-16 bg-secondary-container mt-2" />
-              <p className="text-on-surface-variant text-sm mt-3">
-                Acompanhe todas as atualizações
-              </p>
-            </div>
-            <button className="px-4 py-2 rounded-lg font-bold text-xs text-error border-2 border-error/30 hover:bg-error/10 transition-colors flex items-center gap-1.5">
-              <MaterialIcon icon="delete_sweep" size={16} /> Apagar todas
-            </button>
-          </div>
-          <div className="space-y-3">
-            {[
-              {
-                icon: "description",
-                title: "Contrato aguardando assinatura",
-                desc: "Fazenda Aurora · Trator Valtra BH194 · 02–10 Fev/2026",
-                time: "Agora",
-                unread: true,
-              },
-              {
-                icon: "event_available",
-                title: "Nova solicitação de reserva",
-                desc: "Fazenda São João · Colheitadeira JD S700",
-                time: "2h atrás",
-                unread: true,
-              },
-              {
-                icon: "star",
-                title: "Nova avaliação recebida",
-                desc: "Fazenda Boa Vista avaliou com 5 estrelas",
-                time: "Ontem",
-                unread: false,
-              },
-              {
-                icon: "event_repeat",
-                title: "Solicitação de reagendamento",
-                desc: "Fazenda Aurora deseja alterar período para 15–20 Fev/2026",
-                time: "Ontem",
-                unread: false,
-              },
-              {
-                icon: "payments",
-                title: "Pagamento recebido",
-                desc: "R$ 15.000,00 — Fazenda São João · Colheitadeira JD S700",
-                time: "3 dias atrás",
-                unread: false,
-              },
-            ].map((n, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-4 p-5 rounded-2xl border transition-all hover:shadow-md ${
-                  n.unread
-                    ? "bg-primary/5 border-primary/20"
-                    : "bg-surface-container-lowest border-outline-variant/30"
-                }`}
-              >
-                <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${n.unread ? "bg-primary/10" : "bg-surface-container-high"}`}
-                >
-                  <MaterialIcon
-                    icon={n.icon}
-                    className={
-                      n.unread ? "text-primary" : "text-on-surface-variant"
-                    }
-                    size={22}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-on-surface text-sm">
-                      {n.title}
-                    </h4>
-                    <span className="text-[11px] text-on-surface-variant shrink-0 ml-4">
-                      {n.time}
-                    </span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant mt-0.5">
-                    {n.desc}
-                  </p>
-                </div>
-                {n.unread ? (
-                  <span className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5 shrink-0 animate-pulse" />
-                ) : null}
-                <button
-                  className="shrink-0 p-1 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors"
-                  title="Excluir notificação"
-                >
-                  <MaterialIcon icon="close" size={18} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <DashboardPagination
-            currentPage={1}
-            totalPages={3}
-            onPageChange={() => {}}
-          />
-        </div>
-      ) : null}
+      {tab === "notificacoes" && <NotificationsPanel />}
 
       {/* Avaliações */}
       {tab === "avaliacoes" ? (

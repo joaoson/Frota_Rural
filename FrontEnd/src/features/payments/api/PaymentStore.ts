@@ -1,3 +1,4 @@
+import { notificationKeys } from "@/features/notifications/api/NotificationStore";
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type { CheckoutSession, PaymentStatus } from "../types/payment";
@@ -30,8 +31,10 @@ export class PaymentStore {
     return this.repository.getStatus(rentalId);
   }
 
-  createCheckout(rentalId: string): Promise<CheckoutSession> {
-    return this.repository.createCheckout(rentalId);
+  async createCheckout(rentalId: string): Promise<CheckoutSession> {
+    const session = await this.repository.createCheckout(rentalId);
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return session;
   }
 
   async invalidateStatus(rentalId: string): Promise<void> {

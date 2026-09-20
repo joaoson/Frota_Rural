@@ -15,7 +15,11 @@ const seedScript = readFileSync(new URL('./seed_django.py', import.meta.url), 'u
 
 function seed(action: 'create' | 'delete', id: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile('docker', ['compose', 'exec', '-T', 'backend', 'python', '-', action, id],
+    const container = process.env.E2E_BACKEND_CONTAINER;
+    const command = container
+      ? ['exec', '-i', container, 'python', '-', action, id]
+      : ['compose', 'exec', '-T', 'backend', 'python', '-', action, id];
+    const child = execFile('docker', command,
       { cwd: repoRoot, timeout: 30_000 }, (error, stdout, stderr) => {
         if (error) reject(new Error(`E2E fixture ${action} failed. Is Docker running?\n${stderr || error.message}`));
         else resolve(stdout);

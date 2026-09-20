@@ -176,8 +176,12 @@ python manage.py runserver
 Com o ambiente virtual ativo, execute o script de seed dentro de `BackEnd/`:
 
 ```bash
+python seed.py --dry-run
 python seed.py
 ```
+
+O seed preserva registros existentes e pode ser reexecutado. Contas de exemplo,
+inventário e instruções para Supabase estão em [Devops/SEED.md](Devops/SEED.md).
 
 </details>
 

@@ -26,6 +26,8 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 if not settings.DEBUG:
     raise RuntimeError("Playwright fixtures require DJANGO_DEBUG=true")
+if settings.DATABASES['default']['HOST'] not in {'db', 'localhost', '127.0.0.1', '::1'}:
+    raise RuntimeError("Playwright fixtures require a local database; select a local E2E_BACKEND_CONTAINER")
 action, run_id = sys.argv[1:]
 namespace = uuid.UUID(run_id)
 

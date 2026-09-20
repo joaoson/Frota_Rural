@@ -1,3 +1,4 @@
+import { notificationKeys } from "@/features/notifications/api/NotificationStore";
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type { ContratoData } from "../types/contractDocument";
@@ -64,8 +65,10 @@ export class ContractStore {
     return this.repository.findContractDocument(id);
   }
 
-  createRental(payload: CreateRentalPayload): Promise<Rental> {
-    return this.repository.createRental(payload);
+  async createRental(payload: CreateRentalPayload): Promise<Rental> {
+    const rental = await this.repository.createRental(payload);
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return rental;
   }
 
   previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview> {
@@ -75,11 +78,14 @@ export class ContractStore {
   async createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated> {
     const result = await this.repository.createRecurrence(id, payload);
     void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     return result;
   }
 
-  sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
-    return this.repository.sign(id, role, name, otp);
+  async sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
+    const receipt = await this.repository.sign(id, role, name, otp);
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return receipt;
   }
 
   requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp> {

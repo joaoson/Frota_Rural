@@ -100,7 +100,11 @@ dependências exigem reconstruir a imagem (o `up --build` acima faz isso).
 
 Isso instala a estrutura em um banco novo; **não copia usuários, anúncios,
 locações ou uploads locais**. A migração de dados existentes é uma operação
-separada. Não rode `seed.py` nem a suíte de testes contra o projeto Supabase.
+separada. Para adicionar dados fictícios mediante solicitação, use o seed
+repetível com `--dry-run` e depois `--allow-remote`, conforme o
+[guia de demonstração](SEED.md). Ele preserva os dados existentes e não faz
+pagamentos nem envia mensagens externas. Não rode a suíte de testes contra o
+projeto Supabase.
 
 ## Voltar ao banco local e rodar testes
 

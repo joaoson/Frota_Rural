@@ -17,6 +17,7 @@ from payments.pricing import calcular_total
 from contracts.models import Contracts
 from api.schemas import ContractDocumentSerializer, ContractSignatureSerializer, ErrorResponseSerializer
 from contracts.serializer import ContractSerializer
+from notifications.events import notify_rental_event
 
 REVIEW_NOT_FOUND = OpenApiResponse(description='Avaliação não encontrada.')
 RENTAL_NOT_FOUND = OpenApiResponse(description='Locação não encontrada.')
@@ -255,10 +256,11 @@ def rentals_list(request):
         if not total.is_finite() or total <= 0 or total > Decimal('99999999.99'):
             return Response({'detail': 'O anúncio precisa ter um preço válido para a reserva.'}, status=400)
         rental = serializer.save(total_price=total, status='pending')
-        Contracts.objects.create(
+        contract = Contracts.objects.create(
             id=uuid.uuid4(), rental=rental, accepted_by_lessor=False,
             accepted_by_lessee=False, status="pending_signatures", created_at=timezone.now(),
         )
+        notify_rental_event(rental, 'rental_created', event_key=f'rental:{rental.pk}:created', contract=contract)
     
     return Response(RentalSerializer(rental).data, status=status.HTTP_201_CREATED)
 
@@ -335,6 +337,8 @@ def rental_detail(request, pk):
 
         serializer = RentalSerializer(rental, data=request.data, partial=request.method == 'PATCH')
         serializer.is_valid(raise_exception=True)
+        previous_status = rental.status
+        changed = any(getattr(rental, field) != value for field, value in serializer.validated_data.items())
         save_fields = {'updated_at': timezone.now()}
         if any(field in serializer.validated_data for field in ('start_date', 'end_date')):
             candidate = Rentals(postings=posting,
@@ -344,7 +348,16 @@ def rental_detail(request, pk):
             if not total.is_finite() or total <= 0 or total > Decimal('99999999.99'):
                 return Response({'detail': 'O anúncio precisa ter um preço válido para a reserva.'}, status=400)
             save_fields['total_price'] = total
+            changed = changed or rental.total_price != total
         serializer.save(**save_fields)
+        if changed:
+            event = 'rental_updated'
+            if rental.status != previous_status and rental.status in ('cancelled', 'completed'):
+                event = f'rental_{rental.status}'
+            event_key = f'rental:{rental.pk}:{event}'
+            if event == 'rental_updated':
+                event_key += f':{uuid.uuid4()}'
+            notify_rental_event(rental, event, event_key=event_key)
         return Response(serializer.data, status=status.HTTP_200_OK)
 # --- CONTRACTS ---
 

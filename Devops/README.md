@@ -81,10 +81,12 @@ publicada no host. O backend continua acessando `db:5432` e `redis:6379` na
 rede interna do Compose. A configuração atual de CORS permite o frontend na
 porta 5174.
 
-Depois do seed, use `joao.silva@email.com` (locador) ou
-`maria.oliveira@email.com` (locatário), ambos com senha `Teste1234`.
-São contas de demonstração para desenvolvimento. As URLs de fotos e documentos
-do seed são exemplos; para testar upload, configure o Firebase local.
+Depois do seed, use `joao.silva@example.test` (locador) ou
+`maria.oliveira@example.test` (locatário), ambos com senha inicial `Teste1234`.
+São contas fictícias para desenvolvimento, sem administrador. O seed é
+reexecutável e preserva registros existentes; confira antes com `--dry-run`.
+Consulte [o inventário e a execução no Supabase](SEED.md). Para testar upload,
+configure o Firebase local.
 O arquivo `BackEnd/firebase-service-account.json` fica fora da imagem e do Git;
 no desenvolvimento ele é acessível pelo bind mount do backend.
 

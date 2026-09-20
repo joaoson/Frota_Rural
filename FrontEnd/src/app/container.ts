@@ -1,3 +1,5 @@
+import { HttpNotificationRepository } from "@/features/notifications/api/NotificationRepository";
+import { NotificationStore } from "@/features/notifications/api/NotificationStore";
 import { HttpPricingRepository } from "@/features/pricing/api/PricingRepository";
 import { PricingStore } from "@/features/pricing/api/PricingStore";
 import { HttpAuthRepository } from "@/features/auth/api/AuthRepository";
@@ -65,6 +67,7 @@ const authRepository = new HttpAuthRepository(rawHttpClient);
 export const authStore = new AuthStore(authRepository, tokenStore, queryClient);
 
 const stores = {
+  notifications: new NotificationStore(new HttpNotificationRepository(httpClient), queryClient),
   pricing: new PricingStore(new HttpPricingRepository(httpClient)),
   machines: new MachineStore(new HttpMachineRepository(httpClient), queryClient),
   users: new UserStore(new HttpUserRepository(httpClient), queryClient),
@@ -79,6 +82,7 @@ const stores = {
 } as const;
 
 export const {
+  notifications: notificationStore,
   pricing: pricingStore,
   machines: machineStore,
   users: userStore,

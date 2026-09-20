@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { useAuth } from "@/contexts/useAuth";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useUnreadCount } from "@/features/chat/hooks/useChat";
+import NotificationPopover from "@/components/NotificationPopover";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
@@ -52,6 +53,7 @@ const Navbar = () => {
         
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <NotificationPopover />
 
           {isAuthenticated ? (
             <Link

@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from api.models import Rentals
 from api.schemas import ErrorResponseSerializer
 from postings.models import Postings
+from notifications.events import notify_rental_event
 
 from .availability import MINUTOS_DE_RESERVA, periodos_ocupados, tem_conflito
 from .models import Payments
@@ -108,11 +109,13 @@ def criar_checkout(request, pk):
                 rental.reservation_expires_at = datetime.fromtimestamp(existing.expires_at, datetime_timezone.utc)
                 rental.updated_at = timezone.now()
                 rental.save(update_fields=['status', 'total_price', 'reservation_expires_at', 'updated_at'])
+                notify_rental_event(rental, 'payment_pending', event_key=f'payment:{previous.pk}:pending')
                 return Response({'url': existing.url, 'amount': str(previous.amount)})
             if existing.status == 'complete':
                 return Response({'detail': 'O pagamento já foi enviado. Aguarde a confirmação.'}, status=409)
             previous.status = 'expired'
             previous.save(update_fields=['status', 'updated_at'])
+            notify_rental_event(rental, 'payment_expired', event_key=f'payment:{previous.pk}:expired')
 
         # Stripe's minimum expiry is 30 minutes from request processing. A small
         # margin avoids a session being rejected due to transit time.
@@ -146,12 +149,13 @@ def criar_checkout(request, pk):
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    Payments.objects.create(rental=rental, session_id=sessao.id, amount=total)
+    payment = Payments.objects.create(rental=rental, session_id=sessao.id, amount=total)
     rental.total_price = total
     rental.status = 'awaiting_payment'
     rental.reservation_expires_at = datetime.fromtimestamp(sessao.expires_at, datetime_timezone.utc)
     rental.updated_at = timezone.now()
     rental.save(update_fields=['total_price', 'status', 'reservation_expires_at', 'updated_at'])
+    notify_rental_event(rental, 'payment_pending', event_key=f'payment:{payment.pk}:pending')
 
     return Response({'url': sessao.url, 'amount': str(total)}, status=status.HTTP_200_OK)
 
@@ -207,6 +211,7 @@ def _aprovar(session_id):
     ):
         pagamento.status = 'requires_review'
         pagamento.save(update_fields=['status', 'updated_at'])
+        notify_rental_event(rental, 'payment_requires_review', event_key=f'payment:{pagamento.pk}:requires_review')
         logger.error('Pagamento %s precisa de revisão: reserva indisponível.', pagamento.id)
         return
     pagamento.status = 'approved'
@@ -214,6 +219,7 @@ def _aprovar(session_id):
     rental.status = 'active'
     rental.updated_at = timezone.now()
     rental.save(update_fields=['status', 'updated_at'])
+    notify_rental_event(rental, 'payment_approved', event_key=f'payment:{pagamento.pk}:approved')
 
 
 @transaction.atomic
@@ -230,10 +236,12 @@ def _expirar(session_id):
         return
     pagamento.status = 'expired'
     pagamento.save(update_fields=['status', 'updated_at'])
+    notify_rental_event(rental, 'payment_expired', event_key=f'payment:{pagamento.pk}:expired')
     if rental.status == 'awaiting_payment' and not rental.payments.filter(status='pending').exists():
         rental.status = 'cancelled'
         rental.updated_at = timezone.now()
         rental.save(update_fields=['status', 'updated_at'])
+        notify_rental_event(rental, 'rental_cancelled', event_key=f'rental:{rental.pk}:rental_cancelled')
 
 
 @csrf_exempt

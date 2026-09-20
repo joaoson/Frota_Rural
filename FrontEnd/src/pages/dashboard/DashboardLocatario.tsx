@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
+import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { useAuth } from "@/contexts/useAuth";
 import { AccountSection } from "@/features/dashboard/components/AccountSection";
 import {
@@ -14,7 +15,7 @@ import OperadoresPanel from "@/components/OperadoresPanel";
 import { useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
 import { RentalRecurrenceDialog } from "@/features/contracts/components/RentalRecurrenceDialog";
 import { RentalPaymentButton } from "@/features/payments/components/RentalPaymentButton";
-import { rentalMachineName, type Rental } from "@/features/contracts/types/rental";
+import { rentalMachineName, rentalHasContract, type Rental } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import {
   useCreateReview,
@@ -51,12 +52,6 @@ const ratingsData = [
   { month: "Fev", rating: 5.0 },
 ];
 
-const NOTIFICATIONS = [
-  { id: 1, icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
-  { id: 2, icon: "description", title: "Contrato pronto para assinatura", desc: "Colheitadeira JD S700 · Fazenda São João", time: "3h atrás", unread: true },
-  { id: 3, icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
-];
-
 const sidebarItems: readonly SidebarItem<Tab>[] = [
   { icon: "dashboard", label: "Dashboard", tab: "dashboard" },
   { icon: "search", label: "Buscar Máquinas", tab: "buscar" },
@@ -85,7 +80,10 @@ type Tab =
 const DashboardLocatario = () => {
   const { userId, logout } = useAuth();
 
-  const [tab, setTab] = useState<Tab>("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tab: Tab = sidebarItems.find((item) => item.tab === requestedTab)?.tab ?? "dashboard";
+  const setTab = (next: Tab) => setSearchParams({ tab: next });
   const [showReagendar, setShowReagendar] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [recurrenceSource, setRecurrenceSource] = useState<Rental | null>(null);
@@ -119,7 +117,8 @@ const DashboardLocatario = () => {
           style: "currency",
           currency: "BRL",
         }),
-        contract: rental.contractNumber,
+        contract: rentalHasContract(rental) ? rental.contractNumber : null,
+        hasContract: rentalHasContract(rental),
         acceptedByLessor: rental.acceptedByLessor,
         acceptedByLessee: rental.acceptedByLessee,
         image: machine2,
@@ -131,6 +130,7 @@ const DashboardLocatario = () => {
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
+  const contracts = rentals.filter((rental) => rental.hasContract);
   const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "awaiting_payment" || r.status === "active" || r.status === "signed" || r.status === "validating");
   const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled" || r.status === "closed");
 
@@ -207,7 +207,6 @@ const DashboardLocatario = () => {
       accountName={user ? `${user.name.split(" ")[0]} ${user.name.split(" ").slice(-1)[0]}` : "…"}
       accountRole="Locatário"
       avatarClassName="bg-tertiary-container text-on-tertiary"
-      notifications={NOTIFICATIONS}
     >
       {/* Dashboard */}
       {tab === "dashboard" && (
@@ -395,7 +394,8 @@ const DashboardLocatario = () => {
               </button>
             ))}
           </div>
-          {rentals.map((c) => (
+          {contracts.length === 0 && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
+          {contracts.map((c) => (
             <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -458,45 +458,7 @@ const DashboardLocatario = () => {
       {tab === "chat" && <ChatInboxPanel subtitle="Converse com seus locadores" />}
 
       {/* Notificações */}
-      {tab === "notificacoes" && (
-        <div className="space-y-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="font-headline text-3xl font-bold text-primary">Notificações</h1>
-              <div className="h-1 w-16 bg-secondary-container mt-2" />
-              <p className="text-on-surface-variant text-sm mt-3">Acompanhe todas as atualizações</p>
-            </div>
-            <button className="px-4 py-2 rounded-lg font-bold text-xs text-error border-2 border-error/30 hover:bg-error/10 transition-colors flex items-center gap-1.5">
-              <MaterialIcon icon="delete_sweep" size={16} /> Apagar todas
-            </button>
-          </div>
-          <div className="space-y-3">
-            {[
-              { icon: "event_available", title: "Reserva confirmada", desc: "Trator Valtra BH194 · 02–10 Fev/2026", time: "Agora", unread: true },
-              { icon: "chat_bubble", title: "Nova mensagem de João Silva", desc: "Sim, tudo certo. Operador com NR-31.", time: "Ontem", unread: false },
-              { icon: "event_repeat", title: "Reagendamento aprovado", desc: "Novo período: 15–20 Fev/2026 · Trator Valtra BH194", time: "2 dias atrás", unread: false },
-              { icon: "payments", title: "Pagamento processado", desc: "R$ 15.000,00 — Trator Valtra BH194", time: "3 dias atrás", unread: false },
-            ].map((n, i) => (
-              <div key={i} className={`flex items-start gap-4 p-5 rounded-2xl border transition-all hover:shadow-md ${n.unread ? "bg-primary/5 border-primary/20" : "bg-surface-container-lowest border-outline-variant/30"}`}>
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${n.unread ? "bg-primary/10" : "bg-surface-container-high"}`}>
-                  <MaterialIcon icon={n.icon} className={n.unread ? "text-primary" : "text-on-surface-variant"} size={22} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-on-surface text-sm">{n.title}</h4>
-                    <span className="text-[11px] text-on-surface-variant shrink-0 ml-4">{n.time}</span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant mt-0.5">{n.desc}</p>
-                </div>
-                {n.unread && <span className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5 shrink-0 animate-pulse" />}
-                <button className="shrink-0 p-1 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors" title="Excluir notificação">
-                  <MaterialIcon icon="close" size={18} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {tab === "notificacoes" && <NotificationsPanel />}
 
       {/* Minha Conta */}
       {tab === "conta" && (

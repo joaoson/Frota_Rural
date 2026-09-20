@@ -18,6 +18,7 @@ export const rentalApiSchema = z.object({
   accepted_by_lessor: z.boolean().nullish(),
   accepted_by_lessee: z.boolean().nullish(),
   contract_status: z.string().nullish(),
+  contract_id: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
   lessee_name: z.string().nullish(),

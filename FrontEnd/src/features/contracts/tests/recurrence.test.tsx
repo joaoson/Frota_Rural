@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RentalRecurrenceDialog } from "../components/RentalRecurrenceDialog";
@@ -242,10 +243,10 @@ describe("programar recorrência", () => {
 
   it.each(["completed", "closed"])("makes recurrence and details available on historical %s rental cards", (status) => {
     const onScheduleRecurrence = vi.fn();
-    render(<RentalCard rental={{ id: source.id, status, contract: "FR-001", machine: "Trator", period: "05/01/2026", total: "R$ 840,00" }}
+    render(<MemoryRouter><RentalCard rental={{ id: source.id, status, contract: "FR-001", machine: "Trator", period: "05/01/2026", total: "R$ 840,00" }}
       counterparty={{ label: "Locador", name: "José", icon: "person", className: "" }}
       detailsOpen={false} onToggleDetails={vi.fn()} onScheduleRecurrence={onScheduleRecurrence}
-      review={{ buttonLabel: "Avaliar", title: "Avaliar", prompt: "Avalie", open: false, onToggle: vi.fn(), rating: 5, onRatingChange: vi.fn(), comment: "", onCommentChange: vi.fn(), submitting: false, onSubmit: vi.fn() }} />);
+      review={{ buttonLabel: "Avaliar", title: "Avaliar", prompt: "Avalie", open: false, onToggle: vi.fn(), rating: 5, onRatingChange: vi.fn(), comment: "", onCommentChange: vi.fn(), submitting: false, onSubmit: vi.fn() }} /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /Programar recorrência/ }));
     expect(onScheduleRecurrence).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: /Ver Detalhes/ })).toBeTruthy();

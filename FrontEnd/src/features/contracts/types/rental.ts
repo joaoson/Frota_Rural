@@ -14,6 +14,7 @@ export interface Rental {
   machineBrand: string | null;
   machineModel: string | null;
   contractNumber: string | null;
+  contractId?: string | null;
   startDate: Date | null;
   endDate: Date | null;
   totalPrice: number | null;
@@ -121,4 +122,9 @@ export interface SignatureOtp {
 export interface SignatureReceipt {
   rental: Rental | null;
   evidence: SignatureEvidence | null;
+}
+
+/** Um número legível pode existir mesmo antes da geração do documento. */
+export function rentalHasContract(rental: Pick<Rental, "contractId" | "contractStatus">): boolean {
+  return Boolean(rental.contractId || rental.contractStatus);
 }
