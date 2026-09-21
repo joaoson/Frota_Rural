@@ -10,6 +10,7 @@ import {
   HttpError,
   NetworkError,
   NotFoundError,
+  RequestCanceledError,
   ServerError,
   UnauthorizedError,
   UnexpectedError,
@@ -67,6 +68,11 @@ function firstFieldMessage(fieldErrors: FieldErrors): string | undefined {
 
 export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) return error;
+
+  const isAbortError = (error instanceof Error || error instanceof DOMException) && error.name === "AbortError";
+  if (axios.isCancel(error) || isAbortError) {
+    return new RequestCanceledError(error);
+  }
 
   if (error instanceof AxiosError) {
     const response = error.response;

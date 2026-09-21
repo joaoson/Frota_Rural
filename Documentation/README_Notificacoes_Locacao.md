@@ -35,6 +35,12 @@ um novo aviso.
 - A leitura e a exclusão ficam salvas no servidor e são independentes para cada
   destinatário. Excluir um aviso não altera a locação, o pagamento ou o contrato.
 
+Ao trocar filtros, sair da página ou desmontar um componente, requisições antigas
+podem ser canceladas. O cliente HTTP distingue esse cancelamento de falhas de
+conexão: não registra erro nem tenta novamente uma requisição cancelada. A nova
+consulta continua normalmente. Falhas reais de rede mantêm a mensagem de erro e
+a possibilidade de tentar novamente.
+
 Esta entrega usa notificações internas. Não envia e-mail, SMS ou push do sistema
 operacional. A passagem do prazo provisório de uma reserva, sozinha, não executa
 um agendador: avisos de pagamento vencido acompanham os eventos de pagamento

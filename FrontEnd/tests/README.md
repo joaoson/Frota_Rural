@@ -52,6 +52,8 @@ you. The GitHub Actions workflow starts its own stack with an empty database.
   without creating a partial series. Scheduling does not initiate checkout.
 - Notifications reach both parties, refresh automatically, link to the rental,
   preserve read/dismiss actions after reload and reject another recipient's ID.
+  Replacing a pending filter aborts its obsolete request without a connection
+  error log or alert; the new filter still loads.
 
 ## Test data and cleanup
 

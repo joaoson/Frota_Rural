@@ -93,3 +93,55 @@ test('refreshes new rental updates automatically and links to the affected renta
   await expect(page).toHaveURL(new RegExp(`tab=locacoes#locacao-${rental}$`));
   await expect(page.locator(`[id="locacao-${rental}"]`)).toBeVisible();
 });
+
+test('canceling an obsolete notification filter does not report a connection failure', async ({ page, data }) => {
+  const notificationErrors: string[] = [];
+  page.on('console', message => {
+    const text = message.text();
+    if (message.type() === 'error' && text.includes('HTTP') && text.includes('notifications/') && text.includes('falhou')) {
+      notificationErrors.push(text);
+    }
+  });
+
+  let releasePayment!: () => void;
+  const paymentGate = new Promise<void>(resolve => { releasePayment = resolve; });
+  let paymentStarted!: () => void;
+  const paymentRequestStarted = new Promise<void>(resolve => { paymentStarted = resolve; });
+  const emptyInbox = { results: [], count: 0, unread_count: 0 };
+  await page.route('**/api/notifications/**', async route => {
+    const kind = new URL(route.request().url()).searchParams.get('kind');
+    if (kind === 'payment') {
+      paymentStarted();
+      await paymentGate;
+      // The browser has already canceled this obsolete request when the gate opens.
+      await route.fulfill({ json: emptyInbox }).catch(() => undefined);
+    } else if (kind === 'contract') {
+      await route.fulfill({ json: emptyInbox });
+    } else {
+      await route.continue();
+    }
+  });
+
+  try {
+    await loginViaAPI(page.context(), data.renter);
+    await page.goto('/dashboard-locatario?tab=notificacoes');
+    const panel = page.getByRole('region', { name: 'Notificações', exact: true });
+    await expect(panel.getByText('Nenhuma notificação por enquanto', { exact: true })).toBeVisible();
+    const filter = panel.getByRole('combobox', { name: /Tipo de notificação/ });
+    const canceledPayment = page.waitForEvent('requestfailed', request => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith('/notifications/') && url.searchParams.get('kind') === 'payment';
+    });
+    await filter.selectOption('payment');
+    await paymentRequestStarted;
+    await expect(panel.getByText('Carregando notificações...', { exact: true })).toBeVisible();
+    await filter.selectOption('contract');
+    await canceledPayment;
+    await expect(filter).toHaveValue('contract');
+    await expect(panel.getByText('Nenhuma notificação neste filtro', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    expect(notificationErrors).toEqual([]);
+  } finally {
+    releasePayment();
+  }
+});

@@ -1,6 +1,6 @@
 # Develop merge validation — 2026-09-20
 
-Current integration candidate: `codex/fix-pricing-research`.
+Current integration candidate: `codex/fix-notification-cancellation`.
 Previously validated baseline: `codex/retrofit-pricing-chat-develop`.
 Target checked: `origin/develop` at `c44750fccd9e1ce2b1ca9be60451b2e7e15f08b0`.
 
@@ -27,7 +27,8 @@ retrofit tip, but the retrofit already includes the current develop architecture
 | Local retrofit baseline | `e06bcfb`, 2026-09-20 | Adds review fixes to that Docker/Groq implementation |
 | `codex/rental-recurrence-supabase` | `9f59e4b` | Inherits the reviewed retrofit, adds T06 and the live Supabase connection |
 | `codex/rental-notifications` | `2696628` | Adds T05 notifications and safe, repeatable Supabase demo data |
-| `codex/fix-pricing-research` | Current candidate | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
+| `codex/fix-pricing-research` | `1e0b6bf` | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
+| `codex/fix-notification-cancellation` | Current candidate | Distinguishes canceled notification requests from connection failures |
 
 The running `frota_rural_retrofit` Docker stack mounts this checkout, with the
 frontend on port 5174 and backend on port 8001. Its configured pricing provider
@@ -228,7 +229,7 @@ the formula before application. Research cache keeps the missing new price null;
 the suggestion audit stores the estimate separately. Missing sourced used prices,
 invalid inputs and implausible results still return 422.
 
-### Current verification
+### Pricing verification at delivery
 
 | Check | Result |
 | --- | --- |
@@ -245,3 +246,29 @@ R$3,703,703.70 replacement estimate, with 3 years of age and retention 0.729. Th
 are validation inputs/results, not certification of a market rental rate. No
 listing was published during the live smoke check. Automated tests used local
 databases and simulated external providers.
+
+## Notification cancellation classified as a network error
+
+Changing filters or unmounting a notification query legitimately aborts its HTTP
+request. Axios reports `CanceledError`, but the shared adapter previously mapped
+every Axios error without a response to `NetworkError`, causing false connection
+error logs. Both an adapter/query test and a Chromium test reproduced that exact
+message before the fix.
+
+The client now represents Axios and native aborts as `RequestCanceledError`,
+propagates cancellation without error logging and disables retries for it.
+Abort signals, notification queries and authentication refresh remain intact.
+Real network errors still log and retain their existing retry policy.
+
+### Current verification
+
+| Check | Result |
+| --- | --- |
+| Frontend unit/component suite | 62 passed, including 5 HTTP cancellation regressions |
+| Notification and authentication browser suites | 27 passed across Chromium, Firefox and WebKit |
+| Live Supabase-backed app | Obsolete filter canceled quietly; replacement request returned HTTP 200 and rendered without an error alert |
+| ESLint, production build and E2E TypeScript | Passed; existing bundle-size warning remains |
+| Independent review | No blocking findings; real network errors and shared token refresh remain supported |
+
+The backend was unchanged; its preceding full regression run remains 227 passed.
+Browser fixtures use an isolated local database, never Supabase.
