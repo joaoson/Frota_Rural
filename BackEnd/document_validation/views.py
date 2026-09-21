@@ -1,6 +1,9 @@
 from django.db import IntegrityError
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
+from api.validation import query_uuid
 from rest_framework.response import Response
 from api.schemas import ErrorResponseSerializer
 from .models import OperatorLicense, Certification
@@ -12,6 +15,11 @@ from .serializer import (
     OperatorLicenseSerializer,
 )
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse, OpenApiParameter
+
+def _documents_for_user(model, user):
+    queryset = model.objects.all()
+    return queryset if user.role == 'admin' else queryset.filter(user=user)
+
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
@@ -65,6 +73,7 @@ VALIDATION_STATUS_FILTER = OpenApiParameter(
     ],
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def validate_cnh_document(request):
     file = request.FILES.get("file")
     if not file:
@@ -125,10 +134,11 @@ def validate_cnh_document(request):
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def operator_licenses_list(request):
     if request.method == "GET":
-        qs = OperatorLicense.objects.all().order_by("-created_at", "-id")
-        user_id = request.query_params.get("user")
+        qs = _documents_for_user(OperatorLicense, request.user).order_by("-created_at", "-id")
+        user_id = query_uuid(request, "user")
         if user_id:
             qs = qs.filter(user_id=user_id)
         validation_status = request.query_params.get("validation_status")
@@ -137,7 +147,7 @@ def operator_licenses_list(request):
         serializer = OperatorLicenseSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = OperatorLicenseSerializer(data=request.data)
+    serializer = OperatorLicenseSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -185,9 +195,10 @@ def operator_licenses_list(request):
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
 def operator_license_detail(request, pk):
     try:
-        license = OperatorLicense.objects.get(pk=pk)
+        license = _documents_for_user(OperatorLicense, request.user).get(pk=pk)
     except OperatorLicense.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -195,7 +206,7 @@ def operator_license_detail(request, pk):
         return Response(OperatorLicenseSerializer(license).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = OperatorLicenseSerializer(license, data=request.data)
+        serializer = OperatorLicenseSerializer(license, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -208,7 +219,7 @@ def operator_license_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = OperatorLicenseSerializer(license, data=request.data, partial=True)
+        serializer = OperatorLicenseSerializer(license, data=request.data, partial=True, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -244,10 +255,11 @@ def operator_license_detail(request, pk):
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
 def certifications_list(request):
     if request.method == "GET":
-        qs = Certification.objects.all().order_by("-created_at", "-id")
-        user_id = request.query_params.get("user")
+        qs = _documents_for_user(Certification, request.user).order_by("-created_at", "-id")
+        user_id = query_uuid(request, "user")
         if user_id:
             qs = qs.filter(user_id=user_id)
         validation_status = request.query_params.get("validation_status")
@@ -256,7 +268,7 @@ def certifications_list(request):
         serializer = CertificationSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = CertificationSerializer(data=request.data)
+    serializer = CertificationSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -307,9 +319,10 @@ def certifications_list(request):
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
 def certification_detail(request, pk):
     try:
-        certification = Certification.objects.get(pk=pk)
+        certification = _documents_for_user(Certification, request.user).get(pk=pk)
     except Certification.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -317,7 +330,7 @@ def certification_detail(request, pk):
         return Response(CertificationSerializer(certification).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = CertificationSerializer(certification, data=request.data)
+        serializer = CertificationSerializer(certification, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -330,7 +343,7 @@ def certification_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = CertificationSerializer(certification, data=request.data, partial=True)
+        serializer = CertificationSerializer(certification, data=request.data, partial=True, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -364,6 +377,7 @@ def certification_detail(request, pk):
     ],
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def upload_document(request):
     file = request.FILES.get("file")
     if not file:
@@ -429,9 +443,10 @@ VALID_STATUSES = {"approved", "rejected"}
     ],
 )
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def review_license(request, pk):
     try:
-        license = OperatorLicense.objects.get(pk=pk)
+        license = _documents_for_user(OperatorLicense, request.user).get(pk=pk)
     except OperatorLicense.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -479,9 +494,10 @@ def review_license(request, pk):
     },
 )
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def review_certification(request, pk):
     try:
-        certification = Certification.objects.get(pk=pk)
+        certification = _documents_for_user(Certification, request.user).get(pk=pk)
     except Certification.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

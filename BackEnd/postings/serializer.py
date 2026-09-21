@@ -83,6 +83,39 @@ class PostingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    def validate_machinery(self, value):
+        request = self.context.get('request')
+        if self.instance and value.pk != self.instance.machinery_id:
+            raise serializers.ValidationError('A máquina deste anúncio não pode ser alterada.')
+        if request and value.owner_id != request.user.pk:
+            raise serializers.ValidationError('Anuncie apenas máquinas da sua própria frota.')
+        return value
+
+    def validate_status(self, value):
+        current = self.instance.status if self.instance else None
+        moderated = {'rejected', 'suspended', 'pending_review'}
+        if current in moderated and value != current:
+            raise serializers.ValidationError('O status deste anúncio depende da moderação da plataforma.')
+        # Editing details may retain a moderation status, but only the dedicated
+        # audited moderation endpoints may set or clear that status.
+        if self.instance and value == current:
+            return value
+        if value not in {'active', 'inactive', 'draft'}:
+            raise serializers.ValidationError('Selecione ativo, pausado ou rascunho.')
+        return value
+
+    def validate_hourly_rate(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('O preço por hora deve ser maior que zero.')
+        return value
+
+    def validate(self, attrs):
+        start = attrs.get('availability_start', getattr(self.instance, 'availability_start', None))
+        end = attrs.get('availability_end', getattr(self.instance, 'availability_end', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'availability_end': 'A data final deve ser posterior à inicial.'})
+        return attrs
+
     def validate_location_cep(self, value):
         """Normaliza o CEP para 8 dígitos.
 

@@ -18,6 +18,7 @@ import { detailToDomain, listItemToDomain, uploadedPhotoToDomain } from "./posti
 const COLLECTION_PATH = "postings/";
 
 export interface PostingFilter {
+  ownerId?: string;
   machineryId?: string;
   status?: string;
   availableFrom?: string;
@@ -45,6 +46,7 @@ export class HttpPostingRepository implements PostingRepository {
       method: "GET",
       path: COLLECTION_PATH,
       query: {
+        owner: filter.ownerId,
         machinery: filter.machineryId,
         status: filter.status,
         available_from: filter.availableFrom,

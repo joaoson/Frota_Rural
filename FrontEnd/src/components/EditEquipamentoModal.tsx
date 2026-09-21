@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
+import { HttpError } from "@/shared/http/errors";
 import { validateMachineEdit } from "@/features/machines/types/machineSchemas";
 
 /**
@@ -85,8 +86,8 @@ const EditEquipamentoModal = ({
     try {
       await onSave({ ...form, registroRenagro: form.registroRenagro.trim().toUpperCase() });
       onOpenChange(false);
-    } catch {
-      setSaveError("Não foi possível salvar o equipamento. Tente novamente.");
+    } catch (error) {
+      setSaveError(error instanceof HttpError ? error.message : "Não foi possível salvar o equipamento. Tente novamente.");
     } finally {
       setIsSaving(false);
     }
@@ -183,6 +184,8 @@ const EditEquipamentoModal = ({
                   onChange={(e) => handleChange("finalidade", e.target.value)}
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                 >
+                  <option value="">Não informada</option>
+                  {form.finalidade && !["Plantio", "Pulverização", "Colheita", "Preparo de Solo"].includes(form.finalidade) && <option value={form.finalidade}>{form.finalidade}</option>}
                   <option>Plantio</option>
                   <option>Pulverização</option>
                   <option>Colheita</option>

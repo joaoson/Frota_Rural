@@ -52,6 +52,14 @@ class MachineSerializer(serializers.ModelSerializer):
             data["renagro_number"] = renagro.strip().upper()
         return super().to_internal_value(data)
 
+    def validate_owner(self, value):
+        request = self.context.get('request')
+        if self.instance and value.pk != self.instance.owner_id:
+            raise serializers.ValidationError('O proprietário não pode ser alterado após o cadastro.')
+        if request and (request.user.pk != value.pk or request.user.role != 'locador'):
+            raise serializers.ValidationError('Cadastre a máquina em sua própria conta de locador.')
+        return value
+
     def validate_power_cv(self, value):
         """Faixa plausível para maquinário agrícola.
 

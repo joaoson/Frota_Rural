@@ -7,7 +7,8 @@ from django.utils import timezone
 from rest_framework import status
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from api.validation import query_uuid
 from rest_framework.response import Response
 
 from api.models import Rentals, Reviews
@@ -71,23 +72,24 @@ def _reviews_queryset():
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def reviews_list(request):
     if request.method == "GET":
         qs = _reviews_queryset().order_by("-created_at", "-id")
-        reviewee_id = request.query_params.get("reviewee")
+        reviewee_id = query_uuid(request, "reviewee")
         if reviewee_id:
             qs = qs.filter(reviewee_id=reviewee_id)
-        reviewer_id = request.query_params.get("reviewer")
+        reviewer_id = query_uuid(request, "reviewer")
         if reviewer_id:
             qs = qs.filter(reviewer_id=reviewer_id)
-        rental_id = request.query_params.get("rental")
+        rental_id = query_uuid(request, "rental")
         if rental_id:
             qs = qs.filter(rental_id=rental_id)
             
         serializer = ReviewSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = ReviewSerializer(data=request.data)
+    serializer = ReviewSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -133,9 +135,13 @@ def reviews_list(request):
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def review_detail(request, pk):
     try:
-        review = _reviews_queryset().get(pk=pk)
+        qs = _reviews_queryset()
+        if request.method != 'GET':
+            qs = qs.filter(reviewer=request.user)
+        review = qs.get(pk=pk)
     except Reviews.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -143,7 +149,7 @@ def review_detail(request, pk):
         return Response(ReviewSerializer(review).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = ReviewSerializer(review, data=request.data)
+        serializer = ReviewSerializer(review, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -156,7 +162,7 @@ def review_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = ReviewSerializer(review, data=request.data, partial=True)
+        serializer = ReviewSerializer(review, data=request.data, partial=True, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -224,13 +230,13 @@ def _rentals_for_user(user):
 def rentals_list(request):
     if request.method == "GET":
         qs = _rentals_for_user(request.user).select_related("lessee", "postings__machinery__owner", "contracts")
-        posting_id = request.query_params.get("postings")
+        posting_id = query_uuid(request, "postings")
         if posting_id:
             qs = qs.filter(postings_id=posting_id)
-        lessee_id = request.query_params.get("lessee")
+        lessee_id = query_uuid(request, "lessee")
         if lessee_id:
             qs = qs.filter(lessee_id=lessee_id)
-        lessor_id = request.query_params.get("lessor")
+        lessor_id = query_uuid(request, "lessor")
         if lessor_id:
             qs = qs.filter(postings__machinery__owner_id=lessor_id)
         serializer = RentalSerializer(qs, many=True)
@@ -350,6 +356,9 @@ def rental_detail(request, pk):
             save_fields['total_price'] = total
             changed = changed or rental.total_price != total
         serializer.save(**save_fields)
+        if previous_status != rental.status and rental.status == 'cancelled':
+            Contracts.objects.filter(rental=rental).update(status='cancelled')
+            rental._state.fields_cache.pop('contracts', None)
         if changed:
             event = 'rental_updated'
             if rental.status != previous_status and rental.status in ('cancelled', 'completed'):

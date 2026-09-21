@@ -36,6 +36,7 @@ export type UploadedPhotoApi = z.infer<typeof uploadedPhotoApiSchema>;
 
 export const postingDetailApiSchema = z.object({
   id: z.string(),
+  location_cep: z.string().nullish(),
   hourly_rate: decimalString,
   location_address: z.string().nullish(),
   location_lat: decimalString.nullish(),

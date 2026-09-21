@@ -1,8 +1,8 @@
 # Browser tests
 
 These tests exercise the real React app, Django API, PostgreSQL and Redis over
-HTTP and WebSocket. Only AI pricing and public geocoding/map services are
-intercepted. No Groq, Gemini, Firebase or email keys are required.
+HTTP and WebSocket. AI pricing, checkout failures and public geocoding/map
+services are intercepted. No Groq, Gemini, Firebase or email keys are required.
 
 ## Run locally
 
@@ -54,6 +54,12 @@ you. The GitHub Actions workflow starts its own stack with an empty database.
   preserve read/dismiss actions after reload and reject another recipient's ID.
   Replacing a pending filter aborts its obsolete request without a connection
   error log or alert; the new filter still loads.
+
+- Dashboard fleet/year/status filters, real rental review creation/deletion,
+  listing pause/reopen, location preservation and dependent machine-name refresh.
+- Account/password changes, operator create/edit/unlink and operator login,
+  role routing, deep-link restoration and contract PDF actions.
+- Failed checkout recovery reuses the existing reservation on retry and reload.
 
 ## Test data and cleanup
 

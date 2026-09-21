@@ -108,8 +108,7 @@ export default function AssinaturaContratoModal({
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (e) {
       const mensagem =
-        (e as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Não foi possível enviar o código por e-mail.";
+        e instanceof HttpError ? e.message : "Não foi possível enviar o código por e-mail.";
       toast.error(mensagem);
     } finally {
       setEnviandoOtp(false);
@@ -425,6 +424,7 @@ export default function AssinaturaContratoModal({
                     </p>
                     <input
                       type="text"
+                      aria-label="Código de confirmação por e-mail"
                       inputMode="numeric"
                       maxLength={6}
                       value={codigoOtp}

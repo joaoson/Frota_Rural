@@ -1,6 +1,8 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from api.validation import query_uuid
 from rest_framework.response import Response
 from .models import Machines
 from api.schemas import ErrorResponseSerializer
@@ -74,10 +76,11 @@ MACHINE_CONFLICT = OpenApiResponse(
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def machines_list(request):
     if request.method == "GET":
         qs = _machines_queryset().order_by("-created_at", "-id")
-        owner_id = request.query_params.get("owner")
+        owner_id = query_uuid(request, "owner")
         if owner_id:
             qs = qs.filter(owner_id=owner_id)
         status_filter = request.query_params.get("status")
@@ -92,7 +95,7 @@ def machines_list(request):
         serializer = MachineSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = MachineSerializer(data=request.data)
+    serializer = MachineSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -139,9 +142,13 @@ def machines_list(request):
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def machine_detail(request, pk):
     try:
-        machine = _machines_queryset().get(pk=pk)
+        queryset = _machines_queryset()
+        if request.method != "GET":
+            queryset = queryset.filter(owner=request.user)
+        machine = queryset.get(pk=pk)
     except Machines.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -149,7 +156,7 @@ def machine_detail(request, pk):
         return Response(MachineSerializer(machine).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = MachineSerializer(machine, data=request.data)
+        serializer = MachineSerializer(machine, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -162,7 +169,7 @@ def machine_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = MachineSerializer(machine, data=request.data, partial=True)
+        serializer = MachineSerializer(machine, data=request.data, partial=True, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -175,7 +182,10 @@ def machine_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     try:
-        machine.delete()
+        if machine.postings_set.exists():
+            return Response({"error": "A máquina possui anúncios vinculados e não pode ser excluída."}, status=409)
+        with transaction.atomic():
+            machine.delete()
     except IntegrityError:
         return Response(
             {

@@ -4,6 +4,7 @@ export const rentalApiSchema = z.object({
   id: z.string(),
   postings: z.string(),
   lessee: z.string(),
+  lessor_id: z.string().nullish(),
   operator: z.string().nullish(),
   recurrence: z.string().nullish(),
   reservation_expires_at: z.string().nullish(),

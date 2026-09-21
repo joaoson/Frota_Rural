@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { toast } from "sonner";
 
 import DashboardPagination from "@/components/DashboardPagination";
@@ -59,6 +60,12 @@ interface ReviewsSectionProps {
 
 export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSectionProps) {
   const deleteReview = useDeleteReview();
+  const [receivedPage, setReceivedPage] = useState(1);
+  const [givenPage, setGivenPage] = useState(1);
+  const receivedPages = Math.max(1, Math.ceil(receivedReviews.length / 5));
+  const givenPages = Math.max(1, Math.ceil(givenReviews.length / 5));
+  const currentReceived = Math.min(receivedPage, receivedPages);
+  const currentGiven = Math.min(givenPage, givenPages);
 
   return (
     <div className="space-y-8">
@@ -70,7 +77,7 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
         </h2>
         <div className="space-y-4">
           {receivedReviews.length > 0 ? (
-            receivedReviews.map((review) => (
+            receivedReviews.slice((currentReceived - 1) * 5, currentReceived * 5).map((review) => (
               <ReviewCard
                 key={review.id}
                 name={review.reviewerName}
@@ -84,6 +91,7 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
             <p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>
           )}
         </div>
+        <DashboardPagination currentPage={currentReceived} totalPages={receivedPages} onPageChange={setReceivedPage} />
       </div>
 
       <div>
@@ -92,7 +100,7 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
         </h2>
         <div className="space-y-4">
           {givenReviews.length > 0 ? (
-            givenReviews.map((review) => (
+            givenReviews.slice((currentGiven - 1) * 5, currentGiven * 5).map((review) => (
               <ReviewCard
                 key={review.id}
                 name={review.revieweeName}
@@ -102,14 +110,16 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
                 avatarClassName="bg-primary/10 text-primary"
                 action={
                   <button
+                    type="button"
+                    disabled={deleteReview.isPending}
                     onClick={() => {
                       deleteReview
                         .mutateAsync(review.id)
                         .then(() => toast.success("Avaliação excluída com sucesso."))
-                        .catch(() => toast.error("Erro ao excluir avaliação."));
+                        .catch((error) => toast.error(error instanceof Error ? error.message : "Erro ao excluir avaliação."));
                     }}
                     className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error/10 transition-colors"
-                    title="Excluir avaliação"
+                    aria-label={`Excluir avaliação de ${review.revieweeName ?? "usuário"}`} title="Excluir avaliação"
                   >
                     <MaterialIcon icon="close" size={16} />
                   </button>
@@ -122,18 +132,9 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
             </p>
           )}
         </div>
+        <DashboardPagination currentPage={currentGiven} totalPages={givenPages} onPageChange={setGivenPage} />
       </div>
 
-      {(receivedReviews.length > 0 || givenReviews.length > 0) && (
-        <DashboardPagination
-          currentPage={1}
-          totalPages={Math.max(
-            1,
-            Math.ceil(Math.max(receivedReviews.length, givenReviews.length) / 5),
-          )}
-          onPageChange={() => {}}
-        />
-      )}
     </div>
   );
 }

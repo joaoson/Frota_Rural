@@ -100,7 +100,7 @@ const NovoAnuncio = () => {
 
       form.reset();
       setPhotoFiles([]);
-      navigate("/dashboard");
+      navigate("/dashboard?tab=anuncios");
     } catch (error) {
       toast.error(
         error instanceof HttpError
@@ -115,7 +115,7 @@ const NovoAnuncio = () => {
 
   return (
     <PageShell>
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to="/dashboard?tab=anuncios">Voltar aos Anúncios</BackLink>
 
       <div className="mb-10">
         <h1 className="font-headline text-3xl font-bold text-primary mb-1">Novo Anúncio</h1>
@@ -144,7 +144,8 @@ const NovoAnuncio = () => {
             ))}
           </select>
           
-          {!machinesQuery.isLoading && machines.length === 0 ? (
+          {machinesQuery.isError && <p role="alert" className="text-sm text-error">Não foi possível carregar sua frota. <button type="button" className="underline font-bold" onClick={() => void machinesQuery.refetch()}>Tentar novamente</button></p>}
+          {!machinesQuery.isLoading && !machinesQuery.isError && machines.length === 0 ? (
             <p className="text-[11px] text-outline font-medium">
               Nenhum equipamento ativo.{" "}
               <Link
@@ -205,6 +206,7 @@ const NovoAnuncio = () => {
               className={inputClass(false)}
               {...cepField}
               onChange={(event) => {
+                setCoordenadas(null);
                 void cepField.onChange(event);
                 void handleCepChange(event.target.value);
               }}
@@ -216,7 +218,7 @@ const NovoAnuncio = () => {
               type="text"
               placeholder="Sorriso, MT"
               className={inputClass(Boolean(errors.locationAddress))}
-              {...form.register("locationAddress")}
+              {...form.register("locationAddress", { onChange: () => { setCoordenadas(null); form.setValue("cep", ""); } })}
             />
           </FormField>
           <MapaLocalizacao

@@ -77,6 +77,7 @@ export function DashboardShell<Tab extends string>({
             const buttonEl = (
               <button
                 key={item.tab}
+                aria-current={tab === item.tab ? "page" : undefined}
                 onClick={
                   item.tab !== logoutTab
                     ? () => {
@@ -140,6 +141,8 @@ export function DashboardShell<Tab extends string>({
           <div className="flex items-center gap-4">
             <button
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Abrir menu"
+              aria-expanded={isSidebarOpen}
               className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg"
             >
               <MaterialIcon icon="menu" size={24} />

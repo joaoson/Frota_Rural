@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from api.models import Rentals
+from contracts.models import Contracts
 from machines.models import Machines
 from postings.models import Postings
 from users.models import Users
@@ -48,6 +49,31 @@ class CheckoutReservationTests(TestCase):
 
     def payment(self, session_id='cs_current'):
         return Payments.objects.create(rental=self.rental, session_id=session_id, amount='3024.00')
+
+    @override_settings(STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='')
+    @patch('payments.views.stripe.checkout.Session.create')
+    def test_unconfigured_payments_return_clear_error_without_writes_or_provider_calls(self, create):
+        response = self.client.post(self.checkout_url)
+        self.assertEqual(response.status_code, 503, response.data)
+        self.assertEqual(response.data['code'], 'payment_not_configured')
+        create.assert_not_called()
+        self.assertFalse(Payments.objects.exists())
+        self.rental.refresh_from_db()
+        self.assertEqual(self.rental.status, 'pending')
+
+    @override_settings(STRIPE_SECRET_KEY='sk_test_placeholder', STRIPE_WEBHOOK_SECRET='')
+    @patch('payments.views.stripe.checkout.Session.create')
+    def test_checkout_cannot_collect_payment_without_webhook_configuration(self, create):
+        self.assertEqual(self.client.post(self.checkout_url).status_code, 503)
+        create.assert_not_called()
+        self.assertFalse(Payments.objects.exists())
+
+    @override_settings(STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='whsec_test')
+    @patch('payments.views.stripe.Webhook.construct_event', return_value={'type': 'ignored.event'})
+    def test_signed_webhook_verification_does_not_require_checkout_api_key(self, verify):
+        response = self.client.post('/api/payments/webhook', {}, format='json')
+        self.assertEqual(response.status_code, 200)
+        verify.assert_called_once()
 
     @patch('payments.views._stripe')
     def test_expired_hold_is_revalidated_and_renewed_with_server_price(self, provider):
@@ -157,6 +183,7 @@ class CheckoutReservationTests(TestCase):
     @override_settings(STRIPE_WEBHOOK_SECRET='whsec_test')
     @patch('payments.views._stripe')
     def test_delayed_payment_failure_releases_the_reservation(self, provider):
+        contract = Contracts.objects.create(id=uuid.uuid4(), rental=self.rental, status='pending_signatures')
         payment = self.payment()
         self.rental.status = 'awaiting_payment'
         self.rental.save(update_fields=['status'])
@@ -168,6 +195,8 @@ class CheckoutReservationTests(TestCase):
         self.rental.refresh_from_db()
         self.assertEqual(payment.status, 'expired')
         self.assertEqual(self.rental.status, 'cancelled')
+        contract.refresh_from_db()
+        self.assertEqual(contract.status, 'cancelled')
 
     def test_approval_and_duplicate_events_preserve_confirmed_reservation(self):
         payment = self.payment()

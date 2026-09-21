@@ -65,3 +65,7 @@ export function useRequestSignatureOtp() {
 export function useContractEvidence(id: string | null) {
   return useQuery({ ...contractStore.evidenceOptions(id ?? ""), enabled: Boolean(id) });
 }
+
+export function useCancelRental() {
+  return useMutation<Rental, Error, string>({ mutationFn: (id) => contractStore.cancelRental(id) });
+}

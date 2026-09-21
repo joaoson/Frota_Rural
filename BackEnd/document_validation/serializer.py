@@ -51,7 +51,17 @@ class CnhValidationResultSerializer(serializers.Serializer):
     )
 
 
-class OperatorLicenseSerializer(serializers.ModelSerializer):
+class OwnedDocumentSerializer(serializers.ModelSerializer):
+    def validate_user(self, value):
+        request = self.context.get('request')
+        if self.instance and self.instance.user_id != value.pk:
+            raise serializers.ValidationError('O dono do documento não pode ser alterado.')
+        if request and value.pk != request.user.pk:
+            raise serializers.ValidationError('Cadastre documentos apenas na sua própria conta.')
+        return value
+
+
+class OperatorLicenseSerializer(OwnedDocumentSerializer):
     class Meta:
         model = OperatorLicense
         fields = [
@@ -84,7 +94,7 @@ class OperatorLicenseSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "validation_status", "review_note"]
 
     def create(self, validated_data):
         now = timezone.now()
@@ -103,7 +113,7 @@ class OperatorLicenseSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 
-class CertificationSerializer(serializers.ModelSerializer):
+class CertificationSerializer(OwnedDocumentSerializer):
     class Meta:
         model = Certification
         fields = [
@@ -121,7 +131,7 @@ class CertificationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "validation_status", "review_note"]
 
     def create(self, validated_data):
         now = timezone.now()

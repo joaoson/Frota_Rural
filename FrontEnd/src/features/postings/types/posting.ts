@@ -21,6 +21,7 @@ export interface PostingListItem {
 
 export interface PostingDetail {
   id: string;
+  locationCep?: string | null;
   hourlyRate: number;
   locationAddress: string | null;
   latitude: number | null;

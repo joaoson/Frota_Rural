@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/useAuth";
-import { useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
+import { useCancelRental, useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
 import { rentalMachineName, rentalHasContract } from "@/features/contracts/types/rental";
 import { situacaoAssinatura } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
@@ -27,7 +27,10 @@ import {
   useReceivedReviews,
   useWrittenReviews,
 } from "@/features/reviews/hooks/useReviews";
-import type { Review } from "@/features/reviews/types/review";
+import { averageRating, hasReviewedRental, type Review } from "@/features/reviews/types/review";
+import { ownerSummary, formatCurrency, matchesSearch, yearOptions } from "@/features/dashboard/utils/ownerSummary";
+import { postingStatusBadge } from "@/features/postings/types/postingBadges";
+import { HttpError } from "@/shared/http/errors";
 import { useUser } from "@/features/users/hooks/useUsers";
 import type { User } from "@/features/users/types/user";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -60,24 +63,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-const revenueData = [
-  { month: "Set", value: 8200 },
-  { month: "Out", value: 12400 },
-  { month: "Nov", value: 18600 },
-  { month: "Dez", value: 6250 },
-  { month: "Jan", value: 38400 },
-  { month: "Fev", value: 4800 },
-];
-
-const ratingsData = [
-  { month: "Set", rating: 4.2 },
-  { month: "Out", rating: 4.5 },
-  { month: "Nov", rating: 4.8 },
-  { month: "Dez", rating: 5.0 },
-  { month: "Jan", rating: 4.3 },
-  { month: "Fev", rating: 4.9 },
-];
 
 const sidebarItems = [
   { icon: "dashboard", label: "Dashboard", tab: "dashboard" },
@@ -113,7 +98,7 @@ const DashboardLocador = () => {
   const user: User | null = userQuery.data ?? null;
 
   const machinesQuery = useMachines({ ownerId: userId ?? undefined }, Boolean(userId));
-  const postingsQuery = usePostings({});
+  const postingsQuery = usePostings({ ownerId: userId ?? undefined });
   const rentalsQuery = useRentalsAsLessor(userId);
   const receivedQuery = useReceivedReviews(userId);
   const givenQuery = useWrittenReviews(userId);
@@ -122,6 +107,7 @@ const DashboardLocador = () => {
 
   const createReview = useCreateReview();
   const updateMachine = useUpdateMachine();
+  const cancelRental = useCancelRental();
 
   const receivedReviews: Review[] = receivedQuery.data ?? [];
   const givenReviews: Review[] = givenQuery.data ?? [];
@@ -155,6 +141,8 @@ const DashboardLocador = () => {
         price: p.hourlyRate,
         location: p.locationAddress,
         status: p.status ?? "active",
+        year: p.machineYear,
+        photo: p.primaryPhotoUrl,
       }));
   }, [machinesQuery.data, postingsQuery.data]);
 
@@ -162,6 +150,9 @@ const DashboardLocador = () => {
     () =>
       (rentalsQuery.data ?? []).map((r) => ({
         id: r.id,
+        lesseeId: r.lesseeId,
+        year: r.startDate?.getFullYear(),
+        createdAt: r.createdAt,
         lessee: r.lesseeName ?? "Locatário",
         machine: rentalMachineName(r),
         period:
@@ -211,6 +202,21 @@ const DashboardLocador = () => {
     setIsEditEquipamentoOpen(true);
   };
 
+  const summary = ownerSummary(rentalsQuery.data ?? [], receivedReviews);
+  const revenueData = summary.months;
+  const ratingsData = summary.months;
+  const ratingAverage = averageRating(receivedReviews);
+  const [search, setSearch] = useState<Partial<Record<Tab, string>>>({});
+  const [years, setYears] = useState<Partial<Record<Tab, string>>>({});
+  const [contractFilter, setContractFilter] = useState("Todos");
+  const searchText = search[tab] ?? "";
+  const year = years[tab] ?? "Todos";
+  const matchesYear = (value?: number | null) => year === "Todos" || String(value) === year;
+  const filteredMachines = machines.filter((m) => matchesYear(m.year) && matchesSearch(searchText, m.brand, m.model, m.renagro));
+  const filteredPostings = postings.filter((p) => matchesYear(p.year) && matchesSearch(searchText, p.machine, p.location));
+  const filteredRentals = rentals.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract));
+  const filteredContracts = contracts.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
+
   const activeRentals = useMemo(
     () =>
       rentals.filter(
@@ -226,23 +232,28 @@ const DashboardLocador = () => {
     [rentals],
   );
 
+  const visibleActiveRentals = filteredRentals.filter((rental) => activeRentals.some((active) => active.id === rental.id));
+  const visiblePastRentals = filteredRentals.filter((rental) => pastRentals.some((past) => past.id === rental.id));
+
   const [frotaPage, setFrotaPage] = useState(1);
   const [anunciosPage, setAnunciosPage] = useState(1);
   const frotaPerPage = 2;
   const anunciosPerPage = 2;
-  const frotaTotalPages = Math.ceil(machines.length / frotaPerPage);
-  const anunciosTotalPages = Math.ceil(postings.length / anunciosPerPage);
-  const paginatedFrota = machines.slice(
-    (frotaPage - 1) * frotaPerPage,
-    frotaPage * frotaPerPage,
+  const frotaTotalPages = Math.max(1, Math.ceil(filteredMachines.length / frotaPerPage));
+  const currentFrotaPage = Math.min(frotaPage, frotaTotalPages);
+  const anunciosTotalPages = Math.max(1, Math.ceil(filteredPostings.length / anunciosPerPage));
+  const currentAnunciosPage = Math.min(anunciosPage, anunciosTotalPages);
+  const paginatedFrota = filteredMachines.slice(
+    (currentFrotaPage - 1) * frotaPerPage,
+    currentFrotaPage * frotaPerPage,
   );
-  const paginatedAnuncios = postings.slice(
-    (anunciosPage - 1) * anunciosPerPage,
-    anunciosPage * anunciosPerPage,
+  const paginatedAnuncios = filteredPostings.slice(
+    (currentAnunciosPage - 1) * anunciosPerPage,
+    currentAnunciosPage * anunciosPerPage,
   );
 
-  const submitReview = async () => {
-    if (!userId) return;
+  const submitReview = async (rental: (typeof rentals)[number]) => {
+    if (!userId || !rental.lesseeId || hasReviewedRental(givenReviews, rental.id)) return;
     if (!reviewComment.trim()) {
       toast.error("Por favor, escreva um comentário.");
       return;
@@ -251,17 +262,17 @@ const DashboardLocador = () => {
     try {
       await createReview.mutateAsync({
         reviewer: userId,
-        reviewee: "029d15f3-a577-4238-9c59-42011ddcb5be",
+        reviewee: rental.lesseeId,
         rating: reviewRating,
-        comment: reviewComment,
-        rental: "08e8eaa6-467f-4c98-b5c0-93323829911d",
+        comment: reviewComment.trim(),
+        rental: rental.id,
       });
       toast.success("Avaliação enviada com sucesso!");
       setShowAvaliar(null);
       setReviewRating(5);
       setReviewComment("");
-    } catch {
-      toast.error("Erro ao enviar avaliação.");
+    } catch (error) {
+      toast.error(error instanceof HttpError ? error.message : "Erro ao enviar avaliação.");
     } finally {
       setIsSubmittingReview(false);
     }
@@ -277,6 +288,12 @@ const DashboardLocador = () => {
         icon: "storefront",
         className: "text-tertiary",
       }}
+      analysisHref={r.hasContract ? `/contrato/${r.id}` : undefined}
+      onCancel={async () => {
+        try { await cancelRental.mutateAsync(r.id); toast.success("Reserva recusada."); }
+        catch (error) { toast.error(error instanceof HttpError ? error.message : "Não foi possível recusar a reserva."); }
+      }}
+      cancelling={cancelRental.isPending}
       detailsOpen={showDetalhes === r.id}
       onToggleDetails={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)}
       review={{
@@ -284,13 +301,14 @@ const DashboardLocador = () => {
         title: "Avaliar Locatário",
         prompt: `Como foi a experiência com ${r.lessee}?`,
         open: showAvaliar === r.id,
-        onToggle: () => setShowAvaliar(showAvaliar === r.id ? null : r.id),
+        alreadyReviewed: hasReviewedRental(givenReviews, r.id),
+        onToggle: () => { setShowAvaliar(showAvaliar === r.id ? null : r.id); setReviewRating(5); setReviewComment(""); },
         rating: reviewRating,
         onRatingChange: setReviewRating,
-        comment: reviewComment,
+        comment: reviewComment.trim(),
         onCommentChange: setReviewComment,
         submitting: isSubmittingReview,
-        onSubmit: () => void submitReview(),
+        onSubmit: () => void submitReview(r),
       }}
     />
   );
@@ -306,6 +324,17 @@ const DashboardLocador = () => {
       accountName={user?.name ?? "…"}
       accountRole={<span className="capitalize">{user?.role ?? "…"}</span>}
     >
+      {(() => {
+        const relevant = tab === "dashboard" ? [rentalsQuery, receivedQuery]
+          : tab === "frota" ? [machinesQuery]
+          : tab === "anuncios" ? [machinesQuery, postingsQuery]
+          : ["reservas", "contratos"].includes(tab) ? [rentalsQuery, givenQuery]
+          : tab === "avaliacoes" ? [receivedQuery, givenQuery]
+          : tab === "documentos" ? [licensesQuery, certificationsQuery] : [];
+        return relevant.some((query) => query.isError)
+          ? <div role="alert" className="mb-6 rounded-xl border border-error/30 p-4 text-error">Não foi possível carregar todos os dados desta seção. <button type="button" onClick={() => { for (const query of relevant) void query.refetch(); }} className="font-bold underline">Tentar novamente</button></div>
+          : relevant.some((query) => query.isLoading) ? <p role="status">Carregando dados...</p> : null;
+      })()}
       <EditEquipamentoModal
         open={isEditEquipamentoOpen}
         onOpenChange={setIsEditEquipamentoOpen}
@@ -317,7 +346,7 @@ const DashboardLocador = () => {
             model: data.modelo,
             year: data.anoFabricacao
               ? Number(data.anoFabricacao)
-              : undefined,
+              : null,
             usage_purpose: data.finalidade,
             power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
             hour_meter: data.horimetro ? Number(data.horimetro) : null,
@@ -329,7 +358,7 @@ const DashboardLocador = () => {
       />
 
       {/* Dashboard */}
-      {tab === "dashboard" && (
+      {tab === "dashboard" && !rentalsQuery.isLoading && !receivedQuery.isLoading && !rentalsQuery.isError && !receivedQuery.isError && (
         <div className="space-y-8">
           <div>
             <h1 className="font-headline text-3xl font-bold text-primary">
@@ -344,27 +373,27 @@ const DashboardLocador = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
               {
-                label: "LOCAÇÕES ATIVAS",
+                label: "LOCAÇÕES EM ABERTO",
                 value: String(activeRentals.length),
-                sub: "em andamento",
+                sub: "pendentes e em andamento",
                 icon: "event_available",
               },
               {
                 label: "CONTRATOS",
-                value: String(rentals.length),
-                sub: "assinados",
+                value: String(contracts.length),
+                sub: `${contracts.filter((contract) => situacaoAssinatura(contract).completo).length} assinados`,
                 icon: "description",
               },
               {
                 label: "LOCAÇÕES TOTAIS",
                 value: String(rentals.length),
-                sub: "realizadas",
+                sub: "incluindo pendentes e canceladas",
                 icon: "inventory_2",
               },
               {
-                label: "RECEITA NO MÊS",
-                value: "R$ 38.400",
-                sub: "fevereiro 2026",
+                label: "LOCAÇÕES CONCLUÍDAS NO MÊS",
+                value: formatCurrency(summary.currentMonthTotal),
+                sub: new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
                 icon: "payments",
               },
             ].map((stat, i) => (
@@ -397,15 +426,15 @@ const DashboardLocador = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="font-headline text-lg font-bold text-on-surface">
-                  Evolução da Receita
+                  Valores das Locações Concluídas
                 </h2>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Últimos 6 meses
+                  Últimos 6 meses · valor bruto por data de término, sem confirmação de repasse
                 </p>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-black text-primary">
-                  R$ 86.650
+                  {formatCurrency(summary.sixMonthTotal)}
                 </div>
                 <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
                   Total acumulado
@@ -461,7 +490,7 @@ const DashboardLocador = () => {
                   <Tooltip
                     formatter={(value) => [
                       `R$ ${Number(value).toLocaleString("pt-BR")}`,
-                      "Receita",
+                      "Valor bruto",
                     ]}
                     contentStyle={{
                       borderRadius: 12,
@@ -504,7 +533,7 @@ const DashboardLocador = () => {
                   size={16}
                 />
                 <span className="font-black text-secondary text-sm">
-                  4.7
+                  {ratingAverage == null ? "Sem avaliações" : ratingAverage.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                 </span>
                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">
                   média
@@ -582,7 +611,8 @@ const DashboardLocador = () => {
               {rentals.map((r) => {
                 const badge = rentalStatusBadge(r.status);
                 return (
-                  <div
+                  <Link
+                    to={`/dashboard?tab=reservas#locacao-${r.id}`}
                     key={r.id}
                     className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow"
                   >
@@ -611,7 +641,7 @@ const DashboardLocador = () => {
                         size={20}
                       />
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -641,10 +671,11 @@ const DashboardLocador = () => {
           </div>
 
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={searchText}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            yearValue={year}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            years={yearOptions(machines.map((machine) => machine.year))}
             searchPlaceholder="Buscar por marca, modelo ou registro..."
           />
 
@@ -677,7 +708,7 @@ const DashboardLocador = () => {
                 <div className="flex flex-col gap-2">
                   <span className="px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5 self-end">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary" />{" "}
-                    Disponível
+                    {m.status === "active" ? "Ativo" : m.status === "maintenance" ? "Em manutenção" : "Inativo"}
                   </span>
                   <button
                     onClick={() => openEditModalForMachine(m)}
@@ -689,8 +720,9 @@ const DashboardLocador = () => {
               </div>
             ))}
           </div>
+          {filteredMachines.length === 0 && !machinesQuery.isLoading && !machinesQuery.isError && <p role="status">Nenhum equipamento encontrado.</p>}
           <DashboardPagination
-            currentPage={frotaPage}
+            currentPage={currentFrotaPage}
             totalPages={frotaTotalPages}
             onPageChange={setFrotaPage}
           />
@@ -987,10 +1019,11 @@ const DashboardLocador = () => {
             </Link>
           </div>
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={searchText}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            yearValue={year}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            years={yearOptions(postings.map((posting) => posting.year))}
             searchPlaceholder="Buscar por maquinário ou localização..."
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1000,23 +1033,20 @@ const DashboardLocador = () => {
                 className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 shadow-sm"
               >
                 <div className="h-40 bg-gradient-to-br from-primary/10 via-secondary-container/10 to-tertiary/10 overflow-hidden flex items-center justify-center">
-                  <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
+                  {p.photo ? <img src={p.photo} alt={p.machine} className="h-full w-full object-cover" /> : <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
                     <MaterialIcon
                       icon="precision_manufacturing"
                       className="text-primary"
                       size={28}
                     />
-                  </div>
+                  </div>}
                 </div>
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-headline font-bold text-on-surface">
                       {p.machine}
                     </h4>
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded uppercase tracking-wider border border-primary/20 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />{" "}
-                      Ativo
-                    </span>
+                    <StatusBadge config={postingStatusBadge(p.status)} />
                   </div>
                   <p className="text-sm text-on-surface-variant mb-3 flex items-center gap-1">
                     <MaterialIcon icon="location_on" size={16} />{" "}
@@ -1024,7 +1054,7 @@ const DashboardLocador = () => {
                   </p>
                   <div className="flex justify-between items-center">
                     <div className="text-xl font-black text-primary">
-                      R$ {p.price}
+                      {formatCurrency(p.price)}
                       <span className="text-sm font-bold text-tertiary">
                         /h
                       </span>
@@ -1040,8 +1070,9 @@ const DashboardLocador = () => {
               </div>
             ))}
           </div>
+          {filteredPostings.length === 0 && !postingsQuery.isLoading && !postingsQuery.isError && <p role="status">Nenhum anúncio encontrado.</p>}
           <DashboardPagination
-            currentPage={anunciosPage}
+            currentPage={currentAnunciosPage}
             totalPages={anunciosTotalPages}
             onPageChange={setAnunciosPage}
           />
@@ -1062,14 +1093,15 @@ const DashboardLocador = () => {
           </div>
 
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={searchText}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            yearValue={year}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            years={yearOptions(rentals.map((rental) => rental.year))}
             searchPlaceholder="Buscar por locatário, maquinário ou contrato..."
           />
 
-          {activeRentals.length > 0 ? (
+          {visibleActiveRentals.length > 0 ? (
             <div className="space-y-4">
               <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
                 <MaterialIcon
@@ -1080,12 +1112,12 @@ const DashboardLocador = () => {
                 Locações em Andamento
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {activeRentals.map(renderRentalCard)}
+                {visibleActiveRentals.map(renderRentalCard)}
               </div>
             </div>
           ) : null}
 
-          {pastRentals.length > 0 ? (
+          {visiblePastRentals.length > 0 ? (
             <div className="space-y-4 mt-8">
               <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
                 <MaterialIcon
@@ -1096,16 +1128,12 @@ const DashboardLocador = () => {
                 Locações Passadas
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {pastRentals.map(renderRentalCard)}
+                {visiblePastRentals.map(renderRentalCard)}
               </div>
             </div>
           ) : null}
 
-          <DashboardPagination
-            currentPage={1}
-            totalPages={3}
-            onPageChange={() => {}}
-          />
+          {filteredRentals.length === 0 && !rentalsQuery.isError && !rentalsQuery.isLoading && <p role="status">Nenhuma locação encontrada.</p>}
         </div>
       ) : null}
 
@@ -1122,18 +1150,21 @@ const DashboardLocador = () => {
             </p>
           </div>
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={searchText}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            yearValue={year}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            years={yearOptions(contracts.map((rental) => rental.year))}
             searchPlaceholder="Buscar por contrato, locatário ou maquinário..."
           />
           <div className="flex gap-2">
             {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
               <button
                 key={f}
+                onClick={() => setContractFilter(f)}
+                aria-pressed={contractFilter === f}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                  f === "Todos"
+                  f === contractFilter
                     ? "bg-primary text-on-primary"
                     : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                 }`}
@@ -1142,8 +1173,8 @@ const DashboardLocador = () => {
               </button>
             ))}
           </div>
-          {contracts.length === 0 && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
-          {contracts.map((c) => (
+          {filteredContracts.length === 0 && !rentalsQuery.isError && !rentalsQuery.isLoading && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
+          {filteredContracts.map((c) => (
             <div
               key={c.id}
               className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
@@ -1162,35 +1193,17 @@ const DashboardLocador = () => {
                       {c.contract} — {c.machine}
                     </h3>
                     <p className="text-sm text-on-surface-variant">
-                      {c.lessee} · Criado em 2026
+                      {c.lessee}{c.createdAt ? ` · Criado em ${c.createdAt.toLocaleDateString("pt-BR")}` : ""}
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
-                    c.status === "pending"
-                      ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
-                      : c.status === "active" || c.status === "signed"
-                        ? "bg-primary/10 text-primary border border-primary/20"
-                        : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
-                  }`}
-                >
-                  <MaterialIcon
-                    icon={
-                      c.status === "pending"
-                        ? "description"
-                        : (c.status === "active" || c.status === "signed")
-                          ? "verified"
-                          : "check_circle"
-                    }
-                    size={14}
-                  />
-                  {c.status === "pending"
-                    ? "Assinatura Pendente"
-                    : (c.status === "active" || c.status === "signed")
-                      ? "Assinado"
-                      : "Encerrado"}
-                </span>
+                <StatusBadge config={situacaoAssinatura(c).encerrado
+                  ? { icon: "check_circle", variant: "neutral", label: "Encerrado" }
+                  : situacaoAssinatura(c).completo
+                    ? { icon: "verified", variant: "success", label: "Assinado" }
+                    : ["pending", "awaiting_payment"].includes(c.status ?? "")
+                      ? { icon: "payments", variant: "pending", label: "Aguardando Pagamento" }
+                      : { icon: "description", variant: "pending", label: "Assinatura Pendente" }} />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
                 <div>
@@ -1241,11 +1254,7 @@ const DashboardLocador = () => {
               </div>
             </div>
           ))}
-          <DashboardPagination
-            currentPage={1}
-            totalPages={2}
-            onPageChange={() => {}}
-          />
+
         </div>
       ) : null}
 

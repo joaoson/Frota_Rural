@@ -68,7 +68,8 @@ test('loads research on demand, applies it only on confirmation, and publishes t
     machinery: data.machines[0], hourly_rate: '200.50', suggestion_id: suggestion.suggestion_id,
   });
   const posting = await response.json() as { id: string };
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard\?tab=anuncios$/);
+  await expect(page.getByRole('heading', { name: 'Anúncios', exact: true })).toBeVisible();
   const persisted = await page.request.get(`${apiURL}postings/${posting.id}`);
   expect((await persisted.json()).hourly_rate).toBe('200.50');
 });
@@ -89,7 +90,8 @@ test('unavailable market data still allows publishing a manual price', async ({ 
   const response = await published;
   expect(response.status()).toBe(201);
   expect(response.request().postDataJSON().suggestion_id).toBeUndefined();
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard\?tab=anuncios$/);
+  await expect(page.getByRole('heading', { name: 'Anúncios', exact: true })).toBeVisible();
 });
 
 test('a service failure preserves the manual price and can be retried', async ({ page, data }) => {

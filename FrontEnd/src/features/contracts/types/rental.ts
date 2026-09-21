@@ -4,6 +4,7 @@ export interface Rental {
   id: string;
   postingId: string;
   lesseeId: string;
+  lessorId?: string | null;
   operatorId: string | null;
   recurrenceId?: string | null;
   reservationExpiresAt?: Date | null;
@@ -49,13 +50,14 @@ export function situacaoAssinatura(rental: {
 }) {
   const encerrado = ENCERRADOS.includes(rental.status ?? "");
   const completo = rental.acceptedByLessor && rental.acceptedByLessee;
+  const pagamentoConfirmado = rental.status === "active" || rental.status === "signed";
   return {
     encerrado,
     assinadoPeloLocador: rental.acceptedByLessor,
     assinadoPeloLocatario: rental.acceptedByLessee,
     completo,
-    podeAssinarComoLocador: !encerrado && !rental.acceptedByLessor,
-    podeAssinarComoLocatario: !encerrado && !rental.acceptedByLessee,
+    podeAssinarComoLocador: pagamentoConfirmado && !encerrado && !rental.acceptedByLessor,
+    podeAssinarComoLocatario: pagamentoConfirmado && !encerrado && !rental.acceptedByLessee,
     grupo: encerrado ? "Encerrados" : completo ? "Assinados" : "Pendentes",
   };
 }

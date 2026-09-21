@@ -1,7 +1,8 @@
 from django.utils import timezone
+from django.db import transaction
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from api.models import Rentals
@@ -11,6 +12,8 @@ from machines.models import Machines
 from postings.models import Postings
 from users.models import Users
 from .models import PostingModeration
+from .permissions import IsPlatformAdmin
+from rest_framework.permissions import IsAuthenticated
 from .serializer import PostingRejectionSerializer
 
 USER_NOT_FOUND = OpenApiResponse(description='Usuário não encontrado.')
@@ -48,6 +51,7 @@ def _moderator(request):
     ],
 )
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def warn_user(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -80,6 +84,8 @@ def warn_user(request, pk):
     },
 )
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
+@transaction.atomic
 def suspend_user(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -94,7 +100,9 @@ def suspend_user(request, pk):
 
     machine_ids = Machines.objects.filter(owner=user).values_list('id', flat=True)
     Postings.objects.filter(machinery_id__in=machine_ids, status='active').update(status='suspended')
-    Rentals.objects.filter(lessee=user, status='pending').update(status='cancelled')
+    rental_ids = list(Rentals.objects.filter(lessee=user, status='pending').values_list('id', flat=True))
+    Rentals.objects.filter(id__in=rental_ids).update(status='cancelled')
+    Contracts.objects.filter(rental_id__in=rental_ids, status='pending_signatures').update(status='cancelled')
 
     return Response({'message': f'Usuário {user.name} suspenso.'}, status=status.HTTP_200_OK)
 
@@ -114,6 +122,8 @@ def suspend_user(request, pk):
     },
 )
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
+@transaction.atomic
 def ban_user(request, pk):
     try:
         user = Users.objects.get(pk=pk)
@@ -125,7 +135,7 @@ def ban_user(request, pk):
 
     machine_ids = Machines.objects.filter(owner=user).values_list('id', flat=True)
     Postings.objects.filter(machinery_id__in=machine_ids).exclude(status='inactive').update(status='inactive')
-    rental_ids = Rentals.objects.filter(lessee=user, status__in=['pending', 'active']).values_list('id', flat=True)
+    rental_ids = list(Rentals.objects.filter(lessee=user, status__in=['pending', 'active']).values_list('id', flat=True))
     Rentals.objects.filter(id__in=rental_ids).update(status='cancelled')
     Contracts.objects.filter(rental_id__in=rental_ids, status='pending_signatures').update(status='cancelled')
 
@@ -147,6 +157,7 @@ def ban_user(request, pk):
     },
 )
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def approve_posting(request, pk):
     try:
         posting = Postings.objects.get(pk=pk)
@@ -190,6 +201,7 @@ def approve_posting(request, pk):
     ],
 )
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def reject_posting(request, pk):
     reason = (request.data.get('reason') or '').strip()
     if not reason:
@@ -220,14 +232,10 @@ def reject_posting(request, pk):
 # Moderação de mensagens do chat
 # ---------------------------------------------------------------------------
 
-from rest_framework.decorators import permission_classes  # noqa: E402
-from rest_framework.permissions import IsAuthenticated  # noqa: E402
-
 from chat.models import MessageReports, Messages  # noqa: E402
 from chat.serializer import serialize_message, serialize_user  # noqa: E402
 from chat.services import fan_out_hidden  # noqa: E402
 from chat.threads import format_thread_id  # noqa: E402
-from .permissions import IsPlatformAdmin  # noqa: E402
 from .serializer import MessageModerationDecisionSerializer  # noqa: E402
 
 

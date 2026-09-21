@@ -30,6 +30,7 @@ export function rentalToDomain(dto: RentalApi): Rental {
     id: dto.id,
     postingId: dto.postings,
     lesseeId: dto.lessee,
+    lessorId: dto.lessor_id ?? null,
     operatorId: dto.operator ?? null,
     recurrenceId: dto.recurrence ?? null,
     reservationExpiresAt: toDate(dto.reservation_expires_at),

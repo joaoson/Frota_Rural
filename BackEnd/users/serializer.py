@@ -1,20 +1,38 @@
 from rest_framework import serializers
 from users.models import Users
+from rest_framework.validators import UniqueValidator
 
 class UserSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(choices=['locador', 'locatario', 'operador'])
+    email = serializers.EmailField(validators=[UniqueValidator(queryset=Users.objects.all())])
+
     class Meta:
         model = Users
         fields = '__all__'
+        read_only_fields = ['id', 'status', 'employer', 'last_login', 'created_at', 'updated_at']
         extra_kwargs = {
-            'password': {'write_only': True}  # Hide password in GET responses
+            'password': {'write_only': True, 'min_length': 8}  # Hide password in GET responses
         }
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        user = Users(**validated_data)
+        user = Users(status='active', **validated_data)
         user.set_password(password)
         user.save()
         return user
+
+
+class ProfileSerializer(UserSerializer):
+    """Self-service changes cannot alter roles, account state or credentials."""
+
+    role = serializers.ChoiceField(choices=['locador', 'locatario', 'operador'], required=False)
+    password = serializers.CharField(write_only=True, required=False)
+
+    def validate(self, attrs):
+        protected = {'role', 'status', 'employer', 'password', 'last_login'} & set(self.initial_data)
+        if protected:
+            raise serializers.ValidationError({field: 'Este campo não pode ser alterado pelo perfil.' for field in protected})
+        return attrs
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -69,11 +69,16 @@ class GroqResearchTests(SimpleTestCase):
         self.assertEqual(result.sources, [SOURCE])
         self.assertIsNone(result.search_suggestions_html)
         first, second = [json.loads(request.content) for request in requests]
-        self.assertEqual(first['model'], 'groq/compound-mini')
-        self.assertEqual(requests[0].headers['Groq-Model-Version'], '2025-07-23')
+        self.assertEqual(first['model'], 'openai/gpt-oss-20b')
+        self.assertNotIn('Groq-Model-Version', requests[0].headers)
         self.assertNotIn('Groq-Model-Version', requests[1].headers)
-        self.assertEqual(first['compound_custom']['tools']['enabled_tools'], ['web_search'])
-        self.assertEqual(first['search_settings'], {'country': 'brazil'})
+        self.assertEqual(first['tools'], [{'type': 'browser_search'}])
+        self.assertEqual(first['tool_choice'], 'required')
+        self.assertEqual(first['reasoning_effort'], 'low')
+        self.assertEqual(first['max_completion_tokens'], 2048)
+        self.assertNotIn('compound_custom', first)
+        self.assertNotIn('search_settings', first)
+        self.assertNotIn('response_format', first)
         self.assertIn('John Deere', first['messages'][0]['content'])
         self.assertEqual(second['model'], 'openai/gpt-oss-120b')
         self.assertEqual(second['max_completion_tokens'], 2000)
@@ -81,6 +86,35 @@ class GroqResearchTests(SimpleTestCase):
         self.assertTrue(second['response_format']['json_schema']['strict'])
         self.assertEqual(requests[0].headers['Authorization'], 'Bearer test-groq-key')
         self.assertNotIn('test-groq-key', str(requests[0].url))
+
+    def test_browser_open_evidence_is_used_after_empty_search_result_for_same_url(self):
+        # Shape verified against GPT-OSS browser_search: search may supply only
+        # links, while browser.open supplies the original page for that URL.
+        listing = completion('MISLEADING SUMMARY: this used machine is new.', [
+            {'name': 'browser.search', 'type': 'browser_search', 'search_results': {
+                'results': [{**SOURCE, 'content': ''}],
+            }},
+            {'name': 'browser.open', 'type': 'browser.open', 'search_results': {
+                'results': [{**SOURCE, 'content': SOURCE_CONTENT}],
+            }},
+        ])
+        result, requests = self.run_research([
+            (200, listing), (200, completion(json.dumps(VALUES))),
+        ])
+        self.assertEqual(result.sources, [SOURCE])
+        context = json.loads(requests[1].content)['messages'][0]['content']
+        self.assertIn(SOURCE_CONTENT, context)
+        self.assertNotIn('MISLEADING SUMMARY', context)
+
+    def test_browser_search_without_opened_content_cannot_supply_estimated_prices(self):
+        listing = completion('An apparent price with a source link.', [
+            {'name': 'browser.search', 'type': 'browser_search', 'search_results': {
+                'results': [{**SOURCE, 'content': ''}],
+            }},
+        ])
+        result, requests = self.run_research([(200, listing)])
+        self.assertIsNone(result)
+        self.assertEqual(len(requests), 1)
 
     def test_extraction_uses_raw_s790_listing_and_query_instead_of_wrong_summary(self):
         source = {'url': 'https://example.com/s790-2023-mt', 'title': 'S790 2023'}

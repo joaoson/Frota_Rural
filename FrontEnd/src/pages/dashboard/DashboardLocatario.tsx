@@ -12,17 +12,18 @@ import { ReviewsSection } from "@/features/dashboard/components/ReviewsSection";
 import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import DashboardMachineSearch from "@/components/DashboardMachineSearch";
 import OperadoresPanel from "@/components/OperadoresPanel";
-import { useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
+import { useCancelRental, useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
 import { RentalRecurrenceDialog } from "@/features/contracts/components/RentalRecurrenceDialog";
 import { RentalPaymentButton } from "@/features/payments/components/RentalPaymentButton";
-import { rentalMachineName, rentalHasContract, type Rental } from "@/features/contracts/types/rental";
+import { rentalMachineName, rentalHasContract, situacaoAssinatura, type Rental } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import {
   useCreateReview,
   useReceivedReviews,
   useWrittenReviews,
 } from "@/features/reviews/hooks/useReviews";
-import type { Review } from "@/features/reviews/types/review";
+import { averageRating, hasReviewedRental, type Review } from "@/features/reviews/types/review";
+import AssinaturaContratoModal from "@/components/AssinaturaContratoModal";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { getInitials } from "@/shared/utils/getInitials";
 import { useUser } from "@/features/users/hooks/useUsers";
@@ -32,25 +33,10 @@ import { toast } from "sonner";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
-import machine2 from "@/assets/machine-2.jpg";
 
-const spendData = [
-  { month: "Set", value: 5400 },
-  { month: "Out", value: 8200 },
-  { month: "Nov", value: 12000 },
-  { month: "Dez", value: 6250 },
-  { month: "Jan", value: 0 },
-  { month: "Fev", value: 15000 },
-];
 
-const ratingsData = [
-  { month: "Set", rating: 4.0 },
-  { month: "Out", rating: 4.5 },
-  { month: "Nov", rating: 3.0 },
-  { month: "Dez", rating: 5.0 },
-  { month: "Jan", rating: 0 },
-  { month: "Fev", rating: 5.0 },
-];
+const formatCurrency = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const normalizeSearch = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 
 const sidebarItems: readonly SidebarItem<Tab>[] = [
   { icon: "dashboard", label: "Dashboard", tab: "dashboard" },
@@ -78,13 +64,20 @@ type Tab =
   | "sair";
 
 const DashboardLocatario = () => {
-  const { userId, logout } = useAuth();
+  const { userId, userRole, logout } = useAuth();
+  const isOperator = userRole === "operador";
+  const visibleItems = isOperator ? sidebarItems.filter(item => ["chat", "notificacoes", "conta", "sair"].includes(item.tab)) : sidebarItems;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const tab: Tab = sidebarItems.find((item) => item.tab === requestedTab)?.tab ?? "dashboard";
+  const tab: Tab = visibleItems.find((item) => item.tab === requestedTab)?.tab ?? (isOperator ? "conta" : "dashboard");
   const setTab = (next: Tab) => setSearchParams({ tab: next });
-  const [showReagendar, setShowReagendar] = useState<string | null>(null);
+  const [rentalSearch, setRentalSearch] = useState("");
+  const [rentalYear, setRentalYear] = useState("Todos");
+  const [contractSearch, setContractSearch] = useState("");
+  const [contractYear, setContractYear] = useState("Todos");
+  const [contractFilter, setContractFilter] = useState("Todos");
+  const [signingRental, setSigningRental] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [recurrenceSource, setRecurrenceSource] = useState<Rental | null>(null);
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
@@ -92,10 +85,11 @@ const DashboardLocatario = () => {
 
   const userQuery = useUser(userId);
   const user: User | null = userQuery.data ?? null;
-  const receivedQuery = useReceivedReviews(userId);
-  const givenQuery = useWrittenReviews(userId);
-  const rentalsQuery = useRentalsAsLessee(userId);
+  const receivedQuery = useReceivedReviews(isOperator ? null : userId);
+  const givenQuery = useWrittenReviews(isOperator ? null : userId);
+  const rentalsQuery = useRentalsAsLessee(isOperator ? null : userId);
   const createReview = useCreateReview();
+  const cancelRental = useCancelRental();
 
   const receivedReviews: Review[] = receivedQuery.data ?? [];
   const givenReviews: Review[] = givenQuery.data ?? [];
@@ -121,7 +115,7 @@ const DashboardLocatario = () => {
         hasContract: rentalHasContract(rental),
         acceptedByLessor: rental.acceptedByLessor,
         acceptedByLessee: rental.acceptedByLessee,
-        image: machine2,
+
       })),
     [rentalsQuery.data],
   );
@@ -130,12 +124,39 @@ const DashboardLocatario = () => {
   const [reviewComment, setReviewComment] = useState<string>("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const contracts = rentals.filter((rental) => rental.hasContract);
-  const activeRentals = rentals.filter(r => r.status === "pending" || r.status === "awaiting_payment" || r.status === "active" || r.status === "signed" || r.status === "validating");
-  const pastRentals = rentals.filter(r => r.status === "completed" || r.status === "cancelled" || r.status === "closed");
+  const matches = (r: (typeof rentals)[number], search: string, year: string) =>
+    normalizeSearch(`${r.owner} ${r.machine} ${r.contract ?? ""}`).includes(normalizeSearch(search.trim())) &&
+    (year === "Todos" || String(r.source.startDate?.getFullYear()) === year);
+  const years = ["Todos", ...Array.from(new Set(rentals.flatMap(r => r.source.startDate ? [String(r.source.startDate.getFullYear())] : []))).sort().reverse()];
+  const allContracts = rentals.filter(r => r.hasContract);
+  const contracts = allContracts.filter(r => matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
+  const filteredRentals = rentals.filter(r => matches(r, rentalSearch, rentalYear));
+  const activeRentals = filteredRentals.filter(r => ["pending", "awaiting_payment", "active", "signed", "validating"].includes(r.status ?? ""));
+  const pastRentals = filteredRentals.filter(r => ["completed", "cancelled", "closed"].includes(r.status ?? ""));
+  const today = new Date();
+  const spendData = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(today.getFullYear(), today.getMonth() - 5 + index, 1);
+    const monthRentals = rentals.filter(r => r.source.startDate?.getFullYear() === month.getFullYear() && r.source.startDate?.getMonth() === month.getMonth() && ["active", "signed", "completed", "closed"].includes(r.status ?? ""));
+    return { month: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), value: monthRentals.reduce((sum, r) => sum + (r.source.totalPrice ?? 0), 0) };
+  });
+  const ratingsData = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(today.getFullYear(), today.getMonth() - 5 + index, 1);
+    return { month: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), rating: averageRating(receivedReviews.filter(r => r.createdAt?.getFullYear() === month.getFullYear() && r.createdAt?.getMonth() === month.getMonth())) };
+  });
+  const ratingAverage = averageRating(receivedReviews);
+  const cancel = async (id: string) => {
+    try {
+      await cancelRental.mutateAsync(id);
+      toast.success("Reserva cancelada. As datas foram liberadas.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível cancelar a reserva."); }
+  };
 
-  const submitReview = async () => {
-    if (!userId) return;
+  const submitReview = async (rental: Rental) => {
+    if (!userId || isSubmittingReview) return;
+    if (!rental.lessorId || hasReviewedRental(givenReviews, rental.id)) {
+      toast.error("Não foi possível avaliar esta locação. Atualize a página e tente novamente.");
+      return;
+    }
     if (!reviewComment.trim()) {
       toast.error("Por favor, escreva um comentário.");
       return;
@@ -144,10 +165,10 @@ const DashboardLocatario = () => {
     try {
       await createReview.mutateAsync({
         reviewer: userId,
-        reviewee: "047f6582-ebe6-47af-ba5f-061ac9819b80",
+        reviewee: rental.lessorId,
         rating: reviewRating,
-        comment: reviewComment,
-        rental: "fe6c805a-d5be-4dfe-970f-d2c3fae1cf00",
+        comment: reviewComment.trim(),
+        rental: rental.id,
       });
       toast.success("Avaliação enviada com sucesso!");
       setShowAvaliar(null);
@@ -175,39 +196,41 @@ const DashboardLocatario = () => {
       }}
       detailsOpen={showDetalhes === r.id}
       onToggleDetails={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)}
-      reschedule={{
-        open: showReagendar === r.id,
-        onToggle: () => setShowReagendar(showReagendar === r.id ? null : r.id),
-      }}
+      onCancel={() => void cancel(r.id)}
+      cancelling={cancelRental.isPending && cancelRental.variables === r.id}
+      cancelLabel="Cancelar reserva"
       analysisHref={`/dashboard-locatario/locacoes/${r.id}`}
       review={{
+        alreadyReviewed: hasReviewedRental(givenReviews, r.id),
         buttonLabel: "Avaliar",
         title: "Avaliar Serviço",
         prompt: `Como foi sua experiência com ${r.owner}?`,
         open: showAvaliar === r.id,
-        onToggle: () => setShowAvaliar(showAvaliar === r.id ? null : r.id),
+        onToggle: () => { setShowAvaliar(showAvaliar === r.id ? null : r.id); setReviewComment(""); setReviewRating(5); },
         rating: reviewRating,
         onRatingChange: setReviewRating,
         comment: reviewComment,
         onCommentChange: setReviewComment,
         submitting: isSubmittingReview,
-        onSubmit: () => void submitReview(),
+        onSubmit: () => void submitReview(r.source),
       }}
     />
   );
 
   return (
     <DashboardShell
-      items={sidebarItems}
+      items={visibleItems}
       tab={tab}
       onTabChange={setTab}
       onLogout={logout}
       logoutTab="sair"
       initials={user ? getInitials(user.name) : "…"}
       accountName={user ? `${user.name.split(" ")[0]} ${user.name.split(" ").slice(-1)[0]}` : "…"}
-      accountRole="Locatário"
+      accountRole={isOperator ? "Operador" : "Locatário"}
       avatarClassName="bg-tertiary-container text-on-tertiary"
     >
+      {rentalsQuery.isLoading && <p role="status">Carregando locações...</p>}
+      {rentalsQuery.isError && <div role="alert" className="rounded-xl bg-error/10 p-4 text-error">Não foi possível carregar suas locações. <button type="button" onClick={() => void rentalsQuery.refetch()} className="underline font-bold">Tentar novamente</button></div>}
       {/* Dashboard */}
       {tab === "dashboard" && (
         <div className="space-y-8">
@@ -219,10 +242,10 @@ const DashboardLocatario = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { label: "LOCAÇÕES ATIVAS", value: "1", sub: "em andamento", icon: "event_available" },
-              { label: "CONTRATOS", value: "3", sub: "assinados", icon: "description" },
-              { label: "LOCAÇÕES TOTAIS", value: "4", sub: "realizadas", icon: "inventory_2" },
-              { label: "GASTO NO MÊS", value: "R$ 15.000", sub: "fevereiro 2026", icon: "payments" },
+              { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(r => r.status === "active").length), sub: "em andamento", icon: "event_available" },
+              { label: "CONTRATOS", value: String(allContracts.filter(r => r.acceptedByLessor && r.acceptedByLessee).length), sub: "assinados por ambas as partes", icon: "description" },
+              { label: "LOCAÇÕES TOTAIS", value: String(rentals.length), sub: "reservas registradas", icon: "inventory_2" },
+              { label: "VALOR CONTRATADO NO MÊS", value: formatCurrency(spendData[5].value), sub: today.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }), icon: "payments" },
             ].map((stat, i) => (
               <div key={i} className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-all group">
                 <div className="flex items-center gap-2 mb-3">
@@ -239,11 +262,11 @@ const DashboardLocatario = () => {
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="font-headline text-lg font-bold text-on-surface">Evolução dos Gastos</h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">Últimos 6 meses</p>
+                <h2 className="font-headline text-lg font-bold text-on-surface">Valores das Locações</h2>
+                <p className="text-xs text-on-surface-variant mt-0.5">Últimos 6 meses · valores contratados por mês de início, sem reservas pendentes ou canceladas</p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-black text-primary">R$ 46.850</div>
+                <div className="text-2xl font-black text-primary">{formatCurrency(spendData.reduce((sum, month) => sum + month.value, 0))}</div>
                 <div className="text-[10px] font-bold text-primary uppercase tracking-wider">Total acumulado</div>
               </div>
             </div>
@@ -259,7 +282,7 @@ const DashboardLocatario = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Gasto']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
+                  <Tooltip formatter={(value) => [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Valor contratado']} contentStyle={{ borderRadius: 12, border: '1px solid var(--outline-variant)', background: 'var(--popover)', color: 'var(--popover-foreground)', fontSize: 13 }} labelStyle={{ color: 'var(--popover-foreground)' }} itemStyle={{ color: 'var(--popover-foreground)' }} />
                   <Area type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2.5} fill="url(#colorSpend)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -275,7 +298,7 @@ const DashboardLocatario = () => {
               </div>
               <div className="flex items-center gap-1.5 bg-secondary-container/10 px-3 py-1.5 rounded-lg">
                 <MaterialIcon icon="star" filled className="text-secondary-container" size={16} />
-                <span className="font-black text-secondary text-sm">4.3</span>
+                <span className="font-black text-secondary text-sm">{ratingAverage === null ? "Sem avaliações" : ratingAverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</span>
                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">média</span>
               </div>
             </div>
@@ -306,10 +329,10 @@ const DashboardLocatario = () => {
               {rentals.map((r) => {
                 const badge = rentalStatusBadge(r.status);
                 return (
-                  <div key={r.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                  <Link key={r.id} to={`/dashboard-locatario?tab=locacoes#locacao-${r.id}`} className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high">
-                        <img src={r.image} alt={r.machine} className="w-full h-full object-cover" width={48} height={48} />
+                        <MaterialIcon icon="agriculture" className="text-primary p-2" size={32} />
                       </div>
                       <div>
                         <div className="font-bold text-on-surface text-sm">{r.machine}</div>
@@ -320,7 +343,7 @@ const DashboardLocatario = () => {
                       <StatusBadge config={badge} iconSize={12} />
                       <MaterialIcon icon="chevron_right" className="text-on-surface-variant" size={20} />
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -341,13 +364,15 @@ const DashboardLocatario = () => {
           </div>
 
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={rentalSearch}
+            onSearchChange={setRentalSearch}
+            yearValue={rentalYear}
+            onYearChange={setRentalYear}
+            years={years}
             searchPlaceholder="Buscar por locador, maquinário ou contrato..."
           />
 
+          {!rentalsQuery.isLoading && !rentalsQuery.isError && filteredRentals.length === 0 && <p role="status">Nenhuma locação encontrada.</p>}
           {activeRentals.length > 0 && (
             <div className="space-y-4">
               <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
@@ -381,15 +406,16 @@ const DashboardLocatario = () => {
             <p className="text-on-surface-variant text-sm mt-3">Seus contratos assinados e pendentes</p>
           </div>
           <DashboardSearchBar
-            searchValue=""
-            onSearchChange={() => {}}
-            yearValue="Todos"
-            onYearChange={() => {}}
+            searchValue={contractSearch}
+            onSearchChange={setContractSearch}
+            yearValue={contractYear}
+            onYearChange={setContractYear}
+            years={years}
             searchPlaceholder="Buscar por contrato, locador ou maquinário..."
           />
           <div className="flex gap-2">
             {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
-              <button key={f} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${f === "Todos" ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}>
+              <button key={f} type="button" onClick={() => setContractFilter(f)} aria-pressed={contractFilter === f} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${f === contractFilter ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}>
                 {f}
               </button>
             ))}
@@ -404,16 +430,11 @@ const DashboardLocatario = () => {
                   </div>
                   <div>
                     <h3 className="font-headline font-bold text-on-surface">{c.contract} — {c.machine}</h3>
-                    <p className="text-sm text-on-surface-variant">{c.owner} · Criado em 2026</p>
+                    <p className="text-sm text-on-surface-variant">{c.owner} · {c.source.createdAt ? `Criado em ${c.source.createdAt.toLocaleDateString("pt-BR")}` : c.period}</p>
                   </div>
                 </div>
-                <span className={`px-3 py-1.5 font-bold text-[10px] rounded uppercase tracking-wider flex items-center gap-1.5 ${
-                  c.status === "pending" ? "bg-secondary-container/20 text-secondary border border-secondary-container/30"
-                    : c.status === "active" || c.status === "signed" ? "bg-primary/10 text-primary border border-primary/20"
-                    : "bg-surface-container-high text-on-surface-variant border border-outline-variant/30"
-                }`}>
-                  <MaterialIcon icon={c.status === "pending" ? "description" : (c.status === "active" || c.status === "signed") ? "verified" : "check_circle"} size={14} />
-                  {c.status === "pending" ? "Assinatura Pendente" : (c.status === "active" || c.status === "signed") ? "Assinado" : "Encerrado"}
+                <span className="px-3 py-1.5 font-bold text-xs rounded bg-primary/10 text-primary">
+                  {situacaoAssinatura(c).encerrado ? "Encerrado" : situacaoAssinatura(c).completo ? "Assinado" : "Assinatura Pendente"}
                 </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
@@ -438,9 +459,11 @@ const DashboardLocatario = () => {
                 <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
                   <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                 </Link>
-                <button className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
-                  <MaterialIcon icon="download" size={16} /> Baixar PDF
-                </button>
+                {(c.status === "pending" || c.status === "awaiting_payment") && <RentalPaymentButton rentalId={c.id} />}
+                {situacaoAssinatura(c).podeAssinarComoLocatario && <button type="button" onClick={() => setSigningRental(c.id)} className="bg-primary/10 text-primary px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2"><MaterialIcon icon="draw" size={16} /> Assinar Contrato</button>}
+                <Link to={`/contrato/${c.id}?print=1`} className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
+                  <MaterialIcon icon="download" size={16} /> Imprimir / Salvar PDF
+                </Link>
               </div>
             </div>
           ))}
@@ -455,7 +478,7 @@ const DashboardLocatario = () => {
       {/* Chat */}
       {tab === "operadores" && <OperadoresPanel />}
 
-      {tab === "chat" && <ChatInboxPanel subtitle="Converse com seus locadores" />}
+      {tab === "chat" && <ChatInboxPanel subtitle={isOperator ? "Converse sobre seus serviços" : "Converse com seus locadores"} />}
 
       {/* Notificações */}
       {tab === "notificacoes" && <NotificationsPanel />}
@@ -465,10 +488,11 @@ const DashboardLocatario = () => {
         <AccountSection
           userId={userId}
           user={user}
-          roleLabel="Locatário"
+          roleLabel={isOperator ? "Operador" : "Locatário"}
           avatarClassName="bg-tertiary-container text-on-tertiary"
         />
       )}
+      <AssinaturaContratoModal open={signingRental !== null} onOpenChange={(open) => { if (!open) setSigningRental(null); }} contratoId={signingRental ?? ""} papel="locatario" onAssinado={() => { void rentalsQuery.refetch(); }} />
       {recurrenceSource && <RentalRecurrenceDialog key={recurrenceSource.id} source={recurrenceSource} open={recurrenceOpen} onOpenChange={(open) => { setRecurrenceOpen(open); if (!open) setTab("locacoes"); }} />}
     </DashboardShell>
   );

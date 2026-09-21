@@ -8,6 +8,7 @@ from api.models import Rentals, Reviews
 
 
 class ReviewSerializer(serializers.ModelSerializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
     reviewer_name = serializers.CharField(source='reviewer.name', read_only=True)
     reviewee_name = serializers.CharField(source='reviewee.name', read_only=True)
 
@@ -26,6 +27,25 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at"]
 
+    def validate(self, attrs):
+        request = self.context.get('request')
+        rental = attrs.get('rental', getattr(self.instance, 'rental', None))
+        reviewer = attrs.get('reviewer', getattr(self.instance, 'reviewer', None))
+        reviewee = attrs.get('reviewee', getattr(self.instance, 'reviewee', None))
+        if self.instance:
+            for field in ('rental', 'reviewer', 'reviewee'):
+                if field in attrs and attrs[field].pk != getattr(self.instance, f'{field}_id'):
+                    raise serializers.ValidationError({field: 'Este vínculo não pode ser alterado.'})
+        if request and reviewer and reviewer.pk != request.user.pk:
+            raise serializers.ValidationError({'reviewer': 'Você só pode avaliar em seu próprio nome.'})
+        if rental and reviewer and reviewee:
+            if rental.status != 'completed':
+                raise serializers.ValidationError({'rental': 'A avaliação fica disponível após a conclusão da locação.'})
+            parties = {rental.lessee_id, rental.postings.machinery.owner_id}
+            if reviewer.pk not in parties or reviewee.pk not in parties or reviewer.pk == reviewee.pk:
+                raise serializers.ValidationError({'reviewee': 'Avalie a outra parte desta locação.'})
+        return attrs
+
     def create(self, validated_data):
         return Reviews.objects.create(
             id=uuid.uuid4(),
@@ -36,6 +56,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class RentalSerializer(serializers.ModelSerializer):
     lessee_name = serializers.CharField(source="lessee.name", read_only=True)
+    lessor_id = serializers.CharField(source="postings.machinery.owner_id", read_only=True)
     lessor_name = serializers.CharField(source="postings.machinery.owner.name", read_only=True)
     machine_brand = serializers.CharField(source="postings.machinery.brand", read_only=True)
     machine_model = serializers.CharField(source="postings.machinery.model", read_only=True)
@@ -65,6 +86,7 @@ class RentalSerializer(serializers.ModelSerializer):
             "updated_at",
             "lessee_name",
             "lessor_name",
+            "lessor_id",
             "machine_brand",
             "machine_model",
             "contract_number",

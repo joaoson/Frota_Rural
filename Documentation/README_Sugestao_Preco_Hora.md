@@ -483,7 +483,7 @@ R$ 210 em julho.
 Resolvidas na implementação:
 
 - **Campos do §10** — `hour_meter` e `power_cv` foram adicionados.
-- **Provedor** — Groq (`groq/compound-mini` + `openai/gpt-oss-120b`) por padrão;
+- **Provedor** — Groq (`openai/gpt-oss-20b` com `browser_search` + `openai/gpt-oss-120b`) por padrão;
   Gemini e Claude são alternativas explícitas. Cache de 90 dias por `(marca, modelo, ano)`.
   Sem a chave do provedor escolhido (`GROQ_API_KEY` por padrão), o recurso não
   aparece; nada mais deixa de funcionar.
@@ -503,8 +503,12 @@ Em aberto:
 
 ### Configuração gratuita de desenvolvimento
 
-O adaptador `BackEnd/pricing/groq.py` usa a busca web do Compound e depois
-extrai os fatos com GPT OSS pelo schema JSON. O contexto inclui o pedido original
+O adaptador `BackEnd/pricing/groq.py` usa `browser_search` do GPT-OSS 20B e depois
+extrai os fatos com GPT-OSS 120B pelo schema JSON, em outra chamada sem ferramentas.
+A separação é necessária porque Browser Search não aceita saída estruturada na
+mesma chamada. Esta migração remove a dependência dos modelos Compound,
+cuja desativação foi anunciada para 21/09/2026. Usa a mesma chave e mantém o
+provedor explicitamente selecionado, sem retries nem fallback pago. O contexto inclui o pedido original
 e até 8.000 caracteres de trechos de fontes, com limite por anúncio. Apenas URLs
 citadas pelo extrator e presentes nesse contexto entram na resposta. Resumos
 gerados, URLs sem conteúdo e fontes fora do limite não comprovam preços.

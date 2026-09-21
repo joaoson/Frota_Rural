@@ -21,6 +21,7 @@ from contracts.models import Contracts
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from pricing.models import PricingSuggestions
+from api.models import Reviews
 from users.models import Users
 from rest_framework_simplejwt.tokens import AccessToken
 
@@ -39,10 +40,12 @@ user_ids = [owner_id, renter_id]
 password = f"PwTest-{namespace.hex}!"
 with transaction.atomic():
     if action == "delete":
+        user_ids += list(Users.objects.filter(email=f"pw-operator-{namespace.hex}@example.test").values_list("id", flat=True))
         users = Users.objects.filter(id__in=user_ids)
         if any(not u.email.endswith(f"-{namespace.hex}@example.test") for u in users):
             raise RuntimeError("Refusing to delete users not owned by this fixture")
         Messages.objects.filter(Q(sender_id__in=user_ids) | Q(receiver_id__in=user_ids)).delete()
+        Reviews.objects.filter(Q(reviewer_id__in=user_ids) | Q(reviewee_id__in=user_ids)).delete()
         # Only records owned by this fixture are removed. Source rentals and
         # generated series protect each other until the occurrence link is cleared.
         Rentals.objects.filter(lessee_id=renter_id).update(recurrence=None)

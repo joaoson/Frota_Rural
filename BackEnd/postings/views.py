@@ -2,7 +2,9 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from api.validation import query_uuid, query_date
 from rest_framework.response import Response
 import uuid
 from .models import (
@@ -26,7 +28,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExam
 def _postings_queryset():
     return (
         Postings.objects.all()
-        .select_related("machinery")
+        .select_related("machinery__owner")
         .prefetch_related("postingsphotos_set")
     )
 
@@ -48,6 +50,7 @@ POSTING_INVALID = OpenApiResponse(
             "disponibilidade do anúncio; anúncios sem data definida aparecem em qualquer busca."
         ),
         parameters=[
+            OpenApiParameter('owner', type=str, description='Filtrar pelo proprietário; inclui anúncios pausados apenas para o próprio locador'),
             OpenApiParameter('machinery', type=str, description='Filtrar pela máquina anunciada'),
             OpenApiParameter('status', type=str, description='Status do anúncio (active, draft)'),
             OpenApiParameter('available_from', type=str, description='Disponível a partir de (YYYY-MM-DD)'),
@@ -81,10 +84,18 @@ POSTING_INVALID = OpenApiResponse(
     ),
 )
 @api_view(["GET", "POST"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def postings_list(request):
     if request.method == "GET":
         qs = _postings_queryset().order_by("-created_at", "-id")
-        machinery_id = request.query_params.get("machinery")
+        owner_id = query_uuid(request, "owner")
+        is_admin = getattr(request.user, 'role', None) == 'admin'
+        is_owner = request.user.is_authenticated and owner_id == request.user.pk
+        if owner_id:
+            qs = qs.filter(machinery__owner_id=owner_id)
+        if not (is_admin or is_owner):
+            qs = qs.filter(status='active', machinery__status='active')
+        machinery_id = query_uuid(request, "machinery")
         if machinery_id:
             qs = qs.filter(machinery_id=machinery_id)
         status_filter = request.query_params.get("status")
@@ -92,14 +103,14 @@ def postings_list(request):
             qs = qs.filter(status=status_filter)
         # Filtro de data: sobreposição entre disponibilidade da máquina e o período solicitado.
         # NULLs são tratados como "sem restrição" (máquina sem data definida aparece sempre).
-        available_from = request.query_params.get("available_from")
+        available_from = query_date(request, "available_from")
         if available_from:
             # Exclui máquinas cuja disponibilidade TERMINOU antes da data de início informada
             qs = qs.filter(
                 Q(availability_end__isnull=True) |
                 Q(availability_end__date__gte=available_from)
             )
-        available_until = request.query_params.get("available_until")
+        available_until = query_date(request, "available_until")
         if available_until:
             # Exclui máquinas que só COMEÇAM depois da data de fim informada
             qs = qs.filter(
@@ -109,7 +120,7 @@ def postings_list(request):
         serializer = PostingListSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = PostingSerializer(data=request.data)
+    serializer = PostingSerializer(data=request.data, context={"request": request})
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     try:
@@ -156,9 +167,18 @@ def postings_list(request):
     ),
 )
 @api_view(["GET", "PUT", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticatedOrReadOnly])
 def posting_detail(request, pk):
     try:
-        posting = _postings_queryset().get(pk=pk)
+        qs = _postings_queryset()
+        if request.method != 'GET':
+            qs = qs.filter(machinery__owner=request.user)
+        elif getattr(request.user, 'role', None) != 'admin':
+            visible = Q(status='active', machinery__status='active')
+            if request.user.is_authenticated:
+                visible |= Q(machinery__owner=request.user) | Q(rentals__lessee=request.user)
+            qs = qs.filter(visible).distinct()
+        posting = qs.get(pk=pk)
     except Postings.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -166,7 +186,7 @@ def posting_detail(request, pk):
         return Response(PostingDetailSerializer(posting).data, status=status.HTTP_200_OK)
 
     if request.method == "PUT":
-        serializer = PostingSerializer(posting, data=request.data)
+        serializer = PostingSerializer(posting, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -179,7 +199,7 @@ def posting_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     if request.method == "PATCH":
-        serializer = PostingSerializer(posting, data=request.data, partial=True)
+        serializer = PostingSerializer(posting, data=request.data, partial=True, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         try:
@@ -192,7 +212,11 @@ def posting_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     try:
-        posting.delete()
+        if posting.rentals_set.exists():
+            return Response({"error": "O anúncio possui locações vinculadas e não pode ser excluído. Pause-o para preservar o histórico."}, status=409)
+        with transaction.atomic():
+            posting.postingsphotos_set.all().delete()
+            posting.delete()
     except IntegrityError:
         return Response(
             {
@@ -218,9 +242,10 @@ def posting_detail(request, pk):
     }
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def posting_photos(request, pk):
     try:
-        posting = Postings.objects.get(pk=pk)
+        posting = Postings.objects.get(pk=pk, machinery__owner=request.user)
     except Postings.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

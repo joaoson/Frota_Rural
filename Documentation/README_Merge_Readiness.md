@@ -1,6 +1,6 @@
 # Develop merge validation — 2026-09-20
 
-Current integration candidate: `codex/fix-notification-cancellation`.
+Current integration candidate: `codex/dashboard-flow-audit`.
 Previously validated baseline: `codex/retrofit-pricing-chat-develop`.
 Target checked: `origin/develop` at `c44750fccd9e1ce2b1ca9be60451b2e7e15f08b0`.
 
@@ -28,7 +28,8 @@ retrofit tip, but the retrofit already includes the current develop architecture
 | `codex/rental-recurrence-supabase` | `9f59e4b` | Inherits the reviewed retrofit, adds T06 and the live Supabase connection |
 | `codex/rental-notifications` | `2696628` | Adds T05 notifications and safe, repeatable Supabase demo data |
 | `codex/fix-pricing-research` | `1e0b6bf` | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
-| `codex/fix-notification-cancellation` | Current candidate | Distinguishes canceled notification requests from connection failures |
+| `codex/fix-notification-cancellation` | `81422ac` | Distinguishes canceled notification requests from connection failures |
+| `codex/dashboard-flow-audit` | Current candidate | Repairs dashboard actions, real summaries, account/operator flows, API permissions and integration failures |
 
 The running `frota_rural_retrofit` Docker stack mounts this checkout, with the
 frontend on port 5174 and backend on port 8001. Its configured pricing provider
@@ -272,3 +273,76 @@ Real network errors still log and retain their existing retry policy.
 
 The backend was unchanged; its preceding full regression run remains 227 passed.
 Browser fixtures use an isolated local database, never Supabase.
+
+
+## Dashboard and integration audit
+
+This candidate replaces fixed review IDs and sample dashboard figures with the
+actual rental parties, stored reviews and clearly labeled contractual amounts.
+Fleet/listing/rental/contract searches and year/status filters work. Reviews,
+reservation cancellation, signature recovery, contract printing and listing
+pause/reopen actions persist through the API. Machine edits refresh dependent
+listing data; changing a location clears stale map coordinates while price-only
+edits preserve them. Document links support both backend-relative files and
+absolute storage URLs.
+
+Account and operator forms prevent duplicate writes and stale CEP responses,
+retain useful server errors, expose retry after a failed list request and preserve
+unchanged legacy/demo identifiers. Operator accounts have their own account,
+documents, chat and notification navigation. Role checks prevent entry into the
+wrong dashboard, and login preserves requested dashboard tabs. The unused photo
+upload/identity-verification prototype and rescheduling controls were removed;
+existing recurrence remains available for scheduling future rentals.
+
+API changes require authentication and ownership for account, inventory and
+document mutations; moderation requires an administrator. Reviews require an
+actual completed rental and its other party. Canceled rentals also close their
+contracts. The model schema is unchanged.
+
+### External integrations checked
+
+- Supabase: verified TLS and read-only API responses for the demo owner, tenant
+  and operator inside an explicitly read-only database transaction. Owner
+  inventory returned 10 machines, 10 listings and 4 rentals; the tenant returned
+  4 rentals and one operator. No hosted fixtures or account edits.
+- Redis: successful ping; real chat/WebSocket behavior is also covered locally.
+- Firebase: the configured service account successfully read bucket existence.
+  This check does not upload files or change bucket rules.
+- CNH model: the configured interpreter ran successfully and rejected a synthetic
+  blank image. This checks availability, not model accuracy.
+- Groq: migrated the retiring Compound research model to GPT-OSS 20b
+  `browser_search`, keeping GPT-OSS 120b extraction and bounded original-source
+  evidence. One live research probe returned HTTP 200 with a Brazilian S790
+  listing, price and operating hours. No provider upgrade, retry or fallback.
+  The new two-stage path is covered by mocked provider tests; the live check
+  exercised research only. See [provider details](../Devops/README.md).
+- Stripe: the running environment has neither a secret API key nor a webhook
+  signing secret. Checkout reports a clear 503; payments cannot complete until
+  both are configured. No real checkout, charge or webhook was sent.
+- Resend: a key is present. Email delivery/OTP was not sent during this audit;
+  demonstration accounts use `example.test` and cannot receive mail.
+
+For payment setup, place the Stripe test secret and matching endpoint signing
+secret in the ignored `.env` as `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`.
+Restart the Supabase backend using the two environment files and Compose configs
+from the [Supabase guide](../Devops/SUPABASE.md), preserving `DATABASE_URL`.
+Keep production keys out of test runs. A real test-mode checkout, webhook receipt
+and OTP delivery with a deliverable email still need external configuration.
+
+### Final audit verification
+
+| Check | Result |
+| --- | --- |
+| Django full suite on isolated local PostgreSQL | 256 passed |
+| Frontend unit/component suite | 96 passed |
+| Browser coverage across Chromium, Firefox and WebKit | All 84 scenarios verified: 78 passed in the full run; 6 publishing cases passed after updating their expected return URL to the Anúncios tab |
+| ESLint, production build and E2E TypeScript | Passed; existing large-bundle warning remains |
+| Django system check, migration drift, dependency consistency | Passed; no migration needed |
+| Local browser fixture cleanup | Zero Playwright accounts remain |
+| Merge simulation | Passed without conflicts against refreshed origin/develop at c44750f; target is already an ancestor |
+| Running frontend and public listings API | HTTP 200 on ports 5174 and 8001 |
+
+All automated writes used local PostgreSQL fixtures. Supabase records were checked
+read-only. The running Docker app mounts the updated checkout on ports 5174/8001.
+User intends to add Stripe test keys; neither key was present when this audit
+finished. Payment activation and live email delivery remain unverified.

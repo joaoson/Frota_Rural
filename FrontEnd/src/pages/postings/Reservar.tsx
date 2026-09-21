@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
 import type { RentalOccupancy, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import { HttpError } from "@/shared/http/errors";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 
 
@@ -21,7 +22,6 @@ const isoOuVazio = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 
 
 type Etapa = 1 | 2 | 3;
-type FormaPagamento = "pix" | "cartao";
 
 const ETAPAS: { numero: Etapa; titulo: string }[] = [
   { numero: 1, titulo: "Dados da Reserva" },
@@ -409,8 +409,9 @@ const Reservar = () => {
   const [recibo, setRecibo] = useState<SignatureEvidence | null>(null);
 
   // Etapa 2 — pagamento
-  const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>("pix");
   const [processando, setProcessando] = useState(false);
+  const checkoutInProgress = useRef(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [retornoStripe] = useState(() => {
     const busca = new URLSearchParams(window.location.search);
     return { resultado: busca.get("pagamento"), locacaoId: busca.get("locacao") };
@@ -418,7 +419,9 @@ const Reservar = () => {
   const [confirmandoPagamento, setConfirmandoPagamento] = useState(
     () => retornoStripe.resultado === "sucesso" && !!retornoStripe.locacaoId,
   );
-  const confirmacaoIniciada = useRef(false);
+  const [restaurandoReserva, setRestaurandoReserva] = useState(
+    () => Boolean(retornoStripe.locacaoId && (!retornoStripe.resultado || retornoStripe.resultado === "cancelado")),
+  );
   const [pagamentoEmRevisao, setPagamentoEmRevisao] = useState(false);
   const [sucessoPagamento, setSucessoPagamento] = useState(false);
   const [valorPago, setValorPago] = useState("");
@@ -460,21 +463,45 @@ const Reservar = () => {
   }, [id]);
 
   useEffect(() => {
-    if (confirmacaoIniciada.current) return;
+    const { locacaoId, resultado } = retornoStripe;
+    if (!userId || !locacaoId || (resultado && resultado !== "cancelado")) return;
+    let ignored = false;
+    setRestaurandoReserva(true);
+    setErro(null);
+    void contractStore.findRentalById(locacaoId).then(rental => {
+      if (ignored) return;
+      if (rental.postingId !== id || rental.lesseeId !== userId) {
+        throw new Error("Esta reserva não pertence a este anúncio ou à sua conta.");
+      }
+      if (!["pending", "awaiting_payment"].includes(rental.status ?? "")) {
+        throw new Error("Esta reserva não aguarda pagamento. Consulte seu estado em Minhas Locações.");
+      }
+      setCreatedRental(rental);
+      setDataInicio(isoOuVazio(rental.startDate));
+      setDataFim(isoOuVazio(rental.endDate));
+      setEtapa(2);
+    }).catch(error => {
+      if (!ignored) setErro(error instanceof Error ? error.message : "Não foi possível recuperar sua reserva. Consulte Minhas Locações.");
+    }).finally(() => { if (!ignored) setRestaurandoReserva(false); });
+    return () => { ignored = true; };
+  }, [retornoStripe, id, userId]);
+
+  useEffect(() => {
     const { resultado, locacaoId } = retornoStripe;
     if (!resultado || !locacaoId) return;
-    confirmacaoIniciada.current = true;
 
-    const clearPaymentReturn = () => {
+    let ignored = false;
+    let timer: number | undefined;
+    const clearPaymentReturn = (keepRental = false) => {
       const url = new URL(window.location.href);
       url.searchParams.delete("pagamento");
-      url.searchParams.delete("locacao");
+      if (!keepRental) url.searchParams.delete("locacao");
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     };
 
     if (resultado === "cancelado") {
-      clearPaymentReturn();
-      toast.info("Pagamento cancelado. As datas voltam a ficar disponíveis em alguns minutos.");
+      clearPaymentReturn(true);
+      toast.info("Pagamento interrompido. Você pode tentar novamente para a mesma reserva.");
       return;
     }
 
@@ -482,36 +509,36 @@ const Reservar = () => {
     const MAX_TENTATIVAS = 20;
 
     const concluir = async () => {
-      let valorConfirmado = "";
       try {
-        const rental = await contractStore.findRentalById(locacaoId);
-        if (rental) {
-          setCreatedRental(rental);
-          setDataInicio(isoOuVazio(rental.startDate));
-          setDataFim(isoOuVazio(rental.endDate));
-          valorConfirmado = (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL",
-          });
-        }
-      } catch (erro) {
-        console.error("Erro ao carregar a locação:", erro);
+        const [rental, document] = await Promise.all([
+          contractStore.findRentalById(locacaoId),
+          contractStore.findContractDocument(locacaoId),
+        ]);
+        if (ignored) return;
+        if (rental.postingId !== id) throw new Error("Esta reserva pertence a outro anúncio. Consulte Minhas Locações.");
+        setCreatedRental(rental);
+        setDataInicio(isoOuVazio(rental.startDate));
+        setDataFim(isoOuVazio(rental.endDate));
+        setContratoPreview(document);
+        setValorPago(formatarReais(rental.totalPrice ?? 0));
+        clearPaymentReturn();
+        setConfirmandoPagamento(false);
+        setEtapa(3);
+        window.scrollTo(0, 0);
+        setSucessoPagamento(true);
+      } catch (error) {
+        if (ignored) return;
+        setConfirmandoPagamento(false);
+        setErro(error instanceof HttpError ? error.message : "Seu pagamento foi confirmado, mas não foi possível carregar o contrato. Atualize a página ou consulte Minhas Locações.");
       }
-      setConfirmandoPagamento(false);
-      setEtapa(3);
-      window.scrollTo(0, 0);
-      setValorPago(valorConfirmado);
-      setSucessoPagamento(true);
-      contractStore
-        .findContractDocument(locacaoId)
-        .then(setContratoPreview)
-        .catch((erro: unknown) => console.error("Erro ao carregar o contrato:", erro));
     };
 
     const verificar = async () => {
+      if (ignored) return;
       tentativas += 1;
       try {
         const { status } = await paymentStore.getStatus(locacaoId);
+        if (ignored) return;
         if (status === "requires_review") {
           clearPaymentReturn();
           setConfirmandoPagamento(false);
@@ -525,23 +552,24 @@ const Reservar = () => {
           return;
         }
         if (status === "approved") {
-          clearPaymentReturn();
           await concluir();
           return;
         }
       } catch (erro) {
         console.error("Erro ao consultar o pagamento:", erro);
       }
+      if (ignored) return;
       if (tentativas >= MAX_TENTATIVAS) {
         setConfirmandoPagamento(false);
         toast.error("O pagamento ainda não foi confirmado. Atualize a página em instantes.");
         return;
       }
-      window.setTimeout(verificar, 700);
+      timer = window.setTimeout(verificar, 700);
     };
 
-    verificar();
-  }, [retornoStripe]);
+    void verificar();
+    return () => { ignored = true; if (timer !== undefined) window.clearTimeout(timer); };
+  }, [retornoStripe, id]);
 
   const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Maquinário";
   const valorDiaria = anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0;
@@ -549,10 +577,11 @@ const Reservar = () => {
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
     const dias = calcularDiarias(dataInicio, dataFim);
-    const sub = dias * valorDiaria;
-    const tax = sub * TAXA_PLATAFORMA;
-    return { diarias: dias, subtotal: sub, taxa: tax, total: sub + tax };
-  }, [dataInicio, dataFim, valorDiaria]);
+    const computedTotal = dias * valorDiaria * (1 + TAXA_PLATAFORMA);
+    const reservationTotal = createdRental?.totalPrice ?? computedTotal;
+    const sub = reservationTotal / (1 + TAXA_PLATAFORMA);
+    return { diarias: dias, subtotal: sub, taxa: reservationTotal - sub, total: reservationTotal };
+  }, [dataInicio, dataFim, valorDiaria, createdRental]);
 
   const datasBloqueadas = useMemo(() => {
     const bloqueadas = new Set<string>();
@@ -591,7 +620,7 @@ const Reservar = () => {
     setDataFim(data);
   };
 
-  const numeroContrato = `#CTR-${(id ?? "0000").slice(0, 4).toUpperCase()}`;
+  const numeroContrato = contratoPreview?.contrato.numero ?? createdRental?.contractNumber ?? "Aguardando reserva";
   const periodoTexto =
     dataInicio && dataFim ? `${formatarData(dataInicio)} – ${formatarData(dataFim)}` : "—";
 
@@ -621,27 +650,36 @@ const Reservar = () => {
   };
 
   const pagar = async () => {
-    if (processando) return;
+    if (checkoutInProgress.current || restaurandoReserva || !userId || !id) return;
+    checkoutInProgress.current = true;
     setProcessando(true);
+    setCheckoutError(null);
     try {
-      const rental = await contractStore.createRental({
-        postings: id || "",
-        lessee: userId ?? "",
-        start_date: toRentalDateTime(dataInicio, "start"),
-        end_date: toRentalDateTime(dataFim, "end"),
-        total_price: total,
-        status: "pending",
-      });
-      const { url } = await paymentStore.createCheckout(rental.id);
-      window.location.href = url;
-    } catch (err: unknown) {
-      setProcessando(false);
-      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
-      if (httpStatus === 409) {
-        toast.error("O período escolhido já está reservado. Escolha outras datas.");
-      } else {
-        toast.error("Não foi possível iniciar o pagamento.");
+      let rental = createdRental;
+      if (!rental) {
+        rental = await contractStore.createRental({
+          postings: id, lessee: userId,
+          start_date: toRentalDateTime(dataInicio, "start"),
+          end_date: toRentalDateTime(dataFim, "end"),
+          total_price: total, status: "pending",
+        });
+        // Keep the server-issued reservation before contacting the provider:
+        // retrying or refreshing must never create another rental for these dates.
+        setCreatedRental(rental);
+        const url = new URL(window.location.href);
+        url.searchParams.set("locacao", rental.id);
+        url.searchParams.delete("pagamento");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
       }
+      const { url } = await paymentStore.createCheckout(rental.id);
+      window.location.assign(url);
+    } catch (error: unknown) {
+      const message = error instanceof HttpError ? error.message : "Não foi possível iniciar o pagamento. Tente novamente.";
+      setCheckoutError(message);
+      toast.error(message);
+    } finally {
+      checkoutInProgress.current = false;
+      setProcessando(false);
     }
   };
 
@@ -652,8 +690,8 @@ const Reservar = () => {
       const { sentTo } = await contractStore.requestSignatureOtp(createdRental.id, "locatario");
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
-    } catch {
-      toast.error("Não foi possível enviar o código por e-mail.");
+    } catch (error) {
+      toast.error(error instanceof HttpError ? error.message : "Não foi possível enviar o código por e-mail.");
     } finally {
       setEnviandoOtp(false);
     }
@@ -693,8 +731,7 @@ const Reservar = () => {
       window.scrollTo(0, 0);
     } catch (err) {
       const mensagem =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Erro ao assinar contrato.";
+        err instanceof HttpError ? err.message : "Erro ao assinar contrato.";
       toast.error(mensagem);
       setAssinando(false);
     }
@@ -826,20 +863,21 @@ const Reservar = () => {
           </div>
         )}
 
-        {loading && !confirmandoPagamento && (
+        {(loading || restaurandoReserva) && !confirmandoPagamento && (
           <div className="text-center py-20">
             <p className="text-on-surface-variant text-sm">Carregando reserva...</p>
           </div>
         )}
 
-        {!loading && erro && (
+        {!loading && !restaurandoReserva && erro && (
           <div className="text-center py-20 bg-error-container rounded-2xl border border-error/20">
             <p className="text-error font-bold mb-2">Erro ao carregar</p>
             <p className="text-on-surface-variant text-sm">{erro}</p>
+            <Link className="mt-4 inline-block font-bold underline" to="/dashboard-locatario?tab=locacoes">Minhas Locações</Link>
           </div>
         )}
 
-        {!loading && !erro && !confirmandoPagamento && !pagamentoEmRevisao && anuncio && (
+        {!loading && !restaurandoReserva && !erro && !confirmandoPagamento && !pagamentoEmRevisao && anuncio && (
           <>
             <Stepper etapaAtual={etapa} />
 
@@ -947,43 +985,13 @@ const Reservar = () => {
                 <CartaoPainel className="lg:col-span-3">
                   <TituloSecao>Forma de Pagamento</TituloSecao>
 
-                  <div className="space-y-3 mb-7">
-                    {([
-                      { id: "pix", icone: "qr_code_2", titulo: "Pix", sub: "Aprovação Imediata" },
-                      { id: "cartao", icone: "credit_card", titulo: "Cartão de Crédito", sub: "Visa, Mastercard e outros" },
-                    ] as const).map((opcao) => {
-                      const selecionada = formaPagamento === opcao.id;
-                      return (
-                        <button
-                           key={opcao.id}
-                          onClick={() => setFormaPagamento(opcao.id)}
-                          className={`w-full flex items-center gap-4 rounded-xl p-4 border-2 transition text-left ${
-                            selecionada
-                              ? "border-primary bg-primary/5"
-                              : "border-outline-variant/30 hover:border-outline-variant/60"
-                          }`}
-                        >
-                          <div className="w-11 h-11 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
-                            <MaterialIcon icon={opcao.icone} className="text-tertiary" size={24} />
-                          </div>
-                          <div className="flex-1">
-                            <div className="font-bold text-tertiary">{opcao.titulo}</div>
-                            <div className="text-xs text-on-surface-variant">{opcao.sub}</div>
-                          </div>
-                          <span
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                              selecionada ? "border-primary" : "border-outline/40"
-                            }`}
-                          >
-                            {selecionada && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <p className="mb-5 text-sm text-on-surface-variant">Você escolherá a forma de pagamento disponível no ambiente seguro do provedor.</p>
+                  {createdRental && <p className="mb-4 text-sm">Reserva {createdRental.id.slice(0, 8)} · {periodoTexto}. Tentar novamente usa esta mesma reserva.</p>}
+                  {checkoutError && <p role="alert" className="mb-4 rounded-lg bg-error/10 p-4 text-sm text-error">{checkoutError}</p>}
 
                   <div className="flex gap-3">
-                    <button
+                    {createdRental ? <Link to={`/dashboard-locatario?tab=locacoes#locacao-${createdRental.id}`} className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40">Ver reserva</Link> : <button
+                      disabled={processando}
                       onClick={() => {
                         setEtapa(1);
                         window.scrollTo(0, 0);
@@ -991,7 +999,7 @@ const Reservar = () => {
                       className="px-6 py-4 rounded-lg font-bold text-tertiary border border-outline-variant/40 hover:bg-surface-container-low transition"
                     >
                       Voltar
-                    </button>
+                    </button>}
                     <button
                       onClick={pagar}
                       disabled={processando}
@@ -1020,7 +1028,7 @@ const Reservar = () => {
                       { rotulo: "Contrato", valor: numeroContrato },
                       { rotulo: "Maquinário", valor: titulo },
                       { rotulo: "Período", valor: periodoTexto },
-                      { rotulo: "Locador", valor: "João Silva" },
+                      { rotulo: "Locador", valor: createdRental?.lessorName ?? contratoPreview?.locador.razao_social ?? "Não informado" },
                     ].map((item) => (
                       <div key={item.rotulo} className="flex justify-between items-center py-4">
                         <dt className="text-[10px] uppercase font-bold text-outline tracking-widest">{item.rotulo}</dt>

@@ -1,4 +1,4 @@
-"""Groq REST adapter: Compound web research and GPT OSS schema extraction."""
+"""Groq REST adapter: GPT OSS browser research and separate schema extraction."""
 from __future__ import annotations
 
 import json
@@ -31,7 +31,7 @@ sustentam os valores selecionados, nunca todos os resultados indiscriminadamente
 
 
 def _search_evidence(message):
-    """Preserve condition/location facts the Compound summary can mislabel.
+    """Preserve condition/location facts a generated summary can mislabel.
 
     Bound source text before extraction to fit the free-plan context budget.
     Only evidence actually sent to the extractor may become a citation.
@@ -79,16 +79,17 @@ def research_with_groq(prompt, extraction_prompt, schema):
     headers = {"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}"}
     # Free-plan quotas are enforced by Groq. Never retry or switch providers.
     with httpx.Client(timeout=120.0) as http:
-        # Basic search avoids the large internal contexts of advanced search,
-        # which can exceed the free plan's underlying model token limits.
-        message = _message(http.post(ENDPOINT, headers={
-            **headers, "Groq-Model-Version": "2025-07-23",
-        }, json={
-            "model": "groq/compound-mini",
+        # Compound retires in September 2026. Browser search uses the
+        # existing Groq key; low reasoning and a narrow query limit free-tier
+        # token use. Search and extraction stay separate because browser search
+        # does not support strict structured output in the same request.
+        message = _message(http.post(ENDPOINT, headers=headers, json={
+            "model": "openai/gpt-oss-20b",
             "messages": [{"role": "user", "content": prompt}],
-            "search_settings": {"country": "brazil"},
-            "compound_custom": {"tools": {"enabled_tools": ["web_search"]}},
-            "max_completion_tokens": 4000,
+            "tools": [{"type": "browser_search"}],
+            "tool_choice": "required",
+            "reasoning_effort": "low",
+            "max_completion_tokens": 2048,
         }), require_content=False)
         if message is None:
             return None

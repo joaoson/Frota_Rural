@@ -1,16 +1,23 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from users.models import Users
+from administration.permissions import IsPlatformAdmin
 from users.serializer import (
     UserSerializer,
+    ProfileSerializer,
     ChangePasswordSerializer,
     OperatorSerializer,
     OperatorCreateSerializer,
 )
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiResponse
+
+def _visible_users(user):
+    queryset = Users.objects.all()
+    return queryset if user.role == 'admin' else queryset.filter(pk=user.pk)
+
 
 # Create your views here.
 # TODO: ROLE FIELD SHOULD MATCH ONE THE ENUMS
@@ -89,6 +96,7 @@ def create_user(request):
     responses={200: UserSerializer(many=True)}
 )
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, IsPlatformAdmin])
 def get_users(request):
     users = Users.objects.all()
     serializer = UserSerializer(users, many=True)
@@ -104,9 +112,10 @@ def get_users(request):
     }
 )
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_user_by_email(request, email):
     try:
-        user = Users.objects.get(email=email)
+        user = _visible_users(request.user).get(email=email)
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Users.DoesNotExist:
@@ -148,9 +157,10 @@ def get_user_by_email(request, email):
     ),
 )
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
 def user_detail(request, pk):
     try:
-        user = Users.objects.get(pk=pk)
+        user = _visible_users(request.user).get(pk=pk)
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -159,7 +169,7 @@ def user_detail(request, pk):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'PUT':
-        serializer = UserSerializer(user, data=request.data)
+        serializer = ProfileSerializer(user, data=request.data)
         if serializer.is_valid():
             try:
                 serializer.save()
@@ -174,7 +184,7 @@ def user_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'PATCH':
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer = ProfileSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             try:
                 serializer.save()
@@ -189,7 +199,11 @@ def user_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
-        user.delete()
+        try:
+            with transaction.atomic():
+                user.delete()
+        except IntegrityError:
+            return Response({'detail': 'A conta possui registros vinculados e não pode ser excluída.'}, status=409)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -217,9 +231,10 @@ def user_detail(request, pk):
     ]
 )
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def change_password(request, pk):
     try:
-        user = Users.objects.get(pk=pk)
+        user = Users.objects.get(pk=pk, id=request.user.pk)
     except Users.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 

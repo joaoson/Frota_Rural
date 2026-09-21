@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Link } from "react-router";
 
-import MaterialIcon from "@/components/MaterialIcon";
 import { useChangePassword, useUpdateProfile } from "@/features/users/hooks/useUsers";
 import type { User } from "@/features/users/types/user";
 import { FormField } from "@/shared/components/FormField";
@@ -58,12 +58,17 @@ export function AccountSection({
 
   const documentRef = useRef<HTMLInputElement>(null);
   const confirmPasswordRef = useRef<HTMLInputElement>(null);
+  const cepRequest = useRef(0);
+  const profileSubmitting = useRef(false);
+  const passwordSubmitting = useRef(false);
+
+  useEffect(() => () => { cepRequest.current += 1; }, [userId]);
 
   const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
   if (user && user.id !== syncedUserId) {
     setSyncedUserId(user.id);
     setFormName(user.name);
-    setFormDocument(maskDocument(user.document));
+    setFormDocument(validateDocument(user.document) ? maskDocument(user.document) : user.document);
     setFormEmail(user.email);
     setFormPhone(maskPhone(user.phone?.replace(/^\+55/, "") ?? ""));
     setFormAddress(user.address);
@@ -72,12 +77,16 @@ export function AccountSection({
     setFormCep(maskCEP(user.cep ?? ""));
   }
 
+  const savedDocument = user ? (validateDocument(user.document) ? maskDocument(user.document) : user.document) : "";
+  const documentUnchanged = formDocument === savedDocument;
+
   const handleDocumentBlur = () => {
     const input = documentRef.current;
     if (!input) return;
+    if (documentUnchanged) { input.setCustomValidity(""); return; }
     const digits = formDocument.replace(/\D/g, "");
     if (digits.length === 0) return;
-    if (!validateDocument(formDocument)) {
+    if (!documentUnchanged && !validateDocument(formDocument)) {
       input.setCustomValidity(
         digits.length === 14
           ? "CNPJ inválido. Verifique os dígitos informados."
@@ -90,34 +99,39 @@ export function AccountSection({
   };
 
   const handleCepChange = async (value: string) => {
+    const request = ++cepRequest.current;
     const masked = maskCEP(value);
     setFormCep(masked);
     const digits = masked.replace(/\D/g, "");
     if (digits.length !== 8) return;
     try {
       const address = await lookup(digits);
+      if (request !== cepRequest.current) return;
       setFormAddress(formatAddress(address, "logradouro"));
       setFormCity(address.city);
       setFormState(address.state.toUpperCase());
     } catch {
+      if (request !== cepRequest.current) return;
       toast.error("CEP não encontrado.");
     }
   };
 
   const handleUpdateProfile = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!userId) return;
-    if (!validateDocument(formDocument)) {
+    if (!userId || !user || profileSubmitting.current) return;
+    if (!documentUnchanged && !validateDocument(formDocument)) {
       documentRef.current?.setCustomValidity("CPF ou CNPJ inválido.");
       documentRef.current?.reportValidity();
       return;
     }
+    profileSubmitting.current = true;
+    cepRequest.current += 1;
     try {
       await updateProfile.mutateAsync({
         id: userId,
         input: {
           name: formName.trim(),
-          document: clearSpecialChars(formDocument),
+          document: documentUnchanged ? user.document : clearSpecialChars(formDocument),
           email: formEmail.toLowerCase().trim(),
           phone: `+55${clearSpecialChars(formPhone)}`,
           address: formAddress.trim(),
@@ -129,23 +143,24 @@ export function AccountSection({
       toast.success("Dados atualizados com sucesso.");
     } catch (error) {
       if (error instanceof BadRequestError) {
-        if (error.firstErrorFor("email")) return toast.error("Este e-mail já está em uso.");
-        if (error.firstErrorFor("document"))
-          return toast.error("Este documento já está cadastrado.");
+        return toast.error(Object.values(error.fieldErrors).flat()[0] ?? error.message);
       }
       toast.error("Não foi possível salvar as alterações. Tente novamente.");
+    } finally {
+      profileSubmitting.current = false;
     }
   };
 
   const handleUpdatePassword = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!userId) return;
+    if (!userId || !user || passwordSubmitting.current) return;
     if (newPassword !== confirmPassword) {
       confirmPasswordRef.current?.setCustomValidity("As senhas não coincidem.");
       confirmPasswordRef.current?.reportValidity();
       return;
     }
     confirmPasswordRef.current?.setCustomValidity("");
+    passwordSubmitting.current = true;
     try {
       await changePassword.mutateAsync({ id: userId, currentPassword, newPassword });
       setCurrentPassword("");
@@ -155,15 +170,26 @@ export function AccountSection({
     } catch (error) {
       toast.error(
         error instanceof BadRequestError
-          ? "Senha atual incorreta."
+          ? Object.values(error.fieldErrors).flat()[0] ?? error.message
           : "Não foi possível alterar a senha. Tente novamente.",
       );
+    } finally {
+      passwordSubmitting.current = false;
     }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="Minha Conta" subtitle="Edite suas informações de cadastro" compact />
+      {user?.role === "operador" && (
+        <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 space-y-3">
+          <h2 className="font-headline text-xl font-bold">Meus documentos</h2>
+          <div className="flex flex-wrap gap-4">
+            <Link to="/document/cnh" className="font-bold text-primary hover:underline">Enviar ou atualizar CNH</Link>
+            <Link to="/document/certification" className="font-bold text-primary hover:underline">Enviar certificação</Link>
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <form
@@ -173,28 +199,20 @@ export function AccountSection({
           <h2 className="font-headline text-xl font-bold text-tertiary">Dados Pessoais</h2>
 
           <div className="flex items-center gap-6 pb-2">
-            <div className="relative group">
+            <div>
               <div
                 className={`w-20 h-20 rounded-full flex items-center justify-center font-headline font-bold text-2xl ${avatarClassName}`}
               >
                 {user ? getInitials(user.name) : "…"}
               </div>
-              <label className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                <MaterialIcon icon="photo_camera" className="text-white" size={24} />
-                <input type="file" accept="image/*" className="hidden" />
-              </label>
             </div>
             <div>
               <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
               <div className="text-sm text-on-surface-variant mb-2">{roleLabel}</div>
-              <label className="text-xs font-bold text-primary cursor-pointer hover:underline flex items-center gap-1">
-                <MaterialIcon icon="upload" size={14} /> Alterar foto
-                <input type="file" accept="image/*" className="hidden" />
-              </label>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <fieldset disabled={!user || updateProfile.isPending} className="space-y-4">
             <FormField label="Nome Completo" labelClassName={ACCOUNT_LABEL}>
               <input
                 type="text"
@@ -216,7 +234,7 @@ export function AccountSection({
                   documentRef.current?.setCustomValidity("");
                 }}
                 onBlur={handleDocumentBlur}
-                pattern="\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}"
+                pattern={documentUnchanged ? undefined : "\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}|\\d{2}\\.\\d{3}\\.\\d{3}\\/\\d{4}-\\d{2}"}
                 title="Informe um CPF válido (000.000.000-00) ou CNPJ válido (00.000.000/0001-00)"
                 className={ACCOUNT_INPUT}
               />
@@ -259,7 +277,7 @@ export function AccountSection({
                 type="text"
                 required
                 value={formAddress}
-                onChange={(event) => setFormAddress(event.target.value)}
+                onChange={(event) => { cepRequest.current += 1; setFormAddress(event.target.value); }}
                 className={ACCOUNT_INPUT}
               />
             </FormField>
@@ -269,7 +287,7 @@ export function AccountSection({
                 <input
                   type="text"
                   value={formCity}
-                  onChange={(event) => setFormCity(event.target.value)}
+                  onChange={(event) => { cepRequest.current += 1; setFormCity(event.target.value); }}
                   className={ACCOUNT_INPUT}
                 />
               </FormField>
@@ -277,7 +295,7 @@ export function AccountSection({
               <FormField label="Estado" labelClassName={ACCOUNT_LABEL}>
                 <select
                   value={formState}
-                  onChange={(event) => setFormState(event.target.value)}
+                  onChange={(event) => { cepRequest.current += 1; setFormState(event.target.value); }}
                   className={ACCOUNT_INPUT}
                 >
                   <option value="">--</option>
@@ -289,13 +307,14 @@ export function AccountSection({
                 </select>
               </FormField>
             </div>
-          </div>
+          </fieldset>
 
           <button
             type="submit"
+            disabled={!user || updateProfile.isPending}
             className="w-full bg-primary text-on-primary font-bold py-3.5 rounded-lg hover:shadow-lg transition-all text-sm"
           >
-            Salvar Alterações
+            {updateProfile.isPending ? "Salvando..." : "Salvar Alterações"}
           </button>
         </form>
 
@@ -305,7 +324,7 @@ export function AccountSection({
         >
           <h2 className="font-headline text-xl font-bold text-tertiary">Alterar Senha</h2>
 
-          <div className="space-y-4">
+          <fieldset disabled={!user || changePassword.isPending} className="space-y-4">
             <PasswordField
               label="Senha Atual"
               labelClassName={ACCOUNT_LABEL}
@@ -314,7 +333,6 @@ export function AccountSection({
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
-              minLength={8}
             />
 
             <PasswordField
@@ -345,13 +363,14 @@ export function AccountSection({
               }}
               required
             />
-          </div>
+          </fieldset>
 
           <button
             type="submit"
+            disabled={!user || changePassword.isPending}
             className="w-full bg-secondary-container text-on-secondary-container font-bold py-3.5 rounded-lg hover:brightness-95 transition-all text-sm"
           >
-            Alterar Senha
+            {changePassword.isPending ? "Alterando..." : "Alterar Senha"}
           </button>
         </form>
       </div>

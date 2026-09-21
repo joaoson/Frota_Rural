@@ -41,6 +41,7 @@ export interface RentalFilter {
 export interface ContractRepository {
   listRentals(filter: RentalFilter): Promise<Rental[]>;
   findRentalById(id: string): Promise<Rental>;
+  cancelRental(id: string): Promise<Rental>;
   listByPosting(postingId: string): Promise<Rental[]>;
   listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
@@ -90,6 +91,13 @@ export class HttpContractRepository implements ContractRepository {
 
   async findRentalById(id: string): Promise<Rental> {
     const response = await this.http.send<unknown>({ method: "GET", path: `rentals/${id}` });
+    return rentalToDomain(rentalApiSchema.parse(response.data));
+  }
+
+  async cancelRental(id: string): Promise<Rental> {
+    const response = await this.http.send<unknown>({
+      method: "PATCH", path: `rentals/${id}`, body: { status: "cancelled" },
+    });
     return rentalToDomain(rentalApiSchema.parse(response.data));
   }
 
@@ -148,7 +156,7 @@ export class HttpContractRepository implements ContractRepository {
     });
     const raw = response.data?.signature_evidence;
     return {
-      rental: await this.findRentalById(id),
+      rental: await this.findRentalById((response.data as { rental?: string }).rental ?? id),
       evidence: raw ? toSignatureEvidence(signatureEvidenceApiSchema.parse(raw)) : null,
     };
   }

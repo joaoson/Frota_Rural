@@ -11,7 +11,6 @@ import Index from "@/pages/public/Index";
 import Login from "@/pages/auth/Login";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
-import Reservar from "@/pages/postings/Reservar";
 import Signup from "@/pages/auth/Signup";
 
 export const publicRoutes: ReactElement[] = [
@@ -30,6 +29,5 @@ export const publicRoutes: ReactElement[] = [
   <Route key="buscar" path="/buscar" element={<Navigate to="/buscar-maquinario" replace />} />,
   <Route key="buscar-maq" path="/buscar-maquinario" element={<BuscarMaquinario />} />,
   <Route key="anuncio" path="/anuncio/:id" element={<AnuncioDetalhe />} />,
-  <Route key="reservar" path="/reservar/:id" element={<Reservar />} />,
   <Route key="contrato" path="/contrato/:id" element={<Contrato />} />,
 ];

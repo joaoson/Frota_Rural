@@ -35,7 +35,7 @@ export async function isolateExternalServices(context: BrowserContext) {
   }));
   await context.route('https://nominatim.openstreetmap.org/**', route => route.fulfill({ json: [] }));
   await context.route('https://viacep.com.br/**', route => route.fulfill({
-    json: { localidade: 'Castro', uf: 'PR', cep: '84165-000' },
+    json: { logradouro: 'Rua dos Testes', bairro: 'Centro', localidade: 'Castro', uf: 'PR', cep: '84165-000' },
   }));
   await context.route('https://tile.openstreetmap.org/**', route => route.abort());
 }

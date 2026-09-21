@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import stripe
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -15,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from api.models import Rentals
+from contracts.models import Contracts
 from api.schemas import ErrorResponseSerializer
 from postings.models import Postings
 from notifications.events import notify_rental_event
@@ -31,7 +33,13 @@ DATE_CONFLICT = OpenApiResponse(
 logger = logging.getLogger(__name__)
 
 
-def _stripe():
+class PaymentProviderNotConfigured(ImproperlyConfigured):
+    pass
+
+
+def _stripe(*, checkout=True):
+    if checkout and (not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET):
+        raise PaymentProviderNotConfigured('Stripe checkout and webhook credentials are required.')
     stripe.api_key = settings.STRIPE_SECRET_KEY
     return stripe
 
@@ -49,6 +57,7 @@ def _stripe():
         404: RENTAL_NOT_FOUND,
         409: DATE_CONFLICT,
         502: OpenApiResponse(description='Falha na comunicação com o provedor.'),
+        503: OpenApiResponse(description='Integração de pagamento ainda não configurada.'),
     },
 )
 @api_view(['POST'])
@@ -142,6 +151,12 @@ def criar_checkout(request, pk):
                 f'?locacao={rental.id}&pagamento=cancelado'
             ),
             metadata={'rental_id': str(rental.id)},
+        )
+    except PaymentProviderNotConfigured:
+        return Response(
+            {'detail': 'Pagamentos indisponíveis no momento. A configuração do provedor precisa ser concluída pela plataforma.',
+             'code': 'payment_not_configured'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except stripe.StripeError:
         return Response(
@@ -241,6 +256,7 @@ def _expirar(session_id):
         rental.status = 'cancelled'
         rental.updated_at = timezone.now()
         rental.save(update_fields=['status', 'updated_at'])
+        Contracts.objects.filter(rental=rental, status='pending_signatures').update(status='cancelled')
         notify_rental_event(rental, 'rental_cancelled', event_key=f'rental:{rental.pk}:rental_cancelled')
 
 
@@ -254,9 +270,11 @@ def webhook(request):
         return HttpResponse(status=503)
 
     try:
-        evento = _stripe().Webhook.construct_event(
+        evento = _stripe(checkout=False).Webhook.construct_event(
             request.body, assinatura, settings.STRIPE_WEBHOOK_SECRET
         )
+    except PaymentProviderNotConfigured:
+        return HttpResponse(status=503)
     except (ValueError, stripe.SignatureVerificationError):
         return HttpResponse(status=400)
 

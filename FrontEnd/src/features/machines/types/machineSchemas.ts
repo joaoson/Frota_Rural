@@ -81,7 +81,7 @@ export interface CreateMachinePayload {
   renagro_number?: string;
   brand?: string;
   model?: string;
-  year?: number;
+  year?: number | null;
   power_cv?: number | null;
   hour_meter?: number | null;
   technical_specifications?: string;

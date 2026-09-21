@@ -100,12 +100,11 @@ docker compose exec frontend npm test
 
 ## Precificação com Groq gratuito
 
-**Dependência com encerramento anunciado:** a documentação oficial da Groq lista
-21/09/2026 como data de desativação de `groq/compound` e `groq/compound-mini`,
-sem substituto direto indicado. A chamada real ainda funcionou nesta validação
-de 20/09/2026. A pesquisa deve ser migrada antes do encerramento; a correção de
-extração/estimativa não altera esse ciclo de vida externo. Consulte o
-[aviso da Groq](https://console.groq.com/docs/deprecations#september-21-2026-groqcompound-and-groqcompound-mini).
+A pesquisa foi migrada de Compound para o `browser_search` do GPT-OSS 20B,
+com a mesma chave Groq. Os modelos Compound têm encerramento em 21/09/2026 e
+não são mais usados pelo adaptador. Consulte o
+[aviso da Groq](https://console.groq.com/docs/deprecations) e a
+[documentação de Browser Search](https://console.groq.com/docs/tool-use/built-in-tools/browser-search).
 
 1. Crie uma chave em [Groq Console](https://console.groq.com/keys) e mantenha
    a conta no plano **Free**. Contas no plano Developer são cobradas por uso.
@@ -125,12 +124,22 @@ extração/estimativa não altera esse ciclo de vida externo. Consulte o
 4. Entre como locador, abra **Novo Anúncio**, selecione um equipamento e clique
    em **Sugerir valor com base no mercado**.
 
-Cada pesquisa sem cache usa duas chamadas: `groq/compound-mini` pesquisa na web e
-`openai/gpt-oss-120b` extrai o JSON. Ambos constam no
+Cada pesquisa sem cache usa duas chamadas: `openai/gpt-oss-20b` com
+`browser_search` pesquisa e abre uma fonte; `openai/gpt-oss-120b` extrai o JSON
+sem ferramentas. Browser Search não é compatível com saída estruturada na mesma
+chamada. Ambos os modelos constam no
 [plano gratuito](https://console.groq.com/docs/rate-limits); as cotas efetivas
-variam por conta e podem mudar. A busca usa uma única chamada de ferramenta e
-fixa `Groq-Model-Version: 2025-07-23` (busca básica). Em teste real, a busca
-avançada ultrapassou os limites internos do plano Free, gerando 429/413.
+variam por conta e podem mudar. A busca usa raciocínio `low`, saída de até 2.048
+tokens e pede uma busca e no máximo uma página adicional. Esse limite no pedido
+orienta o modelo; as cotas do provedor continuam sendo o limite efetivo.
+
+Na verificação de 20/09/2026, uma chamada real de pesquisa da S790 2023 retornou
+HTTP 200, consumindo 4.482 tokens. Os resultados da busca tinham links sem texto;
+`browser.open` forneceu os trechos originais com preço, horas e localização.
+O adaptador usa somente os resultados com conteúdo, preservando as mesmas
+restrições de evidência. Esse teste verificou a pesquisa; não realizou pagamento,
+não mudou de plano e não alterou o banco.
+
 A extração recebe os trechos originais dos resultados, com contexto limitado a
 8.000 caracteres e saída de até 2.000 tokens. Preserva condição, horas e
 localização, e cita somente fontes efetivamente usadas.

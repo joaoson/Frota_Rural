@@ -65,8 +65,17 @@ export class ContractStore {
     return this.repository.findContractDocument(id);
   }
 
+  async cancelRental(id: string): Promise<Rental> {
+    const rental = await this.repository.cancelRental(id);
+    await this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
+    return rental;
+  }
+
   async createRental(payload: CreateRentalPayload): Promise<Rental> {
     const rental = await this.repository.createRental(payload);
+    void this.invalidateRentals();
     void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     return rental;
   }
@@ -85,6 +94,9 @@ export class ContractStore {
   async sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
     const receipt = await this.repository.sign(id, role, name, otp);
     void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.evidence(id) });
     return receipt;
   }
 
