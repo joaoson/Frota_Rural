@@ -25,8 +25,9 @@ logger = logging.getLogger(__name__)
         "**A tarifa é por hora faturada, não por hora de horímetro**: a plataforma cobra "
         "8 h por dia de reserva. O valor devolvido é o bruto do locador; "
         "`locatario_paga_brl_hora` já inclui a taxa da plataforma.\n\n"
-        "É uma sugestão: quem define o preço do anúncio é o locador. Quando não há dado "
-        "confiável, o endpoint responde 422 em vez de arriscar um número."
+        "É uma sugestão: quem define o preço do anúncio é o locador. Se faltar somente "
+        "o preço do equivalente novo, o cálculo usa uma estimativa explícita com "
+        "premissas e confiança baixa. Sem preço do usado com fonte, responde 422."
     ),
     request=SuggestionRequestSerializer,
     responses={

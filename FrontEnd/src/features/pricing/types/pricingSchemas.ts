@@ -22,6 +22,11 @@ export const pricingSuggestionSchema: z.ZodType<PricingSuggestion> = z.object({
     categoria: z.string(), idade_anos: z.number(), horimetro: z.number(),
     horimetro_declarado: z.boolean(), potencia_cv: z.number().nullable(),
     valor_mercado_usado_brl: z.number(), valor_novo_equivalente_brl: z.number(),
+    estimativa_valor_novo: z.object({
+      taxa_anual: z.number().min(0).lt(1),
+      fracao_residual_minima: z.number().positive().max(1),
+      retencao_aplicada: z.number().positive().max(1),
+    }).nullish(),
     horas_faturaveis_ano: z.number(), horas_motor_ano: z.number(),
     comparaveis_internos: z.number(), tarifas_mercado_encontradas: z.number(),
     inclui_combustivel: z.boolean(), inclui_operador: z.boolean(),

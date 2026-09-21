@@ -5,6 +5,12 @@
 > (`pricing/tests.py::EngineTests::test_reproduz_o_exemplo_da_especificacao`).
 > Integração com a arquitetura de `develop`: `codex/retrofit-pricing-chat-develop`.
 
+**Atualização de 20/09/2026:** a pesquisa Groq extrai os trechos originais dos
+anúncios, preservando ano, horas, condição e localização. O resumo da busca pode
+confundir usada com nova e não serve mais de entrada para a extração. Quando não
+há preço publicado do equivalente novo, a aplicação oferece a estimativa
+explicitamente rotulada descrita em §3.4, conforme a preferência do usuário.
+
 | Onde | O quê |
 |:---|:---|
 | `BackEnd/pricing/params.py` | Parâmetros por categoria, versionados (§3.3) |
@@ -120,8 +126,8 @@ preferíveis a um chute.
 | `brand`, `model`, `year` | `machines` | ✅ existe |
 | `usage_purpose` | `machines` | ⚠️ texto livre, 4 valores de fato |
 | `location_lat/lng`, `location_cep` | `postings` | ✅ existe |
-| Horímetro acumulado da máquina | — | ❌ **não existe** (ver §10) |
-| Potência (cv) | — | ❌ **não existe** (ver §10) |
+| Horímetro acumulado da máquina | `machines.hour_meter` | ✅ existe (ver §10) |
+| Potência (cv) | `machines.power_cv` | ✅ existe (ver §10) |
 | Comparáveis internos | `postings.hourly_rate` | ✅ existe, pouco volume ainda |
 
 ### 3.3 Paramétricos por categoria (constantes nossas, versionadas)
@@ -144,6 +150,32 @@ preferíveis a um chute.
 referência aceita para custo de máquinas agrícolas — não são números inventados.
 Todos ficam num único módulo de parâmetros, versionado, para poderem ser
 recalibrados com os dados reais da plataforma.
+
+### 3.4 Equivalente novo estimado quando o preço não é publicado
+
+O preço do usado continua obrigatório, positivo e respaldado por uma fonte.
+Somente quando `new_value_brl` é `null` e o ano da máquina é válido, os parâmetros
+`2026.09.2` permitem esta premissa comercial:
+
+```text
+retenção = max(0,40; 0,90 ^ idade_em_anos)
+valor_novo_estimado = valor_usado_pesquisado / retenção
+```
+
+A taxa de 10% ao ano e o piso de 40% são hipóteses do produto para uma estimativa,
+não fatos encontrados no mercado nem cotação de concessionária. A interface
+mostra **Estimativa**, **Confiança baixa**, os dois valores, a idade, a fórmula e
+as premissas antes de **Usar o valor**. O preço só é aplicado por ação do locador.
+
+`premissas.estimativa_valor_novo` contém `taxa_anual`,
+`fracao_residual_minima` e `retencao_aplicada`; é `null` quando o preço novo foi
+pesquisado. A auditoria salva o valor calculado e essas premissas. O cache de
+pesquisa mantém `new_value_brl: null`, sem transformar a hipótese em preço
+observado. Ao reutilizar o cache, a sugestão continua explicitamente estimada.
+
+Preços presentes, mas inválidos (zero, negativos, NaN), não acionam o fallback.
+Sem preço usado com fonte, ano válido ou resultado dentro da banda de sanidade,
+a API continua respondendo 422 e mantém a edição manual disponível.
 
 ---
 
@@ -304,8 +336,9 @@ Nada da pesquisa entra no cálculo sem passar por:
    hora faturada**. Fora da banda, não sugere: mostra a faixa de mercado e
    avisa que não conseguiu estimar com segurança.
 4. **Exigência de fonte** — sem `fontes[]`, o resultado é descartado.
-5. **Fallback em cascata** — pesquisa falhou → comparáveis internos → tabela
-   R$/cv por categoria e ano → **não sugerir**. Nunca inventar.
+5. **Fallback explícito** — sem preço usado com fonte, **não sugerir**. Se faltar
+   somente o preço novo, aplicar a estimativa rotulada de §3.4. Comparáveis
+   internos ancoram o cálculo quando disponíveis; não substituem a pesquisa.
 6. **Nunca bloquear.** A sugestão é assíncrona, com timeout curto. Se falhar, o
    locador digita o valor normalmente. Criar anúncio **não pode** depender disso.
 7. **Nunca preencher sozinho.** O campo é sugerido, com botão "usar este valor".
@@ -471,9 +504,11 @@ Em aberto:
 ### Configuração gratuita de desenvolvimento
 
 O adaptador `BackEnd/pricing/groq.py` usa a busca web do Compound e depois
-extrai os fatos com GPT OSS pelo schema JSON. As fontes vêm dos resultados
-reais da busca, nunca de URLs inventadas durante a extração. Respostas
-incompletas ou sem fontes não viram sugestões. O adaptador Gemini segue a
+extrai os fatos com GPT OSS pelo schema JSON. O contexto inclui o pedido original
+e até 8.000 caracteres de trechos de fontes, com limite por anúncio. Apenas URLs
+citadas pelo extrator e presentes nesse contexto entram na resposta. Resumos
+gerados, URLs sem conteúdo e fontes fora do limite não comprovam preços.
+Respostas sem preço usado ou fontes não viram sugestões. O adaptador Gemini segue a
 mesma separação, preservando também as sugestões de pesquisa do Google.
 Veja a configuração e as restrições de cada provedor no
 [guia Docker](../Devops/README.md#precificação-com-groq-gratuito).

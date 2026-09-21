@@ -1,7 +1,32 @@
 import { test, expect, openPostingForm, apiURL } from './support/fixtures';
-import { deferred, suggestion } from './support/pricing';
+import { deferred, estimatedSuggestion, suggestion } from './support/pricing';
 
 const suggestLabel = 'Sugerir valor com base no mercado';
+
+test('labels a new-value estimate and shows assumptions before the owner applies its hourly price', async ({ page, data }) => {
+  await page.route('**/api/pricing/suggest', route => route.fulfill({ json: estimatedSuggestion }));
+  await openPostingForm(page, data.owner);
+  await page.getByRole('combobox').selectOption(data.machines[0]);
+  const rate = page.getByLabel('Valor por Hora (R$) *', { exact: true });
+  await rate.fill('250');
+  await page.getByRole('button', { name: suggestLabel }).click();
+  await expect(page.getByText('Estimativa', { exact: true })).toBeVisible();
+  await expect(page.getByText('Confiança baixa', { exact: true })).toBeVisible();
+  const assumptions = page.getByRole('region', { name: 'Premissas da estimativa' });
+  await expect(assumptions).toBeVisible();
+  await expect(assumptions).toContainText('10% ao ano');
+  await expect(assumptions).toContainText('7 anos');
+  await expect(assumptions).toContainText('40% do valor novo');
+  await expect(assumptions).toContainText('R$ 380.000,00');
+  await expect(assumptions).toContainText('R$ 794.485,60');
+  await expect(assumptions).toContainText('retenção aplicada (47,83%)');
+  await expect(rate).toHaveValue('250');
+  await page.getByText('Premissas usadas', { exact: true }).click();
+  await expect(page.getByText('Fontes do valor usado', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Fonte de mercado de teste' })).toHaveAttribute('href', suggestion.fontes[0].url);
+  await page.getByRole('button', { name: /Usar R\$\s*192,15/ }).click();
+  await expect(rate).toHaveValue('192.15');
+});
 
 test('loads research on demand, applies it only on confirmation, and publishes the chosen price', async ({ page, data }) => {
   const gate = deferred();

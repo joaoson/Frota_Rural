@@ -16,6 +16,16 @@ export const suggestion = {
   confianca: 'media', origem: 'pesquisa', versao_parametros: 'e2e',
 } satisfies PricingSuggestion;
 
+export const estimatedSuggestion = {
+  ...suggestion,
+  confianca: 'baixa',
+  premissas: {
+    ...suggestion.premissas,
+    valor_novo_equivalente_brl: 794485.60,
+    estimativa_valor_novo: { taxa_anual: 0.10, fracao_residual_minima: 0.40, retencao_aplicada: 0.4782969 },
+  },
+} satisfies PricingSuggestion;
+
 export function deferred() {
   let resolve!: () => void;
   const promise = new Promise<void>(done => { resolve = done; });

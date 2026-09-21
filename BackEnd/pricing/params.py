@@ -18,7 +18,14 @@ referência de engenharia agrícola para custo de máquinas — não são chute.
 from dataclasses import dataclass
 
 # Sobe a cada mudança de valor neste arquivo. Fica gravado em cada sugestão.
-PARAMS_VERSION = "2026.09.1"
+PARAMS_VERSION = "2026.09.2"
+
+# Premissa comercial para estimar o equivalente novo quando a pesquisa só
+# encontra preço do usado: retenção de 90% ao ano, limitada ao piso de 40%.
+# Não representa uma cotação observada nem a curva de custo temporal abaixo.
+# A sugestão expõe esta premissa e recebe confiança baixa quando a utiliza.
+NEW_EQUIVALENT_ESTIMATE_ANNUAL_DEPRECIATION = 0.10
+NEW_EQUIVALENT_ESTIMATE_MIN_RETENTION = 0.40
 
 # Horas faturadas por dia de reserva. Espelha `payments.pricing.HORAS_POR_DIARIA`:
 # a plataforma cobra por dia de calendário, não por hora de horímetro, e o

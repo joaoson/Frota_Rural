@@ -1,4 +1,4 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
@@ -8,6 +8,7 @@ import { usePricingSuggestion } from "../hooks/usePricingSuggestion";
 import type { PricingSuggestion } from "../types/pricing";
 import type { HttpClient } from "@/shared/http/HttpClient";
 import { pricingSuggestionSchema } from "../types/pricingSchemas";
+import SugestaoPrecoPanel from "../components/SugestaoPrecoPanel";
 
 const { suggest } = vi.hoisted(() => ({ suggest: vi.fn() }));
 vi.mock("@/app/container", () => ({ pricingStore: { suggest } }));
@@ -41,6 +42,46 @@ function deferred<T>() {
 }
 
 describe("pricing through the new architecture", () => {
+  it("preserves optional estimate assumptions and accepts older or explicitly sourced responses", () => {
+    const estimate = { taxa_anual: 0.1, fracao_residual_minima: 0.4, retencao_aplicada: 0.4782969 };
+    const parsed = pricingSuggestionSchema.parse({ ...fixture, premissas: { ...fixture.premissas, estimativa_valor_novo: estimate } });
+    expect(parsed.premissas).toMatchObject({ estimativa_valor_novo: estimate });
+    expect(pricingSuggestionSchema.parse(fixture)).toEqual(fixture);
+    expect(pricingSuggestionSchema.parse({ ...fixture, premissas: { ...fixture.premissas, estimativa_valor_novo: null } }).premissas)
+      .toMatchObject({ estimativa_valor_novo: null });
+  });
+
+  it("explains the estimate before confirmation and distinguishes its sources from the assumed new value", () => {
+    const onApply = vi.fn();
+    const estimated = pricingSuggestionSchema.parse({ ...fixture, confianca: "baixa", premissas: {
+      ...fixture.premissas, valor_novo_equivalente_brl: 794485.6,
+      estimativa_valor_novo: { taxa_anual: 0.1, fracao_residual_minima: 0.4, retencao_aplicada: 0.4782969 },
+    } });
+    render(<SugestaoPrecoPanel suggestion={estimated} onApply={onApply} onDismiss={vi.fn()} />);
+    expect(screen.getByText("Estimativa")).toBeTruthy();
+    expect(screen.getByText("Confiança baixa")).toBeTruthy();
+    const assumptions = screen.getByRole("region", { name: "Premissas da estimativa" });
+    expect(assumptions.closest("details")).toBeNull();
+    expect(assumptions.textContent).toContain("Não encontramos um preço publicado de uma máquina nova equivalente");
+    expect(assumptions.textContent).toContain("10% ao ano");
+    expect(assumptions.textContent).toContain("7 anos");
+    expect(assumptions.textContent).toContain("40%");
+    expect(assumptions.textContent).toContain("47,83%");
+    expect(within(assumptions).getByText(/380\.000,00/)).toBeTruthy();
+    expect(within(assumptions).getByText(/794\.485,60/)).toBeTruthy();
+    expect(screen.getByText("Fontes do valor usado")).toBeTruthy();
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Usar R\$\s*192,15/ }));
+    expect(onApply).toHaveBeenCalledWith("192.15");
+  });
+
+  it("keeps the existing sourced-price presentation when no estimate was used", () => {
+    render(<SugestaoPrecoPanel suggestion={fixture} onApply={vi.fn()} onDismiss={vi.fn()} />);
+    expect(screen.queryByText("Estimativa")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Premissas da estimativa" })).toBeNull();
+    expect(screen.getByText("Fontes")).toBeTruthy();
+  });
+
   it("accepts a market discount while rejecting negative operating costs", () => {
     const discounted = { ...fixture, composicao: [
       ...fixture.composicao,

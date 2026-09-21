@@ -3,6 +3,8 @@ import type { PricingSuggestion } from "@/features/pricing/types/pricing";
 
 const brl = (value: string | number) =>
   Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const percent = (value: number) =>
+  value.toLocaleString("pt-BR", { style: "percent", maximumFractionDigits: 2 });
 
 const CONFIDENCE_LABEL: Record<PricingSuggestion["confianca"], string> = {
   alta: "Confiança alta",
@@ -32,17 +34,23 @@ interface SugestaoPrecoPanelProps {
  */
 const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPanelProps) => {
   const { premissas: p } = suggestion;
+  const estimate = p.estimativa_valor_novo;
   const total = Number(suggestion.sugerido_brl_hora);
 
   return (
     <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <MaterialIcon icon="auto_awesome" size={16} className="text-primary dark:text-primary-bright" />
             <span className="text-[10px] font-bold uppercase tracking-widest text-primary dark:text-primary-bright">
               Valor sugerido
             </span>
+            {estimate && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-secondary-container text-on-surface">
+                Estimativa
+              </span>
+            )}
             <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${CONFIDENCE_STYLE[suggestion.confianca]}`}>
               {CONFIDENCE_LABEL[suggestion.confianca]}
             </span>
@@ -65,6 +73,27 @@ const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPan
           <MaterialIcon icon="close" size={16} />
         </button>
       </div>
+
+      {estimate && (
+        <section aria-label="Premissas da estimativa" className="rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-xs leading-relaxed space-y-2">
+          <p className="font-semibold text-on-surface">Preço de locação com valor novo estimado</p>
+          <p className="text-on-surface-variant">
+            Não encontramos um preço publicado de uma máquina nova equivalente. Estimamos esse valor a partir
+            do preço pesquisado do usado, com depreciação composta de <strong>{percent(estimate.taxa_anual)} ao ano</strong> durante{" "}
+            <strong>{p.idade_anos} {p.idade_anos === 1 ? "ano" : "anos"}</strong>, mantendo no mínimo{" "}
+            <strong>{percent(estimate.fracao_residual_minima)} do valor novo</strong>.
+            Essa é uma premissa do cálculo, não uma cotação de máquina nova.
+          </p>
+          <dl className="grid gap-1 text-on-surface-variant sm:grid-cols-2">
+            <div><dt>Valor pesquisado do usado</dt><dd className="font-semibold text-on-surface">{brl(p.valor_mercado_usado_brl)}</dd></div>
+            <div><dt>Valor novo equivalente estimado</dt><dd className="font-semibold text-on-surface">{brl(p.valor_novo_equivalente_brl)}</dd></div>
+          </dl>
+          <p className="text-on-surface-variant">
+            Valor novo estimado = valor usado ÷ retenção aplicada ({percent(estimate.retencao_aplicada)}).
+            A retenção é o maior valor entre (1 − {percent(estimate.taxa_anual)}) elevado à idade e {percent(estimate.fracao_residual_minima)}.
+          </p>
+        </section>
+      )}
 
       {/* A plataforma cobra 8 h por dia e soma a taxa por fora: sem dizer isso,
           o locador compara o número com uma tarifa de horímetro e se assusta. */}
@@ -98,7 +127,7 @@ const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPan
         <summary className="cursor-pointer font-semibold text-on-surface">Premissas usadas</summary>
         <ul className="mt-2 space-y-1 pl-1">
           <li>Valor de mercado do usado: {brl(p.valor_mercado_usado_brl)}</li>
-          <li>Equivalente novo: {brl(p.valor_novo_equivalente_brl)}</li>
+          <li>Equivalente novo{estimate ? " (estimado)" : ""}: {brl(p.valor_novo_equivalente_brl)}</li>
           <li>
             Horímetro: {p.horimetro.toLocaleString("pt-BR")} h{" "}
             {p.horimetro_declarado
@@ -112,7 +141,7 @@ const SugestaoPrecoPanel = ({ suggestion, onApply, onDismiss }: SugestaoPrecoPan
         </ul>
         {suggestion.fontes.length > 0 ? (
           <div className="mt-2">
-            <p className="font-semibold text-on-surface">Fontes</p>
+            <p className="font-semibold text-on-surface">{estimate ? "Fontes do valor usado" : "Fontes"}</p>
             <ul className="space-y-0.5 mt-1">
               {suggestion.fontes.map((fonte) => (
                 <li key={fonte.url} className="truncate">

@@ -1,6 +1,6 @@
 # Develop merge validation — 2026-09-20
 
-Current integration candidate: `codex/rental-notifications`.
+Current integration candidate: `codex/fix-pricing-research`.
 Previously validated baseline: `codex/retrofit-pricing-chat-develop`.
 Target checked: `origin/develop` at `c44750fccd9e1ce2b1ca9be60451b2e7e15f08b0`.
 
@@ -26,7 +26,8 @@ retrofit tip, but the retrofit already includes the current develop architecture
 | `origin/codex/retrofit-pricing-chat-develop` | `8ccbb39`, 2026-09-09 21:27 -03 | Docker/Groq implementation adapted to develop, with chat and browser tests |
 | Local retrofit baseline | `e06bcfb`, 2026-09-20 | Adds review fixes to that Docker/Groq implementation |
 | `codex/rental-recurrence-supabase` | `9f59e4b` | Inherits the reviewed retrofit, adds T06 and the live Supabase connection |
-| `codex/rental-notifications` | Current candidate | Adds T05 notifications and safe, repeatable Supabase demo data |
+| `codex/rental-notifications` | `2696628` | Adds T05 notifications and safe, repeatable Supabase demo data |
+| `codex/fix-pricing-research` | Current candidate | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
 
 The running `frota_rural_retrofit` Docker stack mounts this checkout, with the
 frontend on port 5174 and backend on port 8001. Its configured pricing provider
@@ -194,7 +195,7 @@ migrations and 27 tables**, with none in `public` and no pending migrations.
 TLS and the absence of table SELECT privileges for `anon` and `authenticated`
 were verified again. Hosted fixtures were not used for automated test suites.
 
-### Current verification
+### T05 verification at delivery
 
 | Check | Result |
 | --- | --- |
@@ -210,3 +211,37 @@ were verified again. Hosted fixtures were not used for automated test suites.
 
 Notifications are delivered inside the app. External payment/AI providers remain
 simulated in regression tests; no real charge, email or push delivery is certified.
+
+## Pricing failure reproduced and fixed
+
+The live Groq path reproduced the S790 failure: the Compound summary mislabeled
+a used listing as new and the extractor returned a range without a usable used
+price. Extraction now receives the original query and bounded source snippets,
+preserving condition, operating hours and location. Only cited URLs present in
+the supplied evidence survive. Empty generated prose no longer discards valid
+search results, and the adapter does not retry or switch providers.
+
+The user chose an explicit estimate when a new-equivalent price is unpublished.
+The deterministic fallback uses a disclosed 10% annual depreciation assumption,
+with a 40% retained-value floor, and low confidence. The UI shows both values and
+the formula before application. Research cache keeps the missing new price null;
+the suggestion audit stores the estimate separately. Missing sourced used prices,
+invalid inputs and implausible results still return 422.
+
+### Current verification
+
+| Check | Result |
+| --- | --- |
+| Full Django suite on isolated local PostgreSQL | 227 passed |
+| Frontend unit/component suite | 57 passed |
+| Pricing browser suite, Chromium/Firefox/WebKit | 15 passed, including explicit estimate display and application |
+| Frontend lint, build and E2E TypeScript | Passed; existing bundle-size warning remains |
+| Django system check and migration drift | Passed; no migration needed |
+| Live Groq → Supabase → browser | S790 2023 returned HTTP 200 and R$3,103.17 per billed hour; estimate label/assumptions verified |
+| Merge base | Latest fetched `origin/develop` remains `c44750f`, already included |
+
+The live result used the observed R$2,700,000 used-machine listing and a calculated
+R$3,703,703.70 replacement estimate, with 3 years of age and retention 0.729. These
+are validation inputs/results, not certification of a market rental rate. No
+listing was published during the live smoke check. Automated tests used local
+databases and simulated external providers.

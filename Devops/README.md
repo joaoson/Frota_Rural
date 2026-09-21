@@ -100,6 +100,13 @@ docker compose exec frontend npm test
 
 ## Precificação com Groq gratuito
 
+**Dependência com encerramento anunciado:** a documentação oficial da Groq lista
+21/09/2026 como data de desativação de `groq/compound` e `groq/compound-mini`,
+sem substituto direto indicado. A chamada real ainda funcionou nesta validação
+de 20/09/2026. A pesquisa deve ser migrada antes do encerramento; a correção de
+extração/estimativa não altera esse ciclo de vida externo. Consulte o
+[aviso da Groq](https://console.groq.com/docs/deprecations#september-21-2026-groqcompound-and-groqcompound-mini).
+
 1. Crie uma chave em [Groq Console](https://console.groq.com/keys) e mantenha
    a conta no plano **Free**. Contas no plano Developer são cobradas por uso.
 2. Preencha o `.env` da raiz (não coloque a chave no frontend):
@@ -124,8 +131,15 @@ Cada pesquisa sem cache usa duas chamadas: `groq/compound-mini` pesquisa na web 
 variam por conta e podem mudar. A busca usa uma única chamada de ferramenta e
 fixa `Groq-Model-Version: 2025-07-23` (busca básica). Em teste real, a busca
 avançada ultrapassou os limites internos do plano Free, gerando 429/413.
-A pesquisa básica pode encontrar menos dados; sem valores confiáveis o app
-continua sem sugerir um preço. O adaptador não faz retries automáticos nem
+A extração recebe os trechos originais dos resultados, com contexto limitado a
+8.000 caracteres e saída de até 2.000 tokens. Preserva condição, horas e
+localização, e cita somente fontes efetivamente usadas.
+Se encontrar preço do usado mas faltar o novo, o app mostra **Estimativa** com
+confiança baixa e premissas explícitas de depreciação de 10% ao ano e piso de
+retenção de 40%. Esse valor calculado não é salvo como cotação pesquisada; veja
+[a fórmula e os limites](../Documentation/README_Sugestao_Preco_Hora.md#34-equivalente-novo-estimado-quando-o-preço-não-é-publicado).
+Sem preço usado com fonte, continua disponível somente a edição manual.
+O adaptador não faz retries automáticos nem
 fallback para outro provedor. Respostas incompletas, sem fontes, cota esgotada
 ou chave ausente deixam o preço manual disponível. A precificação continua
 sendo calculada pelo motor determinístico do backend.

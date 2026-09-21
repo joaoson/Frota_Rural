@@ -3,13 +3,14 @@
 Responsabilidades, nesta ordem:
 
 1. Resolver os insumos da máquina (categoria, idade, horímetro, potência);
-2. Obter o valor de mercado — cache, senão pesquisa, senão comparáveis internos;
+2. Obter o valor de mercado — cache, senão pesquisa com fonte;
 3. Rodar o motor determinístico;
 4. Ancorar o resultado no mercado e nos anúncios da própria plataforma;
 5. Gravar a sugestão para auditoria e calibração futura.
 
-A cascata do passo 2 é deliberada e termina em "não sugerir". Preencher o campo
-com um número inventado é pior do que deixar o locador digitar o dele.
+A cascata do passo 2 exige preço de usado com fonte. Quando falta somente o
+equivalente novo, uma premissa explícita e versionada permite uma estimativa
+de baixa confiança, preservando a pesquisa bruta separada do cálculo.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import math
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from statistics import median
 
 from django.utils import timezone
@@ -199,9 +200,33 @@ def _anchor(cost_rate, market_rates, internal_rates, confidence):
 
 def _machine_age(machine):
     current_year = timezone.now().year
-    if not machine.year:
+    if machine.year is None:
         return 0
-    return max(0, current_year - machine.year)
+    if (
+        isinstance(machine.year, bool)
+        or not isinstance(machine.year, int)
+        or not 0 < machine.year <= current_year
+    ):
+        raise SuggestionUnavailable("Informe um ano válido para esta máquina.")
+    return current_year - machine.year
+
+
+def _estimate_new_equivalent(used_value, age_years):
+    """Premissa comercial auditável; nunca substituir o valor pesquisado."""
+    annual_rate = Decimal(str(P.NEW_EQUIVALENT_ESTIMATE_ANNUAL_DEPRECIATION))
+    minimum_retention = Decimal(str(P.NEW_EQUIVALENT_ESTIMATE_MIN_RETENTION))
+    retention = max(minimum_retention, (1 - annual_rate) ** age_years)
+    try:
+        value = (Decimal(str(used_value)) / retention).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    except (InvalidOperation, OverflowError) as exc:
+        raise SuggestionUnavailable("O valor pesquisado não permite uma estimativa válida.") from exc
+    return value, {
+        "taxa_anual": float(annual_rate),
+        "fracao_residual_minima": float(minimum_retention),
+        "retencao_aplicada": float(retention),
+    }
 
 
 def _estimated_hour_meter(machine, age_years):
@@ -238,8 +263,10 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         source = "pesquisa"
 
     used_value = _positive_number(data.get("used_value_brl"))
-    new_value = _positive_number(data.get("new_value_brl"))
+    raw_new_value = data.get("new_value_brl")
+    new_value = _positive_number(raw_new_value)
     confidence = data.get("confidence") or "baixa"
+    new_value_estimate = None
 
     if not data.get("sources"):
         raise SuggestionUnavailable("A pesquisa não trouxe fontes verificáveis.")
@@ -247,11 +274,17 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         raise SuggestionUnavailable(
             "Não foi encontrado valor de mercado para este modelo e ano."
         )
-    if not new_value:
-        # Sem o valor de novo não há como calcular desgaste nem reparo. Estimar
-        # a partir do usado seria inventar a base de dois dos cinco componentes.
+    if raw_new_value is None:
+        if machine.year is None:
+            raise SuggestionUnavailable(
+                "Informe o ano da máquina para estimar o valor de um equivalente novo."
+            )
+        new_value, new_value_estimate = _estimate_new_equivalent(used_value, age_years)
+        confidence = "baixa"
+    elif not new_value:
+        # Um preço presente, mas inválido, não autoriza a estimativa.
         raise SuggestionUnavailable(
-            "Não foi encontrado o valor de um equivalente novo para esta máquina."
+            "A pesquisa retornou um valor inválido para o equivalente novo."
         )
 
     power_cv = machine.power_cv or data.get("power_cv")
@@ -349,6 +382,7 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
         "potencia_cv": power_cv,
         "valor_mercado_usado_brl": float(used_value),
         "valor_novo_equivalente_brl": float(new_value),
+        "estimativa_valor_novo": new_value_estimate,
         "horas_faturaveis_ano": result.billable_hours_year,
         "horas_motor_ano": result.engine_hours_year,
         "comparaveis_internos": len(internal_rates),

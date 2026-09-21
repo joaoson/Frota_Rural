@@ -13,6 +13,12 @@ export type PricingAssumptions = {
   potencia_cv: number | null;
   valor_mercado_usado_brl: number;
   valor_novo_equivalente_brl: number;
+  /** Ausente/nulo quando a pesquisa encontrou um preço publicado do equivalente novo. */
+  estimativa_valor_novo?: {
+    taxa_anual: number;
+    fracao_residual_minima: number;
+    retencao_aplicada: number;
+  } | null;
   horas_faturaveis_ano: number;
   horas_motor_ano: number;
   comparaveis_internos: number;

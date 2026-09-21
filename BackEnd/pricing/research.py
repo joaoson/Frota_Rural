@@ -106,10 +106,11 @@ um chute plausível."""
 
 # Compound Mini performs only one search. Keep the retrieval request focused;
 # detailed formatting and confidence rules belong in the extraction step.
-GROQ_RESEARCH_PROMPT = """Search the web for {brand} {model} machinery prices in Brazil: \
-used year {year} and new. Report advertised BRL prices, horsepower and source URLs. \
-Include hourly rental rates if found. Exclude overseas listings and converted \
-currencies; leave missing facts unknown. Identify any substitute model used."""
+GROQ_RESEARCH_PROMPT = """Pesquise anúncios brasileiros de {brand} {model} usado, \
+ano {year}, com preço anunciado em R$, condição, horas de uso, localização e URL. \
+Priorize modelo e ano exatos. Informe também o preço de um equivalente novo \
+atual e potência nominal em cv, se publicados. Exclua ofertas no exterior e \
+moedas convertidas. Não estime dados ausentes; identifique modelos substitutos."""
 
 
 EXTRACTION_PROMPT = """Extraia os dados da pesquisa abaixo para o schema.
