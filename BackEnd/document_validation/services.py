@@ -70,10 +70,10 @@ def _screen_license(license_: OperatorLicense) -> None:
     if not result.is_suspicious:
         return
 
-    # Sem nome, CPF ou outros dados pessoais no log: só o id e a decisão.
+    # Sem nome, CPF ou outros dados pessoais no log: só o id, a decisão e os motivos das regras.
     logger.info(
-        "CNH %s considerada suspeita (modo=%s, score=%.2f, campos=%s)",
-        license_.id, mode, result.score, result.fields,
+        "CNH %s considerada suspeita (modo=%s, score=%.2f, campos=%s, motivos=%s)",
+        license_.id, mode, result.score, result.fields, result.reasons,
     )  # fmt: skip
     if mode != "enforce":
         return

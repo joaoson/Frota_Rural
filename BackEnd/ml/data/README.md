@@ -8,11 +8,11 @@ para o que o modelo precisa **em runtime** (e no build do Docker, que copia `Bac
 | `cnh/` | fotos/scans de CNH | não | `cnh_image/train.py` |
 | `not_cnh/` | imagens que não são CNH | não | `cnh_image/train.py` |
 | `names/` | `first_names.tsv`: primeiros nomes e nº de nascimentos (IBGE) | **sim** | `cnh_data` (treino e inferência) |
-| `cities/` | `cities.json` (municípios) e `districts.json` (distritos oficiais), do IBGE; `extra_localities.csv` (Regiões Administrativas do DF, lista fixa) | **sim** | `cnh_data` (treino e inferência) |
+| `cities/` | `cities.json`: UFs e municípios, da DTB do IBGE | **sim** | `cnh_data` (treino e inferência) |
 | `lexicon/` | `lexicon.csv`: listas de palavras escritas à mão (sobrenomes, palavras comuns, "teste"...) | **sim** | `cnh_data/lib/synthetic.py` |
 | `eval/` | `adversarial_cases.json`: 37 casos escritos à mão para avaliar o modelo | **sim** | `cnh_data/train.py` |
 | `synth/` | `cnh_records.csv`: o **dataset sintético** (24.000 plausíveis + 20.000 falsos, ~10 MB) | não (regenerável) | `cnh_data/train.py` |
-| `raw/` | CSVs e JSON brutos do IBGE (~40 MB) | não | `cnh_data/scripts/build_reference_data.py` |
+| `raw/` | fontes brutas do IBGE: CSV de nomes e relatórios `.ods` da DTB (~36 MB) | não | `cnh_data/scripts/build_reference_data.py` |
 
 > Os arquivos versionados são pequenos (≈ 370 KB, 120 KB e 80 KB). Se `names/` ou `cities/` sumirem,
 > o modelo de dados não falha: o adaptador do Django o trata como indisponível e **nada é
@@ -25,34 +25,37 @@ repositório estão descritos nas seções acima; os brutos ficam em `raw/`, for
 
 | Fonte | O que usamos | Onde vai parar |
 |---|---|---|
-| **IBGE — [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html)** | Municípios e **distritos** oficiais. A lista de distritos foi baixada da [API de localidades do IBGE](https://servicodados.ibge.gov.br/api/v1/localidades/distritos) (10.751 distritos) | `raw/ibge_distritos/distritos.json` → `cities/districts.json` |
+| **IBGE — [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html)**, edição 2025 (data base 31/12/2025), relatório *Municípios* (5.571) | **Única fonte de UF e municípios** | `raw/dtb_2025/RELATORIO_DTB_BRASIL_2025_MUNICIPIOS.ods` → `cities/cities.json` |
 | **Base dos Dados — [Nomes no Brasil](https://basedosdados.org/dataset/703f9f0d-caee-4b47-b900-46b1dea2c33c?table=3bc00c7a-28e5-421b-b310-b32bed3dd4d4)** (IBGE, Censo 2010), tabela *Quantidade Município Nome 2010*, ID BigQuery `basedosdados.br_ibge_nomes_brasil.quantidade_municipio_nome_2010` | Primeiros nomes e nº de nascimentos até 31/07/2010 por município (34,62 MB; atualizada na Base dos Dados em 06/10/2022) | `raw/br_ibge_nomes_brasil_quantidade_municipio_nome_2010.csv` → `names/first_names.tsv` |
-| **Base dos Dados — Diretórios Brasil**, tabela *município* (ID BigQuery `basedosdados.br_bd_diretorios_brasil.municipio`; CSV `br_bd_diretorios_brasil_municipio.csv`) | Municípios por UF (5.571) | `raw/br_bd_diretorios_brasil_municipio.csv` → `cities/cities.json` |
 | **[Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset)** (GitHub, ricardobnjunior) | Fotos/scans de CNH e de outros documentos brasileiros, para o modelo de imagem | `cnh/` (e `not_cnh/`) |
 | [Natural Images](https://www.kaggle.com/datasets/prasunroy/natural-images) (Kaggle, prasunroy) | Imagens que **não** são documento, para a classe `not_cnh` | `not_cnh/` |
 
 Não há outra fonte de dados reais. Os cadastros de CNH usados no treino do `cnh_data` são
-**sintéticos** (`synth/`), gerados a partir dessas bases; `lexicon/`, `eval/` e
-`cities/extra_localities.csv` foram escritos à mão neste projeto.
+**sintéticos** (`synth/`), gerados a partir dessas bases; `lexicon/` e `eval/` foram escritos à
+mão neste projeto. Nomes de UF e de cidades vêm **somente** da DTB: não há lista de localidades
+escrita à mão.
 
 > Confira os termos de uso de cada fonte antes de redistribuir os arquivos brutos ou derivados.
 > O repositório versiona apenas os derivados pequenos (`names/`, `cities/`) e nunca as imagens.
 
 ## names/ e cities/ — bases do IBGE
 
-**Origem:** Censo 2010 do IBGE, distribuído pelo [Base dos Dados](https://basedosdados.org/dataset/703f9f0d-caee-4b47-b900-46b1dea2c33c?table=3bc00c7a-28e5-421b-b310-b32bed3dd4d4), e Divisão Territorial Brasileira do IBGE (veja "Referências" acima).
-Os CSVs brutos são:
+**Origem:** nomes do Censo 2010 do IBGE (via Base dos Dados) e Divisão Territorial Brasileira
+2025 do IBGE (veja "Referências" acima). Os arquivos brutos são:
 
 - `br_ibge_nomes_brasil_quantidade_municipio_nome_2010.csv`: `id_municipio, nome, quantidade_nascimentos_ate_2010`
-  (1.959.116 linhas, 33.076 primeiros nomes, 144,97 milhões de nascimentos).
+  (1.959.116 linhas, 33.076 primeiros nomes, 144,97 milhões de nascimentos). Só usamos `nome` e
+  `quantidade_nascimentos_ate_2010`.
   Só **primeiros nomes** (sem sobrenomes) e só nomes com ao menos 10 ocorrências por município.
-- `br_bd_diretorios_brasil_municipio.csv`: diretório de municípios (5.571 linhas, 27 UFs) com
-  várias colunas; usamos apenas `id_municipio`, `nome` e `sigla_uf`.
-- `ibge_distritos/distritos.json`: lista oficial de **distritos** (10.751, em 27 UFs), baixada em
-  12/10/2026 da API de localidades do IBGE. Para atualizar:
-  `curl -o ml/data/raw/ibge_distritos/distritos.json https://servicodados.ibge.gov.br/api/v1/localidades/distritos`
+- `dtb_2025/RELATORIO_DTB_BRASIL_2025_MUNICIPIOS.ods`: um município por linha (5.571). Usamos o código
+  da UF (convertido na sigla) e o nome do município.
 
-**Como regenerar** (coloque os dois CSVs em `ml/data/raw/`):
+O IBGE publica o relatório em `.xls` e `.ods`; os dois têm o mesmo conteúdo (conferido linha a
+linha). Usamos o `.ods`, que é um zip de XML e se lê com a biblioteca padrão, sem dependência nova.
+Para atualizar, baixe a edição nova na página da DTB e troque o arquivo em `raw/dtb_2025/`
+(ou aponte `--municipalities-ods`).
+
+**Como regenerar** (arquivos de `raw/` no lugar):
 
 ```bash
 cd BackEnd
@@ -63,37 +66,42 @@ cd BackEnd
 
 - `names/first_names.tsv`: `nome_normalizado<TAB>quantidade`, do mais ao menos frequente,
   somando todos os municípios (33.075 nomes). A linha com nome corrompido (`?`) é descartada.
-- `cities/cities.json`: `{UF: {cidade_normalizada: peso}}`, com 5.571 municípios. O `peso` é o
-  total de nascimentos do município na base de nomes (um proxy de população) e só serve para o
-  gerador de dados sintéticos sortear cidades de forma realista.
-- `cities/districts.json`: `{UF: [distrito_normalizado, ...]}` com as **4.894 localidades reais
-  que não são município** (24 UFs) (distritos cujo nome difere da sede, como Barão Geraldo em Campinas/SP).
-  Todo município tem um distrito-sede de mesmo nome; esses ficam de fora porque já estão em
-  `cities.json`. É uma lista oficial, sem nenhuma inferência de nomes.
-- Ficam de fora: região metropolitana, DDD, centroide, comarca e as demais colunas do diretório.
+- `cities/cities.json`: `{UF: [municipio_normalizado, ...]}`, com os 5.571 municípios em ordem
+  alfabética. Sem contagens nem pesos: o modelo só precisa saber se o nome existe na UF.
+- A sigla da UF vem do código numérico do IBGE (`11` = RO, `35` = SP, `53` = DF...), tabela fixa
+  de 27 entradas em `scripts/build_reference_data.py`.
+- Ficam de fora: as regiões geográficas imediata e intermediária e as demais colunas dos relatórios.
 
 **Normalização** (`cnh_data/lib/reference.py::normalize_text`): minúsculo, sem acento e qualquer
 pontuação vira espaço. É necessária porque os nomes do IBGE vêm sem acento (`Jose`) e os
 municípios com acento (`Guajará-Mirim`, `Machadinho D'Oeste`).
 
 **Armadilha conhecida:** 233 nomes de município se repetem entre UFs (`Buritis` existe em RO
-e em MG). A chave de busca é sempre o par (UF, lugar), e um lugar é "conhecido" se for município
-**ou** distrito da UF.
+e em MG). A chave de busca é sempre o par (UF, município).
 
-**Distrito Federal — `cities/extra_localities.csv`:** o IBGE tem um único município (Brasília) e um
-único distrito para o DF, então quem nasceu em Ceilândia, Taguatinga, Gama etc. apareceria como
-"lugar fora da lista". O CSV (`uf,name,note`) lista as 35 Regiões Administrativas do DF, mais
-`Asa Sul`/`Asa Norte`/`Noroeste` e as grafias curtas (`Sudoeste`, `SCIA`, `Sol Nascente`...). Foi
-escrito à mão (não vem do IBGE): confira com a lista oficial do GDF ao atualizar. Se o modelo for
-usado em outra UF com a mesma lacuna, acrescente as linhas aqui (`reference.districts()` as mescla).
+**Distrito Federal:** a DTB tem um único município para o DF (Brasília). As
+Regiões Administrativas (Taguatinga, Ceilândia, Gama...) não estão na tabela e, por decisão do
+projeto, **não há lista extra**: quem nasceu nelas aparece como "lugar fora da lista" e depende da
+regra de que o local de nascimento sozinho nunca recusa.
 
-**Lacunas que ficam:** bairros ("Copacabana"), localidades menores e povoados que não são distrito
-oficial não estão em nenhuma lista. Por isso o modelo nunca recusa **só** por causa do local de
-nascimento (ver "Local de nascimento sozinho nunca recusa" em `cnh_data/README.md`).
+**Lacunas que ficam:** as Regiões Administrativas do DF, distritos que não são município (Barão
+Geraldo, em Campinas/SP), bairros ("Copacabana") e povoados não estão na lista. Por isso o modelo
+nunca recusa **só** por causa do local de nascimento (ver "Local de nascimento sozinho nunca recusa" em `cnh_data/README.md`).
 
 **Limites:** a base não tem sobrenomes, não tem nascidos depois de 2010 (quem tem CNH hoje nasceu
 até 2008, então a cobertura é boa) e não tem nomes muito raros. Por isso a ausência de um nome
 na base é só um sinal fraco para o modelo, nunca um motivo de recusa por si só.
+
+## Cidade e município
+
+- **Município** é a unidade administrativa oficial: o território inteiro, urbano e rural. É o que
+  a DTB lista (5.571, contando Brasília e Fernando de Noronha), e o que documentos oficiais
+  registram junto com a UF.
+- **Cidade** é a sede urbana do município. No uso comum, "cidade" e "município" se confundem, e na
+  DTB o nome do município coincide com o da cidade sede. Por isso o campo livre do formulário
+  ("Cidade de Nascimento") é comparado aos nomes de **município**.
+- Distritos, bairros e povoados **não** estão na lista: quem nasceu num deles e digita o nome dele
+  aparece como lugar desconhecido (ver "Lacunas que ficam" acima).
 
 ## lexicon/ — listas de palavras do gerador sintético
 

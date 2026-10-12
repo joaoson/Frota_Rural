@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from lib import synthetic
 from lib.features import feature_vector
-from lib.model import HIGH_CONFIDENCE, THRESHOLD, PlausibilityModel, assess
+from lib.model import THRESHOLD, PlausibilityModel, assess
 
 from tests.test_rules import PLAUSIBLE
 
@@ -102,14 +102,13 @@ class AssessTests(unittest.TestCase):
         result = assess(PLAUSIBLE, self.model, THRESHOLD, TODAY)
 
         self.assertFalse(result["is_suspicious"])
-        self.assertEqual(result["confidence"], "low")
         self.assertEqual((result["reasons"], result["fields"]), ([], []))
 
     def test_hard_rule_makes_it_suspicious_with_certainty(self):
         result = assess({**PLAUSIBLE, "name": "Teste Teste"}, self.model, THRESHOLD, TODAY)
 
         self.assertTrue(result["is_suspicious"])
-        self.assertEqual((result["confidence"], result["score"]), ("high", 1.0))
+        self.assertEqual(result["score"], 1.0)
         self.assertIn("nome", result["fields"])
         self.assertTrue(result["reasons"])
 
@@ -128,7 +127,7 @@ class AssessTests(unittest.TestCase):
         result = assess(record, self.model, THRESHOLD, TODAY)
 
         self.assertFalse(result["is_suspicious"], result)
-        self.assertEqual((result["confidence"], result["fields"]), ("low", []))
+        self.assertEqual(result["fields"], [])
         self.assertLess(result["score"], THRESHOLD)  # a nota reportada é a que decidiu
 
     def test_unknown_birth_place_still_counts_when_there_is_other_evidence(self):
@@ -143,16 +142,6 @@ class AssessTests(unittest.TestCase):
 
         self.assertFalse(assess(junk, self.model, 1.01, TODAY)["is_suspicious"])
         self.assertTrue(assess(junk, self.model, 0.0, TODAY)["is_suspicious"])
-
-    def test_confidence_levels(self):
-        self.assertGreater(HIGH_CONFIDENCE, THRESHOLD)
-        # Limiar zero: o que tiver qualquer evidência além do local de nascimento é suspeito.
-        flagged = assess(WORD_JUNK, self.model, 0.0, TODAY)
-        self.assertTrue(flagged["is_suspicious"])
-        self.assertEqual(
-            flagged["confidence"], "medium" if flagged["score"] < HIGH_CONFIDENCE else "high"
-        )
-        self.assertEqual(assess(PLAUSIBLE, self.model, THRESHOLD, TODAY)["confidence"], "low")
 
 
 if __name__ == "__main__":

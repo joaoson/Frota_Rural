@@ -69,7 +69,7 @@ código 1 e um JSON `{"error": ...}`.
 {"is_valid": true, "confidence": "high", "score": 0.9523}
 
 // cnh_data/classify.py  (registro no stdin)
-{"is_suspicious": true, "confidence": "high", "score": 1.0,
+{"is_suspicious": true, "score": 1.0,
  "reasons": ["CPF inválido"], "fields": ["números dos documentos"]}
 ```
 

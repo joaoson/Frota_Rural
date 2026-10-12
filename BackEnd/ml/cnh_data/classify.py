@@ -4,7 +4,7 @@ Chamado pelo Django via subprocess (`document_validation/ml_adapters/cnh_data.py
 Lê do **stdin** o registro do cadastro em JSON (CPF e nomes ficam fora do `argv`, que
 qualquer usuário da máquina enxerga com `ps`) e imprime uma linha JSON:
 
-    {"is_suspicious": bool, "confidence": "high|medium|low", "score": 0.0-1.0,
+    {"is_suspicious": bool, "score": 0.0-1.0,
      "reasons": [...], "fields": [...]}
 
 Se o modelo ou as bases de referência não existirem, devolve o mesmo formato com
@@ -31,7 +31,6 @@ MODEL_PATH = BASE_DIR / "models" / "cnh_plausibility.joblib"
 def _failure(message: str) -> dict[str, Any]:
     return {
         "is_suspicious": False,
-        "confidence": "low",
         "score": 0.0,
         "reasons": [],
         "fields": [],

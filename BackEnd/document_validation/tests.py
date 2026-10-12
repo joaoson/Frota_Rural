@@ -247,7 +247,6 @@ class DocumentFileTests(TestCase):
 
 SUSPICIOUS = DataCheckResult(
     is_suspicious=True,
-    confidence="high",
     score=1.0,
     reasons=["CPF inválido"],
     fields=["nome", "datas"],
@@ -351,6 +350,7 @@ class OperatorLicenseScreeningTests(LicenseApiMixin, TestCase):
         self.assertEqual(body["validation_status"], "pending")
         self.assertFalse(body["auto_rejected"])
         self.assertIn("considerada suspeita", logs.output[0])
+        self.assertIn("CPF inválido", logs.output[0])  # os motivos das regras vão para o log
         self.assertNotIn("Carlos", logs.output[0])  # sem dados pessoais no log
 
     @override_settings(ML_PLAUSIBILITY_MODE="off")
@@ -383,12 +383,12 @@ class CnhDataCheckerTests(SimpleTestCase):
         return subprocess.CompletedProcess([], returncode, stdout=stdout, stderr="")
 
     def test_parses_the_model_output(self):
-        output = '{"is_suspicious": true, "confidence": "high", "score": 1.0, "reasons": ["a"], "fields": ["nome"]}'
+        output = '{"is_suspicious": true, "score": 1.0, "reasons": ["a"], "fields": ["nome"]}'
 
         result, _ = self.run_check(self.completed(output))
 
         self.assertTrue(result.is_suspicious)
-        self.assertEqual((result.confidence, result.score), ("high", 1.0))
+        self.assertEqual(result.score, 1.0)
         self.assertEqual((result.reasons, result.fields), (["a"], ["nome"]))
         self.assertIsNone(result.error)
 

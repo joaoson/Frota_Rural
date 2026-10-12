@@ -48,10 +48,11 @@ seguida o modelo avalia e, se suspeita, ela é regravada como `rejected` com `re
 campo `auto_rejected` distingue a recusa do modelo da de um administrador (uma decisão humana
 o zera), para que um retreino futuro não trate a saída do próprio modelo como verdade.
 
-**O local de nascimento sozinho nunca recusa**: as listas do IBGE (municípios e distritos) têm
+**O local de nascimento sozinho nunca recusa**: a lista de municípios do IBGE tem
 lacunas, e o classificador chegou a recusar com nota 1,00 quem nasceu em Taguatinga ou Ceilândia.
-O ML só conta como suspeito se houver outra evidência além do local. As Regiões Administrativas
-do DF entram como lista fixa (`ml/data/cities/extra_localities.csv`).
+O ML só conta como suspeito se houver outra evidência além do local. UF e municípios
+vêm somente da Divisão Territorial Brasileira do IBGE; não há lista extra para o DF (a DTB lista
+só Brasília), então os nascidos nas suas Regiões Administrativas dependem dessa regra.
 
 **Política agressiva**: recusa a partir de 60% de probabilidade (`ML_PLAUSIBILITY_THRESHOLD`).
 `ML_PLAUSIBILITY_MODE` (`off`, `shadow`, `enforce`) permite medir antes de recusar.
@@ -78,7 +79,7 @@ o log não contém dados pessoais e o modelo vê só features numéricas.
 
 ## Referências
 
-- IBGE, [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html): municípios e distritos.
+- IBGE, [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html, edição 2025: UF e municípios.
 - Base dos Dados, [Nomes no Brasil](https://basedosdados.org/dataset/703f9f0d-caee-4b47-b900-46b1dea2c33c?table=3bc00c7a-28e5-421b-b310-b32bed3dd4d4) (IBGE, Censo 2010): frequência de primeiros nomes.
 - [Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset): imagens de documentos do modelo `cnh_image`.
 - Lista completa, com o que foi usado de cada uma: `BackEnd/ml/data/README.md`.

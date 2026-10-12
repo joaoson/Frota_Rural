@@ -73,18 +73,6 @@ class SynthDataTests(unittest.TestCase):
         self.assertTrue(synth_data.LEXICON_PATH.exists())
         self.assertIn("silva", synth_data.SURNAMES)
         self.assertIn("Teste", synth_data.PLACEHOLDER_NAMES)
-        self.assertFalse(hasattr(synth_data, "DISTRICTS"))  # distritos vêm da lista do IBGE
-
-    def test_some_plausible_people_are_born_in_real_districts(self):
-        from lib import reference
-
-        in_district = 0
-        for sample in self.samples:
-            if sample.label == 0 and sample.record["nationality"] == "Brasileiro(a)":
-                city, state = sample.record["birth_place"].rsplit(" – ", 1)
-                if reference.normalize_text(city) in reference.districts().get(state, ()):
-                    in_district += 1
-        self.assertGreater(in_district, 5)
 
     def test_document_number_helpers(self):
         import random

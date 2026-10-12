@@ -2,6 +2,7 @@
 
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from scripts import build_reference_data as build
@@ -16,25 +17,16 @@ NAMES = """id_municipio,nome,quantidade_nascimentos_ate_2010
 2,Ana Paula,5
 """
 
-CITIES = """id_municipio,nome,sigla_uf,nome_regiao_metropolitana
-1,São Paulo,SP,Região Metropolitana de São Paulo
-2,Machadinho D'Oeste,RO,
-3,Buritis,RO,
-4,Buritis,MG,
-"""
-
 
 class BuildReferenceDataTests(unittest.TestCase):
     def setUp(self):
         directory = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: [p.unlink() for p in directory.iterdir()] and directory.rmdir())
         self.names_csv = directory / "names.csv"
-        self.cities_csv = directory / "cities.csv"
         self.names_csv.write_text(NAMES, encoding="utf-8")
-        self.cities_csv.write_text(CITIES, encoding="utf-8")
 
     def test_names_are_normalized_and_summed_across_municipalities(self):
-        by_name, _, discarded = build.build_names(self.names_csv)
+        by_name, discarded = build.build_names(self.names_csv)
 
         self.assertEqual(by_name["jose"], 150)
         self.assertEqual(by_name["joao"], 50)  # "João" e "Joao" viram o mesmo nome
@@ -42,74 +34,74 @@ class BuildReferenceDataTests(unittest.TestCase):
         self.assertEqual(discarded, 2)  # "?" e "Ana Paula" (só 1º nome, só letras)
         self.assertNotIn("ana paula", by_name)
 
-    def test_births_are_summed_per_municipality(self):
-        _, by_municipality, _ = build.build_names(self.names_csv)
 
-        self.assertEqual(by_municipality["1"], 100 + 30 + 200 + 16)
-        self.assertEqual(by_municipality["2"], 50 + 20 + 5)
-
-    def test_cities_are_keyed_by_state_and_weighted(self):
-        _, by_municipality, _ = build.build_names(self.names_csv)
-
-        cities = build.build_cities(self.cities_csv, by_municipality)
-
-        self.assertEqual(sorted(cities), ["MG", "RO", "SP"])
-        self.assertEqual(cities["SP"], {"sao paulo": 346})
-        self.assertEqual(cities["RO"]["machadinho d oeste"], 75)
-        self.assertIn("buritis", cities["RO"])
-        self.assertIn("buritis", cities["MG"])  # mesmo nome, outra UF
-        self.assertEqual(cities["MG"]["buritis"], 0)  # município sem nascimentos na base
+def municipality(uf, code, name):
+    return {"UF": uf, "Código Município Completo": code, "Nome_Município": name}
 
 
-DISTRICTS = [
-    {
-        "nome": "São Paulo",
-        "municipio": {
-            "nome": "São Paulo",
-            "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}},
-        },
-    },
-    {
-        "nome": "Perus",
-        "municipio": {
-            "nome": "São Paulo",
-            "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}},
-        },
-    },
-    {
-        "nome": "Perus",
-        "municipio": {"nome": "Outra", "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}}},
-    },
-    {
-        "nome": "Buritis",
-        "municipio": {"nome": "Outro", "microrregiao": {"mesorregiao": {"UF": {"sigla": "RO"}}}},
-    },
-    {
-        "nome": "Só Imediata",
-        "municipio": {
-            "nome": "X",
-            "regiao-imediata": {"regiao-intermediaria": {"UF": {"sigla": "MG"}}},
-        },
-    },
-]
+class BuildCitiesTests(unittest.TestCase):
+    def test_cities_are_keyed_by_state_abbreviation_and_sorted(self):
+        rows = [
+            municipality("35", "3550308", "São Paulo"),
+            municipality("11", "1100015", "Machadinho D'Oeste"),
+            municipality("11", "1100999", "Buritis"),
+            municipality("31", "3100001", "Buritis"),  # mesmo nome, outra UF
+            municipality("11", "1100998", "Buritis"),  # duplicata na mesma UF
+        ]
 
-
-class BuildDistrictsTests(unittest.TestCase):
-    def test_only_real_localities_are_kept_keyed_by_state(self):
-        import json
-
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "distritos.json"
-            path.write_text(json.dumps(DISTRICTS), encoding="utf-8")
-            cities = {"SP": {"sao paulo": 1}, "RO": {"buritis": 1}}
-
-            districts = build.build_districts(path, cities)
+        cities = build.build_cities(rows)
 
         self.assertEqual(
-            districts["SP"], ["perus"]
-        )  # sede (São Paulo) fica de fora; duplicata some
-        self.assertNotIn("RO", districts)  # "Buritis" já é município da UF
-        self.assertEqual(districts["MG"], ["so imediata"])  # UF pelo caminho alternativo
+            cities,
+            {
+                "MG": ["buritis"],
+                "RO": ["buritis", "machadinho d oeste"],
+                "SP": ["sao paulo"],
+            },
+        )
+
+    def test_every_state_code_maps_to_an_abbreviation(self):
+        self.assertEqual(len(build.UF_BY_CODE), 27)
+        self.assertEqual(build.UF_BY_CODE["53"], "DF")
+        self.assertEqual(build.UF_BY_CODE["35"], "SP")
+
+
+ODS_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+ xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+ xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+<office:body><office:spreadsheet><table:table table:name="DTB">
+<table:table-row><table:table-cell><text:p>TÍTULO : BET</text:p></table:table-cell></table:table-row>
+<table:table-row><table:table-cell/></table:table-row>
+<table:table-row>
+ <table:table-cell><text:p>UF</text:p></table:table-cell>
+ <table:table-cell><text:p>Nome_Município</text:p></table:table-cell>
+ <table:table-cell table:number-columns-repeated="30"/>
+</table:table-row>
+<table:table-row>
+ <table:table-cell><text:p>35</text:p></table:table-cell>
+ <table:table-cell><text:p>São Paulo</text:p></table:table-cell>
+</table:table-row>
+<table:table-row>
+ <table:table-cell><text:p>99</text:p></table:table-cell>
+ <table:table-cell><text:p>Nota de rodapé</text:p></table:table-cell>
+</table:table-row>
+</table:table></office:spreadsheet></office:body></office:document-content>
+"""
+
+
+class ReadDtbTests(unittest.TestCase):
+    def test_reads_header_and_keeps_only_rows_with_a_state_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "dtb.ods"
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("content.xml", ODS_CONTENT)
+
+            rows = build.read_dtb(path)
+
+        self.assertEqual(
+            rows, [{"UF": "35", "Nome_Município": "São Paulo"}]
+        )  # sem título nem rodapé
 
 
 if __name__ == "__main__":

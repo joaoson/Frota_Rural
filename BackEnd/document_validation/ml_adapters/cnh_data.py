@@ -32,7 +32,6 @@ REVIEW_NOTE = (
 @dataclass(frozen=True)
 class DataCheckResult:
     is_suspicious: bool = False
-    confidence: str = "low"
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
     fields: list[str] = field(default_factory=list)
@@ -93,7 +92,6 @@ class CnhDataChecker:
 
         return DataCheckResult(
             is_suspicious=bool(payload.get("is_suspicious")),
-            confidence=str(payload.get("confidence", "low")),
             score=float(payload.get("score", 0.0)),
             reasons=[str(item) for item in payload.get("reasons", [])],
             fields=[str(item) for item in payload.get("fields", [])],

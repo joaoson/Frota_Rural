@@ -22,7 +22,7 @@ _screen_license()                         ML_PLAUSIBILITY_MODE: off | shadow | e
         │  JSON no stdin
         ▼
 ml/cnh_data/classify.py                   regras duras  +  classificador de ML
-        │  {"is_suspicious", "confidence", "score", "reasons", "fields"}
+        │  {"is_suspicious", "score", "reasons", "fields"}
         ▼
 suspeita e modo enforce?  ── sim ──►  validation_status = rejected
                                        review_note = "Os dados informados parecem inconsistentes
@@ -114,7 +114,7 @@ valida isso**: quem chama a API direto, sem o formulário, também passa por aqu
 | UF | `birth_state_invalid`, `issuing_state_invalid` | UF inexistente |
 
 **Não são regras** (de propósito, porque pessoas legítimas as violam): nome fora da base do IBGE,
-lugar de nascimento fora da lista de municípios e distritos da UF (bairros, localidades menores,
+lugar de nascimento fora da lista de municípios da UF (distritos, bairros, localidades menores,
 as Regiões Administrativas do DF e municípios emancipados depois do nascimento são cadastros
 legítimos), nome igual ao do pai (pai e filho com o mesmo nome existem).
 Esses viram *features* do classificador.
@@ -132,7 +132,7 @@ só ~120 features numéricas em 8 grupos (o grupo explica a recusa):
 | Grupo | Exemplos de features |
 |---|---|
 | `name`, `mother_name`, `father_name` | tamanho, razão de vogais, maior repetição, maior sequência de consoantes, trecho de teclas vizinhas, padrão `jkjkjk`, **nota do modelo de caracteres**, **frequência do 1º nome no IBGE** (`known`, `log10(freq)`) |
-| `birth_place` | `city_exact` (o lugar é município **ou distrito oficial** da UF, pela lista do IBGE), `city_similarity` (tolera "Sao Paulo", "Moji"), `city_elsewhere` (existe em outra UF); neutro para estrangeiro |
+| `birth_place` | `city_exact` (a cidade é um município da UF, pela DTB do IBGE), `city_similarity` (tolera "Sao Paulo", "Moji"), `city_elsewhere` (existe em outra UF); neutro para estrangeiro |
 | `dates` | idade na 1ª habilitação e na emissão, anos entre elas, prazo de validade, flags de ordem das datas |
 | `documents` | dígitos distintos, maior repetição e maior sequência em CNH/CPF/RG, CPF válido |
 | `license` | UF de emissão × órgão emissor, categoria avançada, pontos, situação, ACC/EAR |
@@ -157,7 +157,7 @@ echo '{"name": "Asdfghjkl", "cpf": "52998224725", ...}' | ./ml/venv/bin/python m
 ```
 
 ```json
-{"is_suspicious": true, "confidence": "high", "score": 1.0,
+{"is_suspicious": true, "score": 1.0,
  "reasons": ["nome com teclas vizinhas (asdf...)"], "fields": ["nome"]}
 ```
 
@@ -166,10 +166,10 @@ echo '{"name": "Asdfghjkl", "cpf": "52998224725", ...}' | ./ml/venv/bin/python m
   `category`, `first_license_date`, `issue_date`, `expiration_date`, `issuing_state`,
   `issuing_authority`, `situation`, `acc`, `ear`, `medical_restrictions`, `observations`, `points`).
   `birth_place` aceita `–`, `-` ou `/` como separador; também vale mandar `birth_city`/`birth_state`.
-- `is_suspicious = alguma regra dura OU score ≥ limiar`. `score` é a probabilidade do modelo, ou
-  `1.0` se uma regra disparou. `confidence`: `high` (regra, ou score ≥ 0,90), `medium`
-  (suspeito com score entre o limiar e 0,90) e `low` (liberado).
-- `reasons` traz só os motivos das regras (para log); `fields` os grupos de campos.
+- `is_suspicious = alguma regra dura OU (score ≥ limiar E há outra evidência além do local de
+  nascimento)`. `score` é a probabilidade do modelo, ou `1.0` se uma regra disparou.
+- `reasons` traz só os motivos das regras (o Django os registra no log, sem dado pessoal);
+  `fields` os grupos de campos, usados na mensagem ao usuário.
 - Sem modelo ou sem bases: mesmo formato, `is_suspicious: false` e `error` preenchido.
 - Entrada inválida (stdin vazio ou que não é um objeto JSON): `{"error": ...}` e saída com código 1.
 
@@ -215,10 +215,9 @@ treino usa dados **sintéticos**, gerados por `lib/synthetic.py` (determinístic
 
 **Positivos (plausíveis)** — nomes sorteados pela frequência real do IBGE (com gênero
 aproximado pela terminação), sobrenomes de uma lista escrita à mão e de prenomes usados como
-sobrenome, cidade sorteada na UF pelo peso de população, CPF válido, datas coerentes. Inclui de
+sobrenome, cidade sorteada entre os municípios da UF, CPF válido, datas coerentes. Inclui de
 propósito casos esquisitos mas reais, para o modelo não aprender que "incomum = falso": 4% de
-prenomes raros ou estrangeiros, 8% nascidos num **distrito oficial do IBGE** (sorteado da lista real,
-sem derivar nomes), 5% de cidade com erro de digitação, estrangeiros com cidade fora do Brasil, pai ausente, CNHs de validade 3/5/10 anos
+prenomes raros ou estrangeiros, 5% de cidade com erro de digitação, estrangeiros com cidade fora do Brasil, pai ausente, CNHs de validade 3/5/10 anos
 e números de documento com dígitos quase todos distintos.
 
 **Negativos (falsos)** — um plausível corrompido por 1 a 3 *famílias* de mutação:
@@ -278,7 +277,7 @@ famílias não vistas.
 
 ## Resultados
 
-Treino completo de 12/10/2026 sobre `data/synth/cnh_records.csv` (24.000 registros plausíveis e
+Treino completo de 12/10/2026, com UF e municípios só da DTB 2025, sobre `data/synth/cnh_records.csv` (24.000 registros plausíveis e
 20.000 falsos sintéticos, semente 42), limiar 0,60. As famílias "não vistas" são avaliadas
 filtrando o próprio CSV: treina-se com 1/3 das linhas que não têm a família e testa-se nas linhas
 que têm só ela.
@@ -287,8 +286,8 @@ que têm só ela.
 
 | | Recall | Falso positivo | Precisão |
 |---|---|---|---|
-| Só o classificador de ML | 93,9% | 0,21% | 99,7% |
-| Regras + ML (produção) | 95,8% | 0,21% | 99,7% |
+| Só o classificador de ML | 93,6% | 0,12% | 99,8% |
+| Regras + ML (produção) | 95,8% | 0,12% | 99,8% |
 
 PR-AUC do ML (nota bruta, sem a regra do local de nascimento): 1,000.
 
@@ -298,14 +297,14 @@ PR-AUC do ML (nota bruta, sem a regra do local de nascimento): 1,000.
 |---|---|---|---|
 | `keyboard` | 100% | 100% | 100% |
 | `repeat` | 100% | 100% | 100% |
-| `placeholder` | 100% | 100% | 90% |
-| `word_junk` | 97% | 92% | 92% |
-| `gibberish` | 100% | 100% | 100% |
-| `same_name` | 100% | 100% | 0,6% |
-| `dates_inverted` | 100% | 98% | 0,2% |
-| `numbers_degenerate` | 97% | **84,4%** | 0,1% |
-| `city_gibberish` | **32%** | **33%** | 0,7% |
-| `one_field` | 99,6% | 99% | 99% |
+| `placeholder` | 100% | 100% | 89% |
+| `word_junk` | 98% | 89% | 89% |
+| `gibberish` | 100% | 100% | 99,9% |
+| `same_name` | 100% | 100% | 0,5% |
+| `dates_inverted` | 100% | 97% | 0,3% |
+| `numbers_degenerate` | 98,6% | 86,0% | 0,2% |
+| `city_gibberish` | **36%** | **36%** | 0,2% |
+| `one_field` | 98% | 98% | 98% |
 | `full_junk` | 100% | 100% | 100% |
 
 **Casos escritos à mão (37):** os 19 legítimos foram liberados (todos com nota até 0,20) e os 16
@@ -313,7 +312,7 @@ falsos recusados. Dos 2 ambíguos, só informativos, "cidade existente em outra 
 foi liberado (0,00) e "prenome inventado pronunciável" recusado (1,00).
 
 **Local de nascimento no modelo final** (mesmo cadastro plausível, só a naturalidade muda):
-São Paulo, Barão Geraldo (distrito), Taguatinga, Ceilândia, Gama (DF), Copacabana (bairro), uma
+São Paulo, Barão Geraldo (distrito, fora da lista), Taguatinga, Ceilândia, Gama (DF), Copacabana (bairro), uma
 cidade inexistente pronunciável e `Curitiba – SP` ficam todos liberados (nota 0,00). Antes da
 regra "local sozinho nunca recusa", as quatro últimas e as do DF eram recusadas com nota 1,00.
 
@@ -325,14 +324,20 @@ regra "local sozinho nunca recusa", as quatro últimas e as do DF eram recusadas
 - **Troca assumida: cidade sem sentido sozinha.** Com a regra "local de nascimento sozinho nunca
   recusa", um cadastro normal com só a cidade inventada não é recusado pelo ML. Só as regras duras
   pegam (cidade com teclado, letras repetidas ou palavra sem vogal), por isso `city_gibberish` fica
-  em ~32% (era 96% antes da regra). Foi escolha deliberada: recusar com nota 1,00 quem nasceu em
+  em ~36% (era 96% antes da regra). Foi escolha deliberada: recusar com nota 1,00 quem nasceu em
   Taguatinga ou num bairro era pior do que deixar passar uma cidade falsa isolada. O recall do
   holdout caiu de 99,3% para 95,8% pelo mesmo motivo.
-- **Já corrigido: Distrito Federal.** O IBGE lista só Brasília para o DF. Antes de acrescentar as
-  35 Regiões Administrativas (`data/cities/extra_localities.csv`), quem nasceu em Taguatinga,
-  Ceilândia ou Gama era recusado com nota 1,00, assim como "Copacabana". Foi o que motivou a regra.
-- `numbers_degenerate` não vista (84,4%) fica um décimo abaixo da meta de 85% e só chega lá graças
-  às regras de sequência e de baixa variedade; `city_gibberish` (33%) é a que mais fica longe da meta.
+- **Distrito Federal sem lista extra.** A DTB do IBGE lista só Brasília para o DF, e o projeto usa
+  apenas a DTB como fonte de lugares. Quem nasceu em Taguatinga, Ceilândia ou Gama aparece como lugar
+  desconhecido e **só não é recusado por causa da regra acima**: sem ela, o classificador dava nota
+  1,00 a um cadastro legítimo com essa naturalidade (testado em 12/10/2026).
+- `numbers_degenerate` não vista (86,0%) só atinge a meta de 85% graças às regras de sequência e de
+  baixa variedade; `city_gibberish` (36%) é a única que fica longe da meta.
+- **Sem a lista de distritos.** Uma versão anterior também usava os 4.894 distritos da DTB como
+  "lugar conhecido". Retirada, as métricas ficaram equivalentes (recall 95,8% → 95,3%, falso
+  positivo 0,12% → 0,15%), porque a regra do local de nascimento já protege quem nasceu num distrito.
+  Tirar também o peso de população do `cities.json` (as cidades passaram a ser sorteadas de forma
+  uniforme entre os municípios) não mudou nada: recall 95,8% e falso positivo 0,12%.
 - Os números são sobre dados sintéticos e são otimistas. A decisão de produção deve vir de um
   período em `shadow`.
 

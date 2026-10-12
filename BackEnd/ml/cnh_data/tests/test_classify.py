@@ -14,7 +14,7 @@ from tests.test_rules import PLAUSIBLE
 
 SCRIPT = Path(classify.__file__)
 HAS_MODEL = classify.MODEL_PATH.exists()
-CONTRACT_KEYS = {"is_suspicious", "confidence", "score", "reasons", "fields"}
+CONTRACT_KEYS = {"is_suspicious", "score", "reasons", "fields"}
 
 
 def run_cli(stdin: str, **env) -> subprocess.CompletedProcess:
@@ -83,7 +83,7 @@ class ClassifyCliTests(unittest.TestCase):
         result = json.loads(run_cli(json.dumps(junk)).stdout)
 
         self.assertTrue(result["is_suspicious"])
-        self.assertEqual(result["confidence"], "high")
+        self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["reasons"] and result["fields"])
 
     @unittest.skipUnless(HAS_MODEL, "modelo treinado não encontrado (rode train.py)")
