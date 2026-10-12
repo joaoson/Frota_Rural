@@ -8,7 +8,7 @@ import {
 } from "../types/machineSchemas";
 import { toDomain } from "./machineMapper";
 
-const COLLECTION_PATH = "machines/";
+const COLLECTION_PATH = "machines";
 
 export interface MachineFilter {
   ownerId?: string;

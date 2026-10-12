@@ -4,7 +4,7 @@ import type { User } from "../types/user";
 import { userApiSchema, userListApiSchema } from "../types/userSchemas";
 import { type CreateUserPayload, toDomain } from "./userMapper";
 
-const COLLECTION_PATH = "users/";
+const COLLECTION_PATH = "users";
 const CREATE_PATH = "users/create";
 
 export interface UpdateProfileInput {

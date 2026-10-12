@@ -1,34 +1,11 @@
 from django.db import models
 
+from document_validation.enums import LicenseCategory, LicenseSituation, ValidationStatus
+
 
 class OperatorLicense(models.Model):
-
-    class Category(models.TextChoices):
-        A = 'A'
-        B = 'B'
-        C = 'C'
-        D = 'D'
-        E = 'E'
-        AB = 'AB', 'AB'
-        AC = 'AC', 'AC'
-        AD = 'AD', 'AD'
-        AE = 'AE', 'AE'
-
-    class Situation(models.TextChoices):
-        ACTIVE = 'active'
-        EXPIRED = 'expired'
-        SUSPENDED = 'suspended'
-        REVOKED = 'revoked'
-        BLOCKED = 'blocked'
-        PPD = 'ppd'
-
-    class ValidationStatus(models.TextChoices):
-        PENDING = 'pending'
-        APPROVED = 'approved'
-        REJECTED = 'rejected'
-
     id = models.UUIDField(primary_key=True)
-    user = models.ForeignKey('users.Users', models.CASCADE)
+    user = models.ForeignKey("users.Users", models.CASCADE)
 
     name = models.CharField(max_length=255)
     birth_date = models.DateField()
@@ -40,14 +17,14 @@ class OperatorLicense(models.Model):
     birth_place = models.CharField(max_length=255)
 
     cnh_number = models.CharField(max_length=11)
-    category = models.CharField(max_length=2, choices=Category.choices)
+    category = models.CharField(max_length=2, choices=LicenseCategory.choices)
     first_license_date = models.DateField()
     issue_date = models.DateField()
     expiration_date = models.DateField()
     issuing_state = models.CharField(max_length=2)
     issuing_authority = models.CharField(max_length=255)
 
-    situation = models.CharField(max_length=20, choices=Situation.choices)
+    situation = models.CharField(max_length=20, choices=LicenseSituation.choices)
     acc = models.BooleanField(default=False)
     ear = models.BooleanField(default=False)
 
@@ -68,18 +45,15 @@ class OperatorLicense(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        db_table = 'operator_licenses'
+        db_table = "operator_licenses"
+
+    def __str__(self) -> str:
+        return f"CNH {self.cnh_number} ({self.name})"
 
 
 class Certification(models.Model):
-
-    class ValidationStatus(models.TextChoices):
-        PENDING = 'pending'
-        APPROVED = 'approved'
-        REJECTED = 'rejected'
-
     id = models.UUIDField(primary_key=True)
-    user = models.ForeignKey('users.Users', models.CASCADE)
+    user = models.ForeignKey("users.Users", models.CASCADE)
 
     issuing_organization = models.CharField(max_length=255)
     title = models.CharField(max_length=255)
@@ -100,4 +74,7 @@ class Certification(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        db_table = 'certifications'
+        db_table = "certifications"
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.issuing_organization})"

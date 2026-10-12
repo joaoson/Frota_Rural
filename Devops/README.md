@@ -13,7 +13,7 @@ Serviços disponíveis:
 | --- | --- |
 | Frontend (Vite) | http://localhost:5173 |
 | Backend (Django) | http://localhost:8000 |
-| Swagger UI | http://localhost:8000/api/schema/swagger-ui/ |
+| Swagger UI | http://localhost:8000/api/schema/swagger-ui |
 | PostgreSQL | `localhost:5432` |
 
 O backend executa `migrate` antes de iniciar. Para carregar dados de desenvolvimento:

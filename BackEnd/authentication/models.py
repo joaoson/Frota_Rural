@@ -1,6 +1,9 @@
 import uuid
+
 from django.db import models
+
 from users.models import Users
+
 
 class PasswordResets(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -11,4 +14,7 @@ class PasswordResets(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'password_resets'
+        db_table = "password_resets"
+
+    def __str__(self) -> str:
+        return f"Redefinição de senha de {self.user_id} (usado: {self.used})"

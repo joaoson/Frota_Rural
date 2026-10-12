@@ -1,7 +1,7 @@
 from drf_spectacular.contrib.rest_framework_simplejwt import SimpleJWTScheme
 
 
-class AppJWTScheme(SimpleJWTScheme):
+class AppJWTScheme(SimpleJWTScheme):  # type: ignore[no-untyped-call]  # __init_subclass__ sem tipos no drf-spectacular
     """
     Registers `AppJWTAuthentication` as a security scheme in the OpenAPI schema.
 
@@ -11,5 +11,5 @@ class AppJWTScheme(SimpleJWTScheme):
     no way to send a Bearer token.
     """
 
-    target_class = 'authentication.extensions.authentication.AppJWTAuthentication'
-    name = 'jwtAuth'
+    target_class = "authentication.extensions.authentication.AppJWTAuthentication"
+    name = "jwtAuth"

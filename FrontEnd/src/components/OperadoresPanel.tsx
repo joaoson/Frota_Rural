@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadRequestError } from "@/shared/http/errors";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
@@ -257,15 +257,16 @@ const OperadoresPanel = () => {
       }
       closeForm();
     } catch (error) {
+      // 400 (validação) ou 409 (cadastro simultâneo): os dois trazem o campo em conflito.
+      if (error instanceof HttpError && error.firstErrorFor("document")) {
+        setErrors((prev) => ({ ...prev, document: "Este documento já está cadastrado." }));
+        return toast.error("Este documento já está cadastrado.");
+      }
+      if (error instanceof HttpError && error.firstErrorFor("email")) {
+        setErrors((prev) => ({ ...prev, email: "Este e-mail já está em uso." }));
+        return toast.error("Este e-mail já está em uso.");
+      }
       if (error instanceof BadRequestError) {
-        if (error.firstErrorFor("document")) {
-          setErrors((prev) => ({ ...prev, document: "Este documento já está cadastrado." }));
-          return toast.error("Este documento já está cadastrado.");
-        }
-        if (error.firstErrorFor("email")) {
-          setErrors((prev) => ({ ...prev, email: "Este e-mail já está em uso." }));
-          return toast.error("Este e-mail já está em uso.");
-        }
         return toast.error(error.message);
       }
       toast.error("Não foi possível salvar o operador. Tente novamente.");

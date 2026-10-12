@@ -1,6 +1,7 @@
 import resend
 from django.conf import settings
 
+
 def send_password_reset_email(to_email: str, reset_token: str) -> None:
     resend.api_key = settings.RESEND_API_KEY
     from_email = settings.RESEND_SUPPORT_EMAIL
@@ -15,6 +16,7 @@ def send_password_reset_email(to_email: str, reset_token: str) -> None:
     }
 
     resend.Emails.send(params)
+
 
 ## Timeout tem que ser em minutos
 def _build_reset_email_html(reset_url: str, timeout: int) -> str:
@@ -107,7 +109,7 @@ def _build_reset_email_html(reset_url: str, timeout: int) -> str:
             </td>
           </tr>
         </table>
-        
+
       </td>
     </tr>
   </table>
@@ -117,7 +119,9 @@ def _build_reset_email_html(reset_url: str, timeout: int) -> str:
 
 ## Código de uso único enviado antes do aceite do contrato. Serve como prova
 ## de posse do endereço de e-mail no registro de assinatura eletrônica.
-def send_contract_signature_otp_email(to_email: str, code: str, contract_number: str, timeout: int) -> None:
+def send_contract_signature_otp_email(
+    to_email: str, code: str, contract_number: str, timeout: int
+) -> None:
     resend.api_key = settings.RESEND_API_KEY
     from_email = settings.RESEND_SUPPORT_EMAIL
 

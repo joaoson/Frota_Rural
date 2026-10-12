@@ -3,10 +3,18 @@ import hmac
 import json
 import secrets
 import uuid
+from collections.abc import Mapping
+from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from django.conf import settings
 from django.db import transaction
+from django.http import HttpRequest
 from django.utils import timezone
+
+from contracts.models import Contracts, ContractSignatures
+from users.models import Users
 
 HASH_ALGORITHM = "sha256"
 
@@ -16,8 +24,9 @@ GENESIS_HASH = "0" * 64
 
 # --- Canonicalização e hash do documento ---
 
-def canonical_document(document):
 
+def canonical_document(document: Mapping[str, Any]) -> str:
+    """JSON determinístico: mesmas chaves e valores produzem sempre os mesmos bytes."""
     return json.dumps(
         document,
         sort_keys=True,
@@ -27,67 +36,88 @@ def canonical_document(document):
     )
 
 
-def document_hash(document):
+def document_hash(document: Mapping[str, Any]) -> str:
     """SHA-256 (hexadecimal) do documento exato que foi apresentado à parte."""
-    return hashlib.sha256(canonical_document(document).encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical_document(document).encode()).hexdigest()
 
 
 # --- Metadados da requisição ---
 
-def client_ip(request):
+
+def client_ip(request: HttpRequest) -> str:
     """IP de origem, respeitando o proxy reverso à frente da aplicação."""
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    forwarded = str(request.META.get("HTTP_X_FORWARDED_FOR", ""))
     if forwarded:
         # O primeiro endereço da lista é o cliente original.
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR") or ""
+        return forwarded.split(",", maxsplit=1)[0].strip()
+    return str(request.META.get("REMOTE_ADDR") or "")
 
 
-def client_user_agent(request):
+def client_user_agent(request: HttpRequest) -> str:
     # Truncado para não estourar a coluna com um header malicioso.
-    return (request.META.get("HTTP_USER_AGENT") or "")[:1024]
+    return str(request.META.get("HTTP_USER_AGENT") or "")[:1024]
 
 
 # --- Encadeamento imutável ---
 
-def record_fingerprint(*, contract_id, role, signer_id, signer_email, signer_name,
-                       doc_hash, document_version, signed_at, ip_address,
-                       user_agent, otp_verified, previous_hash):
+
+def record_fingerprint(
+    *,
+    contract_id: UUID,
+    role: str,
+    signer_id: UUID | None,
+    signer_email: str,
+    signer_name: str,
+    doc_hash: str,
+    document_version: str,
+    signed_at: datetime,
+    ip_address: str,
+    user_agent: str,
+    otp_verified: bool,
+    previous_hash: str,
+) -> str:
     """Hash que sela o registro inteiro, incluindo o hash do registro anterior.
 
     É esse encadeamento que transforma a tabela em um log verificável: para
     forjar um aceite é preciso recalcular todos os registros seguintes, e a
     verificação (``verify_chain``) detecta qualquer divergência.
     """
-    payload = canonical_document({
-        "contract_id": str(contract_id),
-        "role": role,
-        "signer_id": str(signer_id) if signer_id else "",
-        "signer_email": signer_email,
-        "signer_name": signer_name,
-        "document_hash": doc_hash,
-        "document_version": document_version,
-        "signed_at": signed_at.isoformat(),
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-        "otp_verified": bool(otp_verified),
-        "previous_hash": previous_hash,
-    })
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    payload = canonical_document(
+        {
+            "contract_id": str(contract_id),
+            "role": role,
+            "signer_id": str(signer_id) if signer_id else "",
+            "signer_email": signer_email,
+            "signer_name": signer_name,
+            "document_hash": doc_hash,
+            "document_version": document_version,
+            "signed_at": signed_at.isoformat(),
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "otp_verified": bool(otp_verified),
+            "previous_hash": previous_hash,
+        }
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 @transaction.atomic
-def record_signature(*, contract, document, role, signer=None, signer_name="",
-                     signer_email="", request=None, otp_verified=False):
-
-    from contracts.models import ContractSignatures
-
+def record_signature(
+    *,
+    contract: Contracts,
+    document: Mapping[str, Any],
+    role: str,
+    signer: Users | None = None,
+    signer_name: str = "",
+    signer_email: str = "",
+    ip_address: str = "",
+    user_agent: str = "",
+    otp_verified: bool = False,
+) -> ContractSignatures:
+    """Grava o aceite encadeado ao registro anterior do mesmo contrato."""
     signed_at = timezone.now()
     doc_hash = document_hash(document)
-    ip_address = client_ip(request) if request is not None else ""
-    user_agent = client_user_agent(request) if request is not None else ""
-    version = document.get("contrato", {}).get("versao_documento", "")
-
+    version = str(document.get("contrato", {}).get("versao_documento", ""))
 
     previous = (
         ContractSignatures.objects.select_for_update()
@@ -97,9 +127,9 @@ def record_signature(*, contract, document, role, signer=None, signer_name="",
     )
     previous_hash = previous.record_hash if previous else GENESIS_HASH
 
-    signer_id = getattr(signer, "id", None)
-    signer_email = signer_email or (getattr(signer, "email", "") or "")
-    signer_name = signer_name or (getattr(signer, "name", "") or "")
+    signer_id = signer.id if signer else None
+    signer_email = signer_email or (signer.email if signer else "") or ""
+    signer_name = signer_name or (signer.name if signer else "") or ""
 
     return ContractSignatures.objects.create(
         id=uuid.uuid4(),
@@ -133,11 +163,11 @@ def record_signature(*, contract, document, role, signer=None, signer_name="",
     )
 
 
-def verify_chain(contract, document=None):
-
-    from contracts.models import ContractSignatures
-
-    problems = []
+def verify_chain(
+    contract: Contracts, document: Mapping[str, Any] | None = None
+) -> tuple[bool, list[str]]:
+    """Confere o encadeamento e, se `document` vier, que ele é o que foi assinado."""
+    problems: list[str] = []
     expected_previous = GENESIS_HASH
     current_hash = document_hash(document) if document is not None else None
 
@@ -179,16 +209,16 @@ def verify_chain(contract, document=None):
 # --- OTP por e-mail (prova de posse do endereço) ---
 
 OTP_LENGTH = 6
-OTP_TTL_SECONDS = getattr(settings, "CONTRACT_OTP_TTL_SECONDS", 10 * 60)
-OTP_MAX_ATTEMPTS = getattr(settings, "CONTRACT_OTP_MAX_ATTEMPTS", 5)
+OTP_TTL_SECONDS: int = getattr(settings, "CONTRACT_OTP_TTL_SECONDS", 10 * 60)
+OTP_MAX_ATTEMPTS: int = getattr(settings, "CONTRACT_OTP_MAX_ATTEMPTS", 5)
 
 
-def generate_otp_code():
+def generate_otp_code() -> str:
     """Código numérico de 6 dígitos, sorteado com um gerador criptográfico."""
     return "".join(secrets.choice("0123456789") for _ in range(OTP_LENGTH))
 
 
-def hash_otp_code(code, contract_id):
-
-    salted = f"{contract_id}:{code}".encode("utf-8")
+def hash_otp_code(code: str, contract_id: UUID) -> str:
+    """Hash do código salgado com o contrato: o mesmo código não serve em outro contrato."""
+    salted = f"{contract_id}:{code}".encode()
     return hashlib.sha256(salted).hexdigest()

@@ -9,17 +9,15 @@ import re
 
 from django.conf import settings
 
-_DEFAULT_BANNED = ()
+
+def banned_words() -> tuple[str, ...]:
+    configured: list[str] | None = getattr(settings, "CHAT_BANNED_WORDS", None)
+    return tuple(configured) if configured else ()
 
 
-def banned_words():
-    configured = getattr(settings, 'CHAT_BANNED_WORDS', None)
-    return tuple(configured) if configured else _DEFAULT_BANNED
-
-
-def should_flag(content):
+def should_flag(content: str | None) -> bool:
     words = banned_words()
     if not words:
         return False
-    lowered = (content or '').lower()
-    return any(re.search(r'\b' + re.escape(w) + r'\b', lowered) for w in words)
+    lowered = (content or "").lower()
+    return any(re.search(r"\b" + re.escape(word) + r"\b", lowered) for word in words)

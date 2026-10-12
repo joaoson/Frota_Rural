@@ -38,216 +38,209 @@ SERVIDOR -> CLIENTE
     {"type":"pong","server_time":"...Z"}
 
 Falha por thread devolve `error` e MANTÉM o socket aberto; só falha de conexão
-fecha. `type` desconhecido -> error/invalid_payload, nunca close.
+fecha. `type` desconhecido -> error/invalid_payload, nunca close. Os `code` do
+evento `error` são os mesmos do corpo de erro REST (`ThreadError.code`).
 """
 
 import json
+import uuid
+from collections.abc import Awaitable, Callable
+from typing import Any
+from uuid import UUID
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
-from . import selectors, services
-from .serializer import serialize_message
-from .threads import (
-    SCOPE_RENTAL,
-    ThreadError,
-    can_read,
-    can_write,
-    group_name,
-    load_scope,
-    parse_thread_id,
-    user_group_name,
-)
+from chat.serializer import iso_utc
+from chat.services import ChatService, ThreadService, validation_message
+from chat.threads import ThreadError, group_name, user_group_name
+from users.models import Users
 
-ERROR_FOR_STATUS = {400: 'invalid_thread', 403: 'forbidden', 404: 'not_found', 429: 'rate_limited'}
+type Event = dict[str, Any]
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
+    user: Users
+    subscribed: set[str]
 
-    async def connect(self):
-        user = self.scope.get('user')
-        if user is None or not user.is_authenticated:
+    async def connect(self) -> None:
+        user = self.scope.get("user")
+        if not isinstance(user, Users) or not user.is_authenticated:
             await self.close(code=4401)
             return
         self.user = user
         self.subscribed = set()
         # accept COM subprotocolo: sem isto o browser fecha imediatamente.
-        await self.accept(subprotocol='bearer')
+        await self.accept(subprotocol="bearer")
         await self.channel_layer.group_add(user_group_name(user.id), self.channel_name)
 
-    async def disconnect(self, code):
-        for thread_id in list(getattr(self, 'subscribed', ())):
+    async def disconnect(self, code: int) -> None:
+        for thread_id in list(getattr(self, "subscribed", ())):
             await self.channel_layer.group_discard(group_name(thread_id), self.channel_name)
-        if hasattr(self, 'user'):
-            await self.channel_layer.group_discard(
-                user_group_name(self.user.id), self.channel_name
-            )
+        if hasattr(self, "user"):
+            await self.channel_layer.group_discard(user_group_name(self.user.id), self.channel_name)
 
-    async def receive(self, text_data=None, bytes_data=None):
+    async def receive(self, text_data: str | None = None, bytes_data: bytes | None = None) -> None:
         try:
-            data = json.loads(text_data or '{}')
+            data = json.loads(text_data or "{}")
             if not isinstance(data, dict):
-                raise ValueError
+                raise TypeError
         except (ValueError, TypeError):
-            return await self._error('invalid_payload', 'Mensagem malformada.')
+            await self._error("invalid_payload", "Mensagem malformada.")
+            return
 
-        handler = {
-            'thread.subscribe': self._on_subscribe,
-            'thread.unsubscribe': self._on_unsubscribe,
-            'message.send': self._on_send,
-            'message.read': self._on_read,
-            'typing': self._on_typing,
-            'ping': self._on_ping,
-        }.get(data.get('type'))
-
+        handlers: dict[str, Callable[[Event], Awaitable[None]]] = {
+            "thread.subscribe": self._on_subscribe,
+            "thread.unsubscribe": self._on_unsubscribe,
+            "message.send": self._on_send,
+            "message.read": self._on_read,
+            "typing": self._on_typing,
+            "ping": self._on_ping,
+        }
+        handler = handlers.get(str(data.get("type")))
         if handler is None:
-            return await self._error('invalid_payload', 'Tipo de evento desconhecido.')
+            await self._error("invalid_payload", "Tipo de evento desconhecido.")
+            return
+
         try:
             await handler(data)
         except ThreadError as exc:
-            await self._error(ERROR_FOR_STATUS.get(exc.status, 'server_error'), exc.message)
+            await self._error(exc.code, exc.message)
+        except ValidationError as exc:
+            await self._error("invalid_payload", validation_message(exc))
 
     # --- handlers ----------------------------------------------------------
 
-    async def _on_subscribe(self, data):
-        thread_id = data.get('thread_id') or ''
-        thread = await self._authorize_read(thread_id)
+    async def _on_subscribe(self, data: Event) -> None:
+        thread_id = str(data.get("thread_id") or "")
+        thread = await self._thread_payload(thread_id)
         await self.channel_layer.group_add(group_name(thread_id), self.channel_name)
         self.subscribed.add(thread_id)
-        await self._send({'type': 'thread.subscribed', 'thread_id': thread_id, 'thread': thread})
+        await self._send({"type": "thread.subscribed", "thread_id": thread_id, "thread": thread})
 
-    async def _on_unsubscribe(self, data):
-        thread_id = data.get('thread_id') or ''
+    async def _on_unsubscribe(self, data: Event) -> None:
+        thread_id = str(data.get("thread_id") or "")
         if thread_id in self.subscribed:
             await self.channel_layer.group_discard(group_name(thread_id), self.channel_name)
             self.subscribed.discard(thread_id)
 
-    async def _on_send(self, data):
-        thread_id = data.get('thread_id') or ''
+    async def _on_send(self, data: Event) -> None:
+        thread_id = str(data.get("thread_id") or "")
         if thread_id not in self.subscribed:
-            return await self._error('not_subscribed', 'Assine a conversa antes de enviar.')
-        payload, receiver_id, created = await self._persist(
-            thread_id, data.get('content'), data.get('client_id')
+            await self._error("not_subscribed", "Assine a conversa antes de enviar.")
+            return
+        receiver_id, created = await self._persist(
+            thread_id, data.get("content"), data.get("client_id")
         )
         if created:
-            await database_sync_to_async(services.push_unread)(receiver_id)
+            await database_sync_to_async(ChatService.push_unread)(receiver_id)
 
-    async def _on_read(self, data):
-        thread_id = data.get('thread_id') or ''
-        await self._mark_read(thread_id, data.get('up_to'))
+    async def _on_read(self, data: Event) -> None:
+        await self._mark_read(str(data.get("thread_id") or ""), data.get("up_to"))
 
-    async def _on_typing(self, data):
-        thread_id = data.get('thread_id') or ''
+    async def _on_typing(self, data: Event) -> None:
+        thread_id = str(data.get("thread_id") or "")
         if thread_id not in self.subscribed:
             return
-        await self.channel_layer.group_send(group_name(thread_id), {
-            'type': 'chat.typing',
-            'thread_id': thread_id,
-            'user_id': str(self.user.id),
-            'is_typing': bool(data.get('is_typing')),
-        })
+        await self.channel_layer.group_send(
+            group_name(thread_id),
+            {
+                "type": "chat.typing",
+                "thread_id": thread_id,
+                "user_id": str(self.user.id),
+                "is_typing": bool(data.get("is_typing")),
+            },
+        )
 
-    async def _on_ping(self, _data):
-        await self._send({
-            'type': 'pong',
-            'server_time': timezone.now().isoformat().replace('+00:00', 'Z'),
-        })
+    async def _on_ping(self, _data: Event) -> None:
+        await self._send({"type": "pong", "server_time": iso_utc(timezone.now())})
 
     # --- DB helpers --------------------------------------------------------
 
     @database_sync_to_async
-    def _authorize_read(self, thread_id):
-        from .views import _thread_payload
-        scope, scope_id, lo, hi = parse_thread_id(thread_id)
-        scope_obj = load_scope(scope, scope_id)
-        can_read(self.user, scope, scope_obj, {str(lo), str(hi)})
-        return _thread_payload(self.user, thread_id, scope, scope_id, lo, hi, scope_obj)
+    def _thread_payload(self, thread_id: str) -> Event:
+        return ThreadService.get(self.user, thread_id)
 
     @database_sync_to_async
-    def _persist(self, thread_id, content, client_id):
-        from .views import _thread_qs
-        scope, scope_id, lo, hi = parse_thread_id(thread_id)
-        scope_obj = load_scope(scope, scope_id)
-        qs = _thread_qs(scope, scope_id, lo, hi)
-        # Revalida a escrita a cada envio: o token vale 15 min mas o socket vive
-        # mais, então um usuário banido no meio da sessão para aqui.
-        can_write(self.user, scope, scope_obj, {str(lo), str(hi)}, qs.exists())
-        services.check_rate_limit(self.user.id)
-        receiver_id = hi if str(lo) == str(self.user.id) else lo
-        payload, created = services.create_message(
-            sender=self.user, receiver_id=receiver_id, scope=scope, scope_id=scope_id,
-            content=content, client_id=client_id, thread_id=thread_id,
+    def _persist(self, thread_id: str, content: object, client_id: object) -> tuple[UUID, bool]:
+        # Revalida a escrita a cada envio: o socket vive mais que o token, e a
+        # regra (locação cancelada, anúncio pausado) pode ter mudado no meio.
+        access = ThreadService.authorize(self.user, thread_id, write=True)
+        ChatService.check_rate_limit(self.user.id)
+        try:
+            client_uuid = uuid.UUID(str(client_id)) if client_id else None
+        except ValueError as exc:
+            raise ThreadError("client_id inválido.") from exc
+
+        receiver_id = access.peer_of(self.user.id)
+        _, created = ChatService.create_message(
+            sender=self.user,
+            receiver_id=receiver_id,
+            scope=access.scope,
+            scope_id=access.scope_id,
+            content=content if isinstance(content, str) else None,
+            client_id=client_uuid,
+            thread_id=thread_id,
         )
-        return payload, receiver_id, created
+        return receiver_id, created
 
     @database_sync_to_async
-    def _mark_read(self, thread_id, up_to):
-        from .views import _thread_qs
-        scope, scope_id, lo, hi = parse_thread_id(thread_id)
-        scope_obj = load_scope(scope, scope_id)
-        can_read(self.user, scope, scope_obj, {str(lo), str(hi)})
-        pending = _thread_qs(scope, scope_id, lo, hi).filter(
-            receiver=self.user, read_at__isnull=True
-        )
-        if up_to:
-            pending = pending.filter(sent_at__lte=up_to)
-        ids = list(pending.values_list('id', flat=True)[:500])
-        now = timezone.now()
-        if pending.update(read_at=now):
-            services.fan_out_read(
-                thread_id, self.user.id, now.isoformat().replace('+00:00', 'Z'), ids
-            )
-        services.push_unread(self.user.id)
+    def _mark_read(self, thread_id: str, up_to: object) -> None:
+        ThreadService.mark_read(self.user, thread_id, {"up_to": up_to} if up_to else {})
 
     # --- group event handlers ----------------------------------------------
 
-    async def chat_message_new(self, event):
-        await self._send({
-            'type': 'message.new',
-            'thread_id': event['thread_id'],
-            'message': event['message'],
-        })
+    async def chat_message_new(self, event: Event) -> None:
+        await self._send(
+            {"type": "message.new", "thread_id": event["thread_id"], "message": event["message"]}
+        )
 
-    async def chat_message_read(self, event):
-        await self._send({k: v for k, v in event.items() if k != 'type'} | {'type': 'message.read'})
+    async def chat_message_read(self, event: Event) -> None:
+        await self._send({k: v for k, v in event.items() if k != "type"} | {"type": "message.read"})
 
-    async def chat_message_hidden(self, event):
-        await self._send({
-            'type': 'message.hidden',
-            'thread_id': event['thread_id'],
-            'message_id': event['message_id'],
-        })
+    async def chat_message_hidden(self, event: Event) -> None:
+        await self._send(
+            {
+                "type": "message.hidden",
+                "thread_id": event["thread_id"],
+                "message_id": event["message_id"],
+            }
+        )
 
-    async def chat_typing(self, event):
-        if event['user_id'] == str(self.user.id):
+    async def chat_typing(self, event: Event) -> None:
+        if event["user_id"] == str(self.user.id):
             return  # não ecoa o próprio "digitando"
-        await self._send({
-            'type': 'typing',
-            'thread_id': event['thread_id'],
-            'user_id': event['user_id'],
-            'is_typing': event['is_typing'],
-        })
+        await self._send(
+            {
+                "type": "typing",
+                "thread_id": event["thread_id"],
+                "user_id": event["user_id"],
+                "is_typing": event["is_typing"],
+            }
+        )
 
-    async def chat_unread_updated(self, event):
-        await self._send({
-            'type': 'unread.updated',
-            'unread_total': event['unread_total'],
-            'unread_threads': event['unread_threads'],
-        })
+    async def chat_unread_updated(self, event: Event) -> None:
+        await self._send(
+            {
+                "type": "unread.updated",
+                "unread_total": event["unread_total"],
+                "unread_threads": event["unread_threads"],
+            }
+        )
 
-    async def chat_thread_touch(self, event):
-        thread_id = event['thread_id']
+    async def chat_thread_touch(self, event: Event) -> None:
         try:
-            thread = await self._authorize_read(thread_id)
+            thread = await self._thread_payload(event["thread_id"])
         except ThreadError:
             return
-        await self._send({'type': 'thread.updated', 'thread': thread})
+        await self._send({"type": "thread.updated", "thread": thread})
 
     # --- utils --------------------------------------------------------------
 
-    async def _send(self, payload):
+    async def _send(self, payload: Event) -> None:
         await self.send(text_data=json.dumps(payload))
 
-    async def _error(self, code, message):
-        await self._send({'type': 'error', 'code': code, 'message': message})
+    async def _error(self, code: str, message: str) -> None:
+        await self._send({"type": "error", "code": code, "message": message})

@@ -35,8 +35,8 @@ import {
  */
 const seg = (threadId: string) => encodeURIComponent(threadId);
 
-// `chat/threads/` e `chat/messages/…/report` levam barra; o resto não.
-const THREADS = "chat/threads/";
+// Nenhuma rota da API termina com barra.
+const THREADS = "chat/threads";
 const RESOLVE = "chat/threads/resolve";
 const UNREAD = "chat/unread";
 
@@ -72,7 +72,7 @@ export class HttpChatRepository implements ChatRepository {
   async findThread(threadId: string): Promise<ChatThread> {
     const response = await this.http.send<unknown>({
       method: "GET",
-      path: `${THREADS}${seg(threadId)}`,
+      path: `${THREADS}/${seg(threadId)}`,
     });
     return toChatThread(chatThreadApiSchema.parse(response.data));
   }
@@ -91,7 +91,7 @@ export class HttpChatRepository implements ChatRepository {
   async listMessages(threadId: string, cursor: MessageCursor = {}): Promise<MessagePage> {
     const response = await this.http.send<unknown>({
       method: "GET",
-      path: `${THREADS}${seg(threadId)}/messages`,
+      path: `${THREADS}/${seg(threadId)}/messages`,
       query: { ...cursor },
     });
     return toMessagePage(messagePageApiSchema.parse(response.data));
@@ -102,7 +102,7 @@ export class HttpChatRepository implements ChatRepository {
   async sendMessage(threadId: string, content: string, clientId: string): Promise<ChatMessage> {
     const response = await this.http.send<unknown>({
       method: "POST",
-      path: `${THREADS}${seg(threadId)}/messages`,
+      path: `${THREADS}/${seg(threadId)}/messages`,
       body: { content, client_id: clientId },
     });
     return toChatMessage(chatMessageApiSchema.parse(response.data));
@@ -111,7 +111,7 @@ export class HttpChatRepository implements ChatRepository {
   async markRead(threadId: string, upTo?: string): Promise<MarkReadResult> {
     const response = await this.http.send<unknown>({
       method: "POST",
-      path: `${THREADS}${seg(threadId)}/read`,
+      path: `${THREADS}/${seg(threadId)}/read`,
       body: upTo ? { up_to: upTo } : {},
     });
     return toMarkReadResult(markReadApiSchema.parse(response.data));

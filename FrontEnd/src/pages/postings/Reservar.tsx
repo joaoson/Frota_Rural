@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
 import type { Rental, SignatureEvidence } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
+import { HttpError } from "@/shared/http/errors";
 
 
 const HORAS_POR_DIARIA = 8;
@@ -618,9 +619,11 @@ const Reservar = () => {
       window.location.href = url;
     } catch (err: unknown) {
       setProcessando(false);
-      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
-      if (httpStatus === 409) {
+      if (err instanceof HttpError && err.status === 409) {
         toast.error("O período escolhido já está reservado. Escolha outras datas.");
+      } else if (err instanceof HttpError && err.status === 400) {
+        // Ex.: período em conflito com o intervalo de limpeza de outra reserva.
+        toast.error(err.message);
       } else {
         toast.error("Não foi possível iniciar o pagamento.");
       }
@@ -674,10 +677,7 @@ const Reservar = () => {
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
       window.scrollTo(0, 0);
     } catch (err) {
-      const mensagem =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Erro ao assinar contrato.";
-      toast.error(mensagem);
+      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
       setAssinando(false);
     }
   };

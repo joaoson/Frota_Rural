@@ -26,8 +26,8 @@ import {
   toSignatureOtp,
 } from "./contractMapper";
 
-const RENTALS_PATH = "rentals/";
-const CONTRACTS_PATH = "contracts/";
+const RENTALS_PATH = "rentals";
+const CONTRACTS_PATH = "contracts";
 
 export interface RentalFilter {
   lesseeId?: string;

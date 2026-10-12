@@ -24,9 +24,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/users/",
+              "raw": "{{baseUrl}}/users",
               "host": ["{{baseUrl}}"],
-              "path": ["users", ""]
+              "path": ["users"]
             }
           },
           "response": []
@@ -170,9 +170,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/machines/",
+              "raw": "{{baseUrl}}/machines",
               "host": ["{{baseUrl}}"],
-              "path": ["machines", ""]
+              "path": ["machines"]
             },
             "description": "Optional query params: owner (UUID), status, brand, model."
           },
@@ -184,9 +184,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/machines/?status=active&brand=John%20Deere",
+              "raw": "{{baseUrl}}/machines?status=active&brand=John%20Deere",
               "host": ["{{baseUrl}}"],
-              "path": ["machines", ""],
+              "path": ["machines"],
               "query": [
                 {
                   "key": "status",
@@ -216,9 +216,9 @@
               "raw": "{\n  \"owner\": \"{{userId}}\",\n  \"renagro_number\": \"BR-RENAGRO-TEST-001\",\n  \"brand\": \"John Deere\",\n  \"model\": \"S700\",\n  \"year\": 2022,\n  \"usage_purpose\": \"Plantio\",\n  \"technical_specifications\": \"Motor, plataforma, GPS.\",\n  \"status\": \"active\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/machines/",
+              "raw": "{{baseUrl}}/machines",
               "host": ["{{baseUrl}}"],
-              "path": ["machines", ""]
+              "path": ["machines"]
             }
           },
           "response": []
@@ -304,9 +304,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/postings/",
+              "raw": "{{baseUrl}}/postings",
               "host": ["{{baseUrl}}"],
-              "path": ["postings", ""]
+              "path": ["postings"]
             },
             "description": "Optional query params: machinery (UUID), status."
           },
@@ -318,9 +318,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/postings/?status=active&machinery={{machineId}}",
+              "raw": "{{baseUrl}}/postings?status=active&machinery={{machineId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["postings", ""],
+              "path": ["postings"],
               "query": [
                 {
                   "key": "status",
@@ -350,9 +350,9 @@
               "raw": "{\n  \"machinery\": \"{{machineId}}\",\n  \"hourly_rate\": \"150.00\",\n  \"location_lat\": \"-25.4284\",\n  \"location_lng\": \"-49.2733\",\n  \"location_address\": \"Curitiba, PR\",\n  \"availability_start\": \"2026-04-15T08:00:00Z\",\n  \"availability_end\": \"2026-05-15T18:00:00Z\",\n  \"description\": \"Trator em ótimo estado, disponível para safra\",\n  \"status\": \"active\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/postings/",
+              "raw": "{{baseUrl}}/postings",
               "host": ["{{baseUrl}}"],
-              "path": ["postings", ""]
+              "path": ["postings"]
             }
           },
           "response": []
@@ -438,9 +438,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/operator-licenses/",
+              "raw": "{{baseUrl}}/operator-licenses",
               "host": ["{{baseUrl}}"],
-              "path": ["operator-licenses", ""]
+              "path": ["operator-licenses"]
             },
             "description": "Optional query params: user (UUID), validation_status (pending|approved|rejected)."
           },
@@ -452,9 +452,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/operator-licenses/?user={{userId}}&validation_status=pending",
+              "raw": "{{baseUrl}}/operator-licenses?user={{userId}}&validation_status=pending",
               "host": ["{{baseUrl}}"],
-              "path": ["operator-licenses", ""],
+              "path": ["operator-licenses"],
               "query": [
                 { "key": "user", "value": "{{userId}}" },
                 { "key": "validation_status", "value": "pending" }
@@ -475,9 +475,9 @@
               "raw": "{\n  \"user\": \"{{userId}}\",\n  \"name\": \"João da Silva\",\n  \"birth_date\": \"1990-03-15\",\n  \"cpf\": \"12345678901\",\n  \"rg\": \"123456789\",\n  \"mother_name\": \"Maria da Silva\",\n  \"father_name\": \"José da Silva\",\n  \"nationality\": \"Brasileiro(a)\",\n  \"birth_place\": \"São Paulo – SP\",\n  \"cnh_number\": \"98765432101\",\n  \"category\": \"C\",\n  \"first_license_date\": \"2010-06-20\",\n  \"issue_date\": \"2024-01-10\",\n  \"expiration_date\": \"2029-01-10\",\n  \"issuing_state\": \"SP\",\n  \"issuing_authority\": \"DETRAN-SP\",\n  \"situation\": \"active\",\n  \"acc\": false,\n  \"ear\": true,\n  \"medical_restrictions\": \"Obrigatório uso de lentes corretivas\",\n  \"observations\": \"\",\n  \"points\": 0\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/operator-licenses/",
+              "raw": "{{baseUrl}}/operator-licenses",
               "host": ["{{baseUrl}}"],
-              "path": ["operator-licenses", ""]
+              "path": ["operator-licenses"]
             }
           },
           "response": []
@@ -557,9 +557,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/certifications/",
+              "raw": "{{baseUrl}}/certifications",
               "host": ["{{baseUrl}}"],
-              "path": ["certifications", ""]
+              "path": ["certifications"]
             },
             "description": "Optional query params: user (UUID), validation_status (pending|approved|rejected)."
           },
@@ -571,9 +571,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/certifications/?user={{userId}}&validation_status=pending",
+              "raw": "{{baseUrl}}/certifications?user={{userId}}&validation_status=pending",
               "host": ["{{baseUrl}}"],
-              "path": ["certifications", ""],
+              "path": ["certifications"],
               "query": [
                 { "key": "user", "value": "{{userId}}" },
                 { "key": "validation_status", "value": "pending" }
@@ -594,9 +594,9 @@
               "raw": "{\n  \"user\": \"{{userId}}\",\n  \"issuing_organization\": \"SENAR\",\n  \"title\": \"Operação de Tratores Agrícolas\",\n  \"issue_date\": \"2024-08-15\",\n  \"expiration_date\": \"2027-08-15\",\n  \"credential_code\": \"SENAR-2024-001\",\n  \"description\": \"Curso de 40 horas sobre operação segura de tratores agrícolas, manutenção preventiva e boas práticas no campo.\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/certifications/",
+              "raw": "{{baseUrl}}/certifications",
               "host": ["{{baseUrl}}"],
-              "path": ["certifications", ""]
+              "path": ["certifications"]
             }
           },
           "response": []

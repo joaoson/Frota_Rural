@@ -1,11 +1,8 @@
 from django.urls import path
 
-from .views import (
-    machine_detail,
-    machines_list,
-)
+from machines.views import MachineDetailView, MachineListView
 
 urlpatterns = [
-    path('machines/', machines_list, name='machines_list'),
-    path('machines/<uuid:pk>', machine_detail, name='machine_detail'),
+    path("machines", MachineListView.as_view(), name="machines_list"),
+    path("machines/<uuid:pk>", MachineDetailView.as_view(), name="machine_detail"),
 ]

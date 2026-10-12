@@ -1,21 +1,25 @@
 from django.urls import path
-from .views import (
+
+from authentication.views import (
+    LoginView,
+    LogoutView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    RefreshTokenView,
     VerifyTokenView,
-    login,
-    logout,
-    refresh_token,
-    request_password_reset,
-    confirm_password_reset
 )
 
 urlpatterns = [
-    ## JWT AUTH
-    path('login', login, name='token_obtain_pair'),
-    path('login/refresh', refresh_token, name='token_refresh'),
-    path('login/verify', VerifyTokenView.as_view(), name='token_verify'),
-    path('logout', logout, name='logout'),
-
-    ## PASSWORD RESET
-    path('password-reset/request', request_password_reset, name='password_reset_request'),
-    path('password-reset/confirm', confirm_password_reset, name='password_reset_confirm'),
+    # JWT
+    path("login", LoginView.as_view(), name="token_obtain_pair"),
+    path("login/refresh", RefreshTokenView.as_view(), name="token_refresh"),
+    path("login/verify", VerifyTokenView.as_view(), name="token_verify"),
+    path("logout", LogoutView.as_view(), name="logout"),
+    # Redefinição de senha
+    path(
+        "password-reset/request", PasswordResetRequestView.as_view(), name="password_reset_request"
+    ),
+    path(
+        "password-reset/confirm", PasswordResetConfirmView.as_view(), name="password_reset_confirm"
+    ),
 ]

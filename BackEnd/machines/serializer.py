@@ -1,9 +1,52 @@
-import uuid
-from django.utils import timezone
-from rest_framework import serializers
-from .models import Machines
+from collections.abc import Mapping
+from typing import Any
 
-class MachineSerializer(serializers.ModelSerializer):
+from django.http import QueryDict
+from rest_framework import serializers
+
+from machines.enums import MachineStatus
+from machines.models import Machines
+
+
+class MachineInputSerializer(serializers.ModelSerializer[Machines]):
+    """Campos da máquina que o cliente pode gravar."""
+
+    class Meta:
+        model = Machines
+        fields = [
+            "owner",
+            "renagro_number",
+            "brand",
+            "model",
+            "year",
+            "technical_specifications",
+            "usage_purpose",
+            "status",
+        ]
+
+    def to_internal_value(self, data: object) -> dict[str, Any]:
+        """Canoniza o Renagro antes de qualquer validação de campo.
+
+        `renagro_number` é UNIQUE no banco, e sem isto "br1029304899" e
+        "BR1029304899" seriam dois registros distintos para o mesmo maquinário.
+
+        A normalização precisa acontecer aqui, e não em `validate_renagro_number`:
+        o `UniqueValidator` do DRF roda antes dos métodos `validate_<campo>`, e
+        conferir a unicidade do valor cru deixaria passar um duplicado que só
+        estouraria como IntegrityError na hora de gravar — em vez do 400 com o
+        erro no campo que o cliente sabe tratar.
+        """
+        if isinstance(data, QueryDict):
+            data = data.dict()
+        if isinstance(data, Mapping):
+            renagro = data.get("renagro_number")
+            if isinstance(renagro, str):
+                data = {**data, "renagro_number": renagro.strip().upper()}
+        validated: dict[str, Any] = super().to_internal_value(data)
+        return validated
+
+
+class MachineOutputSerializer(serializers.ModelSerializer[Machines]):
     class Meta:
         model = Machines
         fields = [
@@ -19,36 +62,15 @@ class MachineSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = fields
 
-    def to_internal_value(self, data):
-        """Canoniza o Renagro antes de qualquer validação de campo.
 
-        `renagro_number` é UNIQUE no banco, e sem isto "br1029304899" e
-        "BR1029304899" seriam dois registros distintos para o mesmo maquinário.
+class MachineFilterSerializer(serializers.Serializer[Any]):
+    """Query params aceitos na listagem de máquinas."""
 
-        A normalização precisa acontecer aqui, e não em `validate_renagro_number`:
-        o `UniqueValidator` do DRF roda antes dos métodos `validate_<campo>`, e
-        conferir a unicidade do valor cru deixaria passar um duplicado que só
-        estouraria como IntegrityError (500) na hora de gravar — em vez do 400
-        que o cliente sabe tratar.
-        """
-        renagro = data.get("renagro_number")
-        if isinstance(renagro, str):
-            data = {**data.items()} if hasattr(data, "getlist") else {**data}
-            data["renagro_number"] = renagro.strip().upper()
-        return super().to_internal_value(data)
-
-    def create(self, validated_data):
-        now = timezone.now()
-        validated_data.setdefault("status", "active")
-        return Machines.objects.create(
-            id=uuid.uuid4(),
-            created_at=now,
-            updated_at=now,
-            **validated_data,
-        )
-
-    def update(self, instance, validated_data):
-        validated_data["updated_at"] = timezone.now()
-        return super().update(instance, validated_data)
+    owner = serializers.UUIDField(required=False, help_text="ID do proprietário.")
+    status = serializers.ChoiceField(
+        choices=MachineStatus.choices, required=False, help_text="Status da máquina."
+    )
+    brand = serializers.CharField(required=False, help_text="Marca (sem diferenciar maiúsculas).")
+    model = serializers.CharField(required=False, help_text="Modelo (sem diferenciar maiúsculas).")

@@ -10,7 +10,7 @@ import { PasswordField } from "@/shared/components/PasswordField";
 import { useCepLookup } from "@/shared/hooks/useCepLookup";
 import { formatAddress } from "@/shared/http/ViaCepClient";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
-import { BadRequestError } from "@/shared/http/errors";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
 import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 import { getInitials } from "@/shared/utils/getInitials";
 import { maskCEP } from "@/shared/utils/masks/maskCEP";
@@ -128,7 +128,8 @@ export function AccountSection({
       });
       toast.success("Dados atualizados com sucesso.");
     } catch (error) {
-      if (error instanceof BadRequestError) {
+      // 400 (validação) ou 409 (cadastro simultâneo): os dois trazem o campo em conflito.
+      if (error instanceof HttpError) {
         if (error.firstErrorFor("email")) return toast.error("Este e-mail já está em uso.");
         if (error.firstErrorFor("document"))
           return toast.error("Este documento já está cadastrado.");
