@@ -175,18 +175,54 @@ class DocumentUrlOutputSerializer(serializers.Serializer[Any]):
 
 
 class CnhValidationOutputSerializer(serializers.Serializer[Any]):
-    """Resultado devolvido pelo classificador de CNH."""
+    """Resultado do modelo de imagem: reconhece a CNH e, se conseguir, lê os campos (OCR)."""
 
     # O metaclass do DRF remove os campos declarados dos atributos da classe: este
     # campo não sobrescreve o método `is_valid()` em runtime, só na visão do mypy.
     is_valid = serializers.BooleanField(  # type: ignore[assignment]
-        help_text="`true` quando o modelo reconhece o arquivo como uma CNH (score >= 0.5)."
+        help_text=(
+            "`true` quando a rede neural reconhece o arquivo como uma CNH (score >= 0.5) **ou** "
+            "quando o OCR encontra o layout de uma CNH e campos suficientes e válidos."
+        )
     )
     confidence = serializers.ChoiceField(
         choices=[("high", "Alta"), ("medium", "Média"), ("low", "Baixa")],
-        help_text="Faixa de confiança: `high` (>= 0.85), `medium` (>= 0.5) ou `low`.",
+        help_text=(
+            "Faixa de confiança da rede neural: `high` (>= 0.85), `medium` (>= 0.5) ou `low`. "
+            "Fica `medium` quando só o OCR aprovou o documento."
+        ),
     )
-    score = serializers.FloatField(help_text="Probabilidade de o documento ser uma CNH, de 0 a 1.")
+    score = serializers.FloatField(
+        help_text="Probabilidade de o documento ser uma CNH segundo a rede neural, de 0 a 1."
+    )
+    document_type = serializers.ChoiceField(
+        choices=[
+            ("cnh_antiga", "CNH física antiga (aberta)"),
+            ("cnh_digital", "CNH digital (layout numerado)"),
+            ("desconhecido", "Layout não reconhecido pelo OCR"),
+        ],
+        required=False,
+        help_text=(
+            "Layout que o OCR reconheceu. `desconhecido` (CNH física nova, foto ruim, ou não é uma "
+            "CNH) significa que só vale o `is_valid` da rede neural, sem campos."
+        ),
+    )
+    # Mesmo caso do `is_valid`: o metaclass do DRF tira o campo da classe, então ele não sobrescreve
+    # o atributo `Serializer.fields` em runtime, só na visão do mypy.
+    fields = serializers.DictField(  # type: ignore[assignment]
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Campos lidos por OCR e validados (CPF com dígitos verificadores, datas reais, UF, "
+            "categoria...), com as mesmas chaves do `POST /operator-licenses` para o front "
+            "preencher o formulário. Só traz o que foi possível ler; `null` se o OCR não funcionou."
+        ),
+    )
+    uncertain_fields = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Campos de `fields` lidos com pouca certeza (nome, RG): o usuário deve conferi-los.",
+    )
     error = serializers.CharField(
         required=False,
         help_text="Presente apenas quando o classificador falhou ao processar o arquivo.",

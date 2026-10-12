@@ -79,7 +79,7 @@ o log não contém dados pessoais e o modelo vê só features numéricas.
 
 ## Referências
 
-- IBGE, [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html, edição 2025: UF e municípios.
+- IBGE, [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html), edição 2025: UF e municípios.
 - Base dos Dados, [Nomes no Brasil](https://basedosdados.org/dataset/703f9f0d-caee-4b47-b900-46b1dea2c33c?table=3bc00c7a-28e5-421b-b310-b32bed3dd4d4) (IBGE, Censo 2010): frequência de primeiros nomes.
 - [Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset): imagens de documentos do modelo `cnh_image`.
 - Lista completa, com o que foi usado de cada uma: `BackEnd/ml/data/README.md`.
@@ -93,7 +93,8 @@ o log não contém dados pessoais e o modelo vê só features numéricas.
 - **Os números de treino são otimistas**: medem o quanto o modelo aprendeu o gerador. O limiar de 60%
   não foi calibrado com tráfego real. Recomenda-se um período em `shadow` antes do `enforce`.
 - O modelo só julga **plausibilidade**, não autenticidade: um cadastro bem preenchido com dados de
-  outra pessoa passa. Cruzar a foto (OCR) com os dados digitados é um passo futuro.
+  outra pessoa passa. Cruzar a foto com os dados digitados continua sendo um passo futuro (o OCR da
+  [ADR 0003](0003-ocr-da-cnh-no-modelo-de-imagem.md) já lê os campos, mas só para preencher o formulário).
 - O `.joblib` é acoplado à versão do scikit-learn (fixada em `ml/requirements.txt`); atualizá-la
   exige retreinar.
 - O admin ainda pode aprovar uma CNH recusada automaticamente via `/review`. Esse endpoint hoje

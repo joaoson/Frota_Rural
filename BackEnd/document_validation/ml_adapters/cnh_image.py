@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 MODULE_DIR = ML_DIR / "cnh_image"
 CLASSIFY_SCRIPT = MODULE_DIR / "classify.py"
 MODEL_PATH = MODULE_DIR / "models" / "cnh_classifier.keras"
-CLASSIFY_TIMEOUT_SECONDS = 30
+# Rede neural + OCR: ~3 s medidos no desenvolvimento, com folga para uma CPU mais lenta.
+CLASSIFY_TIMEOUT_SECONDS = 60
 
 
 def _failure(message: str) -> dict[str, Any]:

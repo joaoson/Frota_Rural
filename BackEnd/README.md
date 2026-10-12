@@ -161,7 +161,7 @@ Dois modelos independentes, cada um no seu módulo (visão geral e comparação 
 
 | Modelo | O que faz | Documentação |
 |---|---|---|
-| `ml/cnh_image` | Classifica a **imagem** enviada: é uma CNH? (TensorFlow/MobileNetV2). Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
+| `ml/cnh_image` | Classifica a **imagem** enviada (é uma CNH? TensorFlow/MobileNetV2) e lê os campos por **OCR** (RapidOCR), da CNH antiga e da digital, para preencher o formulário. Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
 | `ml/cnh_data` | Avalia os **dados digitados**: parecem reais ou "só para enviar o formulário"? (regras + scikit-learn). Se parecerem falsos, a CNH é gravada como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
 
 Fontes dos dados (IBGE, Base dos Dados e o dataset de imagens): [`ml/data/README.md`](ml/data/README.md#referências-de-onde-vêm-os-dados).
@@ -173,6 +173,8 @@ cd BackEnd
 ./ml/venv/bin/python ml/cnh_image/train.py                                  # precisa das imagens em ml/data/cnh e ml/data/not_cnh
 ./ml/venv/bin/python ml/cnh_data/train.py                                   # lê (ou gera) ml/data/synth/cnh_records.csv
 ./ml/venv/bin/python -m unittest discover -s ml/cnh_data/tests -t ml/cnh_data
+./ml/venv/bin/python -m unittest discover -s ml/cnh_image/tests -t ml/cnh_image
+./ml/venv/bin/python ml/cnh_image/scripts/evaluate_ocr.py                    # mede o OCR no dataset
 ```
 
 ### Variáveis de ambiente do ML

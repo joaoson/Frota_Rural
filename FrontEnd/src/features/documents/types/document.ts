@@ -1,4 +1,4 @@
-import type { ValidationStatus } from "./documentSchemas";
+import type { CnhFormValues, ValidationStatus } from "./documentSchemas";
 
 export class BirthPlace {
   static readonly SEPARATOR = " – ";
@@ -65,11 +65,18 @@ export interface Certification extends ReviewableDocument {
   mediaUrl: string | null;
 }
 
+export type CnhDocumentType = "cnh_antiga" | "cnh_digital" | "desconhecido";
+
 export interface CnhValidationResult {
   isValid: boolean;
   confidence: "high" | "medium" | "low";
   score: number;
   error: string | null;
+  documentType: CnhDocumentType;
+  /** Campos do formulário lidos por OCR (vazio se o OCR não leu nada). */
+  extractedFields: Partial<CnhFormValues>;
+  /** Campos de `extractedFields` lidos com pouca certeza. */
+  uncertainFields: (keyof CnhFormValues)[];
 }
 
 export function isApproved(document: ReviewableDocument): boolean {

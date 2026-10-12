@@ -1,5 +1,5 @@
 import { documentUrl } from "@/features/documents/api/documentUrl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -41,6 +41,13 @@ const CNH_SITUATIONS = [
   { value: "ppd", label: "PPD" },
 ] as const;
 
+const DOCUMENT_TYPE_LABEL = {
+  cnh_antiga: "antiga",
+  cnh_digital: "digital",
+} as const;
+
+const OCR_UNCERTAIN_HINT = "Lido do documento com pouca certeza: confira antes de enviar.";
+
 const UPLOAD_INSTRUCTIONS = [
   "Abra sua CNH e posicione conforme o exemplo ao lado",
   "Não envie fotos de telas ou cópias",
@@ -81,6 +88,12 @@ const CNHUpload = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [validationResult, setValidationResult] = useState<CnhValidationResult | null>(null);
+  const [uncertainFields, setUncertainFields] = useState<ReadonlySet<keyof CnhFormValues>>(
+    new Set(),
+  );
+  // Campos que o último documento preencheu: ao trocar de arquivo voltam ao valor anterior, para
+  // dados de um documento (ex.: naturalidade da CNH digital) não ficarem no cadastro de outro.
+  const filledByDocument = useRef<ReadonlySet<keyof CnhFormValues>>(new Set());
 
   const licensesQuery = useOperatorLicenses({ userId: userId ?? undefined }, Boolean(userId));
   const saveLicense = useSaveLicense();
@@ -108,16 +121,40 @@ const CNHUpload = () => {
     });
   }, [existingLicense, form]);
 
+  const clearDocumentFields = () => {
+    for (const key of filledByDocument.current) form.resetField(key);
+    filledByDocument.current = new Set();
+    setUncertainFields(new Set());
+  };
+
+  // Preenche o formulário com o que o OCR leu (só os campos lidos; o resto fica como está).
+  // Nada é enviado: o usuário confere e edita antes de cadastrar.
+  const fillFromDocument = (result: CnhValidationResult) => {
+    const entries = Object.entries(result.extractedFields) as [
+      keyof CnhFormValues,
+      CnhFormValues[keyof CnhFormValues],
+    ][];
+    for (const [key, value] of entries) {
+      form.setValue(key, value as never, { shouldDirty: true, shouldValidate: true });
+    }
+    filledByDocument.current = new Set(entries.map(([key]) => key));
+    setUncertainFields(new Set(result.uncertainFields));
+  };
+
   const handleFile = (selected: File) => {
     const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (!allowed) return;
 
     setFile(selected);
     setValidationResult(null);
+    clearDocumentFields();
 
     validateCnh
       .mutateAsync(selected)
-      .then(setValidationResult)
+      .then((result) => {
+        setValidationResult(result);
+        fillFromDocument(result);
+      })
       .catch((error: unknown) => {
         setValidationResult({
           isValid: false,
@@ -127,9 +164,14 @@ const CNHUpload = () => {
             error instanceof HttpError
               ? error.message
               : "Erro inesperado ao validar o documento.",
+          documentType: "desconhecido",
+          extractedFields: {},
+          uncertainFields: [],
         });
       });
   };
+
+  const filledCount = Object.keys(validationResult?.extractedFields ?? {}).length;
 
   const onSubmit = form.handleSubmit(async (values) => {
     if (!userId) {
@@ -280,11 +322,17 @@ const CNHUpload = () => {
                       }
                       size={18}
                     />
-                    {validationResult.confidence === "high"
-                      ? "Documento reconhecido como CNH. Prossiga com o preenchimento dos dados."
-                      : validationResult.confidence === "medium"
-                        ? "Documento possivelmente é uma CNH"
-                        : "Documento não reconhecido como CNH, favor seguir as instruções de captura de imagem"}
+                    {validationResult.documentType !== "desconhecido"
+                      ? `CNH ${DOCUMENT_TYPE_LABEL[validationResult.documentType]} reconhecida.${
+                          filledCount > 0
+                            ? ` Preenchemos ${filledCount} ${filledCount === 1 ? "campo" : "campos"} com os dados do documento: confira antes de enviar.`
+                            : " Prossiga com o preenchimento dos dados."
+                        }`
+                      : validationResult.confidence === "high"
+                        ? "Documento reconhecido como CNH. Prossiga com o preenchimento dos dados."
+                        : validationResult.confidence === "medium"
+                          ? "Documento possivelmente é uma CNH"
+                          : "Documento não reconhecido como CNH, favor seguir as instruções de captura de imagem"}
                   </div>
                 ))}
             </FormField>
@@ -338,7 +386,11 @@ const CNHUpload = () => {
                 Dados de Identificação
               </p>
 
-              <FormField label="Nome Completo *" error={errors.name?.message}>
+              <FormField
+                label="Nome Completo *"
+                error={errors.name?.message}
+                hint={uncertainFields.has("name") ? OCR_UNCERTAIN_HINT : undefined}
+              >
                 <input
                   type="text"
                   placeholder="Conforme consta na CNH"
@@ -367,7 +419,11 @@ const CNHUpload = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-5">
-                <FormField label="RG *" error={errors.rg?.message}>
+                <FormField
+                  label="RG *"
+                  error={errors.rg?.message}
+                  hint={uncertainFields.has("rg") ? OCR_UNCERTAIN_HINT : undefined}
+                >
                   <input
                     type="text"
                     placeholder="00.000.000-0"
@@ -443,7 +499,11 @@ const CNHUpload = () => {
                     {...form.register("cnhNumber")}
                   />
                 </FormField>
-                <FormField label="Categoria *" error={errors.category?.message}>
+                <FormField
+                  label="Categoria *"
+                  error={errors.category?.message}
+                  hint={uncertainFields.has("category") ? OCR_UNCERTAIN_HINT : undefined}
+                >
                   <select
                     className={inputClass(Boolean(errors.category))}
                     {...form.register("category")}

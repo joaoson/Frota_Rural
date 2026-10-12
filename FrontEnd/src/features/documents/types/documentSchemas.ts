@@ -71,11 +71,19 @@ export const certificationApiSchema = z.object({
 export type CertificationApi = z.infer<typeof certificationApiSchema>;
 export const certificationListApiSchema = z.array(certificationApiSchema);
 
+export const CNH_DOCUMENT_TYPES = ["cnh_antiga", "cnh_digital", "desconhecido"] as const;
+
 export const cnhValidationApiSchema = z.object({
   is_valid: z.boolean(),
   confidence: z.enum(["high", "medium", "low"]),
   score: z.number(),
   error: z.string().optional(),
+  /** Layout que o OCR reconheceu. `desconhecido` = só vale `is_valid` da rede neural. */
+  document_type: z.enum(CNH_DOCUMENT_TYPES).optional(),
+  /** Campos lidos por OCR, com as chaves do payload de `POST operator-licenses`. */
+  fields: z.record(z.string(), z.union([z.string(), z.boolean()])).nullish(),
+  /** Campos de `fields` lidos com pouca certeza: o usuário deve conferi-los. */
+  uncertain_fields: z.array(z.string()).optional(),
 });
 export type CnhValidationApi = z.infer<typeof cnhValidationApiSchema>;
 

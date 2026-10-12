@@ -11,9 +11,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from rest_framework_simplejwt.tokens import AccessToken
 
-from document_validation.ml_adapters import cnh_data
+from document_validation.ml_adapters import cnh_data, cnh_image
 from document_validation.ml_adapters.cnh_data import CnhDataChecker, DataCheckResult
-from document_validation.ml_adapters.common import ML_PYTHON
+from document_validation.ml_adapters.common import ML_DIR, ML_PYTHON
 from document_validation.models import Certification, OperatorLicense
 from users.models import Users
 
@@ -217,16 +217,48 @@ class DocumentFileTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["message"], "Nenhum arquivo enviado.")
 
-    def test_classification_result_is_returned(self):
-        result = {"is_valid": True, "confidence": "high", "score": 0.97}
+    def validate(self, result):
         with patch("document_validation.services.CnhClassifier.classify", return_value=result):
-            response = self.client.post(
+            return self.client.post(
                 "/api/operator-licenses/validate-document",
                 {"file": SimpleUploadedFile("cnh.jpg", b"x", content_type="image/jpeg")},
             )
 
+    def test_classification_result_is_returned(self):
+        result = {"is_valid": True, "confidence": "high", "score": 0.97}
+
+        response = self.validate(result)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        # Sem OCR (ou com um classificador antigo), os campos novos voltam vazios.
+        self.assertEqual(response.json(), {**result, "fields": None})
+
+    def test_ocr_fields_and_layout_are_returned_for_the_form_to_prefill(self):
+        result = {
+            "is_valid": True,
+            "confidence": "medium",
+            "score": 0.35,
+            "document_type": "cnh_digital",
+            "fields": {"cpf": "52998224725", "birth_place": "CURITIBA – PR", "ear": True},
+            "uncertain_fields": ["name"],
+        }
+
+        response = self.validate(result)
+
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json(), result)
+
+    def test_unknown_layout_has_no_fields(self):
+        result = {
+            "is_valid": True,
+            "confidence": "high",
+            "score": 0.9,
+            "document_type": "desconhecido",
+            "fields": None,
+            "uncertain_fields": [],
+        }
+
+        self.assertEqual(self.validate(result).json(), result)
 
     def test_missing_ml_environment_returns_503(self):
         with patch(
@@ -499,3 +531,48 @@ class OperatorLicenseEndToEndTests(LicenseApiMixin, TestCase):
 
         self.assertEqual(fixed["validation_status"], "pending")
         self.assertIsNone(fixed["review_note"])
+
+
+_DATA = ML_DIR / "data"
+_PHOTOS = sorted((_DATA / "cnh").glob("*_in.jpg"))[:1]
+_DIGITAL_PDF = _DATA / "cnh_digital" / "CNH-e.pdf"
+
+
+@skipUnless(
+    ML_PYTHON.exists() and cnh_image.MODEL_PATH.exists() and (_PHOTOS or _DIGITAL_PDF.exists()),
+    "venv de ML, modelo de imagem ou arquivos de exemplo ausentes (ver ml/README.md)",
+)
+class CnhOcrEndToEndTests(TestCase):
+    """Sem simulação: API → adaptador → subprocess → rede neural + OCR → serializer.
+
+    Só afirma estrutura (layout, chaves, CPF válido), nunca valores: o PDF digital é um
+    documento pessoal real.
+    """
+
+    def post(self, path: Path, content_type: str):
+        upload = SimpleUploadedFile(path.name, path.read_bytes(), content_type=content_type)
+        return self.client.post("/api/operator-licenses/validate-document", {"file": upload})
+
+    @skipUnless(_PHOTOS, "dataset BID ausente")
+    def test_old_cnh_photo_returns_fields_for_the_form(self):
+        response = self.post(_PHOTOS[0], "image/jpeg")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.json()
+        self.assertTrue(body["is_valid"])
+        self.assertEqual(body["document_type"], "cnh_antiga")
+        self.assertEqual(len(body["fields"]["cpf"]), 11)
+        self.assertEqual(len(body["fields"]["cnh_number"]), 11)
+        self.assertTrue(set(body["uncertain_fields"]) <= set(body["fields"]))
+
+    @skipUnless(_DIGITAL_PDF.exists(), "CNH digital ausente")
+    def test_digital_cnh_is_promoted_by_the_ocr_even_if_the_network_rejects_it(self):
+        response = self.post(_DIGITAL_PDF, "application/pdf")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        body = response.json()
+        self.assertTrue(body["is_valid"])
+        self.assertEqual(body["document_type"], "cnh_digital")
+        self.assertLess(body["score"], 0.5)  # a rede só conhece a CNH antiga
+        self.assertEqual(body["confidence"], "medium")
+        self.assertIn("birth_place", body["fields"])  # a digital traz a naturalidade

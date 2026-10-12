@@ -5,7 +5,8 @@ para o que o modelo precisa **em runtime** (e no build do Docker, que copia `Bac
 
 | Subpasta | Conteúdo | Versionada | Quem usa |
 |---|---|---|---|
-| `cnh/` | fotos/scans de CNH | não | `cnh_image/train.py` |
+| `cnh/` | CNH antiga do BID, em trios: `*_in.jpg` (foto), `*_gt_ocr.txt` (texto e caixas, latin-1) e `*_gt_segmentation.jpg` (máscara de texto) | não | `cnh_image/train.py` (só os `_in`), `cnh_image/scripts/` (ground truth do OCR) |
+| `cnh_digital/` | PDF de uma CNH digital de exemplo (**documento pessoal real**: nunca citar valores em testes/docs) | não | testes locais do OCR |
 | `not_cnh/` | imagens que não são CNH | não | `cnh_image/train.py` |
 | `names/` | `first_names.tsv`: primeiros nomes e nº de nascimentos (IBGE) | **sim** | `cnh_data` (treino e inferência) |
 | `cities/` | `cities.json`: UFs e municípios, da DTB do IBGE | **sim** | `cnh_data` (treino e inferência) |
@@ -27,7 +28,7 @@ repositório estão descritos nas seções acima; os brutos ficam em `raw/`, for
 |---|---|---|
 | **IBGE — [Divisão Territorial Brasileira](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/divisao-regional/23701-divisao-territorial-brasileira.html)**, edição 2025 (data base 31/12/2025), relatório *Municípios* (5.571) | **Única fonte de UF e municípios** | `raw/dtb_2025/RELATORIO_DTB_BRASIL_2025_MUNICIPIOS.ods` → `cities/cities.json` |
 | **Base dos Dados — [Nomes no Brasil](https://basedosdados.org/dataset/703f9f0d-caee-4b47-b900-46b1dea2c33c?table=3bc00c7a-28e5-421b-b310-b32bed3dd4d4)** (IBGE, Censo 2010), tabela *Quantidade Município Nome 2010*, ID BigQuery `basedosdados.br_ibge_nomes_brasil.quantidade_municipio_nome_2010` | Primeiros nomes e nº de nascimentos até 31/07/2010 por município (34,62 MB; atualizada na Base dos Dados em 06/10/2022) | `raw/br_ibge_nomes_brasil_quantidade_municipio_nome_2010.csv` → `names/first_names.tsv` |
-| **[Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset)** (GitHub, ricardobnjunior) | Fotos/scans de CNH e de outros documentos brasileiros, para o modelo de imagem | `cnh/` (e `not_cnh/`) |
+| **[Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset)** (GitHub, ricardobnjunior) | Fotos de CNH antiga (documentos fictícios, ~3 fotos de cada, 43% giradas) e o texto de cada uma, para treinar a rede neural e **aprender/medir o OCR** | `cnh/` (e `not_cnh/`) |
 | [Natural Images](https://www.kaggle.com/datasets/prasunroy/natural-images) (Kaggle, prasunroy) | Imagens que **não** são documento, para a classe `not_cnh` | `not_cnh/` |
 
 Não há outra fonte de dados reais. Os cadastros de CNH usados no treino do `cnh_data` são

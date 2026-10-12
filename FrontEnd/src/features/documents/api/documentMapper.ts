@@ -1,4 +1,6 @@
 import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
+import { maskDocument } from "@/shared/utils/masks/maskDocument";
+import { maskRG } from "@/shared/utils/masks/maskRG";
 
 import { BirthPlace, type Certification, type CnhValidationResult, type OperatorLicense } from "../types/document";
 import type {
@@ -58,12 +60,60 @@ export function certificationToDomain(dto: CertificationApi): Certification {
   };
 }
 
+/** Chave do payload da API (campo lido por OCR) → campo do formulário de CNH. */
+const EXTRACTED_FIELD_TO_FORM: Record<string, keyof CnhFormValues> = {
+  name: "name",
+  birth_date: "birthDate",
+  cpf: "cpf",
+  rg: "rg",
+  mother_name: "motherName",
+  father_name: "fatherName",
+  nationality: "nationality",
+  cnh_number: "cnhNumber",
+  category: "category",
+  first_license_date: "firstLicenseDate",
+  issue_date: "issueDate",
+  expiration_date: "expirationDate",
+  issuing_state: "issuingState",
+  issuing_authority: "issuingAuthority",
+  observations: "observations",
+  ear: "ear",
+};
+
+/** Campos lidos por OCR → valores do formulário (CPF e RG com máscara, naturalidade separada). */
+export function extractedToFormValues(
+  fields: Record<string, string | boolean> | null | undefined,
+): Partial<CnhFormValues> {
+  const values: Partial<CnhFormValues> = {};
+  for (const [key, value] of Object.entries(fields ?? {})) {
+    if (key === "birth_place" && typeof value === "string") {
+      const place = BirthPlace.parse(value);
+      values.birthCity = place.city;
+      values.birthState = place.state;
+    } else if (key === "cpf" && typeof value === "string") {
+      values.cpf = maskDocument(value);
+    } else if (key === "rg" && typeof value === "string") {
+      values.rg = maskRG(value);
+    } else if (key === "ear") {
+      values.ear = value === true;
+    } else if (key in EXTRACTED_FIELD_TO_FORM && typeof value === "string") {
+      Object.assign(values, { [EXTRACTED_FIELD_TO_FORM[key]]: value });
+    }
+  }
+  return values;
+}
+
 export function validationToDomain(dto: CnhValidationApi): CnhValidationResult {
   return {
     isValid: dto.is_valid,
     confidence: dto.confidence,
     score: dto.score,
     error: dto.error ?? null,
+    documentType: dto.document_type ?? "desconhecido",
+    extractedFields: extractedToFormValues(dto.fields),
+    uncertainFields: (dto.uncertain_fields ?? []).flatMap((key) =>
+      key in EXTRACTED_FIELD_TO_FORM ? [EXTRACTED_FIELD_TO_FORM[key]] : [],
+    ),
   };
 }
 

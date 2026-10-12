@@ -6,11 +6,11 @@ dados [`data/`](data/README.md).
 
 | | [`cnh_image`](cnh_image/README.md) | [`cnh_data`](cnh_data/README.md) |
 |---|---|---|
-| **Pergunta** | O arquivo enviado é uma CNH? | Os dados digitados parecem de verdade ou "só para enviar o formulário"? |
+| **Pergunta** | O arquivo enviado é uma CNH? E o que está escrito nela (OCR)? | Os dados digitados parecem de verdade ou "só para enviar o formulário"? |
 | **Entrada** | foto/PDF da CNH | JSON com os campos do cadastro (nome, datas, CPF, cidade...) |
-| **Técnica** | CNN (MobileNetV2, TensorFlow) | regras duras + `HistGradientBoosting` calibrado (scikit-learn) |
+| **Técnica** | CNN (MobileNetV2, TensorFlow) + OCR (RapidOCR) com parser por layout | regras duras + `HistGradientBoosting` calibrado (scikit-learn) |
 | **Quando roda** | ao escolher o arquivo no `CNHUpload.tsx` | ao salvar a CNH (`POST`/`PUT`/`PATCH /api/operator-licenses`) |
-| **Efeito** | só avisa o usuário na tela | grava a CNH como `rejected` com o motivo em `review_note` (o envio continua liberado) |
+| **Efeito** | avisa o usuário e **preenche o formulário** com os campos lidos (CNH antiga e digital) | grava a CNH como `rejected` com o motivo em `review_note` (o envio continua liberado) |
 | **Se o modelo falha** | devolve `is_valid: false` + `error` | **nada é recusado**: o erro vira "não suspeito" (fail-open) |
 | **Adaptador Django** | `document_validation/ml_adapters/cnh_image.py` | `document_validation/ml_adapters/cnh_data.py` |
 | **Entrada do processo** | caminho do arquivo no `argv` | JSON no `stdin` (CPF e nomes não aparecem em `ps`) |
@@ -18,8 +18,9 @@ dados [`data/`](data/README.md).
 As fontes dos dados (IBGE, Base dos Dados e o dataset de imagens de documentos) estão em
 [`data/README.md`](data/README.md#referências-de-onde-vêm-os-dados).
 
-Os dois são independentes: um não usa a saída do outro. Cruzar a foto com os dados digitados (OCR)
-é um passo futuro.
+Os dois são independentes: um não usa a saída do outro. O que o OCR do `cnh_image` lê só preenche o
+formulário; depois de editado e enviado, passa pelo `cnh_data` como qualquer dado digitado. Comparar
+a foto com o que foi digitado continua sendo um passo futuro.
 
 ## Estrutura
 
@@ -30,7 +31,10 @@ ml/
 ├── venv/                  (ignorado) Python 3.13
 ├── data/                  dados compartilhados (CSV, JSON...), uma subpasta por conjunto → data/README.md
 ├── cnh_image/             modelo de imagem → cnh_image/README.md
-│   ├── train.py  classify.py  models/
+│   ├── train.py  classify.py  models/        (rede neural + layout_antiga.json do OCR)
+│   ├── lib/                   OCR: leitura, layouts, parsers, validadores
+│   ├── scripts/               aprendem o layout e medem o OCR
+│   └── tests/
 └── cnh_data/              modelo de dados → cnh_data/README.md
     ├── train.py  classify.py  models/        (iguais ao cnh_image)
     ├── scripts/               preparam os dados que o train.py lê (IBGE e CSV sintético)
@@ -66,7 +70,8 @@ código 1 e um JSON `{"error": ...}`.
 
 ```jsonc
 // cnh_image/classify.py <arquivo>
-{"is_valid": true, "confidence": "high", "score": 0.9523}
+{"is_valid": true, "confidence": "high", "score": 0.9523,
+ "document_type": "cnh_antiga", "fields": {"cpf": "..."}, "uncertain_fields": ["name"]}
 
 // cnh_data/classify.py  (registro no stdin)
 {"is_suspicious": true, "score": 1.0,
@@ -79,8 +84,9 @@ código 1 e um JSON `{"error": ...}`.
 # adaptadores e integração no Django (o subprocess é simulado)
 CHANNEL_LAYER_BACKEND=memory DJANGO_DEBUG=true venv/bin/python manage.py test document_validation
 
-# módulo cnh_data (roda no venv de ML, que tem o scikit-learn)
+# módulos de ML (rodam no venv de ML)
 ./ml/venv/bin/python -m unittest discover -s ml/cnh_data/tests -t ml/cnh_data
+./ml/venv/bin/python -m unittest discover -s ml/cnh_image/tests -t ml/cnh_image
 ```
 
 ## Adicionar um novo modelo

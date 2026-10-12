@@ -6,9 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# poppler-utils is required by pdf2image in the document-classification flow.
+# poppler-utils is required by pdf2image (and pdfimages) in the document-classification flow;
+# libgl1 and libglib2.0-0 are required by opencv, which the OCR (rapidocr-onnxruntime) depends on.
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y build-essential libpq-dev poppler-utils \
+    && apt-get install --no-install-recommends -y build-essential libpq-dev poppler-utils libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY BackEnd/docs/requirements.txt /tmp/requirements.txt
