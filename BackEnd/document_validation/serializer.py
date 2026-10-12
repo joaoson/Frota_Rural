@@ -138,6 +138,7 @@ class OperatorLicenseOutputSerializer(serializers.ModelSerializer[OperatorLicens
             "file_url",
             "validation_status",
             "review_note",
+            "auto_rejected",
             "created_at",
             "updated_at",
         ]

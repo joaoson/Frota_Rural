@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -12,8 +13,8 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 
 from users.models import Users
 from common.exceptions import Conflict, ServiceUnavailable
-from document_validation.classifier import CnhClassifier
 from document_validation.enums import ValidationStatus
+from document_validation.ml_adapters import CnhClassifier, CnhDataChecker
 from document_validation.models import Certification, OperatorLicense
 from document_validation.serializer import (
     CertificationInputSerializer,
@@ -22,8 +23,18 @@ from document_validation.serializer import (
     OperatorLicenseInputSerializer,
 )
 
+logger = logging.getLogger(__name__)
+
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 ALLOWED_TYPES = frozenset({"image/jpeg", "image/png", "image/webp", "application/pdf"})
+
+# Campos da CNH enviados ao modelo de plausibilidade (ver ml/cnh_data/README.md).
+SCREENED_FIELDS = (
+    "name", "birth_date", "cpf", "rg", "mother_name", "father_name", "nationality",
+    "birth_place", "cnh_number", "category", "first_license_date", "issue_date",
+    "expiration_date", "issuing_state", "issuing_authority", "situation", "acc", "ear",
+    "medical_restrictions", "observations", "points",
+)  # fmt: skip
 
 
 def _apply_review(document: OperatorLicense | Certification, data: Mapping[str, Any]) -> None:
@@ -33,7 +44,44 @@ def _apply_review(document: OperatorLicense | Certification, data: Mapping[str, 
     document.validation_status = serializer.validated_data["validation_status"]
     document.review_note = serializer.validated_data.get("review_note") or None
     document.updated_at = timezone.now()
-    document.save(update_fields=["validation_status", "review_note", "updated_at"])
+    update_fields = ["validation_status", "review_note", "updated_at"]
+    if isinstance(document, OperatorLicense):
+        # A decisão de uma pessoa substitui a do modelo.
+        document.auto_rejected = False
+        update_fields.append("auto_rejected")
+    document.save(update_fields=update_fields)
+
+
+def _screen_license(license_: OperatorLicense) -> None:
+    """Recusa automaticamente a CNH cujos dados parecem falsos (modelo `cnh_data`).
+
+    O envio nunca é bloqueado: a CNH já foi gravada como `pending` e, se o modelo a
+    considerar suspeita, é regravada como `rejected` com o motivo em `review_note`.
+    Quem reedita a CNH volta para `pending` e é reavaliado (ver `update`).
+
+    `ML_PLAUSIBILITY_MODE`: `off` desliga, `shadow` só registra em log e `enforce` recusa.
+    """
+    mode = settings.ML_PLAUSIBILITY_MODE
+    if mode == "off":
+        return
+
+    record = {name: getattr(license_, name) for name in SCREENED_FIELDS}
+    result = CnhDataChecker.check(record)
+    if not result.is_suspicious:
+        return
+
+    # Sem nome, CPF ou outros dados pessoais no log: só o id e a decisão.
+    logger.info(
+        "CNH %s considerada suspeita (modo=%s, score=%.2f, campos=%s)",
+        license_.id, mode, result.score, result.fields,
+    )  # fmt: skip
+    if mode != "enforce":
+        return
+
+    license_.validation_status = ValidationStatus.REJECTED
+    license_.review_note = result.review_note
+    license_.auto_rejected = True
+    license_.save(update_fields=["validation_status", "review_note", "auto_rejected"])
 
 
 class OperatorLicenseService:
@@ -50,12 +98,12 @@ class OperatorLicenseService:
     @staticmethod
     @transaction.atomic
     def create(data: Mapping[str, Any], *, actor: Users) -> OperatorLicense:
-        """Cadastra a CNH, que sempre entra aguardando a análise."""
+        """Cadastra a CNH, que entra aguardando a análise (ou recusada, se os dados parecerem falsos)."""
         serializer = OperatorLicenseInputSerializer(data=data, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         try:
-            return serializer.save(
+            license_ = serializer.save(
                 id=uuid4(),
                 validation_status=ValidationStatus.PENDING,
                 created_at=now,
@@ -63,24 +111,35 @@ class OperatorLicenseService:
             )
         except IntegrityError as exc:
             raise Conflict("Dados em conflito com um registro existente.") from exc
+        _screen_license(license_)
+        return license_
 
     @staticmethod
     @transaction.atomic
     def update(
         license_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False
     ) -> OperatorLicense:
-        """Qualquer edição invalida a análise anterior: a CNH volta para `pending`."""
+        """Qualquer edição invalida a análise anterior: a CNH volta para `pending`.
+
+        Depois disso os dados são reavaliados pelo modelo de plausibilidade, então uma
+        edição corrigida sai da recusa automática e uma ainda suspeita volta a ela.
+        """
         license_ = OperatorLicenseService.get(license_id, actor=actor)
-        serializer = OperatorLicenseInputSerializer(license_, data=data, partial=partial, context={"actor": actor})
+        serializer = OperatorLicenseInputSerializer(
+            license_, data=data, partial=partial, context={"actor": actor}
+        )
         serializer.is_valid(raise_exception=True)
         try:
-            return serializer.save(
+            license_ = serializer.save(
                 validation_status=ValidationStatus.PENDING,
                 review_note=None,
+                auto_rejected=False,
                 updated_at=timezone.now(),
             )
         except IntegrityError as exc:
             raise Conflict("Dados em conflito com um registro existente.") from exc
+        _screen_license(license_)
+        return license_
 
     @staticmethod
     @transaction.atomic

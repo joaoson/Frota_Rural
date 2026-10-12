@@ -1,3 +1,11 @@
+"""Treino do classificador de imagem de CNH (MobileNetV2, transfer learning).
+
+Lê as imagens de `ml/data/cnh/` e `ml/data/not_cnh/` (pasta de dados compartilhada
+entre os modelos) e salva o melhor modelo em `ml/cnh_image/models/cnh_classifier.keras`.
+
+Uso: ./ml/venv/bin/python ml/cnh_image/train.py
+"""
+
 import os
 import pathlib
 
@@ -13,8 +21,13 @@ EPOCHS = 30
 PATIENCE = 5
 SEED = 42
 
+# O Keras trata toda subpasta de DATA_DIR como uma classe. Como `ml/data/` é
+# compartilhada com outros conjuntos (names, cities, synth...), as classes são fixas.
+# A ordem alfabética é mantida: cnh=0, not_cnh=1.
+CLASS_NAMES = ["cnh", "not_cnh"]
+
 BASE_DIR = pathlib.Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = BASE_DIR.parent / "data"
 MODEL_DIR = BASE_DIR / "models"
 MODEL_PATH = MODEL_DIR / "cnh_classifier.keras"
 
@@ -34,6 +47,7 @@ def main():
         DATA_DIR,
         validation_split=0.2,
         subset="training",
+        class_names=CLASS_NAMES,
         seed=SEED,
         image_size=IMG_SIZE,
         batch_size=BATCH_SIZE,
@@ -44,6 +58,7 @@ def main():
         DATA_DIR,
         validation_split=0.2,
         subset="validation",
+        class_names=CLASS_NAMES,
         seed=SEED,
         image_size=IMG_SIZE,
         batch_size=BATCH_SIZE,

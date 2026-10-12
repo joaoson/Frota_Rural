@@ -40,6 +40,9 @@ class OperatorLicense(models.Model):
         default=ValidationStatus.PENDING,
     )
     review_note = models.TextField(blank=True, null=True)
+    # True quando a recusa veio do modelo de plausibilidade, não de um administrador.
+    # Serve para não tratar a saída do próprio modelo como verdade em um retreino.
+    auto_rejected = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

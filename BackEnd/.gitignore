@@ -221,7 +221,20 @@ __marimo__/
 .idea
 
 # ML Training
+# ml/data/ é compartilhada entre os modelos. Imagens, CSVs brutos e o dataset sintético
+# (regenerável) ficam fora do git. São versionados só os dados pequenos que o modelo de
+# dados precisa: bases do IBGE (names, cities), listas de palavras (lexicon) e os casos de
+# avaliação escritos à mão (eval).
 ml/data/**
+!ml/data/README.md
+!ml/data/names/
+!ml/data/names/**
+!ml/data/cities/
+!ml/data/cities/**
+!ml/data/lexicon/
+!ml/data/lexicon/**
+!ml/data/eval/
+!ml/data/eval/**
 
 # Local image cache
 /media

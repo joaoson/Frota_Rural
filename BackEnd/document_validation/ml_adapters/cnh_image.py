@@ -1,22 +1,21 @@
+"""Adaptador do modelo de imagem de CNH (`ml/cnh_image/`)."""
+
 import json
 import logging
-import os
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
+
+from document_validation.ml_adapters.common import ML_DIR, ML_PYTHON
 
 logger = logging.getLogger(__name__)
 
-ML_DIR = Path(settings.BASE_DIR) / "ml"
-# A imagem Docker fornece este interpretador em /opt/ml-venv; o caminho local
-# continua sendo o padrão para quem executa o projeto sem containers.
-ML_PYTHON = Path(os.getenv("ML_PYTHON", str(ML_DIR / "venv" / "bin" / "python")))
-CLASSIFY_SCRIPT = ML_DIR / "classify.py"
-MODEL_PATH = ML_DIR / "models" / "cnh_classifier.keras"
+MODULE_DIR = ML_DIR / "cnh_image"
+CLASSIFY_SCRIPT = MODULE_DIR / "classify.py"
+MODEL_PATH = MODULE_DIR / "models" / "cnh_classifier.keras"
 CLASSIFY_TIMEOUT_SECONDS = 30
 
 
@@ -28,7 +27,7 @@ class CnhClassifier:
     """Adaptador do classificador de CNH, que roda no interpretador isolado do ML.
 
     O TensorFlow não suporta a versão de Python do Django, então a inferência é
-    feita por `subprocess` em `ml/classify.py`.
+    feita por `subprocess` em `ml/cnh_image/classify.py`.
     """
 
     @staticmethod
@@ -43,7 +42,7 @@ class CnhClassifier:
         if not MODEL_PATH.exists():
             raise FileNotFoundError(
                 f"Modelo não encontrado em {MODEL_PATH}. "
-                "Execute: ./ml/venv/bin/python ml/train_cnh_classifier.py"
+                "Execute: ./ml/venv/bin/python ml/cnh_image/train.py"
             )
 
     @staticmethod
@@ -70,7 +69,7 @@ class CnhClassifier:
                 check=False,
             )
             if result.returncode != 0:
-                logger.error("Erro no classify.py: %s", result.stderr)
+                logger.error("Erro no cnh_image/classify.py: %s", result.stderr)
                 return _failure("Erro ao processar o documento.")
             classification: dict[str, Any] = json.loads(result.stdout)
             return classification

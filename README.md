@@ -239,9 +239,9 @@ Frota_Rural/
 │   ├── users/                # Perfis de locador, locatário e administração
 │   ├── machines/             # Cadastro e gestão de maquinário
 │   ├── postings/             # Anúncios, reservas e contratos
-│   ├── document_validation/  # Integração com o classificador de CNH
+│   ├── document_validation/  # Cadastro de CNH e integração com os modelos de ML
 │   ├── administration/       # Endpoints administrativos
-│   ├── ml/                   # Treino e inferência (TensorFlow) + venv próprio
+│   ├── ml/                   # Modelos de ML (cnh_image, cnh_data), dados e venv próprio
 │   ├── docs/                 # requirements.txt e coleções Postman
 │   └── manage.py
 │

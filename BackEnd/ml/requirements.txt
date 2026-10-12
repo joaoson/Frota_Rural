@@ -1,3 +1,10 @@
+# cnh_image (classificador de imagem)
 tensorflow==2.21.0
 Pillow==12.2.0
 pdf2image==1.17.0
+
+# cnh_data (plausibilidade dos dados). O .joblib é acoplado à versão do scikit-learn:
+# ao atualizá-lo, retreine com `ml/cnh_data/train.py`.
+numpy==2.4.6
+scikit-learn==1.9.1
+joblib==1.6.0

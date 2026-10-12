@@ -1,14 +1,19 @@
 import shutil
+import subprocess
 import tempfile
 import uuid
 from datetime import date
 from pathlib import Path
+from unittest import skipUnless
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from rest_framework_simplejwt.tokens import AccessToken
 
+from document_validation.ml_adapters import cnh_data
+from document_validation.ml_adapters.cnh_data import CnhDataChecker, DataCheckResult
+from document_validation.ml_adapters.common import ML_PYTHON
 from document_validation.models import Certification, OperatorLicense
 from users.models import Users
 
@@ -26,7 +31,11 @@ def make_user(seq=1):
     )
 
 
-class OperatorLicenseTests(TestCase):
+class LicenseApiMixin:
+    """Helpers de chamada à API de CNH, compartilhados pelas classes de teste."""
+
+    client: Client
+
     def setUp(self):
         self.user = make_user()
         self.admin = make_user(99)
@@ -64,6 +73,16 @@ class OperatorLicenseTests(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.admin)}"
         )
 
+    def edit(self, license_id, body):
+        return self.client.patch(
+            f"/api/operator-licenses/{license_id}", body, content_type="application/json"
+        )
+
+
+# O modelo de plausibilidade tem testes próprios (abaixo): aqui fica desligado para que
+# estes testes não dependam do modelo treinado nem do interpretador do ML.
+@override_settings(ML_PLAUSIBILITY_MODE="off")
+class OperatorLicenseTests(LicenseApiMixin, TestCase):
     def test_create_always_starts_pending_even_if_client_says_approved(self):
         response = self.post(self.payload(validation_status="approved", review_note="ok"))
 
@@ -224,3 +243,259 @@ class DocumentFileTests(TestCase):
             response.json(),
             {"code": "service_unavailable", "message": "Modelo não encontrado.", "errors": {}},
         )
+
+
+SUSPICIOUS = DataCheckResult(
+    is_suspicious=True,
+    confidence="high",
+    score=1.0,
+    reasons=["CPF inválido"],
+    fields=["nome", "datas"],
+)
+FINE = DataCheckResult()
+CHECK = "document_validation.services.CnhDataChecker.check"
+EXPECTED_NOTE = (
+    "Os dados informados parecem inconsistentes ou falsos (nome, datas). "
+    "Corrija e reenvie, ou aguarde a análise manual."
+)
+
+
+@override_settings(ML_PLAUSIBILITY_MODE="enforce")
+class OperatorLicenseScreeningTests(LicenseApiMixin, TestCase):
+    """Recusa automática pelo modelo de plausibilidade (o checker é simulado)."""
+
+    def test_suspicious_data_is_saved_but_rejected_with_the_reason(self):
+        with patch(CHECK, return_value=SUSPICIOUS):
+            response = self.post(self.payload())
+
+        self.assertEqual(response.status_code, 201, response.content)
+        body = response.json()
+        self.assertEqual(body["validation_status"], "rejected")
+        self.assertEqual(body["review_note"], EXPECTED_NOTE)
+        self.assertTrue(body["auto_rejected"])
+        self.assertTrue(OperatorLicense.objects.filter(id=body["id"]).exists())
+
+    def test_plausible_data_stays_pending(self):
+        with patch(CHECK, return_value=FINE):
+            body = self.post(self.payload()).json()
+
+        self.assertEqual(body["validation_status"], "pending")
+        self.assertIsNone(body["review_note"])
+        self.assertFalse(body["auto_rejected"])
+
+    def test_checker_failure_never_rejects(self):
+        with patch(CHECK, return_value=DataCheckResult(error="modelo indisponível")):
+            body = self.post(self.payload()).json()
+
+        self.assertEqual(body["validation_status"], "pending")
+
+    def test_the_checker_receives_the_license_fields_but_no_internal_state(self):
+        with patch(CHECK, return_value=FINE) as check:
+            self.post(self.payload(name="Carlos Santos"))
+
+        record = check.call_args.args[0]
+        self.assertEqual(record["name"], "Carlos Santos")
+        self.assertEqual(record["birth_date"], date(1988, 11, 5))
+        self.assertEqual(record["birth_place"], "Curitiba/PR")
+        for internal in ("id", "user", "validation_status", "review_note", "file_url"):
+            self.assertNotIn(internal, record)
+
+    def test_edit_is_screened_again_and_can_leave_the_rejection(self):
+        with patch(CHECK, return_value=SUSPICIOUS):
+            license_id = self.post(self.payload()).json()["id"]
+
+        with patch(CHECK, return_value=FINE):
+            fixed = self.edit(license_id, {"name": "Carlos Eduardo Santos"})
+
+        self.assertEqual(fixed.status_code, 200, fixed.content)
+        self.assertEqual(fixed.json()["validation_status"], "pending")
+        self.assertIsNone(fixed.json()["review_note"])
+        self.assertFalse(fixed.json()["auto_rejected"])
+
+    def test_edit_that_is_still_suspicious_is_rejected_again(self):
+        with patch(CHECK, return_value=FINE):
+            license_id = self.post(self.payload()).json()["id"]
+
+        with patch(CHECK, return_value=SUSPICIOUS):
+            edited = self.edit(license_id, {"name": "asdf"})
+
+        self.assertEqual(edited.json()["validation_status"], "rejected")
+        self.assertEqual(edited.json()["review_note"], EXPECTED_NOTE)
+
+    def test_admin_decision_replaces_the_automatic_rejection(self):
+        with patch(CHECK, return_value=SUSPICIOUS):
+            license_id = self.post(self.payload()).json()["id"]
+
+        approved = self.review(license_id, {"validation_status": "approved", "review_note": "ok"})
+
+        self.assertEqual(approved.json()["validation_status"], "approved")
+        self.assertFalse(approved.json()["auto_rejected"])
+
+    def test_admin_rejection_is_not_marked_as_automatic(self):
+        with patch(CHECK, return_value=FINE):
+            license_id = self.post(self.payload()).json()["id"]
+
+        rejected = self.review(license_id, {"validation_status": "rejected", "review_note": "x"})
+
+        self.assertEqual(rejected.json()["validation_status"], "rejected")
+        self.assertFalse(rejected.json()["auto_rejected"])
+
+    @override_settings(ML_PLAUSIBILITY_MODE="shadow")
+    def test_shadow_mode_only_logs(self):
+        with (
+            patch(CHECK, return_value=SUSPICIOUS),
+            self.assertLogs("document_validation.services", level="INFO") as logs,
+        ):
+            body = self.post(self.payload()).json()
+
+        self.assertEqual(body["validation_status"], "pending")
+        self.assertFalse(body["auto_rejected"])
+        self.assertIn("considerada suspeita", logs.output[0])
+        self.assertNotIn("Carlos", logs.output[0])  # sem dados pessoais no log
+
+    @override_settings(ML_PLAUSIBILITY_MODE="off")
+    def test_off_mode_does_not_call_the_model(self):
+        with patch(CHECK, return_value=SUSPICIOUS) as check:
+            body = self.post(self.payload()).json()
+
+        check.assert_not_called()
+        self.assertEqual(body["validation_status"], "pending")
+
+
+class CnhDataCheckerTests(SimpleTestCase):
+    """Adaptador do modelo de dados: o subprocess é simulado."""
+
+    RECORD = {"name": "Carlos Santos", "cpf": "52998224725", "issue_date": date(2023, 1, 10)}
+
+    def run_check(self, completed=None, **run_kwargs):
+        # MagicMock em ML_PYTHON/MODEL_PATH: `.exists()` é verdadeiro sem tocar no disco.
+        with (
+            patch.object(cnh_data, "ML_PYTHON"),
+            patch.object(cnh_data, "MODEL_PATH"),
+            patch("document_validation.ml_adapters.cnh_data.subprocess.run", **run_kwargs) as run,
+        ):
+            if completed is not None:
+                run.return_value = completed
+            return CnhDataChecker.check(self.RECORD), run
+
+    @staticmethod
+    def completed(stdout="", returncode=0):
+        return subprocess.CompletedProcess([], returncode, stdout=stdout, stderr="")
+
+    def test_parses_the_model_output(self):
+        output = '{"is_suspicious": true, "confidence": "high", "score": 1.0, "reasons": ["a"], "fields": ["nome"]}'
+
+        result, _ = self.run_check(self.completed(output))
+
+        self.assertTrue(result.is_suspicious)
+        self.assertEqual((result.confidence, result.score), ("high", 1.0))
+        self.assertEqual((result.reasons, result.fields), (["a"], ["nome"]))
+        self.assertIsNone(result.error)
+
+    def test_record_goes_through_stdin_not_argv(self):
+        _, run = self.run_check(self.completed('{"is_suspicious": false}'))
+
+        args, kwargs = run.call_args
+        self.assertNotIn("52998224725", " ".join(args[0]))
+        self.assertIn('"cpf": "52998224725"', kwargs["input"])
+        self.assertIn('"issue_date": "2023-01-10"', kwargs["input"])  # date vira ISO
+        self.assertEqual(kwargs["timeout"], cnh_data.CHECK_TIMEOUT_SECONDS)
+
+    def test_technical_failures_fail_open(self):
+        cases = {
+            "processo com erro": self.completed("", returncode=1),
+            "saída inválida": self.completed("não é json"),
+            "erro do modelo": self.completed('{"is_suspicious": false, "error": "sem modelo"}'),
+        }
+        for name, completed in cases.items():
+            with self.subTest(name), self.assertLogs("document_validation.ml_adapters.cnh_data"):
+                result, _ = self.run_check(completed)
+                self.assertFalse(result.is_suspicious)
+                self.assertIsNotNone(result.error)
+
+    def test_timeout_fails_open(self):
+        timeout = subprocess.TimeoutExpired(cmd="x", timeout=10)
+
+        with self.assertLogs("document_validation.ml_adapters.cnh_data"):
+            result, _ = self.run_check(side_effect=timeout)
+
+        self.assertFalse(result.is_suspicious)
+        self.assertEqual(result.error, "tempo limite excedido")
+
+    def test_missing_model_fails_open_without_running_anything(self):
+        with (
+            patch.object(cnh_data, "ML_PYTHON"),
+            patch.object(cnh_data, "MODEL_PATH") as model,
+            patch("document_validation.ml_adapters.cnh_data.subprocess.run") as run,
+            self.assertLogs("document_validation.ml_adapters.cnh_data"),
+        ):
+            model.exists.return_value = False
+            result = CnhDataChecker.check(self.RECORD)
+
+        run.assert_not_called()
+        self.assertFalse(result.is_suspicious)
+
+    def test_review_note_cites_fields_but_not_rules(self):
+        with_fields = DataCheckResult(
+            is_suspicious=True, reasons=["CPF inválido"], fields=["nome", "datas"]
+        )
+        without_fields = DataCheckResult(is_suspicious=True)
+
+        self.assertEqual(with_fields.review_note, EXPECTED_NOTE)
+        self.assertNotIn("CPF", with_fields.review_note)
+        self.assertEqual(
+            without_fields.review_note,
+            "Os dados informados parecem inconsistentes ou falsos. "
+            "Corrija e reenvie, ou aguarde a análise manual.",
+        )
+
+
+@skipUnless(
+    ML_PYTHON.exists() and cnh_data.MODEL_PATH.exists(),
+    "venv de ML ou modelo treinado ausentes (ver ml/README.md)",
+)
+@override_settings(ML_PLAUSIBILITY_MODE="enforce")
+class OperatorLicenseEndToEndTests(LicenseApiMixin, TestCase):
+    """Sem simulação: API → service → subprocess → modelo treinado de verdade."""
+
+    def realistic(self, **overrides):
+        fields = {
+            "name": "Carlos Eduardo Santos",
+            "cpf": "529.982.247-25",
+            "rg": "29.384.756-1",
+            "mother_name": "Maria Aparecida Santos",
+            "father_name": "Antônio Carlos Santos",
+            "nationality": "Brasileiro(a)",
+            "birth_place": "Curitiba – PR",
+            "cnh_number": "48213907563",
+            **overrides,
+        }
+        return self.payload(**fields)
+
+    def test_realistic_data_is_left_for_the_admin(self):
+        body = self.post(self.realistic()).json()
+
+        self.assertEqual(body["validation_status"], "pending")
+        self.assertFalse(body["auto_rejected"])
+
+    def test_junk_data_is_saved_as_rejected_with_the_reason(self):
+        response = self.post(
+            self.realistic(name="Asdfghjkl", mother_name="Teste", cnh_number="11111111111")
+        )
+
+        self.assertEqual(response.status_code, 201, response.content)
+        body = response.json()
+        self.assertEqual(body["validation_status"], "rejected")
+        self.assertTrue(body["auto_rejected"])
+        self.assertIn("parecem inconsistentes ou falsos", body["review_note"])
+        self.assertIn("nome", body["review_note"])
+        self.assertTrue(OperatorLicense.objects.filter(id=body["id"]).exists())
+
+    def test_fixing_the_data_leaves_the_rejection(self):
+        license_id = self.post(self.realistic(name="Asdfghjkl")).json()["id"]
+        self.assertEqual(OperatorLicense.objects.get(id=license_id).validation_status, "rejected")
+
+        fixed = self.edit(license_id, {"name": "Carlos Eduardo Santos"}).json()
+
+        self.assertEqual(fixed["validation_status"], "pending")
+        self.assertIsNone(fixed["review_note"])

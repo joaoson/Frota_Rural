@@ -1,3 +1,12 @@
+"""Inferência do classificador de imagem de CNH.
+
+Chamado pelo Django via subprocess (`document_validation/ml_adapters/cnh_image.py`):
+recebe o caminho de uma imagem ou PDF e imprime uma linha JSON
+`{"is_valid", "confidence", "score"}` (e `"error"` se o modelo não existir).
+
+Uso: ./ml/venv/bin/python ml/cnh_image/classify.py <arquivo>
+"""
+
 import json
 import os
 import pathlib
