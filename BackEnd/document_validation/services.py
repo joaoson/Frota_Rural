@@ -2,6 +2,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from django.conf import settings
@@ -52,28 +53,76 @@ def _apply_review(document: OperatorLicense | Certification, data: Mapping[str, 
     document.save(update_fields=update_fields)
 
 
+def _stored_document(file_url: str | None) -> Path | None:
+    """Arquivo em `MEDIA_ROOT/documents/` a que `file_url` se refere, ou `None`.
+
+    `file_url` vem do cliente: só vale o que o próprio `upload` devolveria (um nome simples
+    dentro de `documents/`), para que ninguém aponte o OCR para outro arquivo do servidor.
+    """
+    if not file_url:
+        return None
+    prefix = f"{settings.MEDIA_URL}documents/"
+    path = urlparse(file_url).path
+    if not path.startswith(prefix):
+        return None
+    name = path.removeprefix(prefix)
+    if not name or name != Path(name).name:
+        return None
+    candidate = Path(settings.MEDIA_ROOT) / "documents" / name
+    return candidate if candidate.is_file() else None
+
+
+def _read_stored_document(license_: OperatorLicense) -> dict[str, Any] | None:
+    """OCR do arquivo salvo da CNH, no formato que o `cnh_data` espera, ou `None`.
+
+    Roda de novo no servidor (o cliente não pode forjar o que foi lido). Qualquer problema
+    (sem arquivo, OCR indisponível, layout não reconhecido) vira `None`: o modelo então
+    avalia só a plausibilidade dos dados. Os valores lidos nunca vão para o log.
+    """
+    path = _stored_document(license_.file_url)
+    if path is None:
+        return None
+    try:
+        reading = CnhClassifier.classify_path(path)
+    except Exception as exc:
+        logger.warning("OCR da CNH %s indisponível (%s).", license_.id, type(exc).__name__)
+        return None
+    fields = reading.get("fields")
+    if "error" in reading or not fields:
+        return None
+    return {"fields": fields, "uncertain_fields": reading.get("uncertain_fields") or []}
+
+
 def _screen_license(license_: OperatorLicense) -> None:
-    """Recusa automaticamente a CNH cujos dados parecem falsos (modelo `cnh_data`).
+    """Avalia a veracidade dos dados da CNH (modelo `cnh_data`) e recusa se forem falsos.
 
-    O envio nunca é bloqueado: a CNH já foi gravada como `pending` e, se o modelo a
-    considerar suspeita, é regravada como `rejected` com o motivo em `review_note`.
-    Quem reedita a CNH volta para `pending` e é reavaliado (ver `update`).
+    O modelo compara o digitado com o que o OCR leu da foto salva e calcula o índice de
+    veracidade (guardado em `veracity_score`). Sem foto ou com pouco OCR, vale só a
+    plausibilidade dos dados. O envio nunca é bloqueado: a CNH já foi gravada como
+    `pending` e, se o modelo a considerar suspeita, é regravada como `rejected` com o
+    motivo em `review_note`. Quem reedita a CNH volta para `pending` e é reavaliado (ver
+    `update`).
 
-    `ML_PLAUSIBILITY_MODE`: `off` desliga, `shadow` só registra em log e `enforce` recusa.
+    `ML_PLAUSIBILITY_MODE`: `off` desliga, `shadow` só calcula o índice e registra em log,
+    e `enforce` também recusa.
     """
     mode = settings.ML_PLAUSIBILITY_MODE
     if mode == "off":
         return
 
     record = {name: getattr(license_, name) for name in SCREENED_FIELDS}
-    result = CnhDataChecker.check(record)
+    result = CnhDataChecker.check(record, _read_stored_document(license_))
+    if result.veracity is not None:
+        license_.veracity_score = result.veracity
+        license_.save(update_fields=["veracity_score"])
     if not result.is_suspicious:
         return
 
     # Sem nome, CPF ou outros dados pessoais no log: só o id, a decisão e os motivos das regras.
     logger.info(
-        "CNH %s considerada suspeita (modo=%s, score=%.2f, campos=%s, motivos=%s)",
-        license_.id, mode, result.score, result.fields, result.reasons,
+        "CNH %s considerada suspeita (modo=%s, score=%.2f, veracidade=%s, base=%s, campos=%s, motivos=%s)",
+        license_.id, mode, result.score, result.veracity, result.basis, result.fields,
+        result.reasons,
     )  # fmt: skip
     if mode != "enforce":
         return
@@ -134,6 +183,7 @@ class OperatorLicenseService:
                 validation_status=ValidationStatus.PENDING,
                 review_note=None,
                 auto_rejected=False,
+                veracity_score=None,
                 updated_at=timezone.now(),
             )
         except IntegrityError as exc:

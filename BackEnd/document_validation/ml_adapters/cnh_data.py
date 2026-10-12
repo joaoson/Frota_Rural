@@ -27,6 +27,11 @@ REVIEW_NOTE = (
     "Os dados informados parecem inconsistentes ou falsos{fields}. "
     "Corrija e reenvie, ou aguarde a análise manual."
 )
+# Quando é a foto da CNH que contradiz o digitado (não a plausibilidade dos dados).
+MISMATCH_NOTE = (
+    "Os dados informados não conferem com o documento enviado{fields}. "
+    "Corrija e reenvie, ou aguarde a análise manual."
+)
 
 
 @dataclass(frozen=True)
@@ -35,11 +40,19 @@ class DataCheckResult:
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
     fields: list[str] = field(default_factory=list)
+    # Índice de veracidade (0-100, maior = mais verdadeiro). `None` se o modelo não avaliou.
+    veracity: int | None = None
+    # "ocr+plausibility" ou "plausibility" (fallback quando o OCR leu pouco).
+    basis: str | None = None
+    # Grupos de campos que a foto contradiz de forma inequívoca (vazio se não foi o caso).
+    mismatch_fields: list[str] = field(default_factory=list)
     error: str | None = None
 
     @property
     def review_note(self) -> str:
         """Texto mostrado ao dono da CNH. Cita os campos, nunca as regras nem o limiar."""
+        if self.mismatch_fields:
+            return MISMATCH_NOTE.format(fields=f" ({', '.join(self.mismatch_fields)})")
         where = f" ({', '.join(self.fields)})" if self.fields else ""
         return REVIEW_NOTE.format(fields=where)
 
@@ -54,8 +67,11 @@ class CnhDataChecker:
     """Roda `ml/cnh_data/classify.py` no interpretador isolado do ML."""
 
     @staticmethod
-    def check(record: Mapping[str, Any]) -> DataCheckResult:
+    def check(record: Mapping[str, Any], ocr: Mapping[str, Any] | None = None) -> DataCheckResult:
         """Avalia o registro da CNH. Nunca levanta exceção (ver docstring do módulo).
+
+        `ocr` é o que o `cnh_image` leu da foto (`fields` e `uncertain_fields`), ou `None`
+        para avaliar só a plausibilidade dos dados digitados.
 
         O registro vai por stdin, não por `argv`, para que CPF e nomes não apareçam
         na lista de processos da máquina.
@@ -69,7 +85,9 @@ class CnhDataChecker:
         try:
             result = subprocess.run(
                 [str(ML_PYTHON), str(CLASSIFY_SCRIPT)],
-                input=json.dumps(record, default=_json_default, ensure_ascii=False),
+                input=json.dumps(
+                    {"record": record, "ocr": ocr}, default=_json_default, ensure_ascii=False
+                ),
                 capture_output=True,
                 text=True,
                 timeout=CHECK_TIMEOUT_SECONDS,
@@ -95,4 +113,7 @@ class CnhDataChecker:
             score=float(payload.get("score", 0.0)),
             reasons=[str(item) for item in payload.get("reasons", [])],
             fields=[str(item) for item in payload.get("fields", [])],
+            veracity=payload.get("veracity"),
+            basis=payload.get("basis"),
+            mismatch_fields=[str(item) for item in payload.get("mismatch_fields", [])],
         )

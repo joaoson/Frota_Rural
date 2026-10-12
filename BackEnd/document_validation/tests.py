@@ -1,3 +1,4 @@
+import json
 import shutil
 import subprocess
 import tempfile
@@ -394,6 +395,179 @@ class OperatorLicenseScreeningTests(LicenseApiMixin, TestCase):
         self.assertEqual(body["validation_status"], "pending")
 
 
+READ = "document_validation.services.CnhClassifier.classify_path"
+OCR_READING = {
+    "is_valid": True,
+    "confidence": "high",
+    "score": 0.99,
+    "document_type": "cnh_antiga",
+    "fields": {"cpf": "52998224725", "birth_date": "1988-11-05"},
+    "uncertain_fields": ["name"],
+}
+MISMATCH = DataCheckResult(
+    is_suspicious=True,
+    score=0.97,
+    fields=["números dos documentos"],
+    veracity=3,
+    basis="ocr+plausibility",
+    mismatch_fields=["números dos documentos"],
+)
+
+
+@override_settings(ML_PLAUSIBILITY_MODE="enforce")
+class OperatorLicenseVeracityTests(LicenseApiMixin, TestCase):
+    """Índice de veracidade: o OCR do arquivo salvo entra na avaliação (checker e OCR simulados)."""
+
+    def setUp(self):
+        super().setUp()
+        self.media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media_root, ignore_errors=True)
+        documents = Path(self.media_root, "documents")
+        documents.mkdir()
+        (documents / "cnh.jpg").write_bytes(b"x")
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root)
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
+
+    def post_with_file(self, file_url="/media/documents/cnh.jpg", **overrides):
+        return self.post(self.payload(file_url=file_url, **overrides))
+
+    def test_the_ocr_of_the_stored_file_is_given_to_the_checker(self):
+        with (
+            patch(READ, return_value=OCR_READING) as read,
+            patch(CHECK, return_value=FINE) as check,
+        ):
+            self.post_with_file()
+
+        self.assertEqual(read.call_args.args[0], Path(self.media_root, "documents", "cnh.jpg"))
+        self.assertEqual(
+            check.call_args.args[1],
+            {"fields": OCR_READING["fields"], "uncertain_fields": ["name"]},
+        )
+
+    def test_a_full_url_for_the_stored_file_is_accepted(self):
+        with patch(READ, return_value=OCR_READING) as read, patch(CHECK, return_value=FINE):
+            self.post_with_file("http://localhost:8000/media/documents/cnh.jpg")
+
+        read.assert_called_once()
+
+    def test_the_veracity_is_stored_and_returned(self):
+        with (
+            patch(READ, return_value=OCR_READING),
+            patch(CHECK, return_value=DataCheckResult(veracity=88)),
+        ):
+            body = self.post_with_file().json()
+
+        self.assertEqual(body["veracity_score"], 88)
+        self.assertEqual(OperatorLicense.objects.get(id=body["id"]).veracity_score, 88)
+        self.assertEqual(body["validation_status"], "pending")
+
+    def test_a_photo_mismatch_rejects_with_the_dedicated_note(self):
+        with patch(READ, return_value=OCR_READING), patch(CHECK, return_value=MISMATCH):
+            body = self.post_with_file().json()
+
+        self.assertEqual(body["validation_status"], "rejected")
+        self.assertTrue(body["auto_rejected"])
+        self.assertEqual(body["veracity_score"], 3)
+        self.assertIn("não conferem com o documento enviado", body["review_note"])
+        self.assertIn("números dos documentos", body["review_note"])
+        self.assertNotIn("0.97", body["review_note"])
+
+    def test_without_a_file_there_is_no_ocr_and_the_checker_falls_back(self):
+        with patch(READ) as read, patch(CHECK, return_value=FINE) as check:
+            self.post(self.payload())
+
+        read.assert_not_called()
+        self.assertIsNone(check.call_args.args[1])
+
+    def test_unreadable_documents_fall_back_to_plausibility(self):
+        cases = {
+            "erro do classificador": {"is_valid": False, "error": "falhou"},
+            "layout não reconhecido": {
+                **OCR_READING,
+                "document_type": "desconhecido",
+                "fields": None,
+            },
+            "sem campos": {**OCR_READING, "fields": {}},
+        }
+        for name, reading in cases.items():
+            with (
+                self.subTest(name),
+                patch(READ, return_value=reading),
+                patch(CHECK, return_value=FINE) as check,
+            ):
+                self.post_with_file(cnh_number=f"{len(name):011d}")
+                self.assertIsNone(check.call_args.args[1])
+
+    def test_an_ocr_crash_never_breaks_the_save(self):
+        with (
+            patch(READ, side_effect=FileNotFoundError("sem venv")),
+            patch(CHECK, return_value=FINE) as check,
+            self.assertLogs("document_validation.services", level="WARNING") as logs,
+        ):
+            response = self.post_with_file()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(check.call_args.args[1])
+        self.assertNotIn("sem venv", logs.output[0])
+
+    def test_file_urls_outside_the_documents_folder_are_never_read(self):
+        Path(self.media_root, "secret.jpg").write_bytes(b"x")
+        urls = [
+            "/media/documents/../secret.jpg",
+            "/media/secret.jpg",
+            "/etc/passwd",
+            "/media/documents/missing.jpg",
+            "/media/documents/",
+            "https://evil.example/other.jpg",
+        ]
+        for url in urls:
+            with self.subTest(url=url), patch(READ) as read, patch(CHECK, return_value=FINE):
+                self.post_with_file(url, cnh_number=f"{len(url):011d}")
+                read.assert_not_called()
+
+    def test_editing_recomputes_the_veracity(self):
+        with (
+            patch(READ, return_value=OCR_READING),
+            patch(CHECK, return_value=DataCheckResult(veracity=90)),
+        ):
+            license_id = self.post_with_file().json()["id"]
+
+        with (
+            patch(READ, return_value=OCR_READING),
+            patch(CHECK, return_value=DataCheckResult(veracity=40)),
+        ):
+            edited = self.edit(license_id, {"name": "Carlos Eduardo Santos"})
+
+        self.assertEqual(edited.json()["veracity_score"], 40)
+
+    def test_editing_with_the_model_unavailable_clears_the_stale_index(self):
+        with patch(CHECK, return_value=DataCheckResult(veracity=90)):
+            license_id = self.post(self.payload()).json()["id"]
+
+        with patch(CHECK, return_value=DataCheckResult(error="modelo indisponível")):
+            edited = self.edit(license_id, {"name": "Carlos Eduardo Santos"})
+
+        self.assertIsNone(edited.json()["veracity_score"])
+
+    @override_settings(ML_PLAUSIBILITY_MODE="shadow")
+    def test_shadow_mode_stores_the_index_but_does_not_reject(self):
+        with patch(READ, return_value=OCR_READING), patch(CHECK, return_value=MISMATCH):
+            body = self.post_with_file().json()
+
+        self.assertEqual(body["validation_status"], "pending")
+        self.assertEqual(body["veracity_score"], 3)
+
+    @override_settings(ML_PLAUSIBILITY_MODE="off")
+    def test_off_mode_runs_neither_the_ocr_nor_the_model(self):
+        with patch(READ) as read, patch(CHECK) as check:
+            body = self.post_with_file().json()
+
+        read.assert_not_called()
+        check.assert_not_called()
+        self.assertIsNone(body["veracity_score"])
+
+
 class CnhDataCheckerTests(SimpleTestCase):
     """Adaptador do modelo de dados: o subprocess é simulado."""
 
@@ -423,6 +597,37 @@ class CnhDataCheckerTests(SimpleTestCase):
         self.assertEqual(result.score, 1.0)
         self.assertEqual((result.reasons, result.fields), (["a"], ["nome"]))
         self.assertIsNone(result.error)
+
+    def test_parses_the_veracity_fields(self):
+        output = (
+            '{"is_suspicious": true, "score": 0.97, "reasons": [], "fields": ["datas"], '
+            '"veracity": 3, "basis": "ocr+plausibility", "mismatch_fields": ["datas"]}'
+        )
+
+        result, _ = self.run_check(self.completed(output))
+
+        self.assertEqual((result.veracity, result.basis), (3, "ocr+plausibility"))
+        self.assertEqual(result.mismatch_fields, ["datas"])
+
+    def test_ocr_goes_through_stdin_next_to_the_record(self):
+        ocr = {"fields": {"cpf": "52998224725"}, "uncertain_fields": ["name"]}
+
+        with (
+            patch.object(cnh_data, "ML_PYTHON"),
+            patch.object(cnh_data, "MODEL_PATH"),
+            patch("document_validation.ml_adapters.cnh_data.subprocess.run") as run,
+        ):
+            run.return_value = self.completed('{"is_suspicious": false}')
+            CnhDataChecker.check(self.RECORD, ocr)
+
+        payload = json.loads(run.call_args.kwargs["input"])
+        self.assertEqual(payload["ocr"], ocr)
+        self.assertEqual(payload["record"]["name"], "Carlos Santos")
+
+    def test_without_ocr_the_envelope_carries_null(self):
+        _, run = self.run_check(self.completed('{"is_suspicious": false}'))
+
+        self.assertIsNone(json.loads(run.call_args.kwargs["input"])["ocr"])
 
     def test_record_goes_through_stdin_not_argv(self):
         _, run = self.run_check(self.completed('{"is_suspicious": false}'))
@@ -478,6 +683,17 @@ class CnhDataCheckerTests(SimpleTestCase):
         self.assertEqual(
             without_fields.review_note,
             "Os dados informados parecem inconsistentes ou falsos. "
+            "Corrija e reenvie, ou aguarde a análise manual.",
+        )
+
+    def test_review_note_for_a_photo_mismatch_names_the_fields_only(self):
+        result = DataCheckResult(
+            is_suspicious=True, fields=["datas"], mismatch_fields=["números dos documentos"]
+        )
+
+        self.assertEqual(
+            result.review_note,
+            "Os dados informados não conferem com o documento enviado (números dos documentos). "
             "Corrija e reenvie, ou aguarde a análise manual.",
         )
 
@@ -576,3 +792,64 @@ class CnhOcrEndToEndTests(TestCase):
         self.assertLess(body["score"], 0.5)  # a rede só conhece a CNH antiga
         self.assertEqual(body["confidence"], "medium")
         self.assertIn("birth_place", body["fields"])  # a digital traz a naturalidade
+
+
+@skipUnless(
+    ML_PYTHON.exists()
+    and cnh_image.MODEL_PATH.exists()
+    and cnh_data.MODEL_PATH.exists()
+    and _PHOTOS,
+    "venv de ML, modelos ou dataset BID ausentes (ver ml/README.md)",
+)
+@override_settings(ML_PLAUSIBILITY_MODE="enforce")
+class OperatorLicensePhotoConsistencyEndToEndTests(LicenseApiMixin, TestCase):
+    """Sem simulação: foto salva → OCR → `cnh_data` → CNH recusada ou não.
+
+    Os documentos do dataset BID são fictícios, e as datas deles são aleatórias (as regras
+    de datas disparariam), então aqui só se afirma o que a foto muda: o motivo da recusa.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media_root, ignore_errors=True)
+        settings_override = override_settings(MEDIA_ROOT=self.media_root)
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+
+    def upload_and_read(self):
+        """Sobe uma foto do BID e devolve (file_url, campos lidos pelo OCR)."""
+        photo = _PHOTOS[0]
+        content = SimpleUploadedFile(photo.name, photo.read_bytes(), content_type="image/jpeg")
+        read = self.client.post("/api/operator-licenses/validate-document", {"file": content})
+        fields = read.json()["fields"] or {}
+        content = SimpleUploadedFile(photo.name, photo.read_bytes(), content_type="image/jpeg")
+        url = self.client.post("/api/documents/upload", {"file": content}).json()["url"]
+        return url, fields
+
+    def form_from(self, fields, **overrides):
+        keys = (
+            "cpf", "cnh_number", "birth_date", "issue_date", "expiration_date",
+            "first_license_date", "issuing_state",
+        )  # fmt: skip
+        return {**{key: fields[key] for key in keys if key in fields}, **overrides}
+
+    def test_data_that_match_the_photo_are_not_refused_for_inconsistency(self):
+        url, fields = self.upload_and_read()
+        self.assertIn("cpf", fields, "o OCR deveria ler o CPF da primeira foto do dataset")
+
+        body = self.post(self.payload(file_url=url, **self.form_from(fields))).json()
+
+        self.assertNotIn("não conferem", body["review_note"] or "")
+        self.assertIsInstance(body["veracity_score"], int)
+
+    def test_a_cpf_that_contradicts_the_photo_is_refused_with_the_dedicated_note(self):
+        url, fields = self.upload_and_read()
+        other_cpf = "52998224725" if fields["cpf"] != "52998224725" else "11144477735"
+
+        body = self.post(self.payload(file_url=url, **self.form_from(fields, cpf=other_cpf))).json()
+
+        self.assertEqual(body["validation_status"], "rejected")
+        self.assertTrue(body["auto_rejected"])
+        self.assertIn("não conferem com o documento enviado", body["review_note"])
+        self.assertLessEqual(body["veracity_score"], 5)

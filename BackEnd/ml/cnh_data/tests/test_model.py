@@ -146,3 +146,49 @@ class AssessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def ocr_of(record):
+    """O OCR de uma foto que mostra exatamente `record` (só os campos fortes)."""
+    keys = ("cpf", "cnh_number", "birth_date", "issue_date", "expiration_date")
+    return {"fields": {key: record[key] for key in keys}, "uncertain_fields": []}
+
+
+class AssessWithOcrTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        AssessTests.setUpClass.__func__(cls)
+
+    def test_no_ocr_changes_nothing_and_reports_the_fallback(self):
+        result = assess(WORD_JUNK, self.model, THRESHOLD, TODAY)
+
+        self.assertEqual(result["basis"], "plausibility")
+        self.assertEqual(result["veracity"], round(100 * (1 - result["score"])))
+        self.assertEqual(set(result["consistency"].values()), {"absent"})
+        self.assertEqual(result["mismatch_fields"], [])
+
+    def test_ocr_that_confirms_the_data_vouches_for_a_borderline_record(self):
+        result = assess(WORD_JUNK, self.model, THRESHOLD, TODAY, ocr=ocr_of(WORD_JUNK))
+
+        self.assertFalse(result["is_suspicious"], result)
+        self.assertEqual(result["basis"], "ocr+plausibility")
+        self.assertGreaterEqual(result["veracity"], 100 - round(100 * THRESHOLD))
+
+    def test_ocr_cannot_vouch_for_a_record_that_breaks_a_hard_rule(self):
+        record = {**PLAUSIBLE, "name": "Teste Teste"}
+
+        result = assess(record, self.model, THRESHOLD, TODAY, ocr=ocr_of(record))
+
+        self.assertTrue(result["is_suspicious"])
+        self.assertEqual(result["veracity"], 0)
+
+    def test_contradicting_ocr_refuses_a_plausible_record(self):
+        ocr = ocr_of(PLAUSIBLE)
+        ocr["fields"]["cpf"] = "11144477735"
+
+        result = assess(PLAUSIBLE, self.model, THRESHOLD, TODAY, ocr=ocr)
+
+        self.assertTrue(result["is_suspicious"])
+        self.assertEqual(result["mismatch_fields"], ["números dos documentos"])
+        self.assertEqual(result["fields"], ["números dos documentos"])
+        self.assertEqual(result["reasons"], [])  # nenhuma regra: foi a consistência

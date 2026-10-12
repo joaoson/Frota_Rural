@@ -48,13 +48,7 @@ class CnhClassifier:
 
     @staticmethod
     def classify(file: UploadedFile) -> dict[str, Any]:
-        """Grava o upload em arquivo temporário e devolve o JSON do classificador.
-
-        Falhas do próprio motor (processo com erro, timeout, saída inválida) não
-        levantam: voltam como documento recusado com o campo `error`.
-        """
-        CnhClassifier.check_setup()
-
+        """Grava o upload em arquivo temporário e devolve o JSON do classificador."""
         suffix = ".pdf" if file.content_type == "application/pdf" else ".jpg"
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             for chunk in file.chunks():
@@ -62,8 +56,22 @@ class CnhClassifier:
             tmp_path = Path(tmp.name)
 
         try:
+            return CnhClassifier.classify_path(tmp_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def classify_path(path: Path) -> dict[str, Any]:
+        """Roda o classificador (rede neural + OCR) em um arquivo que já está no disco.
+
+        Falhas do próprio motor (processo com erro, timeout, saída inválida) não
+        levantam: voltam como documento recusado com o campo `error`.
+        """
+        CnhClassifier.check_setup()
+
+        try:
             result = subprocess.run(
-                [str(ML_PYTHON), str(CLASSIFY_SCRIPT), str(tmp_path)],
+                [str(ML_PYTHON), str(CLASSIFY_SCRIPT), str(path)],
                 capture_output=True,
                 text=True,
                 timeout=CLASSIFY_TIMEOUT_SECONDS,
@@ -79,5 +87,3 @@ class CnhClassifier:
         except (json.JSONDecodeError, OSError) as exc:
             logger.error("Erro ao decodificar resultado: %s", exc)
             return _failure("Erro ao processar o documento.")
-        finally:
-            tmp_path.unlink(missing_ok=True)

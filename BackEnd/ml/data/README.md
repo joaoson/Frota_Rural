@@ -12,6 +12,7 @@ para o que o modelo precisa **em runtime** (e no build do Docker, que copia `Bac
 | `cities/` | `cities.json`: UFs e municípios, da DTB do IBGE | **sim** | `cnh_data` (treino e inferência) |
 | `lexicon/` | `lexicon.csv`: listas de palavras escritas à mão (sobrenomes, palavras comuns, "teste"...) | **sim** | `cnh_data/lib/synthetic.py` |
 | `eval/` | `adversarial_cases.json`: 37 casos escritos à mão para avaliar o modelo | **sim** | `cnh_data/train.py` |
+| `eval/` | `ocr_readings.jsonl`: OCR das fotos de validação do BID + verdade, para calibrar o índice de veracidade (gerado por `cnh_image/scripts/export_readings.py`) | não (regenerável) | `cnh_data/scripts/evaluate_veracity.py` |
 | `synth/` | `cnh_records.csv`: o **dataset sintético** (24.000 plausíveis + 20.000 falsos, ~10 MB) | não (regenerável) | `cnh_data/train.py` |
 | `raw/` | fontes brutas do IBGE: CSV de nomes e relatórios `.ods` da DTB (~36 MB) | não | `cnh_data/scripts/build_reference_data.py` |
 

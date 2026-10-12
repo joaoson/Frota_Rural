@@ -14,7 +14,10 @@ from tests.test_rules import PLAUSIBLE
 
 SCRIPT = Path(classify.__file__)
 HAS_MODEL = classify.MODEL_PATH.exists()
-CONTRACT_KEYS = {"is_suspicious", "score", "reasons", "fields"}
+CONTRACT_KEYS = {
+    "is_suspicious", "score", "reasons", "fields", "veracity", "basis", "consistency",
+    "mismatch_fields",
+}  # fmt: skip
 
 
 def run_cli(stdin: str, **env) -> subprocess.CompletedProcess:
@@ -56,7 +59,14 @@ class ClassifyFunctionTests(unittest.TestCase):
 
 class ClassifyCliTests(unittest.TestCase):
     def test_invalid_stdin_is_a_usage_error(self):
-        for stdin in ("", "não é json", "[1, 2]"):
+        for stdin in (
+            "",
+            "não é json",
+            "[1, 2]",
+            json.dumps(PLAUSIBLE),
+            '{"record": 1}',
+            '{"record": {}, "ocr": 5}',
+        ):
             with self.subTest(stdin=stdin):
                 completed = run_cli(stdin)
                 self.assertEqual(completed.returncode, 1)
@@ -64,7 +74,7 @@ class ClassifyCliTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_MODEL, "modelo treinado não encontrado (rode train.py)")
     def test_plausible_record_with_the_real_model(self):
-        completed = run_cli(json.dumps(PLAUSIBLE))
+        completed = run_cli(json.dumps({"record": PLAUSIBLE}))
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         result = json.loads(completed.stdout)
@@ -80,17 +90,30 @@ class ClassifyCliTests(unittest.TestCase):
             "cnh_number": "11111111111",
         }
 
-        result = json.loads(run_cli(json.dumps(junk)).stdout)
+        result = json.loads(run_cli(json.dumps({"record": junk})).stdout)
 
         self.assertTrue(result["is_suspicious"])
         self.assertEqual(result["score"], 1.0)
         self.assertTrue(result["reasons"] and result["fields"])
 
     @unittest.skipUnless(HAS_MODEL, "modelo treinado não encontrado (rode train.py)")
+    def test_ocr_that_contradicts_the_record_refuses_it(self):
+        ocr = {"fields": {"cpf": "11144477735", "birth_date": "1985-06-14"}, "uncertain_fields": []}
+
+        result = json.loads(run_cli(json.dumps({"record": PLAUSIBLE, "ocr": ocr})).stdout)
+
+        self.assertTrue(result["is_suspicious"], result)
+        self.assertEqual(result["consistency"]["cpf"], "mismatch")
+        self.assertEqual(result["consistency"]["birth_date"], "match")
+        self.assertEqual(result["basis"], "ocr+plausibility")
+        self.assertIn("números dos documentos", result["mismatch_fields"])
+        self.assertLess(result["veracity"], 10)
+
+    @unittest.skipUnless(HAS_MODEL, "modelo treinado não encontrado (rode train.py)")
     def test_accepts_non_ascii_json_and_returns_utf8(self):
         record = {**PLAUSIBLE, "name": "Wanderléia Müller", "mother_name": "Eurídice Müller"}
 
-        completed = run_cli(json.dumps(record, ensure_ascii=False))
+        completed = run_cli(json.dumps({"record": record}, ensure_ascii=False))
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
 

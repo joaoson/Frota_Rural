@@ -241,6 +241,7 @@ ml/data/**
 !ml/data/lexicon/**
 !ml/data/eval/
 !ml/data/eval/**
+ml/data/eval/ocr_readings.jsonl
 
 # Local image cache
 /media

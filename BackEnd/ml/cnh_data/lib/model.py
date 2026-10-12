@@ -11,7 +11,8 @@ Pipeline:
 
 O classificador só reconhece o tipo de lixo que viu no treino: restrições de monotonicidade
 foram testadas e não melhoraram a generalização (e dobraram os falsos positivos). O que
-cobre lixo inédito são as regras duras (`rules.py`) e a nota de anomalia. `assess()`, no fim deste arquivo, junta os dois.
+cobre lixo inédito são as regras duras (`rules.py`) e a nota de anomalia. `assess()`, no fim deste
+arquivo, junta regras, classificador e (quando há foto) a consistência com o OCR (`veracity.py`).
 
 Para explicar a recusa, `explain` neutraliza um grupo de features por vez (nome, datas,
 local...) trocando-o pela mediana dos registros plausíveis e mede quanto a nota cai.
@@ -27,9 +28,11 @@ import sklearn
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import HistGradientBoostingClassifier, IsolationForest
 
+from lib.consistency import compare
 from lib.features import FEATURE_GROUPS, FEATURE_NAMES, feature_vector
 from lib.record import GROUP_LABELS
 from lib.rules import evaluate_rules
+from lib.veracity import BASIS_OCR, combine
 
 SEED = 42
 ISOLATION_SHARE = 0.4  # fatia dos positivos reservada ao IsolationForest (fora do classificador)
@@ -170,7 +173,7 @@ class PlausibilityModel:
         )
 
 
-# --- Decisão final: regras duras + classificador ---------------------------------------
+# --- Decisão final: regras duras + classificador + consistência com o OCR -------------
 
 THRESHOLD = 0.60  # política agressiva: recusa a partir de 60% de chance de ser falso
 
@@ -180,33 +183,44 @@ def assess(
     model: PlausibilityModel,
     threshold: float = THRESHOLD,
     today: date | None = None,
+    ocr: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resultado no mesmo formato de `classify.py`.
 
-    `score` é a probabilidade de dado falso do modelo, ou 1.0 se alguma regra dura
-    disparou. `fields` são os grupos de campos que motivaram a suspeita.
+    `ocr` é o que o `cnh_image` leu da foto (`fields` e `uncertain_fields`), ou `None`.
+    `score` é a nota de "dado falso" já combinada (1.0 se alguma regra dura disparou) e
+    `veracity` é o índice de 0 a 100 (`veracity.py`). `fields` são os grupos de campos que
+    motivaram a suspeita; `mismatch_fields`, os que o OCR contradisse de forma inequívoca.
     """
     hits = evaluate_rules(record, today)
     row = np.asarray([feature_vector(record)], dtype=float)
-    model_score = float(model.score_matrix(row)[0])
+    model_fake = float(model.score_matrix(row)[0])
     model_flags = bool(model.flags(row, threshold)[0])
-    if model_score >= threshold and not model_flags:
+    if model_fake >= threshold and not model_flags:
         # Só o local de nascimento puxava a nota: ele sozinho não recusa (ver PLACE_ALONE_FLOOR).
-        model_score = float(model.score_without_place(row)[0])
-    suspicious = bool(hits) or model_flags
+        model_fake = float(model.score_without_place(row)[0])
+
+    consistency = compare(record, ocr)
+    verdict = combine(model_fake, consistency, threshold, rule_hit=bool(hits))
 
     groups: list[str] = []
     for hit in hits:
         if hit.group not in groups:
             groups.append(hit.group)
-    if model_flags:
-        groups += [group for group in model.explain(record) if group not in groups]
-
-    score = 1.0 if hits else model_score
+    if verdict.is_suspicious:
+        if verdict.basis == BASIS_OCR:
+            groups += [group for group in consistency.groups if group not in groups]
+        if model_flags:
+            groups += [group for group in model.explain(record) if group not in groups]
+    mismatch_groups = consistency.groups if verdict.hard_mismatch else []
 
     return {
-        "is_suspicious": suspicious,
-        "score": round(score, 4),
+        "is_suspicious": verdict.is_suspicious,
+        "score": verdict.fake_score,
         "reasons": [hit.message for hit in hits],
-        "fields": [GROUP_LABELS[group] for group in groups] if suspicious else [],
+        "fields": [GROUP_LABELS[group] for group in groups],
+        "veracity": verdict.veracity,
+        "basis": verdict.basis,
+        "consistency": consistency.status,
+        "mismatch_fields": [GROUP_LABELS[group] for group in mismatch_groups],
     }

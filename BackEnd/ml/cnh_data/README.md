@@ -1,13 +1,25 @@
-# cnh_data — os dados digitados na CNH parecem de verdade?
+# cnh_data — os dados digitados na CNH são verdadeiros?
 
-Modelo que avalia os **dados do formulário** de cadastro de CNH (`CNHUpload.tsx`) e decide se
-parecem reais ou preenchidos "só para enviar". Roda ao salvar a CNH; se os dados parecerem
-falsos, o cadastro **continua liberado**, mas já é gravado como `rejected` com o motivo em
-`review_note`. Decisão registrada em
-[`Documentation/adr/0002`](../../../Documentation/adr/0002-validacao-de-plausibilidade-dos-dados-da-cnh.md).
+Modelo que avalia os **dados do formulário** de cadastro de CNH (`CNHUpload.tsx`) e calcula um
+**índice de veracidade** (0 a 100). Roda ao salvar a CNH; se os dados parecerem falsos, o cadastro
+**continua liberado**, mas já é gravado como `rejected` com o motivo em `review_note`. O índice é
+guardado em `OperatorLicense.veracity_score`.
 
-É independente do modelo que olha a foto ([`cnh_image`](../cnh_image/README.md)); a comparação
-dos dois está em [`../README.md`](../README.md).
+O índice junta duas fontes de evidência:
+
+1. **Consistência com a foto**: o servidor roda o OCR do `cnh_image` no arquivo salvo e compara os
+   campos que ele leu com confiança (CPF, nº de registro, datas...) com o que foi digitado.
+2. **Plausibilidade dos dados** (o fallback): regras duras e um classificador de ML, que valem
+   sozinhos quando o OCR leu pouco ou nada (nomes contra a base do IBGE, coerência de nascimento,
+   emissão e validade...).
+
+Decisões registradas nas ADRs
+[0002](../../../Documentation/adr/0002-validacao-de-plausibilidade-dos-dados-da-cnh.md) (plausibilidade)
+e [0004](../../../Documentation/adr/0004-indice-de-veracidade-dados-x-ocr.md) (cruzamento com o OCR).
+
+O código continua independente do modelo que olha a foto ([`cnh_image`](../cnh_image/README.md)):
+este modelo só **recebe** o resultado do OCR como dado (o Django faz a ponte); a comparação dos dois
+está em [`../README.md`](../README.md).
 
 ## Fluxo
 
@@ -19,17 +31,30 @@ OperatorLicenseService.create/update      grava a CNH como pending (update zera 
         │
         ▼
 _screen_license()                         ML_PLAUSIBILITY_MODE: off | shadow | enforce
-        │  JSON no stdin
+        │
+        ├─ file_url aponta para um arquivo salvo em MEDIA_ROOT/documents?
+        │     sim ─► ml/cnh_image/classify.py lê a foto (OCR) ─► campos + uncertain_fields
+        │     não / OCR falhou / layout não reconhecido ─► ocr = null (só plausibilidade)
+        │
+        │  {"record": {...}, "ocr": {...} | null}  no stdin
         ▼
-ml/cnh_data/classify.py                   regras duras  +  classificador de ML
-        │  {"is_suspicious", "score", "reasons", "fields"}
+ml/cnh_data/classify.py                   consistência com o OCR + regras duras + classificador de ML
+        │  {"is_suspicious", "score", "veracity", "basis", "consistency",
+        │   "mismatch_fields", "reasons", "fields"}
         ▼
-suspeita e modo enforce?  ── sim ──►  validation_status = rejected
-                                       review_note = "Os dados informados parecem inconsistentes
-                                                      ou falsos (nome, datas). Corrija e reenvie,
-                                                      ou aguarde a análise manual."
-                                       auto_rejected = true
+OperatorLicense.veracity_score = veracity (shadow e enforce)
+        │
+suspeita e modo enforce?  ── sim ──►  validation_status = rejected, auto_rejected = true
+                                       review_note =
+                                         "Os dados informados não conferem com o documento enviado
+                                          (números dos documentos). Corrija e reenvie, ..."   ← foto contradiz
+                                         ou "... parecem inconsistentes ou falsos (nome, datas). ..."
 ```
+
+O servidor roda o OCR de novo no arquivo salvo, em vez de confiar no que o front leu, para que o
+cliente não possa mandar um OCR inventado que bata com dados falsos. `file_url` vem do cliente:
+só vale um nome simples dentro de `MEDIA_ROOT/documents/` (qualquer outro caminho é ignorado).
+O OCR roda a cada salvamento e edição (+~3 s).
 
 A edição (`PUT`/`PATCH`) volta a CNH para `pending` e **reavalia**: corrigir os dados tira a
 recusa, e uma edição ainda suspeita volta a ser recusada. Uma decisão de administrador
@@ -45,12 +70,15 @@ cnh_data/
 │
 ├── scripts/                      preparam os DADOS que o train.py lê (rodam antes, uma vez)
 │   ├── build_reference_data.py       CSVs do IBGE (data/raw)  →  data/names + data/cities
-│   └── generate_synthetic_data.py    IBGE + data/lexicon      →  data/synth/cnh_records.csv
+│   ├── generate_synthetic_data.py    IBGE + data/lexicon      →  data/synth/cnh_records.csv
+│   └── evaluate_veracity.py          calibra o índice contra leituras reais do OCR (não gera modelo)
 │
 ├── lib/                          código de apoio, importado pelos scripts (não roda sozinho)
 │   ├── rules.py       camada 1: regras duras
 │   ├── features.py    registro → vetor de números (camada 2)
-│   ├── model.py       PlausibilityModel (ML) e assess() (regras + ML = decisão final)
+│   ├── consistency.py  camada 3: digitado × OCR da foto, campo a campo (sem ML)
+│   ├── veracity.py    junta plausibilidade e consistência no índice de veracidade
+│   ├── model.py       PlausibilityModel (ML) e assess() (regras + ML + consistência = decisão final)
 │   ├── reference.py   consulta às bases do IBGE (nome, cidade)
 │   ├── record.py      utilitários do registro: datas, CPF, birth_place, padrões de dígitos/teclado
 │   └── synthetic.py   gerador dos registros plausíveis/falsos e leitura/escrita do CSV
@@ -68,6 +96,7 @@ bases do IBGE (e os links das fontes) está em
 | `data/lexicon/lexicon.csv` | listas de palavras escritas à mão que o gerador usa (sobrenomes, palavras comuns, "teste"...) |
 | `data/synth/cnh_records.csv` | **o dataset sintético** que o `train.py` lê (gerado, fora do git) |
 | `data/eval/adversarial_cases.json` | 37 casos escritos à mão para avaliar |
+| `data/eval/ocr_readings.jsonl` | leituras do OCR das fotos de validação do BID + verdade, para `evaluate_veracity.py` (gerado por `cnh_image/scripts/export_readings.py`, fora do git) |
 | `data/raw` | CSVs brutos do IBGE (fora do git) |
 
 **Ordem das coisas** (só o `train.py` é necessário no dia a dia; ele gera o CSV sozinho se faltar):
@@ -150,34 +179,116 @@ só ~120 features numéricas em 8 grupos (o grupo explica a recusa):
   (`nome`, `nome da mãe`, `datas`...), em português, usado na `review_note`. A mensagem cita
   campos, **nunca as regras nem o limiar**.
 
+## Camada 3 — consistência com a foto e índice de veracidade (`consistency.py`, `veracity.py`)
+
+Sem ML: igualdades e uma similaridade de texto. Cada campo que o OCR devolveu é comparado com o
+digitado, e o resultado é `match`, `mismatch` ou `absent` (campo que o OCR não leu, ou que o
+formulário deixou vazio, **nunca** conta como divergência). Cada campo tem um **peso** que reflete a
+precisão medida do OCR (veja `cnh_image/README.md`):
+
+| Peso | Campos | Como compara |
+|---|---|---|
+| 1,0 (fortes) | `cpf`, `cnh_number`, `birth_date`, `first_license_date`, `issue_date`, `expiration_date` | igualdade (dígitos / data ISO); o OCR acerta 99–100% |
+| 0,5 | `issuing_state`, e `category`, `rg`, `name` **só se o OCR não os marcou como incertos** | igualdade; nome por similaridade ≥ 0,85 (tolera uma letra errada e acento) |
+| 0,25 | `mother_name`, `father_name`, `birth_place` | filiação vale se bater com a mãe **ou** o pai digitados (a ordem do OCR é heurística); local compara UF e similaridade da cidade |
+
+`evidência` é a soma dos pesos dos campos comparados e `concordância`, a fração ponderada que
+bate. O índice combina com a plausibilidade (`P(falso)` do modelo, já com a regra do local de
+nascimento):
+
+```
+w      = min(1, evidência / 3)          (0 se evidência < 1: o OCR é ignorado)
+falso  = w · (1 − concordância) + (1 − w) · P(falso)
+veracity = round(100 · (1 − falso))
+```
+
+Com pouco ou nenhum OCR, `w = 0` e o índice é exatamente a plausibilidade: **o fallback é o próprio
+modelo de antes**, sem caminho de código separado (`basis = "plausibility"`; com OCR,
+`"ocr+plausibility"`). Com vários campos fortes batendo, o OCR "avaliza" o registro e a suspeita do
+modelo (nome raro, cidade fora da lista...) pesa pouco.
+
+**Recusa** (`is_suspicious`) quando, nesta ordem:
+
+1. uma **regra dura** dispara: o OCR bater não adianta (CPF inválido, datas impossíveis...);
+2. há **divergência dura** com o OCR (o CPF diverge, ou duas divergências em campos fortes), mesmo
+   que o modelo goste dos dados: o OCR é 99–100% preciso nesses campos, então não é erro de leitura.
+   A nota fica em, no mínimo, 0,95;
+3. a nota combinada chega ao limiar (`ML_PLAUSIBILITY_THRESHOLD`, 0,60).
+
+Uma divergência isolada em um campo forte (um dia de emissão trocado) **não** recusa sozinha. Quando é
+a foto que contradiz o digitado, a mensagem ao dono é "não conferem com o documento enviado (campos)",
+sem valores nem pesos.
+
+**O que isto não prova**: consistência não é autenticidade. Quem sobe a foto de uma CNH alheia e
+digita os dados dessa mesma foto passa. O cruzamento pega dados digitados que **não** correspondem
+ao documento enviado, e quem aceita o preenchimento automático do front bate por construção.
+
+### Calibração (`scripts/evaluate_veracity.py`)
+
+Simula cadastros contra as leituras reais do OCR das 356 fotos de validação do BID que tiveram
+campos lidos (`ml/data/eval/ocr_readings.jsonl`). A nota de plausibilidade é sorteada entre as de
+registros sintéticos plausíveis não vistos no treino, e as regras duras ficam de fora: os nomes do BID
+são fictícios com o sobrenome primeiro (o modelo recusaria 78% deles) e as datas são aleatórias.
+Resultado no limiar 0,60 (não muda de 0,40 a 0,80: quem decide é a divergência dura):
+
+| Cenário | Recusado |
+|---|---|
+| honesto (digita o que está na foto) | 0,0% |
+| honesto, e o modelo desconfia (P = 0,8) | 0,0% |
+| honesto, OCR com 2, 1 ou 0 campos | 0,0% |
+| uma data errada (digitação) | 0,8% |
+| CPF de outro documento* | 100% |
+| nº de registro e emissão de outro* | 100% |
+| tudo de outro documento | 99,7% |
+| dados plausíveis inventados | 99,7% |
+
+\*só nas fotos em que o OCR leu o campo trocado (o que o OCR não leu não pode ser contradito).
+Limites: a "digitação" simulada é perfeita (sem erros de quem digita de verdade), o dataset é
+sintético e o OCR em fotos reais pode errar mais. Por isso, **comece em `shadow`**.
+
+```bash
+./ml/venv/bin/python ml/cnh_image/scripts/export_readings.py      # OCR das fotos de validação (~4 min)
+./ml/venv/bin/python ml/cnh_data/scripts/evaluate_veracity.py     # simula e imprime a tabela acima
+```
+
 ## Contrato do `classify.py`
 
 ```bash
-echo '{"name": "Asdfghjkl", "cpf": "52998224725", ...}' | ./ml/venv/bin/python ml/cnh_data/classify.py
+echo '{"record": {"name": "Asdfghjkl", "cpf": "52998224725", ...}, "ocr": null}' \
+  | ./ml/venv/bin/python ml/cnh_data/classify.py
 ```
 
 ```json
-{"is_suspicious": true, "score": 1.0,
- "reasons": ["nome com teclas vizinhas (asdf...)"], "fields": ["nome"]}
+{"is_suspicious": true, "score": 1.0, "veracity": 0, "basis": "plausibility",
+ "reasons": ["nome com teclas vizinhas (asdf...)"], "fields": ["nome"],
+ "consistency": {"cpf": "absent", "...": "absent"}, "mismatch_fields": []}
 ```
+
+- Entrada: `{"record": {...}, "ocr": {"fields": {...}, "uncertain_fields": [...]} | null}`.
+  `ocr` é a saída do `cnh_image` (as mesmas chaves do `record`); `null` avalia só a plausibilidade.
+- Saída: `score` é a nota de "dado falso" **já combinada** (1.0 se uma regra disparou), e `veracity`
+  é `round(100 · (1 − score))`. `basis` diz se o OCR entrou. `consistency` traz o status de cada campo
+  comparável (só nomes de campo, nunca valores) e `mismatch_fields` os grupos que a foto contradiz de
+  forma inequívoca (vazio se a recusa não veio daí).
 
 - Campos do registro: os do `OperatorLicenseInputSerializer` (`name`, `birth_date`, `cpf`, `rg`,
   `mother_name`, `father_name`, `nationality`, `birth_place` "Cidade – UF", `cnh_number`,
   `category`, `first_license_date`, `issue_date`, `expiration_date`, `issuing_state`,
   `issuing_authority`, `situation`, `acc`, `ear`, `medical_restrictions`, `observations`, `points`).
   `birth_place` aceita `–`, `-` ou `/` como separador; também vale mandar `birth_city`/`birth_state`.
-- `is_suspicious = alguma regra dura OU (score ≥ limiar E há outra evidência além do local de
-  nascimento)`. `score` é a probabilidade do modelo, ou `1.0` se uma regra disparou.
+- Sem OCR: `is_suspicious = alguma regra dura OU (score ≥ limiar E há outra evidência além do
+  local de nascimento)`. Com OCR, soma-se a divergência dura e a combinação descritas acima.
 - `reasons` traz só os motivos das regras (o Django os registra no log, sem dado pessoal);
   `fields` os grupos de campos, usados na mensagem ao usuário.
-- Sem modelo ou sem bases: mesmo formato, `is_suspicious: false` e `error` preenchido.
-- Entrada inválida (stdin vazio ou que não é um objeto JSON): `{"error": ...}` e saída com código 1.
+- Sem modelo ou sem bases: mesmo formato, `is_suspicious: false`, `veracity: null` e `error` preenchido.
+- Entrada inválida (stdin vazio, sem `record` objeto ou com `ocr` que não é objeto): `{"error": ...}` e
+  saída com código 1.
 
 ## Configuração
 
 | Variável | Padrão | Efeito |
 |---|---|---|
-| `ML_PLAUSIBILITY_MODE` | `enforce` | `off` não avalia; `shadow` avalia e só registra em log (id da CNH, score e campos, sem dados pessoais); `enforce` recusa |
+| `ML_PLAUSIBILITY_MODE` | `enforce` | `off` não avalia (nem roda o OCR); `shadow` avalia, grava `veracity_score` e só registra em log (id da CNH, score, índice e campos, sem dados pessoais); `enforce` também recusa |
 | `ML_PLAUSIBILITY_THRESHOLD` | `0.60` | A partir de qual probabilidade o modelo recusa (política agressiva). Sobe-se o limiar para recusar menos |
 
 > **Comece em `shadow`.** O limiar foi escolhido sobre dados sintéticos, sem tráfego real. Em
@@ -348,8 +459,9 @@ regra "local sozinho nunca recusa", as quatro últimas e as do DF eram recusadas
 - **O ML só reconhece o tipo de lixo que viu no treino.** Restrições de monotonicidade foram
   testadas e não ajudaram a extrapolar (e dobraram o falso positivo), então foram descartadas.
   Lixo inédito é coberto pelas regras duras e pela nota de anomalia.
-- **Plausibilidade não é autenticidade**: um cadastro bem preenchido com dados de outra pessoa
-  passa. Cruzar a foto (OCR) com os dados digitados é um passo futuro.
+- **Consistência não é autenticidade**: um cadastro bem preenchido com os dados de uma foto alheia
+  passa. O OCR só desmente dados que não correspondem ao documento enviado, e só onde leu o campo
+  (~78–84% das fotos por campo forte; CNH física nova nunca foi testada).
 - A validade dos **dígitos verificadores da CNH** não é usada: o algoritmo precisa ser confirmado
   com CNHs reais antes de virar sinal (um erro aqui recusaria CNHs verdadeiras).
 - Sobrenomes não estão na base do IBGE; só o modelo de caracteres os cobre.
@@ -361,7 +473,9 @@ regra "local sozinho nunca recusa", as quatro últimas e as do DF eram recusadas
 
 CPF, nome e nome da mãe são dados pessoais. O registro vai ao processo pelo **stdin** (não
 aparece em `ps`), o modelo só vê **features numéricas derivadas**, o log do Django guarda apenas o
-id da CNH, o score e os grupos de campos, e `ml/data/synth/` contém só dados sintéticos.
+id da CNH, o score, o índice e os grupos de campos (nunca os valores lidos pelo OCR), e
+`ml/data/synth/` contém só dados sintéticos. O OCR é refeito a cada salvamento e não é guardado.
+`veracity_score` é um número, sem dados pessoais.
 
 ## Retreino com dados reais
 
@@ -384,5 +498,7 @@ O caminho para sair do sintético:
 Cobrem normalização e bases (`test_reference`), cada regra (`test_rules`), features
 (`test_features`), gerador sintético e leitura/escrita do CSV (`test_synth_data`), gerador das bases
 (`test_build_reference_data`), modelo e decisão (`test_model`) e o CLI (`test_classify`; os testes
-com o modelo real são pulados se o `.joblib` não existir). A integração no Django está em
-`document_validation/tests.py` (`OperatorLicenseScreeningTests`, `CnhDataCheckerTests`).
+com o modelo real são pulados se o `.joblib` não existir), consistência (`test_consistency`) e o
+índice (`test_veracity`). A integração no Django está em `document_validation/tests.py`
+(`OperatorLicenseScreeningTests`, `OperatorLicenseVeracityTests`, `CnhDataCheckerTests` e, com foto
+real do dataset, `OperatorLicensePhotoConsistencyEndToEndTests`).

@@ -6,11 +6,11 @@ dados [`data/`](data/README.md).
 
 | | [`cnh_image`](cnh_image/README.md) | [`cnh_data`](cnh_data/README.md) |
 |---|---|---|
-| **Pergunta** | O arquivo enviado é uma CNH? E o que está escrito nela (OCR)? | Os dados digitados parecem de verdade ou "só para enviar o formulário"? |
-| **Entrada** | foto/PDF da CNH | JSON com os campos do cadastro (nome, datas, CPF, cidade...) |
-| **Técnica** | CNN (MobileNetV2, TensorFlow) + OCR (RapidOCR) com parser por layout | regras duras + `HistGradientBoosting` calibrado (scikit-learn) |
+| **Pergunta** | O arquivo enviado é uma CNH? E o que está escrito nela (OCR)? | Os dados digitados são verdadeiros: conferem com a foto e parecem de verdade? (índice de veracidade 0–100) |
+| **Entrada** | foto/PDF da CNH | JSON com os campos do cadastro (nome, datas, CPF, cidade...) e, se houver, o OCR do arquivo salvo |
+| **Técnica** | CNN (MobileNetV2, TensorFlow) + OCR (RapidOCR) com parser por layout | consistência com o OCR + regras duras + `HistGradientBoosting` calibrado (scikit-learn) |
 | **Quando roda** | ao escolher o arquivo no `CNHUpload.tsx` | ao salvar a CNH (`POST`/`PUT`/`PATCH /api/operator-licenses`) |
-| **Efeito** | avisa o usuário e **preenche o formulário** com os campos lidos (CNH antiga e digital) | grava a CNH como `rejected` com o motivo em `review_note` (o envio continua liberado) |
+| **Efeito** | avisa o usuário e **preenche o formulário** com os campos lidos (CNH antiga e digital) | grava `veracity_score` e, se falso, a CNH como `rejected` com o motivo em `review_note` (o envio continua liberado) |
 | **Se o modelo falha** | devolve `is_valid: false` + `error` | **nada é recusado**: o erro vira "não suspeito" (fail-open) |
 | **Adaptador Django** | `document_validation/ml_adapters/cnh_image.py` | `document_validation/ml_adapters/cnh_data.py` |
 | **Entrada do processo** | caminho do arquivo no `argv` | JSON no `stdin` (CPF e nomes não aparecem em `ps`) |
@@ -18,9 +18,10 @@ dados [`data/`](data/README.md).
 As fontes dos dados (IBGE, Base dos Dados e o dataset de imagens de documentos) estão em
 [`data/README.md`](data/README.md#referências-de-onde-vêm-os-dados).
 
-Os dois são independentes: um não usa a saída do outro. O que o OCR do `cnh_image` lê só preenche o
-formulário; depois de editado e enviado, passa pelo `cnh_data` como qualquer dado digitado. Comparar
-a foto com o que foi digitado continua sendo um passo futuro.
+O código dos dois é independente (nenhum importa o outro), mas o **Django liga um ao outro** ao salvar a
+CNH: roda o OCR do `cnh_image` no arquivo salvo e entrega o resultado ao `cnh_data` como dado, para
+comparar a foto com o que foi digitado (índice de veracidade, [ADR 0004](../../Documentation/adr/0004-indice-de-veracidade-dados-x-ocr.md)).
+Sem foto ou sem OCR, o `cnh_data` avalia só a plausibilidade dos dados.
 
 ## Estrutura
 
@@ -73,9 +74,10 @@ código 1 e um JSON `{"error": ...}`.
 {"is_valid": true, "confidence": "high", "score": 0.9523,
  "document_type": "cnh_antiga", "fields": {"cpf": "..."}, "uncertain_fields": ["name"]}
 
-// cnh_data/classify.py  (registro no stdin)
-{"is_suspicious": true, "score": 1.0,
- "reasons": ["CPF inválido"], "fields": ["números dos documentos"]}
+// cnh_data/classify.py  ({"record": ..., "ocr": ...|null} no stdin)
+{"is_suspicious": true, "score": 1.0, "veracity": 0, "basis": "plausibility",
+ "reasons": ["CPF inválido"], "fields": ["números dos documentos"],
+ "consistency": {"cpf": "absent", "...": "absent"}, "mismatch_fields": []}
 ```
 
 ## Testes

@@ -43,7 +43,9 @@ cnh_image/
 │   └── groundtruth.py             lê o gt_ocr do dataset (usado por treino e scripts)
 ├── scripts/
 │   ├── learn_layout.py            ◄ GERA models/layout_antiga.json a partir do dataset
-│   └── evaluate_ocr.py            mede o OCR (cobertura/precisão por campo)
+│   ├── export_readings.py          exporta o OCR das fotos de validação (ponte para cnh_data/scripts/evaluate_veracity.py)
+│   ├── evaluate_ocr.py            mede o OCR (cobertura/precisão por campo)
+│   └── export_readings.py         exporta o OCR das fotos de validação para calibrar o cnh_data
 └── tests/                         unittest
 ```
 
@@ -187,6 +189,9 @@ cd BackEnd
 
 # reaprender o layout da CNH antiga a partir do ground truth (gera models/layout_antiga.json)
 ./ml/venv/bin/python ml/cnh_image/scripts/learn_layout.py
+
+# exportar o OCR das fotos de validação (alimenta ml/cnh_data/scripts/evaluate_veracity.py)
+./ml/venv/bin/python ml/cnh_image/scripts/export_readings.py
 
 # medir o OCR (cobertura/precisão por campo, latência)
 ./ml/venv/bin/python ml/cnh_image/scripts/evaluate_ocr.py [--limit N] [--show-errors]

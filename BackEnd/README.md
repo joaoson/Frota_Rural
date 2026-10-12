@@ -34,14 +34,14 @@ BackEnd/
 │   ├── cnh_image/     ← Modelo 1: o arquivo enviado é uma CNH? (imagem)
 │   │   ├── train.py, classify.py
 │   │   └── models/cnh_classifier.keras
-│   └── cnh_data/      ← Modelo 2: os dados digitados parecem falsos? (tabular)
+│   └── cnh_data/      ← Modelo 2: índice de veracidade dos dados digitados (foto × formulário + plausibilidade)
 │       ├── train.py, classify.py     ← igual ao cnh_image
 │       ├── scripts/, lib/, tests/    ← preparação de dados, código de apoio e testes
 │       └── models/cnh_plausibility.joblib
 ```
 
 **Por que dois venvs?**
-O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess`: o Django chama o `classify.py` de cada modelo (`ml/cnh_image/` recebe um arquivo temporário; `ml/cnh_data/` recebe o registro em JSON pelo stdin).
+O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess`: o Django chama o `classify.py` de cada modelo (`ml/cnh_image/` recebe o caminho de um arquivo; `ml/cnh_data/` recebe o registro e o OCR da foto, se houver, em JSON pelo stdin).
 
 ## Instruções de Configuração
 
@@ -162,7 +162,7 @@ Dois modelos independentes, cada um no seu módulo (visão geral e comparação 
 | Modelo | O que faz | Documentação |
 |---|---|---|
 | `ml/cnh_image` | Classifica a **imagem** enviada (é uma CNH? TensorFlow/MobileNetV2) e lê os campos por **OCR** (RapidOCR), da CNH antiga e da digital, para preencher o formulário. Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
-| `ml/cnh_data` | Avalia os **dados digitados**: parecem reais ou "só para enviar o formulário"? (regras + scikit-learn). Se parecerem falsos, a CNH é gravada como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
+| `ml/cnh_data` | Calcula o **índice de veracidade** dos dados digitados: conferem com a foto (OCR) e parecem reais? (consistência + regras + scikit-learn). Guarda o índice em `veracity_score` e, se parecerem falsos, grava a CNH como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
 
 Fontes dos dados (IBGE, Base dos Dados e o dataset de imagens): [`ml/data/README.md`](ml/data/README.md#referências-de-onde-vêm-os-dados).
 
@@ -173,6 +173,7 @@ cd BackEnd
 ./ml/venv/bin/python ml/cnh_image/train.py                                  # precisa das imagens em ml/data/cnh e ml/data/not_cnh
 ./ml/venv/bin/python ml/cnh_data/train.py                                   # lê (ou gera) ml/data/synth/cnh_records.csv
 ./ml/venv/bin/python -m unittest discover -s ml/cnh_data/tests -t ml/cnh_data
+./ml/venv/bin/python ml/cnh_data/scripts/evaluate_veracity.py                  # calibra o índice (precisa do export_readings.py antes)
 ./ml/venv/bin/python -m unittest discover -s ml/cnh_image/tests -t ml/cnh_image
 ./ml/venv/bin/python ml/cnh_image/scripts/evaluate_ocr.py                    # mede o OCR no dataset
 ```

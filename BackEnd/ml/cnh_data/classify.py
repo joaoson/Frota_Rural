@@ -1,18 +1,28 @@
-"""Inferência do modelo de plausibilidade dos dados da CNH.
+"""Inferência do modelo de veracidade dos dados da CNH.
 
 Chamado pelo Django via subprocess (`document_validation/ml_adapters/cnh_data.py`).
-Lê do **stdin** o registro do cadastro em JSON (CPF e nomes ficam fora do `argv`, que
-qualquer usuário da máquina enxerga com `ps`) e imprime uma linha JSON:
+Lê do **stdin** um JSON com o cadastro e, se houver, o OCR da foto (CPF e nomes ficam fora
+do `argv`, que qualquer usuário da máquina enxerga com `ps`):
 
-    {"is_suspicious": bool, "score": 0.0-1.0,
+    {"record": {...campos do cadastro...},
+     "ocr": {"fields": {...}, "uncertain_fields": [...]} | null}    # saída do cnh_image
+
+e imprime uma linha JSON:
+
+    {"is_suspicious": bool, "score": 0.0-1.0,       # nota de "dado falso" combinada
+     "veracity": 0-100,                              # índice de veracidade (maior = mais verdadeiro)
+     "basis": "ocr+plausibility" | "plausibility",   # em que o índice se baseou
+     "consistency": {campo: "match"|"mismatch"|"absent"},
+     "mismatch_fields": [...],                       # o que o OCR contradiz de forma inequívoca
      "reasons": [...], "fields": [...]}
 
+Sem `ocr` (ou com poucos campos lidos), vale só a plausibilidade dos dados digitados.
 Se o modelo ou as bases de referência não existirem, devolve o mesmo formato com
 `is_suspicious: false` e o campo `error`: falha técnica nunca vira recusa.
 
 Variável de ambiente opcional: ML_PLAUSIBILITY_THRESHOLD (padrão em `lib/model.py`).
 
-Uso: echo '{"name": "..."}' | ./ml/venv/bin/python ml/cnh_data/classify.py
+Uso: echo '{"record": {"name": "..."}}' | ./ml/venv/bin/python ml/cnh_data/classify.py
 """
 
 import json
@@ -34,6 +44,10 @@ def _failure(message: str) -> dict[str, Any]:
         "score": 0.0,
         "reasons": [],
         "fields": [],
+        "veracity": None,
+        "basis": None,
+        "consistency": {},
+        "mismatch_fields": [],
         "error": message,
     }
 
@@ -45,12 +59,12 @@ def _threshold() -> float:
         return THRESHOLD
 
 
-def classify(record: dict[str, Any]) -> dict[str, Any]:
+def classify(record: dict[str, Any], ocr: dict[str, Any] | None = None) -> dict[str, Any]:
     if not MODEL_PATH.exists():
         return _failure(f"Modelo não encontrado em {MODEL_PATH}")
     if not reference_available():
         return _failure("Bases de referência (ml/data/names e ml/data/cities) não encontradas")
-    return assess(record, PlausibilityModel.load(MODEL_PATH), _threshold())
+    return assess(record, PlausibilityModel.load(MODEL_PATH), _threshold(), ocr=ocr)
 
 
 if __name__ == "__main__":
@@ -58,8 +72,10 @@ if __name__ == "__main__":
         payload = json.loads(sys.stdin.read())
     except json.JSONDecodeError:
         payload = None
-    if not isinstance(payload, dict):
-        print(json.dumps({"error": "Uso: enviar o registro da CNH como JSON no stdin"}))
+    record = payload.get("record") if isinstance(payload, dict) else None
+    ocr = payload.get("ocr") if isinstance(payload, dict) else None
+    if not isinstance(record, dict) or not (ocr is None or isinstance(ocr, dict)):
+        print(json.dumps({"error": 'Uso: enviar {"record": {...}, "ocr": {...} | null} no stdin'}))
         sys.exit(1)
 
-    print(json.dumps(classify(payload), ensure_ascii=False))
+    print(json.dumps(classify(record, ocr), ensure_ascii=False))
