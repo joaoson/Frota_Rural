@@ -67,6 +67,36 @@ class CityMatchTests(unittest.TestCase):
         self.assertFalse(wrong.exact_in_state)
         self.assertTrue(wrong.exists_in_other_state)
 
+    def test_official_districts_count_as_known_places(self):
+        # Barão Geraldo é distrito de Campinas (SP) e não município.
+        match = reference.city_match("Barão Geraldo", "SP")
+        self.assertTrue(match.exact_in_state)
+        other = reference.city_match("Barão Geraldo", "RJ")
+        self.assertFalse(other.exact_in_state)
+        self.assertTrue(other.exists_in_other_state)
+
+    def test_districts_exclude_the_municipality_seats(self):
+        self.assertNotIn("campinas", reference.districts()["SP"])
+        self.assertIn("barao geraldo", reference.districts()["SP"])
+        self.assertIn("campinas", reference.localities("SP"))
+        self.assertIn("barao geraldo", reference.localities("sp"))
+
+    def test_federal_district_regions_come_from_the_fixed_list(self):
+        # O IBGE lista só Brasília para o DF; as Regiões Administrativas vêm de extra_localities.csv.
+        self.assertTrue(reference.city_match("Brasília", "DF").exact_in_state)
+        for region in (
+            "Ceilândia",
+            "Taguatinga",
+            "Gama",
+            "Águas Claras",
+            "Sol Nascente",
+            "Asa Norte",
+        ):
+            with self.subTest(region):
+                self.assertTrue(reference.city_match(region, "DF").exact_in_state)
+        self.assertFalse(reference.city_match("Ceilândia", "SP").exact_in_state)
+        self.assertEqual(len(reference.districts()["DF"]) >= 35, True)
+
     def test_empty_city(self):
         self.assertEqual(reference.city_match("", "SP"), (False, 0.0, False))
 
@@ -76,11 +106,14 @@ class MissingDataTests(unittest.TestCase):
         missing = Path("/nonexistent/file")
         reference.first_names.cache_clear()
         reference.cities.cache_clear()
+        reference.districts.cache_clear()
         self.addCleanup(reference.first_names.cache_clear)
         self.addCleanup(reference.cities.cache_clear)
+        self.addCleanup(reference.districts.cache_clear)
         with (
             patch.object(reference, "NAMES_PATH", missing),
             patch.object(reference, "CITIES_PATH", missing),
+            patch.object(reference, "DISTRICTS_PATH", missing),
         ):
             self.assertFalse(reference.reference_available())
             self.assertEqual(reference.first_name_stats("Maria"), (False, 0.0))

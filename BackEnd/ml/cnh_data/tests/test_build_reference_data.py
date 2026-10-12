@@ -61,5 +61,56 @@ class BuildReferenceDataTests(unittest.TestCase):
         self.assertEqual(cities["MG"]["buritis"], 0)  # município sem nascimentos na base
 
 
+DISTRICTS = [
+    {
+        "nome": "São Paulo",
+        "municipio": {
+            "nome": "São Paulo",
+            "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}},
+        },
+    },
+    {
+        "nome": "Perus",
+        "municipio": {
+            "nome": "São Paulo",
+            "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}},
+        },
+    },
+    {
+        "nome": "Perus",
+        "municipio": {"nome": "Outra", "microrregiao": {"mesorregiao": {"UF": {"sigla": "SP"}}}},
+    },
+    {
+        "nome": "Buritis",
+        "municipio": {"nome": "Outro", "microrregiao": {"mesorregiao": {"UF": {"sigla": "RO"}}}},
+    },
+    {
+        "nome": "Só Imediata",
+        "municipio": {
+            "nome": "X",
+            "regiao-imediata": {"regiao-intermediaria": {"UF": {"sigla": "MG"}}},
+        },
+    },
+]
+
+
+class BuildDistrictsTests(unittest.TestCase):
+    def test_only_real_localities_are_kept_keyed_by_state(self):
+        import json
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "distritos.json"
+            path.write_text(json.dumps(DISTRICTS), encoding="utf-8")
+            cities = {"SP": {"sao paulo": 1}, "RO": {"buritis": 1}}
+
+            districts = build.build_districts(path, cities)
+
+        self.assertEqual(
+            districts["SP"], ["perus"]
+        )  # sede (São Paulo) fica de fora; duplicata some
+        self.assertNotIn("RO", districts)  # "Buritis" já é município da UF
+        self.assertEqual(districts["MG"], ["so imediata"])  # UF pelo caminho alternativo
+
+
 if __name__ == "__main__":
     unittest.main()

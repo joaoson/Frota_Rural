@@ -164,6 +164,8 @@ Dois modelos independentes, cada um no seu módulo (visão geral e comparação 
 | `ml/cnh_image` | Classifica a **imagem** enviada: é uma CNH? (TensorFlow/MobileNetV2). Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
 | `ml/cnh_data` | Avalia os **dados digitados**: parecem reais ou "só para enviar o formulário"? (regras + scikit-learn). Se parecerem falsos, a CNH é gravada como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
 
+Fontes dos dados (IBGE, Base dos Dados e o dataset de imagens): [`ml/data/README.md`](ml/data/README.md#referências-de-onde-vêm-os-dados).
+
 Treinar e testar cada um:
 
 ```bash

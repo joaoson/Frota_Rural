@@ -68,6 +68,29 @@ class PlausibilityModelTests(unittest.TestCase):
         self.assertTrue(set(groups) & {"name", "mother_name"}, groups)
 
 
+class _FakeModel(PlausibilityModel):
+    """Notas fixas, para testar a regra do local de nascimento sem depender de treino."""
+
+    def __init__(self):
+        pass
+
+    def score_matrix(self, matrix):
+        return np.array([0.9, 0.9, 0.3])
+
+    def score_without_place(self, matrix):
+        return np.array([0.05, 0.5, 0.9])
+
+
+class PlaceAloneTests(unittest.TestCase):
+    def test_birth_place_alone_never_flags(self):
+        flags = _FakeModel().flags(np.zeros((3, 1)), 0.6)
+
+        # 1ª: nota alta, mas sem o local cai a 0,05  -> só o local puxava: NÃO recusa
+        # 2ª: nota alta e sem o local ainda 0,5      -> há outra evidência: recusa
+        # 3ª: nota 0,3 abaixo do limiar              -> não recusa (mesmo sem o local sendo alto)
+        self.assertEqual(flags.tolist(), [False, True, False])
+
+
 class AssessTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -99,6 +122,22 @@ class AssessTests(unittest.TestCase):
         self.assertEqual(result["reasons"], [])  # nenhuma regra: foi o modelo
         self.assertTrue(result["fields"])
 
+    def test_unknown_birth_place_alone_is_not_enough_to_refuse(self):
+        record = {**PLAUSIBLE, "birth_place": "Zorbaldo do Norte – SP"}  # não está em nenhuma lista
+
+        result = assess(record, self.model, THRESHOLD, TODAY)
+
+        self.assertFalse(result["is_suspicious"], result)
+        self.assertEqual((result["confidence"], result["fields"]), ("low", []))
+        self.assertLess(result["score"], THRESHOLD)  # a nota reportada é a que decidiu
+
+    def test_unknown_birth_place_still_counts_when_there_is_other_evidence(self):
+        record = {**WORD_JUNK, "birth_place": "Zorbaldo do Norte – SP"}
+
+        result = assess(record, self.model, THRESHOLD, TODAY)
+
+        self.assertTrue(result["is_suspicious"], result)
+
     def test_threshold_controls_the_decision(self):
         junk = WORD_JUNK
 
@@ -107,10 +146,13 @@ class AssessTests(unittest.TestCase):
 
     def test_confidence_levels(self):
         self.assertGreater(HIGH_CONFIDENCE, THRESHOLD)
-        result = assess(PLAUSIBLE, self.model, 0.0, TODAY)  # limiar zero: tudo é suspeito
+        # Limiar zero: o que tiver qualquer evidência além do local de nascimento é suspeito.
+        flagged = assess(WORD_JUNK, self.model, 0.0, TODAY)
+        self.assertTrue(flagged["is_suspicious"])
         self.assertEqual(
-            result["confidence"], "medium" if result["score"] < HIGH_CONFIDENCE else "high"
+            flagged["confidence"], "medium" if flagged["score"] < HIGH_CONFIDENCE else "high"
         )
+        self.assertEqual(assess(PLAUSIBLE, self.model, THRESHOLD, TODAY)["confidence"], "low")
 
 
 if __name__ == "__main__":

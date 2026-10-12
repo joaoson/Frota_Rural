@@ -85,7 +85,7 @@ def decisions(
     model: PlausibilityModel, data: Dataset, rows: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
     """(só ML, regras + ML) como arrays booleanos para as linhas pedidas."""
-    ml_only = model.score_matrix(data.matrix[rows]) >= THRESHOLD
+    ml_only = model.flags(data.matrix[rows], THRESHOLD)
     return ml_only, ml_only | data.rule_hits[rows]
 
 

@@ -15,6 +15,9 @@ dados [`data/`](data/README.md).
 | **Adaptador Django** | `document_validation/ml_adapters/cnh_image.py` | `document_validation/ml_adapters/cnh_data.py` |
 | **Entrada do processo** | caminho do arquivo no `argv` | JSON no `stdin` (CPF e nomes não aparecem em `ps`) |
 
+As fontes dos dados (IBGE, Base dos Dados e o dataset de imagens de documentos) estão em
+[`data/README.md`](data/README.md#referências-de-onde-vêm-os-dados).
+
 Os dois são independentes: um não usa a saída do outro. Cruzar a foto com os dados digitados (OCR)
 é um passo futuro.
 

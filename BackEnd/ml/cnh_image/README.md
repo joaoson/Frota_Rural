@@ -28,9 +28,9 @@ ml/data/cnh/        ← fotos/scans de CNH (formato antigo ou novo)
 ml/data/not_cnh/    ← fotos aleatórias, selfies, outros documentos
 ```
 
-- Datasets sugeridos:
-  [Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset)
-  e [Natural Images (Kaggle)](https://www.kaggle.com/datasets/prasunroy/natural-images).
+- Datasets usados: [Brazilian-Identity-Document-Dataset](https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset) (GitHub) para as CNHs e
+  [Natural Images (Kaggle)](https://www.kaggle.com/datasets/prasunroy/natural-images) para a
+  classe `not_cnh`. Referências completas em [`../data/README.md`](../data/README.md#referências-de-onde-vêm-os-dados).
 - Formatos aceitos: `.jpg`, `.png`, `.jpeg`. As duas pastas devem ter quantidades parecidas.
 - As demais subpastas de `ml/data/` (`names`, `cities`, `synth`...) **não** são lidas por este
   modelo: o treino fixa `class_names=["cnh", "not_cnh"]` (mantendo `cnh=0`, `not_cnh=1`).
