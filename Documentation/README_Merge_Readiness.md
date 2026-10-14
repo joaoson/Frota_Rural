@@ -346,3 +346,34 @@ All automated writes used local PostgreSQL fixtures. Supabase records were check
 read-only. The running Docker app mounts the updated checkout on ports 5174/8001.
 User intends to add Stripe test keys; neither key was present when this audit
 finished. Payment activation and live email delivery remain unverified.
+
+## Stripe activation and database recovery — 2026-10-14
+
+The user supplied a Stripe test secret key and resumed the paused Supabase
+project. After restoration completed, the backend connected to `frota_rural`
+over TLS. Automatic migrations remained disabled; no hosted application records
+were modified during these checks.
+
+- Stripe API authentication succeeded with `livemode=false`.
+- The local Docker listener supplied its signing secret to the ignored
+  `BackEnd/.env`; the effective backend secret matched the listener after restart.
+- A new, unpaid Stripe test Checkout Session was created directly through the
+  SDK, confirmed absent from application payments, and immediately expired.
+  Its exact `checkout.session.expired` event reached the local webhook with
+  HTTP 200. An unsigned webhook request returned HTTP 400.
+- Frontend and public listings returned HTTP 200 on ports 5174 and 8001.
+- Owner and tenant profile, rental and notification GET endpoints each returned
+  HTTP 200 inside a PostgreSQL read-only transaction. Both accounts retained
+  their four seeded rentals; notification counts were zero and four respectively.
+- Django system checks passed.
+
+This verifies Stripe checkout creation, webhook transport/signature validation,
+and restored dashboard reads. No card payment was submitted, so a completed
+rental payment and contract email/OTP delivery remain unverified live. The
+earlier automated test results above were not rerun against Supabase.
+
+The [local Stripe guide](../Devops/STRIPE.md) documents the repeatable listener
+setup and how to reconnect it after recreating the backend container.
+The helper passed seven offline checks and a real run that replaced the local
+listener. A second unpaid checkout/expiry probe then reached that new listener
+with HTTP 200; the frontend and listings API remained available.
