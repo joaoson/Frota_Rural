@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from api.models import Reviews
+from reviews.models import Reviews
 from api.test_recurrence import RecurrenceFixtures
 from contracts.models import Contracts
 from document_validation.models import Certification
@@ -68,10 +68,10 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         self.assertIsNone(account.employer_id)
 
     def test_user_directory_requires_admin(self):
-        self.assertEqual(self.client.get('/api/users/').status_code, 403)
+        self.assertEqual(self.client.get('/api/users').status_code, 403)
         admin = self.user('admin', 'admin')
         self.client.force_authenticate(admin)
-        self.assertEqual(self.client.get('/api/users/').status_code, 200)
+        self.assertEqual(self.client.get('/api/users').status_code, 200)
 
     def test_machine_writes_require_owner_and_cannot_transfer_ownership(self):
         url = f'/api/machines/{self.machine.pk}'
@@ -86,7 +86,7 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
 
     def test_machine_creation_cannot_assign_someone_elses_inventory(self):
         self.client.force_authenticate(self.owner)
-        response = self.client.post('/api/machines/', {
+        response = self.client.post('/api/machines', {
             'owner': str(self.other.pk), 'brand': 'John Deere', 'model': 'S790',
         }, format='json')
         self.assertEqual(response.status_code, 400, response.data)
@@ -95,21 +95,21 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         self.posting.status = 'paused'
         self.posting.save()
         self.client.force_authenticate(None)
-        self.assertEqual(self.client.get('/api/postings/').data, [])
+        self.assertEqual(self.client.get('/api/postings').data, [])
         self.assertEqual(self.client.get(f'/api/postings/{self.posting.pk}').status_code, 404)
         self.client.force_authenticate(self.owner)
-        response = self.client.get('/api/postings/', {'owner': str(self.owner.pk)})
+        response = self.client.get('/api/postings', {'owner': str(self.owner.pk)})
         self.assertEqual([item['id'] for item in response.data], [str(self.posting.pk)])
         self.assertEqual(self.client.get(f'/api/postings/{self.posting.pk}').status_code, 200)
         self.client.force_authenticate(self.other)
-        self.assertEqual(self.client.get('/api/postings/', {'owner': str(self.owner.pk)}).data, [])
+        self.assertEqual(self.client.get('/api/postings', {'owner': str(self.owner.pk)}).data, [])
 
     def test_posting_cannot_be_written_by_another_user(self):
         url = f'/api/postings/{self.posting.pk}'
         self.assertEqual(self.client.patch(url, {'hourly_rate': '0.01'}, format='json').status_code, 404)
         self.assertEqual(self.client.delete(url).status_code, 404)
-        self.assertEqual(self.client.post(url + '/photos/', {}, format='multipart').status_code, 404)
-        self.assertEqual(self.client.post('/api/postings/', {
+        self.assertEqual(self.client.post(url + '/photos', {}, format='multipart').status_code, 404)
+        self.assertEqual(self.client.post('/api/postings', {
             'machinery': str(self.machine.pk), 'hourly_rate': '100.00',
         }, format='json').status_code, 400)
 
@@ -128,7 +128,7 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
                 'reviewee': str(self.owner.pk), 'rating': 5, 'comment': 'Good rental', **overrides}
 
     def test_review_uses_real_completed_rental_counterparties(self):
-        response = self.client.post('/api/reviews/', self.review_payload(), format='json')
+        response = self.client.post('/api/reviews', self.review_payload(), format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data['reviewee'], self.owner.pk)
         self.assertEqual(self.client.get(f'/api/rentals/{self.source.pk}').data['lessor_id'], str(self.owner.pk))
@@ -137,19 +137,19 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         for payload in (self.review_payload(reviewer=str(self.other.pk)),
                         self.review_payload(reviewee=str(self.other.pk)),
                         self.review_payload(rating=0), self.review_payload(rating=6)):
-            response = self.client.post('/api/reviews/', payload, format='json')
+            response = self.client.post('/api/reviews', payload, format='json')
             self.assertEqual(response.status_code, 400, response.data)
         self.client.force_authenticate(self.other)
-        self.assertEqual(self.client.post('/api/reviews/', self.review_payload(reviewer=str(self.other.pk)), format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/reviews', self.review_payload(reviewer=str(self.other.pk)), format='json').status_code, 400)
         self.assertEqual(Reviews.objects.count(), 0)
 
     def test_review_requires_completed_rental_and_author_for_changes(self):
         self.source.status = 'pending'
         self.source.save()
-        self.assertEqual(self.client.post('/api/reviews/', self.review_payload(), format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/reviews', self.review_payload(), format='json').status_code, 400)
         self.source.status = 'completed'
         self.source.save()
-        response = self.client.post('/api/reviews/', self.review_payload(), format='json')
+        response = self.client.post('/api/reviews', self.review_payload(), format='json')
         url = f'/api/reviews/{response.data["id"]}'
         self.client.force_authenticate(self.owner)
         self.assertEqual(self.client.patch(url, {'rating': 1}, format='json').status_code, 404)
@@ -172,15 +172,15 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         payload = {'user': str(self.tenant.pk), 'title': 'NR-31',
                    'issuing_organization': 'Training', 'issue_date': '2026-01-01',
                    'description': 'Course', 'validation_status': 'approved'}
-        response = self.client.post('/api/certifications/', payload, format='json')
+        response = self.client.post('/api/certifications', payload, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data['validation_status'], 'pending')
         url = f'/api/certifications/{response.data["id"]}'
         self.assertEqual(self.client.patch(url + '/review', {'validation_status': 'approved'}, format='json').status_code, 403)
         self.client.force_authenticate(self.other)
-        self.assertEqual(self.client.get('/api/certifications/').data, [])
+        self.assertEqual(self.client.get('/api/certifications').data, [])
         self.assertEqual(self.client.get(url).status_code, 404)
-        self.assertEqual(self.client.post('/api/certifications/', payload, format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/certifications', payload, format='json').status_code, 400)
 
     def test_document_review_is_admin_only_and_owner_edits_require_reapproval(self):
         certification = Certification.objects.create(
@@ -190,7 +190,7 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         url = f'/api/certifications/{certification.pk}'
         admin = self.user('admin', 'admin')
         self.client.force_authenticate(admin)
-        self.assertEqual(self.client.get('/api/certifications/').status_code, 200)
+        self.assertEqual(self.client.get('/api/certifications').status_code, 200)
         response = self.client.patch(url + '/review', {'validation_status': 'approved'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.client.force_authenticate(self.tenant)
@@ -209,24 +209,24 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
             'expiration_date': '2030-01-01', 'issuing_state': 'PR', 'issuing_authority': 'DETRAN',
             'situation': 'active', 'validation_status': 'approved',
         }
-        response = self.client.post('/api/operator-licenses/', payload, format='json')
+        response = self.client.post('/api/operator-licenses', payload, format='json')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data['validation_status'], 'pending')
         url = f'/api/operator-licenses/{response.data["id"]}'
         self.assertEqual(self.client.patch(url + '/review', {'validation_status': 'approved'}, format='json').status_code, 403)
         self.client.force_authenticate(self.other)
-        self.assertEqual(self.client.get('/api/operator-licenses/').data, [])
+        self.assertEqual(self.client.get('/api/operator-licenses').data, [])
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertEqual(self.client.patch(url, {'name': 'Other'}, format='json').status_code, 404)
-        self.assertEqual(self.client.post('/api/operator-licenses/', payload, format='json').status_code, 400)
+        self.assertEqual(self.client.post('/api/operator-licenses', payload, format='json').status_code, 400)
         self.client.force_authenticate(self.user('admin', 'admin'))
         self.assertEqual(self.client.get(url).status_code, 200)
         self.assertEqual(self.client.patch(url + '/review', {'validation_status': 'approved'}, format='json').status_code, 200)
 
     def test_anonymous_document_uploads_and_analysis_require_login(self):
         self.client.force_authenticate(None)
-        for url in ('/api/documents/upload/', '/api/operator-licenses/validate-document/',
-                    '/api/certifications/', '/api/operator-licenses/'):
+        for url in ('/api/documents/upload', '/api/operator-licenses/validate-document',
+                    '/api/certifications', '/api/operator-licenses'):
             self.assertEqual(self.client.post(url, {}, format='multipart').status_code, 401)
 
     def test_only_admin_can_moderate_accounts(self):
@@ -250,8 +250,8 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
             self.assertEqual(contract.status, 'cancelled')
 
     def test_invalid_query_identifiers_are_400_not_server_errors(self):
-        for url, field in [('/api/postings/', 'machinery'), ('/api/machines/', 'owner'),
-                           ('/api/rentals/', 'lessee'), ('/api/reviews/', 'reviewee'),
-                           ('/api/certifications/', 'user')]:
+        for url, field in [('/api/postings', 'machinery'), ('/api/machines', 'owner'),
+                           ('/api/rentals/', 'lessee'), ('/api/reviews', 'reviewee'),
+                           ('/api/certifications', 'user')]:
             response = self.client.get(url, {field: 'not-a-uuid'})
             self.assertEqual(response.status_code, 400, (url, response.data))

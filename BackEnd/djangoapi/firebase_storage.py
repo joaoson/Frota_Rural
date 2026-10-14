@@ -1,10 +1,16 @@
+import contextlib
 import os
 import threading
 import uuid
+from typing import TYPE_CHECKING, ClassVar
 from urllib.parse import quote
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.uploadedfile import UploadedFile
+
+if TYPE_CHECKING:
+    from google.cloud.storage import Bucket
 
 # Endpoint de download do Firebase. O acesso é regido pelas Storage Rules do
 # projeto — com regra de leitura pública no prefixo, dispensa token na URL.
@@ -16,27 +22,37 @@ _EXTENSION_BY_CONTENT_TYPE = {
     "image/webp": "webp",
 }
 
-_bucket = None
-_bucket_lock = threading.Lock()
-
 
 class FirebaseStorageNotConfigured(ImproperlyConfigured):
     """Credencial ou bucket do Firebase ausente nas configurações."""
+
+
+class _BucketCache:
+    """Bucket inicializado uma única vez por processo, protegido por lock."""
+
+    bucket: ClassVar["Bucket | None"] = None
+    lock: ClassVar[threading.Lock] = threading.Lock()
 
 
 def is_configured() -> bool:
     return bool(settings.FIREBASE_STORAGE_BUCKET and settings.FIREBASE_CREDENTIALS_FILE)
 
 
-def _get_bucket():
-    """Inicializa o app do Firebase uma única vez por processo."""
-    global _bucket
-    if _bucket is not None:
-        return _bucket
+def _cached_bucket() -> "Bucket | None":
+    # Lido por função: o mypy estreitaria o atributo para None depois da primeira
+    # checagem e daria a segunda, dentro do lock, como inalcançável.
+    return _BucketCache.bucket
 
-    with _bucket_lock:
-        if _bucket is not None:
-            return _bucket
+
+def _get_bucket() -> "Bucket":
+    """Inicializa o app do Firebase uma única vez por processo."""
+    if (bucket := _cached_bucket()) is not None:
+        return bucket
+
+    with _BucketCache.lock:
+        # Outra thread pode ter inicializado enquanto esperávamos o lock.
+        if (bucket := _cached_bucket()) is not None:
+            return bucket
 
         if not is_configured():
             raise FirebaseStorageNotConfigured(
@@ -59,20 +75,20 @@ def _get_bucket():
                 credentials.Certificate(settings.FIREBASE_CREDENTIALS_FILE),
                 {"storageBucket": settings.FIREBASE_STORAGE_BUCKET},
             )
-        _bucket = storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+        _BucketCache.bucket = storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+        return _BucketCache.bucket
 
-    return _bucket
 
-
-def upload_image(image_file, folder: str) -> str:
+def upload_image(image_file: UploadedFile, folder: str) -> str:
     """Envia ``image_file`` ao Firebase e devolve o caminho do objeto no bucket.
 
     O nome é sempre um UUID novo, então o conteúdo é imutável e pode ser
     cacheado indefinidamente pelo navegador.
     """
-    extension = _EXTENSION_BY_CONTENT_TYPE.get(image_file.content_type)
+    name = image_file.name or ""
+    extension = _EXTENSION_BY_CONTENT_TYPE.get(image_file.content_type or "")
     if extension is None:
-        extension = image_file.name.rsplit(".", 1)[-1].lower() if "." in image_file.name else "jpg"
+        extension = name.rsplit(".", 1)[-1].lower() if "." in name else "jpg"
 
     path = f"{folder.strip('/')}/{uuid.uuid4()}.{extension}"
 
@@ -90,14 +106,12 @@ def delete_image(path: str) -> None:
         return
     from google.api_core import exceptions as google_exceptions
 
-    try:
+    with contextlib.suppress(google_exceptions.NotFound):
         _get_bucket().blob(path).delete()
-    except google_exceptions.NotFound:
-        pass
 
 
 def _is_absolute_url(value: str) -> bool:
-    return value.startswith("http://") or value.startswith("https://")
+    return value.startswith(("http://", "https://"))
 
 
 def public_url(path: str | None) -> str | None:

@@ -377,3 +377,44 @@ setup and how to reconnect it after recreating the backend container.
 The helper passed seven offline checks and a real run that replaced the local
 listener. A second unpaid checkout/expiry probe then reached that new listener
 with HTTP 200; the frontend and listings API remained available.
+
+## Develop integration — 2026-10-14
+
+The PR candidate integrates `origin/develop` at `2680fa9` (backend architecture
+refactor) into `codex/develop-rental-features`. It keeps the new service layer,
+split views, dedicated `rentals`/`reviews` apps, slash-free API routes and
+structured error responses while retaining recurring rentals, notifications,
+pricing estimates, dashboard fixes and the Supabase/Stripe configuration.
+Frontend clients and browser fixtures follow the revised routes and model apps.
+
+The two branches had independently added migrations after `api.0004`. Conditional
+historical-state operations preserve the original dependency histories, carry
+recurrence fields and constraints into the relocated rental model, and retarget
+incoming relationships without recreating rental tables. Explicit merge
+migrations join the rental and machine histories. PostgreSQL regression tests
+upgrade both previously deployed histories and verify preserved IDs, amounts,
+recurrence metadata and contract/notification relationships. A fresh database
+also migrates successfully.
+
+Final authorization review additionally closed an operator-assignment gap.
+Creating or rescheduling a rental, changing its operator, or creating a recurring
+series now requires a current, unblocked operator from the tenant's team. The
+assignment is revalidated under a row lock; historical assignments and safe
+idempotent retries remain intact. Nine regression tests cover the change.
+
+| Check | Integrated candidate result |
+| --- | --- |
+| Django full suite on isolated local PostgreSQL | 367 passed, including both migration upgrade paths |
+| Frontend unit/component suite | 101 passed |
+| Browser scenarios across Chromium, Firefox and WebKit | 84 passed |
+| ESLint, production build and browser-test TypeScript | Passed; existing large-bundle warning remains |
+| Django system check, migration drift and dependency consistency | Passed |
+| Independent backend, frontend and migration review | No unresolved blocking findings |
+
+Validation used a separate worktree, local database and ports 5175/8002. The
+running Supabase application on 5174/8001 was not switched to this candidate, and
+no hosted records or schema were changed. Deployment must apply the committed
+migrations through the [Supabase guide](../Devops/SUPABASE.md). External-provider
+behavior is covered by controlled test doubles in this integration run; a full
+live test-card payment and contract email/OTP delivery remain unverified. Earlier
+sections retain results from the preceding revisions and integration checks.

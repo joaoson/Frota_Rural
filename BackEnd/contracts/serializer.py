@@ -1,13 +1,52 @@
-import uuid
-from django.utils import timezone
+from typing import Any
+
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from api.serializer import RentalSerializer
-from contracts.models import ContractSignatures, Contracts
+from contracts.enums import ContractStatus, SignatureRole
+from contracts.models import Contracts, ContractSignatures
+from rentals.serializer import RentalOutputSerializer
+
+# --- Entrada ----------------------------------------------------------------
 
 
-class ContractSerializer(serializers.ModelSerializer):
-    rental_details = RentalSerializer(source="rental", read_only=True)
+class ContractOtpRequestInputSerializer(serializers.Serializer[Any]):
+    """Pedido do código de uso único enviado por e-mail antes do aceite."""
+
+    role = serializers.ChoiceField(
+        choices=SignatureRole.choices, help_text="Parte que vai assinar."
+    )
+
+
+class ContractSignInputSerializer(serializers.Serializer[Any]):
+    """Aceite de uma das partes no contrato de locação."""
+
+    role = serializers.ChoiceField(
+        choices=SignatureRole.choices, help_text="Parte que está assinando."
+    )
+    name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        max_length=255,
+        help_text='Identificação de quem assinou, ex.: "João da Silva - CPF 123.456.789-00".',
+    )
+    otp = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text=(
+            "Código de 6 dígitos enviado por e-mail. Obrigatório quando "
+            "`CONTRACT_SIGNATURE_REQUIRE_OTP` está ligado."
+        ),
+    )
+
+
+# --- Saída: recursos ----------------------------------------------------------
+
+
+class ContractOutputSerializer(serializers.ModelSerializer[Contracts]):
+    rental_details = RentalOutputSerializer(source="rental", read_only=True)
 
     class Meta:
         model = Contracts
@@ -21,16 +60,10 @@ class ContractSerializer(serializers.ModelSerializer):
             "created_at",
             "rental_details",
         ]
-        read_only_fields = ["id", "created_at"]
-
-    def create(self, validated_data):
-        validated_data.setdefault("id", uuid.uuid4())
-        validated_data.setdefault("created_at", timezone.now())
-        validated_data.setdefault("status", "pending_signatures")
-        return Contracts.objects.create(**validated_data)
+        read_only_fields = fields
 
 
-class ContractSignatureSerializer(serializers.ModelSerializer):
+class ContractSignatureOutputSerializer(serializers.ModelSerializer[ContractSignatures]):
     """Evidência do aceite, no formato em que ela é exibida e auditada."""
 
     class Meta:
@@ -54,3 +87,146 @@ class ContractSignatureSerializer(serializers.ModelSerializer):
         ]
         # Toda a evidência é gravada pelo servidor: nada aqui vem do cliente.
         read_only_fields = fields
+
+
+class ContractSignOutputSerializer(ContractOutputSerializer):
+    """Contrato após o aceite, com a evidência que acabou de ser gravada.
+
+    A evidência chega pelo contexto (`context={"signature": ...}`), porque ela
+    não é um atributo do contrato e sim o resultado da operação.
+    """
+
+    signature_evidence = serializers.SerializerMethodField()
+
+    class Meta(ContractOutputSerializer.Meta):
+        fields = [*ContractOutputSerializer.Meta.fields, "signature_evidence"]
+        read_only_fields = fields
+
+    @extend_schema_field(ContractSignatureOutputSerializer)
+    def get_signature_evidence(self, obj: Contracts) -> dict[str, Any]:
+        data: dict[str, Any] = ContractSignatureOutputSerializer(self.context["signature"]).data
+        return data
+
+
+class ContractOtpOutputSerializer(serializers.Serializer[Any]):
+    sent_to = serializers.CharField(
+        help_text="E-mail da parte, mascarado, para ela saber onde procurar o código."
+    )
+    expires_in_seconds = serializers.IntegerField()
+
+
+# --- Saída: documento do contrato ---------------------------------------------
+#
+# Os campos abaixo precisam acompanhar `contracts.contract_document`: o
+# serializer só devolve o que declara, e o front renderiza o PDF a partir deles.
+
+
+class _ContractTermsSerializer(serializers.Serializer[Any]):
+    numero = serializers.CharField()
+    versao_documento = serializers.CharField()
+    data_geracao = serializers.CharField()
+    data_inicio = serializers.CharField()
+    data_fim = serializers.CharField()
+    prazo_dias = serializers.IntegerField()
+    valor_unitario = serializers.CharField()
+    estimativa_horas = serializers.IntegerField()
+    valor_locacao = serializers.CharField()
+    valor_taxa_plataforma = serializers.CharField()
+    percentual_taxa_plataforma = serializers.CharField()
+    valor_total_estimado = serializers.CharField()
+
+
+class _ContractOperationSerializer(serializers.Serializer[Any]):
+    codigo = serializers.CharField()
+
+
+class _ContractPartySerializer(serializers.Serializer[Any]):
+    razao_social = serializers.CharField()
+    tipo_documento = serializers.CharField(
+        help_text="`CPF` ou `CNPJ`, inferido pela quantidade de dígitos; vazio se não reconhecido."
+    )
+    documento = serializers.CharField()
+    endereco_completo = serializers.CharField()
+    representante_nome = serializers.CharField()
+    representante_cpf = serializers.CharField()
+    representante_estado_civil = serializers.CharField()
+
+
+class _ContractLessorSerializer(_ContractPartySerializer):
+    endereco_equipamento = serializers.CharField()
+
+
+class _ContractLesseeSerializer(_ContractPartySerializer):
+    municipio = serializers.CharField()
+    uf = serializers.CharField()
+    local_servico = serializers.CharField()
+
+
+class _ContractEquipmentSerializer(serializers.Serializer[Any]):
+    tipo = serializers.CharField()
+    marca = serializers.CharField()
+    modelo = serializers.CharField()
+    ano = serializers.IntegerField(allow_null=True)
+    renagro = serializers.CharField()
+    valor_estimado = serializers.CharField()
+
+
+class _ContractPostingSerializer(serializers.Serializer[Any]):
+    tipo_servico = serializers.CharField()
+    finalidade_uso = serializers.CharField()
+
+
+class _ContractSignatureDatesSerializer(serializers.Serializer[Any]):
+    data_locador = serializers.CharField(help_text="Data do aceite, ou `—` se ainda não assinou.")
+    data_locatario = serializers.CharField(help_text="Data do aceite, ou `—` se ainda não assinou.")
+
+
+class _SignatureSummarySerializer(serializers.Serializer[Any]):
+    papel = serializers.ChoiceField(choices=SignatureRole.choices)
+    nome = serializers.CharField()
+    email = serializers.CharField()
+    assinado_em_utc = serializers.CharField()
+    hash_documento = serializers.CharField()
+    algoritmo_hash = serializers.CharField()
+    versao_documento = serializers.CharField()
+    ip = serializers.CharField()
+    otp_verificado = serializers.BooleanField()
+    hash_registro = serializers.CharField()
+
+
+class _DocumentEvidenceSerializer(serializers.Serializer[Any]):
+    hash_documento_atual = serializers.CharField()
+    algoritmo_hash = serializers.CharField()
+    assinaturas = _SignatureSummarySerializer(many=True)
+
+
+class ContractDocumentOutputSerializer(serializers.Serializer[Any]):
+    """Payload agregado e já formatado para renderizar o PDF do contrato."""
+
+    contrato = _ContractTermsSerializer()
+    operacao = _ContractOperationSerializer()
+    locador = _ContractLessorSerializer()
+    locatario = _ContractLesseeSerializer()
+    equipamento = _ContractEquipmentSerializer()
+    anuncio = _ContractPostingSerializer()
+    assinatura = _ContractSignatureDatesSerializer()
+    evidencia = _DocumentEvidenceSerializer()
+
+
+class _EvidenceDocumentSerializer(serializers.Serializer[Any]):
+    versao = serializers.CharField()
+    hash = serializers.CharField()
+    algoritmo = serializers.CharField()
+
+
+class ContractEvidenceOutputSerializer(serializers.Serializer[Any]):
+    """Trilha de auditoria completa do aceite eletrônico."""
+
+    contrato_id = serializers.UUIDField()
+    aluguel_id = serializers.UUIDField()
+    status = serializers.ChoiceField(choices=ContractStatus.choices, allow_null=True)
+    documento = _EvidenceDocumentSerializer()
+    cadeia_integra = serializers.BooleanField()
+    inconsistencias = serializers.ListField(child=serializers.CharField())
+    assinaturas = ContractSignatureOutputSerializer(many=True)
+    fundamento_legal = serializers.CharField()

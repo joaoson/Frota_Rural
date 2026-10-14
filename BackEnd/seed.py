@@ -21,7 +21,8 @@ from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from api.models import Rentals, Reviews
+from rentals.models import Rentals
+from reviews.models import Reviews
 from chat.models import Messages
 from contracts.models import Contracts
 from document_validation.models import Certification

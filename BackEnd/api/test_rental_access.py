@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.utils import timezone
 
-from api.models import Rentals
+from rentals.models import Rentals
 from api.test_recurrence import RecurrenceFixtures
 from payments.models import Payments
 
@@ -38,7 +38,7 @@ class RentalAccessTests(RecurrenceFixtures, TestCase):
         for url in [self.url, f'/api/rentals/{self.source.pk}',
                     f'/api/contracts/{self.source.pk}', f'/api/contracts/{self.source.pk}/evidence']:
             self.assertEqual(self.client.get(url).status_code, 404, url)
-        self.assertEqual(self.client.get('/api/contracts/').data, [])
+        self.assertEqual(self.client.get('/api/contracts').data, [])
         self.client.force_authenticate(self.owner)
         self.assertEqual(len(self.client.get('/api/rentals/').data), 2)
         self.assertEqual(self.client.get(f'/api/contracts/{self.source.pk}').status_code, 200)

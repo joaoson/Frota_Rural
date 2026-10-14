@@ -50,7 +50,7 @@ test('renews an expired bearer token after a real 401 and retries the protected 
   page.on('request', request => {
     if (injectedExpiry && new URL(request.url()).pathname === '/api/login/refresh') refreshesAfterExpiry++;
   });
-  await page.route('**/api/machines/?*', async route => {
+  await page.route('**/api/machines?*', async route => {
     if (injectedExpiry) return route.continue();
     injectedExpiry = true;
     await route.continue({
@@ -58,9 +58,9 @@ test('renews an expired bearer token after a real 401 and retries the protected 
     });
   });
   const rejected = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/machines/' && response.status() === 401);
+    new URL(response.url()).pathname === '/api/machines' && response.status() === 401);
   const retried = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/machines/' && response.status() === 200);
+    new URL(response.url()).pathname === '/api/machines' && response.status() === 200);
   await page.goto('/dashboard/novo-anuncio');
   await rejected;
   await retried;

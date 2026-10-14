@@ -198,8 +198,8 @@ describe("programar recorrência", () => {
   });
 
   it("shows field, non-field and availability conflicts and clears them when edited", async () => {
-    mocks.previewRecurrence.mockRejectedValueOnce(new BadRequestError("Dados inválidos", {
-      first_start_date: ["Escolha uma data futura."], non_field_errors: ["As reservas não podem se sobrepor."],
+    mocks.previewRecurrence.mockRejectedValueOnce(new BadRequestError("Dados inválidos", undefined, {
+      fieldErrors: { first_start_date: ["Escolha uma data futura."] }, nonFieldErrors: ["As reservas não podem se sobrepor."],
     })).mockRejectedValueOnce(new ConflictError("Maquinário indisponível em 12/10/2099."));
     renderDialog();
     fillDate();

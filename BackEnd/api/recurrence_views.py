@@ -8,7 +8,7 @@ from api.recurrence import (
     RecurrenceCreateRequestSerializer, RecurrencePreviewRequestSerializer,
     build_preview, create_recurrence, preview_response, series_response, source_for_user,
 )
-from api.serializer import RentalSerializer
+from rentals.serializer import RentalOutputSerializer
 
 
 class RecurrenceDateSerializer(serializers.Serializer):
@@ -33,7 +33,7 @@ class RecurrenceResponseSerializer(serializers.Serializer):
     occurrences = serializers.IntegerField()
     total_price = serializers.DecimalField(max_digits=12, decimal_places=2)
     reservation_expires_at = serializers.DateTimeField()
-    rentals = RentalSerializer(many=True)
+    rentals = RentalOutputSerializer(many=True)
 
 
 @extend_schema(

@@ -10,7 +10,8 @@ from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from api.models import RentalRecurrence, Rentals
+from api.models import RentalRecurrence
+from rentals.models import Rentals
 from contracts.models import Contracts
 from machines.models import Machines
 from payments.models import Payments
@@ -24,6 +25,9 @@ class RecurrenceFixtures:
         self.tenant = self.user('tenant', 'locatario')
         self.other = self.user('other', 'locatario')
         self.operator = self.user('operator', 'operador')
+        self.operator.employer = self.tenant
+        self.operator.status = 'active'
+        self.operator.save(update_fields=['employer', 'status'])
         self.machine = Machines.objects.create(
             id=uuid.uuid4(), owner=self.owner, brand='John Deere', model='6110J', status='active',
         )
@@ -131,7 +135,7 @@ class RentalRecurrenceTests(RecurrenceFixtures, TestCase):
                              ('postings', str(self.posting.pk)), ('operator', str(self.other.pk))]:
             response = self.create(**{field: value})
             self.assertEqual(response.status_code, 400, response.data)
-            self.assertIn(field, response.data)
+            self.assertIn(field, response.data["errors"])
         self.assertEqual(RentalRecurrence.objects.count(), 0)
 
     def test_validates_required_dates_frequency_count_and_key(self):
@@ -142,7 +146,7 @@ class RentalRecurrenceTests(RecurrenceFixtures, TestCase):
             self.assertEqual(self.create(**data).status_code, 400, data)
         response = self.client.post(self.create_url, self.payload, format='json')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('idempotency_key', response.data)
+        self.assertIn('idempotency_key', response.data['errors'])
 
     def test_monthly_dates_anchor_to_first_day_including_leap_year(self):
         for year, feb_day in [(2031, 28), (2032, 29)]:
@@ -212,7 +216,7 @@ class RentalRecurrenceTests(RecurrenceFixtures, TestCase):
         self.source.save()
         response = self.create()
         self.assertEqual(response.status_code, 400)
-        self.assertIn('frequency', response.data)
+        self.assertIn('frequency', response.data['errors'])
 
     def test_current_occupied_statuses_block_series(self):
         for status in ['active', 'signed', 'completed', 'closed', 'pending', 'awaiting_payment']:

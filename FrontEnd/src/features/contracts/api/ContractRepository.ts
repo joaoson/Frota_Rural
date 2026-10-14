@@ -30,8 +30,8 @@ import {
 
 import { recurrencePreviewSchema, recurrenceCreatedSchema, type RecurrenceInput, type CreateRecurrenceInput, type RecurrencePreview, type RecurrenceCreated } from "../types/recurrence";
 
-const RENTALS_PATH = "rentals/";
-const CONTRACTS_PATH = "contracts/";
+const RENTALS_PATH = "rentals";
+const CONTRACTS_PATH = "contracts";
 
 export interface RentalFilter {
   lesseeId?: string;

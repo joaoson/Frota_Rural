@@ -9,7 +9,9 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import APIException, NotFound
 
-from api.models import RentalRecurrence, Rentals
+from api.models import RentalRecurrence
+from rentals.models import Rentals
+from rentals.serializer import validate_operator_assignment
 from contracts.models import Contracts
 from payments.availability import INTERVALO_DE_LIMPEZA, MINUTOS_DE_RESERVA, tem_conflito
 from payments.pricing import calcular_total
@@ -65,12 +67,11 @@ def _start_date(first_date, frequency, index):
     return first_date.replace(year=year, month=month, day=day)
 
 
-def build_preview(source, data):
+def build_preview(source, data, *, lock_operator=False):
     posting = source.postings
     if posting.status != 'active' or posting.machinery.status != 'active':
         raise serializers.ValidationError({'detail': 'O anúncio e a máquina precisam estar ativos.'})
-    if source.operator and source.operator.status not in (None, '', 'active'):
-        raise serializers.ValidationError({'detail': 'O operador da locação original não está ativo.'})
+    source.operator = validate_operator_assignment(source.operator, source.lessee, lock=lock_operator)
     if data['first_start_date'] <= timezone.localdate():
         raise serializers.ValidationError({'first_start_date': 'Escolha uma data futura.'})
     duration = source.end_date - source.start_date
@@ -151,7 +152,7 @@ def create_recurrence(source_id, user, data):
     # availability check, closing the check-then-insert race on PostgreSQL.
     posting = Postings.objects.select_for_update().select_related('machinery').get(pk=source.postings_id)
     source.postings = posting
-    preview = build_preview(source, data)
+    preview = build_preview(source, data, lock_operator=True)
     series = RentalRecurrence.objects.create(
         source_rental=source, lessee=user,
         first_start_date=data['first_start_date'], frequency=data['frequency'],
@@ -175,7 +176,7 @@ def create_recurrence(source_id, user, data):
 
 
 def series_response(series):
-    from api.serializer import RentalSerializer
+    from rentals.serializer import RentalOutputSerializer
 
     rentals = series.rentals.select_related('lessee', 'postings__machinery__owner', 'contracts').order_by('recurrence_index')
     return {
@@ -186,5 +187,5 @@ def series_response(series):
         'occurrences': series.occurrences,
         'total_price': str(series.total_price),
         'reservation_expires_at': series.created_at + timedelta(minutes=MINUTOS_DE_RESERVA),
-        'rentals': RentalSerializer(rentals, many=True).data,
+        'rentals': RentalOutputSerializer(rentals, many=True).data,
     }

@@ -3,11 +3,13 @@ import axios, { AxiosError, type AxiosInstance } from "axios";
 import { getApiBaseUrl } from "./apiUrls";
 import type { HttpClient, HttpRequest, HttpResponse } from "./HttpClient";
 import {
+  type ApiErrorBody,
   BadRequestError,
   ConflictError,
   type FieldErrors,
   ForbiddenError,
   HttpError,
+  type HttpErrorDetails,
   NetworkError,
   NotFoundError,
   RequestCanceledError,
@@ -17,6 +19,9 @@ import {
 } from "./errors";
 
 export { DEFAULT_BASE_URL } from "./apiUrls";
+
+// Business-rule errors must not be attached to a nonexistent form field.
+const NON_FIELD_ERRORS = "non_field_errors";
 
 export function createAxiosInstance(baseURL?: string): AxiosInstance {
   return axios.create({
@@ -33,33 +38,48 @@ export function createPublicAxiosInstance(baseURL: string): AxiosInstance {
   return axios.create({ baseURL });
 }
 
-// Parse de erro do backend nas duas formas que ele usa
-// {"error": "..."}` / `{"detail": "..."}` viram mensagem plana
-// {campo: ["msg"]}` vira `fieldErrors`
-function parseErrorBody(data: unknown): { message?: string; fieldErrors: FieldErrors } {
-  const fieldErrors: FieldErrors = {};
-  if (data === null || typeof data !== "object") {
-    return { fieldErrors };
-  }
-
-  let message: string | undefined;
-  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-    if ((key === "error" || key === "detail") && typeof value === "string") {
-      message = value;
-      continue;
-    }
-    if (Array.isArray(value)) {
-      const messages = value.filter((item): item is string => typeof item === "string");
-      if (messages.length > 0) fieldErrors[key] = messages;
-    } else if (typeof value === "string") {
-      fieldErrors[key] = [value];
-    }
-  }
-
-  return { message, fieldErrors };
+interface ParsedErrorBody extends HttpErrorDetails {
+  message?: string;
+  fieldErrors: FieldErrors;
+  nonFieldErrors: string[];
 }
 
-function firstFieldMessage(fieldErrors: FieldErrors): string | undefined {
+function stringList(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+// Accept the structured API envelope and feature endpoints that still return
+// DRF field errors or { error/detail }. Both forms retain useful validation text.
+function parseErrorBody(data: unknown): ParsedErrorBody {
+  const fieldErrors: FieldErrors = {};
+  const nonFieldErrors: string[] = [];
+  if (data === null || typeof data !== "object") {
+    return { fieldErrors, nonFieldErrors };
+  }
+
+  const body = data as Partial<ApiErrorBody> & Record<string, unknown>;
+  const apiCode = typeof body.code === "string" ? body.code : undefined;
+  const message = [body.message, body.error, body.detail].find((value): value is string => typeof value === "string");
+
+  const structured = body.errors !== null && typeof body.errors === "object" && !Array.isArray(body.errors);
+  const errors = structured ? body.errors as Record<string, unknown> : body;
+  for (const [field, value] of Object.entries(errors)) {
+    if (!structured && ["code", "message", "error", "detail", "errors"].includes(field)) continue;
+    const messages = stringList(value);
+    if (messages.length === 0) continue;
+    if (field === NON_FIELD_ERRORS) {
+      nonFieldErrors.push(...messages);
+    } else {
+      fieldErrors[field] = messages;
+    }
+  }
+
+  return { apiCode, message, fieldErrors, nonFieldErrors };
+}
+
+function firstMessage({ fieldErrors, nonFieldErrors }: ParsedErrorBody): string | undefined {
+  if (nonFieldErrors.length > 0) return nonFieldErrors[0];
   for (const messages of Object.values(fieldErrors)) {
     if (messages.length > 0) return messages[0];
   }
@@ -78,28 +98,31 @@ export function toHttpError(error: unknown): HttpError {
     const response = error.response;
     if (!response) return new NetworkError(undefined, error);
 
-    const { message, fieldErrors } = parseErrorBody(response.data);
+    const parsed = parseErrorBody(response.data);
+    const { apiCode, fieldErrors, nonFieldErrors } = parsed;
+    const details: HttpErrorDetails = { apiCode, fieldErrors, nonFieldErrors };
+    // `message` só falta quando o corpo não veio do nosso handler (um proxy, por
+    // exemplo); aí a primeira mensagem disponível é melhor que o texto padrão.
+    const message = parsed.message ?? firstMessage(parsed);
 
     switch (response.status) {
       case 400:
-        return new BadRequestError(
-          message ?? firstFieldMessage(fieldErrors) ?? "Dados inválidos.",
-          fieldErrors,
-          error,
-        );
+        return new BadRequestError(message, error, details);
       case 401:
-        return new UnauthorizedError(message, error);
+        return new UnauthorizedError(message, error, details);
       case 403:
-        return new ForbiddenError(message, error);
+        return new ForbiddenError(message, error, details);
       case 404:
-        return new NotFoundError(message, error);
+        return new NotFoundError(message, error, details);
       case 422:
-        return new HttpError("unprocessable_entity", message ?? "Não foi possível processar os dados.", 422, error);
+        return new HttpError("unprocessable_entity", message ?? "Não foi possível processar os dados.", 422, error, details);
       case 409:
-        return new ConflictError(message, error);
+        return new ConflictError(message, error, details);
       default:
-        if (response.status >= 500) return new ServerError(response.status, message, error);
-        return new UnexpectedError(message, error);
+        if (response.status >= 500) {
+          return new ServerError(response.status, message, error, details);
+        }
+        return new UnexpectedError(message, error, details);
     }
   }
 

@@ -28,7 +28,7 @@ class SignatureFixtures(RecurrenceFixtures):
 class SignatureAccessTests(SignatureFixtures, TestCase):
     def test_contract_routes_require_authentication(self):
         self.client.force_authenticate(None)
-        for url in ['/api/contracts/', f'/api/contracts/{self.rental.pk}', f'/api/contracts/{self.rental.pk}/evidence']:
+        for url in ['/api/contracts', f'/api/contracts/{self.rental.pk}', f'/api/contracts/{self.rental.pk}/evidence']:
             self.assertEqual(self.client.get(url).status_code, 401)
         for url in [self.url, f'/api/contracts/{self.rental.pk}/otp']:
             self.assertEqual(self.client.post(url, {'role': 'locatario'}, format='json').status_code, 401)

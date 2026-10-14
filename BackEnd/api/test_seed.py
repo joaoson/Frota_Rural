@@ -7,7 +7,8 @@ from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 
-from api.models import Rentals, Reviews
+from rentals.models import Rentals
+from reviews.models import Reviews
 from chat.models import Messages
 from contracts.models import Contracts, ContractSignatures
 from document_validation.models import Certification

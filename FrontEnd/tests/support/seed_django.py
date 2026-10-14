@@ -14,14 +14,15 @@ from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from api.models import Rentals, RentalRecurrence
+from rentals.models import Rentals
+from api.models import RentalRecurrence
 from chat.models import Messages
 from chat.threads import format_thread_id
 from contracts.models import Contracts
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from pricing.models import PricingSuggestions
-from api.models import Reviews
+from reviews.models import Reviews
 from users.models import Users
 from rest_framework_simplejwt.tokens import AccessToken
 

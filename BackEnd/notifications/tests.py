@@ -7,11 +7,12 @@ from django.db import transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from api.models import RentalRecurrence, Rentals
+from api.models import RentalRecurrence
+from rentals.models import Rentals
 from api.test_recurrence import RecurrenceFixtures
 from contracts.models import Contracts, ContractSignatures
 from payments.models import Payments
-from payments.views import _aprovar, _expirar
+from payments.services import PaymentService
 
 from .events import notify_rental_event
 from .models import Notification
@@ -150,7 +151,7 @@ class RentalNotificationTests(NotificationFixtures, TestCase):
         def fail_after_write(*args, **kwargs):
             notify_rental_event(*args, **kwargs)
             raise RuntimeError('notification write failed')
-        with patch('api.views.notify_rental_event', side_effect=fail_after_write):
+        with patch('rentals.services.notify_rental_event', side_effect=fail_after_write):
             with self.assertRaises(RuntimeError):
                 self.new_rental()
         self.assertEqual(Rentals.objects.count(), 1)
@@ -213,7 +214,7 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
     def payment(self, session_id='cs_notifications'):
         return Payments.objects.create(rental=self.rental, session_id=session_id, amount=self.rental.total_price)
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_checkout_and_retry_emit_one_pending_event_per_party(self, provider):
         session = SimpleNamespace(id='cs_pending', url='https://checkout.stripe.com/test', status='open',
                                   expires_at=int((timezone.now() + timedelta(minutes=31)).timestamp()))
@@ -226,9 +227,9 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
 
     def test_approval_replay_and_expiry_do_not_duplicate_or_contradict_confirmation(self):
         payment = self.payment()
-        _aprovar(payment.session_id)
-        _aprovar(payment.session_id)
-        _expirar(payment.session_id)
+        PaymentService._approve(payment.session_id)
+        PaymentService._approve(payment.session_id)
+        PaymentService._expire(payment.session_id)
         self.assertEqual(Notification.objects.filter(kind='payment').count(), 2)
         self.assertEqual(Notification.objects.filter(title='Pagamento confirmado').count(), 2)
 
@@ -236,25 +237,25 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
         payment = self.payment()
         self.rental.status = 'awaiting_payment'
         self.rental.save(update_fields=['status'])
-        _expirar(payment.session_id)
-        _expirar(payment.session_id)
+        PaymentService._expire(payment.session_id)
+        PaymentService._expire(payment.session_id)
         self.assertEqual(Notification.objects.filter(title='Prazo de pagamento encerrado').count(), 2)
         self.assertEqual(Notification.objects.filter(title='Reserva cancelada').count(), 2)
 
     def test_late_conflicting_payment_notifies_review_without_confirmation(self):
         payment = self.payment()
         self.conflict()
-        with self.assertLogs('payments.views', level='ERROR'):
-            _aprovar(payment.session_id)
-        _aprovar(payment.session_id)
+        with self.assertLogs('payments.services', level='ERROR'):
+            PaymentService._approve(payment.session_id)
+        PaymentService._approve(payment.session_id)
         self.assertEqual(Notification.objects.filter(title='Pagamento em análise').count(), 2)
         self.assertFalse(Notification.objects.filter(title='Pagamento confirmado').exists())
 
     def test_notification_failure_rolls_back_payment_approval(self):
         payment = self.payment()
-        with patch('payments.views.notify_rental_event', side_effect=RuntimeError('failed event')):
+        with patch('payments.services.notify_rental_event', side_effect=RuntimeError('failed event')):
             with self.assertRaises(RuntimeError):
-                _aprovar(payment.session_id)
+                PaymentService._approve(payment.session_id)
         payment.refresh_from_db()
         self.rental.refresh_from_db()
         self.assertEqual(payment.status, 'pending')
@@ -264,7 +265,7 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
     @override_settings(CONTRACT_SIGNATURE_REQUIRE_OTP=False)
     def test_both_signatures_and_completion_notify_once_with_duplicate_rejected(self):
         payment = self.payment()
-        _aprovar(payment.session_id)
+        PaymentService._approve(payment.session_id)
         url = f'/api/contracts/{self.rental.pk}/sign'
         response = self.client.post(url, {'role': 'locatario'}, format='json')
         self.assertEqual(response.status_code, 200, response.data)

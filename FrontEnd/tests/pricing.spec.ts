@@ -60,7 +60,7 @@ test('loads research on demand, applies it only on confirmation, and publishes t
   await rate.fill('200.50');
   await page.getByLabel('Localização *', { exact: true }).fill('Castro, PR');
   const published = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/postings/' && response.request().method() === 'POST');
+    new URL(response.url()).pathname === '/api/postings' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Publicar Anúncio' }).click();
   const response = await published;
   expect(response.status()).toBe(201);
@@ -85,7 +85,7 @@ test('unavailable market data still allows publishing a manual price', async ({ 
   await page.getByLabel('Valor por Hora (R$) *', { exact: true }).fill('180');
   await page.getByLabel('Localização *', { exact: true }).fill('Castro, PR');
   const published = page.waitForResponse(response =>
-    new URL(response.url()).pathname === '/api/postings/' && response.request().method() === 'POST');
+    new URL(response.url()).pathname === '/api/postings' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Publicar Anúncio' }).click();
   const response = await published;
   expect(response.status()).toBe(201);

@@ -404,7 +404,7 @@ class EndpointTests(TestCase):
                 '/api/pricing/suggest', {'machinery': str(self.machine.id)}, format='json'
             ).json()['suggestion_id']
 
-        response = self.client.post('/api/postings/', {
+        response = self.client.post('/api/postings', {
             'machinery': str(self.machine.id),
             'hourly_rate': '210.00',
             'location_address': 'Sorriso, MT',
@@ -428,7 +428,7 @@ class EndpointTests(TestCase):
                 '/api/pricing/suggest', {'machinery': str(outra.id)}, format='json'
             ).json()['suggestion_id']
 
-        response = self.client.post('/api/postings/', {
+        response = self.client.post('/api/postings', {
             'machinery': str(self.machine.id),
             'hourly_rate': '210.00',
             'location_address': 'Sorriso, MT',

@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { HttpError } from "@/shared/http/errors";
 import { RentalPaymentButton } from "@/features/payments/components/RentalPaymentButton";
 import { useRentalRecurrence } from "../hooks/useRentalRecurrence";
 import { rentalMachineName, type Rental } from "../types/rental";
@@ -26,8 +26,8 @@ function duration(rental: Rental) {
 }
 
 function ErrorMessage({ error }: { error: Error }) {
-  const messages = error instanceof BadRequestError && error.hasFieldErrors
-    ? Object.entries(error.fieldErrors).flatMap(([field, errors]) => errors.map((message) => `${fieldLabels[field] ? `${fieldLabels[field]}: ` : ""}${message}`))
+  const messages = error instanceof HttpError && (error.hasFieldErrors || error.nonFieldErrors.length > 0)
+    ? [...Object.entries(error.fieldErrors).flatMap(([field, errors]) => errors.map((message) => `${fieldLabels[field] ? `${fieldLabels[field]}: ` : ""}${message}`)), ...error.nonFieldErrors]
     : [error instanceof HttpError ? error.message : "Não foi possível concluir. Confira sua conexão e tente novamente."];
   return <div role="alert" className="rounded-xl border border-error/30 bg-error/10 p-4 text-sm text-error">{messages.map((message, index) => <p key={index}>{message}</p>)}</div>;
 }

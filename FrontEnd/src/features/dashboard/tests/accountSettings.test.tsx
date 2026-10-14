@@ -42,13 +42,13 @@ describe('account and operator actions', () => {
     fireEvent.submit(form); fireEvent.submit(form);
     expect(mocks.update).toHaveBeenCalledOnce();
     await act(async () => pending.resolve());
-    mocks.update.mockRejectedValueOnce(new BadRequestError('Dados inválidos', { document: ['CPF inválido.'] }));
+    mocks.update.mockRejectedValueOnce(new BadRequestError('Dados inválidos', undefined, { fieldErrors: { document: ['CPF inválido.'] } }));
     fireEvent.submit(form);
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('CPF inválido.'));
     expect(screen.queryByText('Alterar foto')).toBeNull();
   });
   it('shows new-password validation instead of incorrectly blaming the current password', async () => {
-    mocks.password.mockRejectedValueOnce(new BadRequestError('Dados inválidos', { new_password: ['A senha é muito comum.'] }));
+    mocks.password.mockRejectedValueOnce(new BadRequestError('Dados inválidos', undefined, { fieldErrors: { new_password: ['A senha é muito comum.'] } }));
     render(<AccountSection userId={user.id} user={user} roleLabel="Locador" />);
     fireEvent.change(screen.getByLabelText('Senha Atual'), { target: { value: 'Atual1234' } });
     fireEvent.change(screen.getByLabelText('Nova Senha'), { target: { value: 'Password123' } });

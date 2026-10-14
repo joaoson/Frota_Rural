@@ -1,4 +1,4 @@
-export const DEFAULT_BASE_URL = "http://localhost:8000/api/";
+export const DEFAULT_BASE_URL = "http://localhost:8000/api";
 
 function alignLocalHostname(url: URL, pageOrigin: string, development: boolean): URL {
   const page = new URL(pageOrigin);

@@ -13,7 +13,8 @@ import { PageHeader } from "@/shared/components/PageHeader";
 import { PageShell } from "@/shared/components/PageShell";
 import { PasswordField } from "@/shared/components/PasswordField";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
-import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { applyFieldErrors } from "@/shared/http/applyFieldErrors";
+import { HttpError } from "@/shared/http/errors";
 import { masked } from "@/shared/lib/maskedRegister";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { maskCEP } from "@/shared/utils/masks/maskCEP";
@@ -28,6 +29,8 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof SignupFormValues>> = {
   address: "address",
   cep: "cep",
   birth_date: "birthDate",
+  city: "city",
+  state: "state",
   password: "password",
   role: "role",
 };
@@ -69,21 +72,10 @@ const Signup = () => {
       );
       navigate("/login");
     } catch (error) {
-      if (error instanceof BadRequestError && error.hasFieldErrors) {
-        let placed = false;
-        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
-          const formField = API_FIELD_TO_FORM[apiField];
-          const message = messages[0];
-          if (formField && message) {
-            form.setError(formField, { type: "server", message });
-            placed = true;
-          }
-        }
-        if (placed) return;
-      }
+      if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
         error instanceof HttpError
-          ? error.message
+          ? (error.firstFieldError()?.message ?? error.message)
           : "Ocorreu um problema com o cadastro. Tente novamente mais tarde.",
       );
     }

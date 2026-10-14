@@ -12,10 +12,10 @@ import {
 } from "../types/documentSchemas";
 import { certificationToDomain, licenseToDomain, validationToDomain } from "./documentMapper";
 
-const LICENSES_PATH = "operator-licenses/";
-const CERTIFICATIONS_PATH = "certifications/";
-const UPLOAD_PATH = "documents/upload/";
-const VALIDATE_PATH = "operator-licenses/validate-document/";
+const LICENSES_PATH = "operator-licenses";
+const CERTIFICATIONS_PATH = "certifications";
+const UPLOAD_PATH = "documents/upload";
+const VALIDATE_PATH = "operator-licenses/validate-document";
 
 export interface DocumentFilter {
   userId?: string;

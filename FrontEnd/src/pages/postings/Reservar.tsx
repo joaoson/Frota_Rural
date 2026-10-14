@@ -10,8 +10,8 @@ import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
 import type { RentalOccupancy, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
-import { HttpError } from "@/shared/http/errors";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
+import { HttpError } from "@/shared/http/errors";
 
 
 const HORAS_POR_DIARIA = 8;
@@ -730,9 +730,7 @@ const Reservar = () => {
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
       window.scrollTo(0, 0);
     } catch (err) {
-      const mensagem =
-        err instanceof HttpError ? err.message : "Erro ao assinar contrato.";
-      toast.error(mensagem);
+      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
       setAssinando(false);
     }
   };

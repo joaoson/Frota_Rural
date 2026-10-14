@@ -1,4 +1,3 @@
-import io
 import uuid
 from datetime import date
 from unittest.mock import patch
@@ -43,19 +42,17 @@ class PostingPhotoUploadTests(TestCase):
             updated_at=timezone.now(),
         )
         self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(owner)}"
-        self.url = f"/api/postings/{self.posting.id}/photos/"
+        self.url = f"/api/postings/{self.posting.id}/photos"
 
     def _image(self, name="foto.jpg", content_type="image/jpeg", size=64):
         return SimpleUploadedFile(name, b"x" * size, content_type=content_type)
 
     def test_upload_stores_only_the_path_and_returns_public_url(self):
         with patch(
-            "postings.views.firebase_storage.upload_image",
+            "postings.services.firebase_storage.upload_image",
             return_value=f"postings/{self.posting.id}/abc.jpg",
         ) as upload:
-            response = self.client.post(
-                self.url, {"image": self._image(), "is_primary": "true"}
-            )
+            response = self.client.post(self.url, {"image": self._image(), "is_primary": "true"})
 
         self.assertEqual(response.status_code, 201)
         upload.assert_called_once()
@@ -83,11 +80,9 @@ class PostingPhotoUploadTests(TestCase):
             created_at=timezone.now(),
         )
         with patch(
-            "postings.views.firebase_storage.upload_image", return_value="postings/new.jpg"
+            "postings.services.firebase_storage.upload_image", return_value="postings/new.jpg"
         ):
-            response = self.client.post(
-                self.url, {"image": self._image(), "is_primary": "true"}
-            )
+            response = self.client.post(self.url, {"image": self._image(), "is_primary": "true"})
 
         self.assertEqual(response.status_code, 201)
         old.refresh_from_db()
@@ -95,30 +90,28 @@ class PostingPhotoUploadTests(TestCase):
         self.assertEqual(PostingsPhotos.objects.filter(is_primary=True).count(), 1)
 
     def test_rejects_unsupported_content_type(self):
-        with patch("postings.views.firebase_storage.upload_image") as upload:
+        with patch("postings.services.firebase_storage.upload_image") as upload:
             response = self.client.post(
                 self.url,
                 {"image": self._image(name="doc.pdf", content_type="application/pdf")},
             )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("application/pdf", response.json()["error"])
+        self.assertIn("application/pdf", response.json()["message"])
         upload.assert_not_called()
         self.assertEqual(PostingsPhotos.objects.count(), 0)
 
     def test_rejects_file_over_5mb(self):
-        with patch("postings.views.firebase_storage.upload_image") as upload:
-            response = self.client.post(
-                self.url, {"image": self._image(size=5 * 1024 * 1024 + 1)}
-            )
+        with patch("postings.services.firebase_storage.upload_image") as upload:
+            response = self.client.post(self.url, {"image": self._image(size=5 * 1024 * 1024 + 1)})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("excede o", response.json()["error"])
+        self.assertIn("excede o", response.json()["message"])
         upload.assert_not_called()
 
     def test_returns_503_when_firebase_is_not_configured(self):
         from djangoapi.firebase_storage import FirebaseStorageNotConfigured
 
         with patch(
-            "postings.views.firebase_storage.upload_image",
+            "postings.services.firebase_storage.upload_image",
             side_effect=FirebaseStorageNotConfigured("faltou config"),
         ):
             response = self.client.post(self.url, {"image": self._image()})
@@ -132,18 +125,18 @@ class PostingPhotoUploadTests(TestCase):
         response = self.client.post(self.url, {"image": "x"}, content_type="application/json")
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("multipart/form-data", response.json()["error"])
-        self.assertIn("application/json", response.json()["error"])
+        self.assertIn("multipart/form-data", response.json()["message"])
+        self.assertIn("application/json", response.json()["message"])
 
     def test_missing_file_in_multipart_still_says_no_file(self):
         response = self.client.post(self.url, {"is_primary": "true"})
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"], "Nenhum arquivo enviado.")
+        self.assertEqual(response.json()["message"], "Nenhum arquivo enviado.")
 
     def test_unknown_posting_returns_404(self):
         response = self.client.post(
-            f"/api/postings/{uuid.uuid4()}/photos/", {"image": self._image()}
+            f"/api/postings/{uuid.uuid4()}/photos", {"image": self._image()}
         )
         self.assertEqual(response.status_code, 404)
 
@@ -197,11 +190,11 @@ class PostingPhotoSerializationTests(TestCase):
         legacy = "https://storage.example.com/postings/legado.jpg"
         self._photo(legacy, True)
 
-        response = self.client.get("/api/postings/")
+        response = self.client.get("/api/postings")
         item = next(p for p in response.json() if p["id"] == str(self.posting.id))
         self.assertEqual(item["primary_photo_url"], legacy)
 
     def test_list_returns_null_when_there_are_no_photos(self):
-        response = self.client.get("/api/postings/")
+        response = self.client.get("/api/postings")
         item = next(p for p in response.json() if p["id"] == str(self.posting.id))
         self.assertIsNone(item["primary_photo_url"])

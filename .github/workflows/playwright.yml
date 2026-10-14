@@ -38,7 +38,7 @@ jobs:
       - name: Wait for frontend and backend
         run: |
           curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:5173/ > /dev/null
-          curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:8000/api/schema/swagger-ui/ > /dev/null
+          curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:8000/api/schema/swagger-ui > /dev/null
       - name: Check frontend and browser test types
         working-directory: FrontEnd
         run: |

@@ -65,7 +65,7 @@ test('reuses a past rental, previews current prices, and creates independent uns
   });
   expect(replay.status()).toBe(201);
   expect((await replay.json()).id).toBe(series.id);
-  const rentals = await page.request.get(`${apiURL}rentals/?lessee=${data.renter.id}`, {
+  const rentals = await page.request.get(`${apiURL}rentals?lessee=${data.renter.id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(await rentals.json()).toHaveLength(3);
@@ -94,7 +94,7 @@ test('changing the schedule invalidates its preview and a conflicting date creat
   await expect(dialog.getByRole('button', { name: 'Criar 2 reservas', exact: true })).toHaveCount(0);
   await dialog.getByLabel('Frequência', { exact: true }).selectOption('weekly');
 
-  const conflict = await page.request.post(`${apiURL}rentals/`, {
+  const conflict = await page.request.post(`${apiURL}rentals`, {
     headers, data: { postings: data.posting, lessee: data.renter.id,
       ...schedule.dates[1], total_price: '3024.00', status: 'pending' },
   });
@@ -102,6 +102,6 @@ test('changing the schedule invalidates its preview and a conflicting date creat
   await dialog.getByRole('button', { name: 'Consultar datas e valores' }).click();
   await expect(dialog.getByRole('alert')).toContainText(/conflita|disponível/);
   await expect(dialog.getByRole('button', { name: 'Criar 2 reservas', exact: true })).toHaveCount(0);
-  const rentals = await page.request.get(`${apiURL}rentals/?lessee=${data.renter.id}`, { headers });
+  const rentals = await page.request.get(`${apiURL}rentals?lessee=${data.renter.id}`, { headers });
   expect(await rentals.json()).toHaveLength(2);
 });

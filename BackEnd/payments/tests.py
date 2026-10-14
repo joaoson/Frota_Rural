@@ -8,7 +8,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from api.models import Rentals
+from rentals.models import Rentals
 from contracts.models import Contracts
 from machines.models import Machines
 from postings.models import Postings
@@ -16,7 +16,8 @@ from users.models import Users
 
 from .availability import tem_conflito
 from .models import Payments
-from .views import _aprovar, _expirar
+from payments.services import PaymentService
+import stripe
 
 
 class CheckoutReservationTests(TestCase):
@@ -51,7 +52,7 @@ class CheckoutReservationTests(TestCase):
         return Payments.objects.create(rental=self.rental, session_id=session_id, amount='3024.00')
 
     @override_settings(STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='')
-    @patch('payments.views.stripe.checkout.Session.create')
+    @patch('payments.services.stripe.checkout.Session.create')
     def test_unconfigured_payments_return_clear_error_without_writes_or_provider_calls(self, create):
         response = self.client.post(self.checkout_url)
         self.assertEqual(response.status_code, 503, response.data)
@@ -62,20 +63,20 @@ class CheckoutReservationTests(TestCase):
         self.assertEqual(self.rental.status, 'pending')
 
     @override_settings(STRIPE_SECRET_KEY='sk_test_placeholder', STRIPE_WEBHOOK_SECRET='')
-    @patch('payments.views.stripe.checkout.Session.create')
+    @patch('payments.services.stripe.checkout.Session.create')
     def test_checkout_cannot_collect_payment_without_webhook_configuration(self, create):
         self.assertEqual(self.client.post(self.checkout_url).status_code, 503)
         create.assert_not_called()
         self.assertFalse(Payments.objects.exists())
 
     @override_settings(STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='whsec_test')
-    @patch('payments.views.stripe.Webhook.construct_event', return_value={'type': 'ignored.event'})
+    @patch('payments.services.stripe.Webhook.construct_event', return_value={'type': 'ignored.event'})
     def test_signed_webhook_verification_does_not_require_checkout_api_key(self, verify):
         response = self.client.post('/api/payments/webhook', {}, format='json')
         self.assertEqual(response.status_code, 200)
         verify.assert_called_once()
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_expired_hold_is_revalidated_and_renewed_with_server_price(self, provider):
         self.assertFalse(tem_conflito(self.posting.id, self.rental.start_date, self.rental.end_date))
         provider.return_value.checkout.Session.create.return_value = self.session
@@ -91,7 +92,7 @@ class CheckoutReservationTests(TestCase):
         self.assertEqual(kwargs['line_items'][0]['price_data']['unit_amount'], 302400)
         self.assertIn('expires_at', kwargs)
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_checkout_retry_reuses_open_session(self, provider):
         self.payment()
         provider.return_value.checkout.Session.retrieve.return_value = self.session
@@ -102,7 +103,7 @@ class CheckoutReservationTests(TestCase):
         self.rental.refresh_from_db()
         self.assertGreater(self.rental.reservation_expires_at, timezone.now())
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_other_tenants_and_anonymous_visitors_cannot_start_checkout(self, provider):
         self.client.force_authenticate(self.owner)
         self.assertEqual(self.client.post(self.checkout_url).status_code, 404)
@@ -110,7 +111,7 @@ class CheckoutReservationTests(TestCase):
         self.assertEqual(self.client.post(self.checkout_url).status_code, 401)
         provider.assert_not_called()
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_occupied_dates_reject_checkout_before_contacting_stripe(self, provider):
         Rentals.objects.create(
             id=uuid.uuid4(), postings=self.posting, lessee=self.owner,
@@ -121,7 +122,7 @@ class CheckoutReservationTests(TestCase):
         provider.assert_not_called()
         self.assertFalse(Payments.objects.exists())
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_paid_or_cancelled_reservations_cannot_be_charged_again(self, provider):
         for status in ('active', 'signed', 'completed', 'cancelled'):
             self.rental.status = status
@@ -130,7 +131,7 @@ class CheckoutReservationTests(TestCase):
                 self.assertEqual(self.client.post(self.checkout_url).status_code, 409)
         provider.assert_not_called()
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_checkout_revalidates_changed_posting_limits(self, provider):
         for changes in (
             {'max_reservation_days': 1},
@@ -152,7 +153,7 @@ class CheckoutReservationTests(TestCase):
         self.client.force_authenticate(self.owner)
         self.assertEqual(self.client.get(url).status_code, 404)
 
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_reviewed_payment_cannot_be_charged_again(self, provider):
         payment = self.payment()
         payment.status = 'requires_review'
@@ -161,7 +162,7 @@ class CheckoutReservationTests(TestCase):
         provider.assert_not_called()
 
     @override_settings(STRIPE_WEBHOOK_SECRET='whsec_test')
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_delayed_payment_waits_for_paid_webhook(self, provider):
         payment = self.payment()
         def deliver(kind, payment_status):
@@ -181,7 +182,7 @@ class CheckoutReservationTests(TestCase):
         self.assertEqual(payment.status, 'approved')
 
     @override_settings(STRIPE_WEBHOOK_SECRET='whsec_test')
-    @patch('payments.views._stripe')
+    @patch('payments.services._stripe')
     def test_delayed_payment_failure_releases_the_reservation(self, provider):
         contract = Contracts.objects.create(id=uuid.uuid4(), rental=self.rental, status='pending_signatures')
         payment = self.payment()
@@ -200,9 +201,9 @@ class CheckoutReservationTests(TestCase):
 
     def test_approval_and_duplicate_events_preserve_confirmed_reservation(self):
         payment = self.payment()
-        _aprovar(payment.session_id)
-        _aprovar(payment.session_id)
-        _expirar(payment.session_id)
+        PaymentService._approve(payment.session_id)
+        PaymentService._approve(payment.session_id)
+        PaymentService._expire(payment.session_id)
         payment.refresh_from_db()
         self.rental.refresh_from_db()
         self.assertEqual(payment.status, 'approved')
@@ -214,8 +215,8 @@ class CheckoutReservationTests(TestCase):
             id=uuid.uuid4(), postings=self.posting, lessee=self.owner,
             start_date=self.rental.start_date, end_date=self.rental.end_date, status='active',
         )
-        with self.assertLogs('payments.views', level='ERROR'):
-            _aprovar(payment.session_id)
+        with self.assertLogs('payments.services', level='ERROR'):
+            PaymentService._approve(payment.session_id)
         payment.refresh_from_db()
         self.rental.refresh_from_db()
         self.assertEqual(payment.status, 'requires_review')
@@ -226,9 +227,194 @@ class CheckoutReservationTests(TestCase):
         current = self.payment('cs_new')
         self.rental.status = 'awaiting_payment'
         self.rental.save(update_fields=['status'])
-        _expirar(old.session_id)
+        PaymentService._expire(old.session_id)
         self.rental.refresh_from_db()
         self.assertEqual(self.rental.status, 'awaiting_payment')
-        _expirar(current.session_id)
+        PaymentService._expire(current.session_id)
         self.rental.refresh_from_db()
         self.assertEqual(self.rental.status, 'cancelled')
+
+
+CREATE_SESSION = "payments.services.stripe.checkout.Session.create"
+CONSTRUCT_EVENT = "payments.services.stripe.Webhook.construct_event"
+
+
+def make_user(role, seq):
+    return Users.objects.create(
+        id=uuid.uuid4(),
+        name=f"{role.title()} {seq}",
+        document=f"doc{seq:011d}",
+        email=f"{role}{seq}@teste.com",
+        role=role,
+        address="Rua Teste, 100",
+        birth_date=date(1990, 1, 1),
+        status="active",
+    )
+
+
+@override_settings(STRIPE_SECRET_KEY="sk_test_placeholder", STRIPE_WEBHOOK_SECRET="whsec_test")
+class PaymentTestCase(TestCase):
+    def setUp(self):
+        owner = make_user("locador", 1)
+        self.lessee = make_user("locatario", 2)
+        machine = Machines.objects.create(
+            id=uuid.uuid4(), owner=owner, brand="John Deere", model="6135J", status="active"
+        )
+        self.posting = Postings.objects.create(
+            id=uuid.uuid4(), machinery=machine, hourly_rate="100.00", status="active"
+        )
+        self.start = timezone.now() + timedelta(days=10)
+        self.rental = self.make_rental(status="pending")
+        self.client = APIClient()
+        self.client.force_authenticate(self.lessee)
+
+    def make_rental(self, status, created_at=None, offset_days=0):
+        start = self.start + timedelta(days=offset_days)
+        return Rentals.objects.create(
+            id=uuid.uuid4(),
+            postings=self.posting,
+            lessee=self.lessee,
+            start_date=start,
+            end_date=start + timedelta(days=2),
+            status=status,
+            created_at=created_at or timezone.now(),
+        )
+
+
+class CheckoutTests(PaymentTestCase):
+    def checkout(self, rental_id=None):
+        return self.client.post(f"/api/rentals/{rental_id or self.rental.id}/checkout")
+
+    def test_checkout_recalculates_amount_and_holds_the_rental(self):
+        session = SimpleNamespace(id="cs_test_1", url="https://checkout.stripe.com/c/cs_test_1", expires_at=int((timezone.now() + timedelta(minutes=31)).timestamp()))
+        with patch(CREATE_SESSION, return_value=session) as create:
+            response = self.checkout()
+
+        self.assertEqual(response.status_code, 200, response.content)
+        # 100/h x 8h x 3 diárias + 5% de taxa.
+        self.assertEqual(response.json(), {"url": session.url, "amount": "2520.00"})
+        self.assertEqual(
+            create.call_args.kwargs["line_items"][0]["price_data"]["unit_amount"], 252000
+        )
+        payment = Payments.objects.get()
+        self.assertEqual(payment.status, "pending")
+        self.rental.refresh_from_db()
+        self.assertEqual(self.rental.status, "awaiting_payment")
+        self.assertEqual(self.rental.total_price, Decimal("2520.00"))
+
+    def test_overlapping_confirmed_rental_blocks_checkout(self):
+        self.make_rental(status="active", offset_days=1)
+
+        with patch(CREATE_SESSION) as create:
+            response = self.checkout()
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "period_unavailable")
+        create.assert_not_called()
+
+    def test_stripe_failure_returns_502_and_records_nothing(self):
+        with patch(CREATE_SESSION, side_effect=stripe.StripeError("fora do ar")):
+            response = self.checkout()
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["code"], "external_service_error")
+        self.assertFalse(Payments.objects.exists())
+
+    def test_unknown_rental_returns_404(self):
+        response = self.checkout(rental_id=uuid.uuid4())
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["message"], "Locação não encontrada.")
+
+
+class PaymentStatusAndOccupancyTests(PaymentTestCase):
+    def test_status_is_404_until_a_checkout_exists(self):
+        response = self.client.get(f"/api/rentals/{self.rental.id}/payment")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_status_returns_latest_payment(self):
+        Payments.objects.create(rental=self.rental, session_id="cs_1", amount="2520.00")
+
+        response = self.client.get(f"/api/rentals/{self.rental.id}/payment")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(), {"status": "pending", "amount": "2520.00", "rental_status": "pending"}
+        )
+
+    def test_occupancy_ignores_stale_unpaid_reservations(self):
+        Rentals.objects.filter(id=self.rental.id).update(
+            created_at=timezone.now() - timedelta(hours=1)
+        )
+        confirmed = self.make_rental(status="signed", offset_days=20)
+
+        response = self.client.get(f"/api/postings/{self.posting.id}/ocupacao")
+
+        self.assertEqual(response.status_code, 200)
+        periods = response.json()["ocupados"]
+        self.assertEqual([p["id"] for p in periods], [str(confirmed.id)])
+        self.assertEqual(periods[0]["status"], "signed")
+
+
+@override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")
+class WebhookTests(PaymentTestCase):
+    def setUp(self):
+        super().setUp()
+        Rentals.objects.filter(id=self.rental.id).update(status="awaiting_payment")
+        self.payment = Payments.objects.create(
+            rental=self.rental, session_id="cs_test_1", amount="2520.00"
+        )
+
+    def send(self, event=None, **patch_kwargs):
+        if event is not None:
+            patch_kwargs["return_value"] = event
+        with patch(CONSTRUCT_EVENT, **patch_kwargs):
+            return self.client.post(
+                "/api/payments/webhook",
+                data=b'{"id": "evt_1"}',
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="t=1,v1=abc",
+            )
+
+    @staticmethod
+    def event(event_type, session_id="cs_test_1"):
+        return {"type": event_type, "data": {"object": {"id": session_id, "payment_status": "paid"}}}
+
+    def test_completed_session_approves_payment_and_activates_rental(self):
+        response = self.send(self.event("checkout.session.completed"))
+
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.rental.refresh_from_db()
+        self.assertEqual(self.payment.status, "approved")
+        self.assertEqual(self.rental.status, "active")
+
+    def test_expired_session_cancels_the_held_rental(self):
+        response = self.send(self.event("checkout.session.expired"))
+
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.rental.refresh_from_db()
+        self.assertEqual(self.payment.status, "expired")
+        self.assertEqual(self.rental.status, "cancelled")
+
+    def test_unrelated_events_are_acknowledged_and_ignored(self):
+        response = self.send(self.event("customer.created"))
+
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "pending")
+
+    def test_invalid_signature_returns_400(self):
+        response = self.send(side_effect=stripe.SignatureVerificationError("inválida", "t=1"))
+
+        self.assertEqual(response.status_code, 400)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "pending")
+
+    @override_settings(STRIPE_WEBHOOK_SECRET="")
+    def test_missing_secret_returns_503(self):
+        response = self.send(self.event("checkout.session.completed"))
+
+        self.assertEqual(response.status_code, 503)

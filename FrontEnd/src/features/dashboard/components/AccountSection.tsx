@@ -10,7 +10,7 @@ import { PasswordField } from "@/shared/components/PasswordField";
 import { useCepLookup } from "@/shared/hooks/useCepLookup";
 import { formatAddress } from "@/shared/http/ViaCepClient";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
-import { BadRequestError } from "@/shared/http/errors";
+import { BadRequestError, HttpError } from "@/shared/http/errors";
 import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 import { getInitials } from "@/shared/utils/getInitials";
 import { maskCEP } from "@/shared/utils/masks/maskCEP";
@@ -142,8 +142,8 @@ export function AccountSection({
       });
       toast.success("Dados atualizados com sucesso.");
     } catch (error) {
-      if (error instanceof BadRequestError) {
-        return toast.error(Object.values(error.fieldErrors).flat()[0] ?? error.message);
+      if (error instanceof HttpError) {
+        return toast.error(error.firstFieldError()?.message ?? error.message);
       }
       toast.error("Não foi possível salvar as alterações. Tente novamente.");
     } finally {

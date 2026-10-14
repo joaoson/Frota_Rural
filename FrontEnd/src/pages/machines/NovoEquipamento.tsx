@@ -11,7 +11,8 @@ import {
 import { toCreatePayload } from "@/features/machines/api/machineMapper";
 import { OTHER_BRAND } from "@/features/machines/types/brands";
 import type { MachineFormValues } from "@/features/machines/types/machineSchemas";
-import { BadRequestError } from "@/shared/http/errors";
+import { applyFieldErrors } from "@/shared/http/applyFieldErrors";
+import { HttpError } from "@/shared/http/errors";
 import { BackLink } from "@/shared/components/BackLink";
 import { PageShell } from "@/shared/components/PageShell";
 import { FormField } from "@/shared/components/FormField";
@@ -48,22 +49,11 @@ const NovoEquipamento = () => {
       toast.success("Equipamento cadastrado com sucesso.");
       form.reset(MACHINE_FORM_DEFAULTS);
     } catch (error) {
-      if (error instanceof BadRequestError && error.hasFieldErrors) {
-        let placed = false;
-        for (const [apiField, messages] of Object.entries(error.fieldErrors)) {
-          const formField = API_FIELD_TO_FORM[apiField];
-          const message = messages[0];
-          if (formField && message) {
-            form.setError(formField, { type: "server", message });
-            placed = true;
-          }
-        }
-        if (placed) return;
-      }
+      if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
 
       toast.error(
-        error instanceof BadRequestError
-          ? error.message
+        error instanceof HttpError
+          ? (error.firstFieldError()?.message ?? error.message)
           : "Erro ao cadastrar equipamento. Verifique os dados e tente novamente.",
       );
     }

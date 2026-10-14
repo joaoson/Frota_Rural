@@ -15,7 +15,7 @@ import {
 } from "../types/postingSchemas";
 import { detailToDomain, listItemToDomain, uploadedPhotoToDomain } from "./postingMapper";
 
-const COLLECTION_PATH = "postings/";
+const COLLECTION_PATH = "postings";
 
 export interface PostingFilter {
   ownerId?: string;
@@ -93,7 +93,7 @@ export class HttpPostingRepository implements PostingRepository {
 
     const response = await this.http.send<unknown>({
       method: "POST",
-      path: `${COLLECTION_PATH}${postingId}/photos/`,
+      path: `${COLLECTION_PATH}/${postingId}/photos`,
       body: form,
       headers: { "Content-Type": undefined },
     });

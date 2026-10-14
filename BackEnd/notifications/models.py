@@ -14,7 +14,7 @@ class Notification(models.Model):
     kind = models.CharField(max_length=12, choices=Kind.choices)
     title = models.CharField(max_length=160)
     message = models.TextField()
-    rental = models.ForeignKey('api.Rentals', models.SET_NULL, null=True, blank=True)
+    rental = models.ForeignKey('rentals.Rentals', models.SET_NULL, null=True, blank=True)
     posting = models.ForeignKey('postings.Postings', models.SET_NULL, null=True, blank=True)
     contract = models.ForeignKey('contracts.Contracts', models.SET_NULL, null=True, blank=True)
     event_key = models.CharField(max_length=200)

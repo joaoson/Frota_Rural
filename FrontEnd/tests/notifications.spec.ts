@@ -18,7 +18,7 @@ async function reserve(page: Page, data: Seed, token: string): Promise<string> {
   start.setUTCHours(8, 0, 0, 0);
   const end = new Date(start);
   end.setUTCHours(18);
-  const response = await page.request.post(`${apiURL}rentals/`, {
+  const response = await page.request.post(`${apiURL}rentals`, {
     headers: { Authorization: `Bearer ${token}` },
     data: { postings: data.posting, lessee: data.renter.id,
       start_date: start.toISOString(), end_date: end.toISOString() },

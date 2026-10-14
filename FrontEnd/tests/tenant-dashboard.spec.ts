@@ -6,7 +6,7 @@ test('tenant reviews target the selected rental, persist after reload and can be
   const rental = page.locator(`[id="locacao-${data.sourceRental}"]`);
   await rental.getByRole('button', { name: 'Avaliar', exact: true }).click();
   await rental.getByPlaceholder('Conte como foi a experiência...').fill('Máquina em boas condições e entrega pontual.');
-  const response = page.waitForResponse(r => r.url().endsWith('/api/reviews/') && r.request().method() === 'POST');
+  const response = page.waitForResponse(r => r.url().endsWith('/api/reviews') && r.request().method() === 'POST');
   await rental.getByRole('button', { name: 'Enviar Avaliação', exact: true }).click();
   const reviewResponse = await response;
   expect(reviewResponse.status()).toBe(201);
@@ -18,7 +18,7 @@ test('tenant reviews target the selected rental, persist after reload and can be
   await expect(page.getByText('"Máquina em boas condições e entrega pontual."', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Excluir avaliação de Playwright owner', exact: true }).click();
   await expect(page.getByText('Você ainda não forneceu nenhuma avaliação.', { exact: true })).toBeVisible();
-  const reviews = await page.request.get(`${apiURL}reviews/?reviewer=${data.renter.id}`, { headers: { Authorization: `Bearer ${token}` } });
+  const reviews = await page.request.get(`${apiURL}reviews?reviewer=${data.renter.id}`, { headers: { Authorization: `Bearer ${token}` } });
   expect(await reviews.json()).toEqual([]);
 });
 
@@ -26,7 +26,7 @@ test('tenant rental filters and confirmed cancellation update the real reservati
   const token = await loginViaAPI(page.context(), data.renter);
   const start = new Date(); start.setUTCDate(start.getUTCDate() + 20); start.setUTCHours(8, 0, 0, 0);
   const end = new Date(start); end.setUTCHours(18);
-  const created = await page.request.post(`${apiURL}rentals/`, { headers: { Authorization: `Bearer ${token}` }, data: { postings: data.posting, lessee: data.renter.id, start_date: start.toISOString(), end_date: end.toISOString() } });
+  const created = await page.request.post(`${apiURL}rentals`, { headers: { Authorization: `Bearer ${token}` }, data: { postings: data.posting, lessee: data.renter.id, start_date: start.toISOString(), end_date: end.toISOString() } });
   expect(created.status()).toBe(201);
   const { id } = await created.json() as { id: string };
   await page.goto('/dashboard-locatario?tab=locacoes');
@@ -73,7 +73,7 @@ test('failed checkout retries and reloads reuse the same reservation', async ({ 
   await firstDay.click();
   await firstDay.click();
   await page.getByRole('button', { name: 'Avançar para Pagamento', exact: true }).click();
-  const createdResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/rentals/' && response.request().method() === 'POST');
+  const createdResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/rentals' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Pagar e Avançar', exact: true }).click();
   const response = await createdResponse;
   expect(response.status()).toBe(201);
@@ -86,6 +86,6 @@ test('failed checkout retries and reloads reuse the same reservation', async ({ 
   await page.getByRole('button', { name: 'Pagar e Avançar', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Pagamentos indisponíveis: provedor em configuração.');
   expect(checkouts).toEqual(Array(3).fill(`/api/rentals/${rental.id}/checkout`));
-  const rentals = await page.request.get(`${apiURL}rentals/?lessee=${data.renter.id}`, { headers: { Authorization: `Bearer ${token}` } });
+  const rentals = await page.request.get(`${apiURL}rentals?lessee=${data.renter.id}`, { headers: { Authorization: `Bearer ${token}` } });
   expect(await rentals.json()).toHaveLength(2);
 });

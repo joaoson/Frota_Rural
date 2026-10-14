@@ -1,19 +1,20 @@
 from django.urls import path
-from .views import (
-    contracts_list,
-    contract_detail,
-    sign_contract,
-    contract_evidence,
-    request_signature_otp,
+
+from contracts.views import (
+    ContractDetailView,
+    ContractEvidenceView,
+    ContractListView,
+    ContractSignatureOtpView,
+    ContractSignView,
 )
 
 urlpatterns = [
-    ## CONTRACTS
-    path('contracts/', contracts_list, name='contracts_list'),
-    path('contracts/<uuid:pk>', contract_detail, name='contract_detail'),
-
-    ## ASSINATURA ELETRÔNICA
-    path('contracts/<uuid:pk>/sign', sign_contract, name='sign_contract'),
-    path('contracts/<uuid:pk>/evidence', contract_evidence, name='contract_evidence'),
-    path('contracts/<uuid:pk>/otp', request_signature_otp, name='request_signature_otp'),
+    path("contracts", ContractListView.as_view(), name="contracts_list"),
+    path("contracts/<uuid:pk>", ContractDetailView.as_view(), name="contract_detail"),
+    # Assinatura eletrônica
+    path("contracts/<uuid:pk>/sign", ContractSignView.as_view(), name="sign_contract"),
+    path("contracts/<uuid:pk>/evidence", ContractEvidenceView.as_view(), name="contract_evidence"),
+    path(
+        "contracts/<uuid:pk>/otp", ContractSignatureOtpView.as_view(), name="request_signature_otp"
+    ),
 ]

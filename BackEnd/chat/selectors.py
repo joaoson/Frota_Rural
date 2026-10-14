@@ -10,9 +10,14 @@ agregar. Confortável até ~10^4 mensagens por usuário; perceptível em 10^5.
 O gatilho para migrar para uma tabela `conversations` está no plano (§10).
 """
 
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
 from django.db import connection
 
-from .threads import SCOPE_POSTING, SCOPE_RENTAL, format_thread_id
+from chat.threads import SCOPE_POSTING, SCOPE_RENTAL, format_thread_id
 
 _INBOX_SQL = """
 WITH mine AS (
@@ -53,54 +58,99 @@ LIMIT %(limit)s OFFSET %(offset)s
 """
 
 
-class _Row:
-    """Adapta a linha crua para o mesmo shape que serialize_message espera."""
+@dataclass(frozen=True)
+class InboxMessageRow:
+    """Última mensagem da thread como vem do SQL, no formato que `serialize_message` lê."""
 
-    def __init__(self, d):
-        self.__dict__.update(d)
+    id: UUID
+    sender_id: UUID
+    receiver_id: UUID
+    rental_id: UUID | None
+    posting_id: UUID | None
+    content: str
+    sent_at: datetime | None
+    read_at: datetime | None
+    hidden_at: datetime | None
+    flagged_for_moderation: bool
+    client_id: UUID | None
 
 
-def inbox_page(user_id, limit=20, offset=0, scope=None):
-    """-> (threads_raw: list[dict], total: int). Sem hidratar peer/label."""
-    scope_filter = ''
-    params = {'me': str(user_id), 'limit': limit, 'offset': offset}
+@dataclass(frozen=True)
+class InboxThreadRow:
+    thread_id: str
+    scope: str
+    scope_id: UUID
+    peer_lo: UUID
+    peer_hi: UUID
+    unread_count: int
+    last_message: InboxMessageRow
+
+
+def inbox_page(
+    user_id: UUID, limit: int = 20, offset: int = 0, scope: str | None = None
+) -> tuple[list[InboxThreadRow], int]:
+    """-> (threads, total). Sem hidratar peer nem rótulo."""
+    scope_filter = ""
+    params: dict[str, Any] = {"me": str(user_id), "limit": limit, "offset": offset}
     if scope in (SCOPE_RENTAL, SCOPE_POSTING):
-        scope_filter = 'WHERE scope = %(scope)s'
-        params['scope'] = scope
+        scope_filter = "WHERE scope = %(scope)s"
+        params["scope"] = scope
 
-    with connection.cursor() as cur:
-        cur.execute(_INBOX_SQL.format(scope_filter=scope_filter), params)
-        rows = cur.fetchall()
+    with connection.cursor() as cursor:
+        cursor.execute(_INBOX_SQL.format(scope_filter=scope_filter), params)
+        rows = cursor.fetchall()
 
     if not rows:
         return [], 0
 
-    total = rows[0][15]
-    out = []
-    for r in rows:
-        (scope_v, scope_id, peer_lo, peer_hi, _last, unread,
-         mid, sender_id, receiver_id, content, sent_at, read_at,
-         hidden_at, flagged, client_id, _t) = r
-        thread_id = format_thread_id(scope_v, scope_id, peer_lo, peer_hi)
-        out.append({
-            'thread_id': thread_id,
-            'scope': scope_v,
-            'scope_id': scope_id,
-            'peer_lo': peer_lo,
-            'peer_hi': peer_hi,
-            'unread_count': unread,
-            'last_message_obj': _Row({
-                'id': mid, 'sender_id': sender_id, 'receiver_id': receiver_id,
-                'content': content, 'sent_at': sent_at, 'read_at': read_at,
-                'hidden_at': hidden_at, 'flagged_for_moderation': flagged,
-                'client_id': client_id, 'rental_id': scope_id if scope_v == 'rental' else None,
-                'posting_id': scope_id if scope_v == 'posting' else None,
-            }),
-        })
-    return out, total
+    total = int(rows[0][15])
+    threads = []
+    for row in rows:
+        (
+            scope_value,
+            scope_id,
+            peer_lo,
+            peer_hi,
+            _last_sent_at,
+            unread,
+            message_id,
+            sender_id,
+            receiver_id,
+            content,
+            sent_at,
+            read_at,
+            hidden_at,
+            flagged,
+            client_id,
+            _total,
+        ) = row
+        threads.append(
+            InboxThreadRow(
+                thread_id=format_thread_id(scope_value, scope_id, peer_lo, peer_hi),
+                scope=scope_value,
+                scope_id=scope_id,
+                peer_lo=peer_lo,
+                peer_hi=peer_hi,
+                unread_count=int(unread),
+                last_message=InboxMessageRow(
+                    id=message_id,
+                    sender_id=sender_id,
+                    receiver_id=receiver_id,
+                    rental_id=scope_id if scope_value == SCOPE_RENTAL else None,
+                    posting_id=scope_id if scope_value == SCOPE_POSTING else None,
+                    content=content,
+                    sent_at=sent_at,
+                    read_at=read_at,
+                    hidden_at=hidden_at,
+                    flagged_for_moderation=bool(flagged),
+                    client_id=client_id,
+                ),
+            )
+        )
+    return threads, total
 
 
-def unread_counts(user_id):
+def unread_counts(user_id: UUID | str) -> dict[str, int]:
     """Badge da navbar. Usa o índice parcial idx_messages_unread."""
     sql = """
         SELECT COUNT(*) AS total,
@@ -112,7 +162,8 @@ def unread_counts(user_id):
         FROM messages
         WHERE receiver_id = %(me)s AND read_at IS NULL
     """
-    with connection.cursor() as cur:
-        cur.execute(sql, {'me': str(user_id)})
-        total, threads = cur.fetchone()
-    return {'unread_total': total or 0, 'unread_threads': threads or 0}
+    with connection.cursor() as cursor:
+        cursor.execute(sql, {"me": str(user_id)})
+        row = cursor.fetchone()
+    total, threads = row if row else (0, 0)
+    return {"unread_total": int(total or 0), "unread_threads": int(threads or 0)}

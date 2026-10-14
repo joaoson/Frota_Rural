@@ -4,6 +4,7 @@ import django.db.models.deletion
 import uuid
 from django.conf import settings
 from django.db import migrations, models
+from api.migration_operations import AddRentalField, AddRentalConstraint, CreateModelWithRentalReference
 
 
 class Migration(migrations.Migration):
@@ -15,12 +16,12 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
+        AddRentalField(
             model_name='rentals',
             name='recurrence_index',
             field=models.PositiveSmallIntegerField(blank=True, null=True),
         ),
-        migrations.CreateModel(
+        CreateModelWithRentalReference(
             name='RentalRecurrence',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
@@ -37,12 +38,12 @@ class Migration(migrations.Migration):
                 'db_table': 'rental_recurrences',
             },
         ),
-        migrations.AddField(
+        AddRentalField(
             model_name='rentals',
             name='recurrence',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='rentals', to='api.rentalrecurrence'),
         ),
-        migrations.AddConstraint(
+        AddRentalConstraint(
             model_name='rentals',
             constraint=models.UniqueConstraint(fields=('recurrence', 'recurrence_index'), name='unique_recurrence_occurrence'),
         ),

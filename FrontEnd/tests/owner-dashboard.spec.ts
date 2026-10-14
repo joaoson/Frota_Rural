@@ -21,7 +21,7 @@ test('owner dashboard uses persisted records, filters fleet, and submits reviews
   await expect(rental.getByText('Avaliação enviada', { exact: true })).toBeVisible();
   await page.reload();
   await expect(rental.getByRole('button', { name: 'Avaliar Locatário', exact: true })).toHaveCount(0);
-  const reviews = await page.request.get(`${apiURL}reviews/?reviewer=${data.owner.id}`, { headers: { Authorization: `Bearer ${token}` } });
+  const reviews = await page.request.get(`${apiURL}reviews?reviewer=${data.owner.id}`, { headers: { Authorization: `Bearer ${token}` } });
   expect(reviews.status()).toBe(200);
   expect(await reviews.json()).toEqual(expect.arrayContaining([expect.objectContaining({ rental: data.sourceRental, reviewee: data.renter.id, comment: 'Entrega pontual e bom cuidado.' })]));
 });

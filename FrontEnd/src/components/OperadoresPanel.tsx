@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { BadRequestError } from "@/shared/http/errors";
+import { HttpError } from "@/shared/http/errors";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
@@ -285,15 +285,16 @@ const OperadoresPanel = () => {
       }
       closeForm();
     } catch (error) {
-      if (error instanceof BadRequestError) {
-        if (error.firstErrorFor("document")) {
-          setErrors((prev) => ({ ...prev, document: error.firstErrorFor("document") }));
-          return toast.error(error.firstErrorFor("document"));
-        }
-        if (error.firstErrorFor("email")) {
-          setErrors((prev) => ({ ...prev, email: error.firstErrorFor("email") }));
-          return toast.error(error.firstErrorFor("email"));
-        }
+      // 400 (validação) ou 409 (cadastro simultâneo): os dois trazem o campo em conflito.
+      if (error instanceof HttpError && error.firstErrorFor("document")) {
+        setErrors((prev) => ({ ...prev, document: error.firstErrorFor("document") }));
+        return toast.error(error.firstErrorFor("document"));
+      }
+      if (error instanceof HttpError && error.firstErrorFor("email")) {
+        setErrors((prev) => ({ ...prev, email: error.firstErrorFor("email") }));
+        return toast.error(error.firstErrorFor("email"));
+      }
+      if (error instanceof HttpError) {
         return toast.error(error.message);
       }
       toast.error("Não foi possível salvar o operador. Tente novamente.");
