@@ -7,6 +7,8 @@ import Contrato from "@/pages/contracts/Contrato";
 import CNHUpload from "@/pages/documents/CNHUpload";
 import SelfieUpload from "@/pages/documents/SelfieUpload";
 import Help from "@/pages/public/Help";
+import Terms from "@/pages/public/Terms";
+import Privacy from "@/pages/public/Privacy";
 import Index from "@/pages/public/Index";
 import Login from "@/pages/auth/Login";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
@@ -16,6 +18,8 @@ import Signup from "@/pages/auth/Signup";
 export const publicRoutes: ReactElement[] = [
   <Route key="home" path="/" element={<Index />} />,
   <Route key="help" path="/help" element={<Help />} />,
+  <Route key="terms" path="/termos-de-uso" element={<Terms />} />,
+  <Route key="privacy" path="/privacidade" element={<Privacy />} />,
 
   <Route key="signup" path="/signup" element={<Signup />} />,
   <Route key="login" path="/login" element={<Login />} />,

@@ -6,11 +6,8 @@
 .frota-companion__hello { padding: 7px 14px; border-radius: 12px 12px 12px 2px; background: var(--surface-container); color: var(--on-surface-variant); font-size: 12px; font-weight: 600; }
 .frota-companion__character { display: block; width: 290px; height: 290px; max-width: 100%; cursor: pointer; border: 0; border-radius: 36px; background: transparent; -webkit-tap-highlight-color: transparent; }
 .frota-companion__parallax { width: 290px; max-width: 100%; transition: transform 160ms ease-out; }
-.frota-companion__sprite { display: block; width: 100%; height: 100%; background-image: url('/mascot/capivara-3d-poses.png'); background-size: 200% 200%; background-position: 0 0; background-repeat: no-repeat; transition: transform 280ms cubic-bezier(.22, 1, .36, 1); }
-.frota-companion[data-pose="curious"] .frota-companion__sprite { background-position: 0 100%; }
-.frota-companion[data-pose="proud"] .frota-companion__sprite,
-.frota-companion[data-pose="wink"] .frota-companion__sprite { background-position: 100% 100%; }
-.frota-companion[data-pose="happy"] .frota-companion__sprite { background-position: 100% 0; transform: translateY(-6px) rotate(-3deg); }
+.frota-companion__sprite { transition: transform 280ms cubic-bezier(.22, 1, .36, 1); }
+.frota-companion[data-pose="happy"] .frota-companion__sprite { transform: translateY(-6px) rotate(-3deg); }
 .frota-companion__character:active .frota-companion__sprite { transform: scale(.97); }
 .frota-companion__hint { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--on-surface-variant); margin: -3px 0 18px; }
 .frota-companion__guidance { border-top: 1px solid var(--outline-variant); padding: 18px 22px 22px; }

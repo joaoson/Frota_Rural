@@ -1,0 +1,13 @@
+.frota-capybara {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background-image: url('/mascot/capivara-3d-poses.png');
+  background-size: 200% 200%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+}
+
+.frota-capybara[data-pose="happy"] { background-position: 100% 0; }
+.frota-capybara[data-pose="curious"] { background-position: 0 100%; }
+.frota-capybara[data-pose="wink"] { background-position: 100% 100%; }

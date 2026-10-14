@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { Link } from "react-router";
 import { ArrowUpRight, Hand, Search, Sprout, Tractor } from "lucide-react";
+import Capybara from "@/shared/components/Capybara";
 import "./MascotCompanion.css";
 
 const guides = [
   { label: "Quero alugar", icon: Search, title: "Encontre uma mão na sua safra.", description: "Busque máquinas pela atividade e localização. Escolha o que faz sentido para o seu campo.", action: "Encontrar máquinas", to: "/buscar-maquinario", pose: "curious" },
-  { label: "Quero anunciar", icon: Tractor, title: "Sua máquina tem mais campo pela frente.", description: "Cadastre seu equipamento e prepare seu anúncio com fotos, preço e disponibilidade.", action: "Começar meu cadastro", to: "/login", pose: "proud" },
+  { label: "Quero anunciar", icon: Tractor, title: "Sua máquina tem mais campo pela frente.", description: "Cadastre seu equipamento e prepare seu anúncio com fotos, preço e disponibilidade.", action: "Começar meu cadastro", to: "/login", pose: "wink" },
   { label: "Como funciona", icon: Sprout, title: "Vamos por partes, produtor.", description: "Conheça as etapas da locação, do anúncio ao contrato. Conte com uma orientação em cada passo.", action: "Conhecer a Frota Rural", to: "/help", pose: "welcome" },
 ] as const;
 
@@ -52,7 +53,7 @@ export default function MascotCompanion() {
           onPointerMove={lookAtPointer}
           onPointerLeave={() => { if (characterRef.current) characterRef.current.style.transform = ""; }}>
           <button type="button" className="frota-companion__character" onClick={greet} aria-label="Cumprimentar a capivara da Frota Rural">
-            <span className="frota-companion__sprite" aria-hidden="true" />
+            <Capybara className="frota-companion__sprite" pose={reaction ?? guide.pose} />
           </button>
         </div>
         <span className="frota-companion__hint"><Hand size={13} aria-hidden="true" /> Toque para dar um oi</span>
