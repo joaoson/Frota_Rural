@@ -3,7 +3,7 @@
 > Status: **implementado**. Este documento é a especificação; o código vive em
 > `BackEnd/pricing/` e os números abaixo são verificados por teste
 > (`pricing/tests.py::EngineTests::test_reproduz_o_exemplo_da_especificacao`).
-> Integração com a arquitetura de `develop`: `codex/retrofit-pricing-chat-develop`.
+> Integração com a arquitetura de `develop`: `develop_joaofre_precificacao_chat`.
 
 **Atualização de 20/09/2026:** a pesquisa Groq extrai os trechos originais dos
 anúncios, preservando ano, horas, condição e localização. O resumo da busca pode
@@ -514,5 +514,13 @@ citadas pelo extrator e presentes nesse contexto entram na resposta. Resumos
 gerados, URLs sem conteúdo e fontes fora do limite não comprovam preços.
 Respostas sem preço usado ou fontes não viram sugestões. O adaptador Gemini segue a
 mesma separação, preservando também as sugestões de pesquisa do Google.
+
+Falhas do Groq por limite de consultas (429), tamanho da consulta (413) ou
+configuração/permissão da chave (401/403) retornam mensagens seguras e orientações
+na resposta 422 da sugestão. Elas aparecem no formulário e permitem seguir com
+preço manual. Nenhum detalhe privado do provedor é exposto, nenhum preço é salvo
+nessas falhas e não há promessa de um prazo fixo para a cota voltar. O tratamento
+vale tanto para a pesquisa quanto para a extração.
+
 Veja a configuração e as restrições de cada provedor no
 [guia Docker](../Devops/README.md#precificação-com-groq-gratuito).

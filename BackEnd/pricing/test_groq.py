@@ -43,8 +43,9 @@ def searched():
     'ANTHROPIC_API_KEY': 'test-paid-key',
 }, clear=True)
 class GroqResearchTests(SimpleTestCase):
-    def run_research(self, responses, model='6110J', year=2019):
-        requests = []
+    def run_research(self, responses, model='6110J', year=2019, requests=None):
+        if requests is None:
+            requests = []
 
         def handler(request):
             requests.append(request)
@@ -56,9 +57,11 @@ class GroqResearchTests(SimpleTestCase):
 
         client = httpx.Client(transport=httpx.MockTransport(handler))
         with patch('pricing.groq.httpx.Client', return_value=client), patch('pricing.research._client') as paid, patch('pricing.gemini.research_with_gemini') as gemini:
-            result = research.research_machine('John Deere', model, year)
-            paid.assert_not_called()
-            gemini.assert_not_called()
+            try:
+                result = research.research_machine('John Deere', model, year)
+            finally:
+                paid.assert_not_called()
+                gemini.assert_not_called()
         return result, requests
 
     def test_default_provider_searches_and_extracts_with_real_citations(self):
@@ -258,11 +261,42 @@ class GroqResearchTests(SimpleTestCase):
         self.assertIsNone(result)
         self.assertEqual(len(requests), 1)
 
-    def test_quota_error_does_not_retry_or_change_provider(self):
-        with self.assertLogs('pricing.research', level='ERROR'):
-            result, requests = self.run_research([(429, {'error': {'message': 'Quota exceeded'}})])
-        self.assertIsNone(result)
-        self.assertEqual(len(requests), 1)
+    def test_provider_errors_are_actionable_in_both_phases_without_retry_or_fallback(self):
+        messages = {
+            429: 'limite de consultas',
+            413: 'não conseguiu processar esta consulta',
+            401: 'problema de configuração',
+            403: 'problema de configuração',
+        }
+        raw_error = 'Private provider diagnostic: test-groq-key'
+        for status, message in messages.items():
+            for phase in ('search', 'extraction'):
+                with self.subTest(status=status, phase=phase):
+                    requests = []
+                    responses = [(200, searched())] if phase == 'extraction' else []
+                    responses.append((status, {'error': {'message': raw_error}}))
+                    with self.assertLogs('pricing.research', level='WARNING') as logs:
+                        with self.assertRaises(research.ResearchUnavailable) as caught:
+                            self.run_research(responses, requests=requests)
+                    self.assertIn(message, str(caught.exception))
+                    self.assertIn('valor manualmente', str(caught.exception))
+                    self.assertNotIn('um minuto', str(caught.exception))
+                    self.assertEqual(len(requests), len(responses))
+                    for output in (str(caught.exception), '\n'.join(logs.output)):
+                        self.assertNotIn(raw_error, output)
+                        self.assertNotIn('test-groq-key', output)
+                        self.assertNotIn(groq.ENDPOINT, output)
+                    self.assertTrue(all(record.exc_info is None for record in logs.records))
+
+    def test_other_http_errors_keep_the_generic_manual_pricing_fallback(self):
+        for phase in ('search', 'extraction'):
+            with self.subTest(phase=phase):
+                responses = [(200, searched())] if phase == 'extraction' else []
+                responses.append((503, {'error': {'message': 'Provider unavailable'}}))
+                with self.assertLogs('pricing.research', level='WARNING'):
+                    result, requests = self.run_research(responses)
+                self.assertIsNone(result)
+                self.assertEqual(len(requests), len(responses))
 
     def test_invalid_extracted_data_is_rejected(self):
         invalid = {**VALUES, 'power_cv': 'unknown'}

@@ -83,7 +83,7 @@ flowchart LR
     BE --> MAIL
 ```
 
-O backend roda em **Python 3.14** e o módulo de ML em **Python 3.13** (última versão suportada pelo TensorFlow). Por isso existem **dois ambientes virtuais isolados**, e a comunicação entre eles acontece via `subprocess` com arquivos temporários.
+Na execução nativa documentada abaixo, o backend usa **Python 3.14** e o módulo de ML usa **Python 3.13** em um ambiente virtual separado. A imagem Docker usa **Python 3.13** nos dois runtimes, preservando o `venv` isolado do ML. A comunicação com o classificador acontece via `subprocess` com arquivos temporários.
 
 <details>
 <summary><b>🗂️ Modelo conceitual do banco de dados</b></summary>
@@ -120,7 +120,7 @@ O script de criação do schema está em [`Database/schema.sql`](Database/schema
 
 | Ferramenta | Versão | Para quê |
 |:---|:---|:---|
-| Node.js | 20+ (npm 10+) | FrontEnd |
+| Node.js | 22.12+ (npm 10+) | FrontEnd |
 | Python | 3.14 | BackEnd Django |
 | Python | 3.13 | Módulo de ML (TensorFlow) |
 | PostgreSQL | 17 | Banco de dados |
@@ -128,16 +128,20 @@ O script de criação do schema está em [`Database/schema.sql`](Database/schema
 
 ### Desenvolvimento containerizado (recomendado)
 
-O ambiente reproduzível — PostgreSQL, Django, dependências de ML e Vite — pode ser
-iniciado sem instalar Python, Node, PostgreSQL ou Poppler no host:
+O ambiente reproduzível — PostgreSQL, Redis, Django, dependências de ML e Vite —
+usa Docker Compose 2.24.4+ e Python 3.10+ no host para o script de configuração.
+Node, PostgreSQL e dependências da aplicação ficam nos containers:
 
 ```bash
-cp .env.example .env
-docker compose up --build
+python3 Devops/dev.py up
+python3 Devops/dev.py check-db
 ```
 
-Consulte [`Devops/README.md`](Devops/README.md) para os serviços, comandos e dados
-de desenvolvimento. A decisão de arquitetura está em
+`develop`, `acceptance` e branches de feature usam banco local automaticamente;
+`main` usa Supabase com `.env.supabase`. Pare o app antes de trocar de branch e
+execute o mesmo comando `up` depois. Consulte [`Devops/DEVELOPMENT.md`](Devops/DEVELOPMENT.md) para os dois
+modos, portas alternativas e hot reload, e [`Devops/CI_CD.md`](Devops/CI_CD.md)
+para os pipelines. A decisão de arquitetura está em
 [`Documentation/adr/0001-containerized-development-environment.md`](Documentation/adr/0001-containerized-development-environment.md).
 
 ### 1. Banco de dados (execução sem containers)
@@ -215,9 +219,9 @@ Com o backend rodando, a documentação **OpenAPI 3** é gerada automaticamente 
 
 | Recurso | Endereço |
 |:---|:---|
-| 🧭 **Swagger UI** | http://127.0.0.1:8000/api/schema/swagger-ui/ |
-| 📘 **ReDoc** | http://127.0.0.1:8000/api/schema/redoc/ |
-| 🧾 **Schema OpenAPI** | http://127.0.0.1:8000/api/schema/ |
+| 🧭 **Swagger UI** | http://127.0.0.1:8000/api/schema/swagger-ui |
+| 📘 **ReDoc** | http://127.0.0.1:8000/api/schema/redoc |
+| 🧾 **Schema OpenAPI** | http://127.0.0.1:8000/api/schema |
 | 🛠️ **Django Admin** | http://127.0.0.1:8000/admin/ |
 
 As coleções do Postman ficam em [`BackEnd/docs/postman/`](BackEnd/docs/postman).

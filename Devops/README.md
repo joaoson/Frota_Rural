@@ -1,44 +1,30 @@
 # Ambiente de desenvolvimento em containers
 
-O ambiente completo é iniciado a partir da raiz do repositório:
+Para os comandos de início e parada da instalação atual no Mac, veja
+[QUICK_START.md](QUICK_START.md).
+
+A branch escolhe o banco: `develop`, `acceptance` e features usam PostgreSQL
+local; `main` usa Supabase. O comando de início é o mesmo:
 
 ```bash
-cp .env.example .env
-docker compose up --build
+python3 Devops/dev.py up
+python3 Devops/dev.py check-db
 ```
 
-Serviços disponíveis:
+Requer Docker Compose 2.24.4+ e Python 3.10+ no host. O frontend local abre em
+http://localhost:5173 e a API em http://localhost:8000. Se houver portas ocupadas,
+use `--port-offset 2` em todos os comandos (frontend 5175, API 8002).
 
-| Serviço | URL / acesso |
-| --- | --- |
-| Frontend (Vite) | http://localhost:5173 |
-| Backend (Django) | http://localhost:8000 |
-| Swagger UI | http://localhost:8000/api/schema/swagger-ui |
-| PostgreSQL | `localhost:5432` |
+Pare o app com `python3 Devops/dev.py down` antes de trocar de branch.
+Na `main`, mantenha `.env.supabase` configurado. Consulte o
+[guia de desenvolvimento](DEVELOPMENT.md) para os padrões por branch,
+manter os dois apps simultaneamente, configurar integrações e executar testes.
+O [guia Supabase](SUPABASE.md) cobre conexão e schema privado; o
+[guia CI/CD](CI_CD.md) descreve os pipelines e a preparação para AWS ou Azure.
 
-O backend executa `migrate` antes de iniciar quando usa o banco local padrão.
-Conexões externas exigem migrations explícitas. Para conectar somente o banco ao
-Supabase, mantendo Docker, Redis, autenticação e Groq, siga o
-[guia Supabase](SUPABASE.md).
-
-Para carregar dados de desenvolvimento em um banco local novo (execute uma vez):
-
-```bash
-docker compose exec backend python seed.py
-```
-
-Comandos úteis:
-
-```bash
-docker compose logs -f backend
-docker compose exec backend python manage.py test
-docker compose down
-docker compose down -v # também remove o banco local em container
-```
-
-As alterações em `BackEnd/` e `FrontEnd/` são montadas como volumes e recarregadas
-automaticamente. Dependências Python e Node, o ambiente de ML e o banco permanecem
-em volumes ou na imagem para que o host não interfira na execução.
+O modo local aplica migrations automaticamente. O modo Supabase exige comandos
+explícitos para migrations e seed. Ambos mantêm hot reload. Para editar somente
+um dos apps, execute-os em checkouts/worktrees diferentes.
 
 ## Chat em tempo real
 
@@ -61,42 +47,25 @@ alcança as duas abas do browser e a feature inteira funciona ponta a ponta.
 Fora do `DJANGO_DEBUG=true` esse valor é recusado (`ImproperlyConfigured`):
 com mais de um worker o fan-out entre processos não aconteceria.
 
-## Testar ao lado de uma instalação local
-
-Se as portas padrão já estiverem ocupadas, ajuste o `.env` da raiz antes de
-executar `docker compose up --build -d`:
-
-```dotenv
-FRONTEND_PORT=5174
-BACKEND_PORT=8001
-POSTGRES_PORT=5433
-REDIS_PORT=6380
-FRONTEND_URL=http://localhost:5174
-VITE_API_BASE_URL=http://localhost:8001/api/
-VITE_WS_BASE_URL=ws://localhost:8001
-```
-
-Os endereços `VITE_*` são acessados pelo navegador, por isso usam a porta
-publicada no host. O backend continua acessando `db:5432` e `redis:6379` na
-rede interna do Compose. A configuração atual de CORS permite o frontend na
-porta 5174.
+## Dados, arquivos e testes
 
 Depois do seed, use `joao.silva@example.test` (locador) ou
 `maria.oliveira@example.test` (locatário), ambos com senha inicial `Teste1234`.
 São contas fictícias para desenvolvimento, sem administrador. O seed é
-reexecutável e preserva registros existentes; confira antes com `--dry-run`.
-Consulte [o inventário e a execução no Supabase](SEED.md). Para testar upload,
-configure o Firebase local.
+reexecutável e preserva registros existentes; confira antes com `seed-preview`.
+Consulte [o inventário](SEED.md). Para testar upload, configure o Firebase no
+arquivo do ambiente selecionado.
 O arquivo `BackEnd/firebase-service-account.json` fica fora da imagem e do Git;
 no desenvolvimento ele é acessível pelo bind mount do backend.
 
-Validação dentro dos containers:
-
 ```bash
-docker compose exec backend python manage.py test --noinput
-docker compose exec frontend npm run build
-docker compose exec frontend npm test
+python3 Devops/dev.py up --mode local
+python3 Devops/dev.py test --mode local
+python3 Devops/dev.py down --mode local
 ```
+
+O comando `down` preserva os volumes. Consulte a instalação do Playwright e os
+comandos de testes do frontend em [DEVELOPMENT.md](DEVELOPMENT.md#comandos-e-testes).
 
 ## Precificação com Groq gratuito
 
@@ -108,17 +77,19 @@ não são mais usados pelo adaptador. Consulte o
 
 1. Crie uma chave em [Groq Console](https://console.groq.com/keys) e mantenha
    a conta no plano **Free**. Contas no plano Developer são cobradas por uso.
-2. Preencha o `.env` da raiz (não coloque a chave no frontend):
+2. Preencha `.env.local` ou `.env.supabase`, conforme o modo selecionado
+   (não coloque a chave no frontend):
 
    ```dotenv
    PRICING_AI_PROVIDER=groq
    GROQ_API_KEY=sua_chave
    ```
 
-3. Recrie apenas o backend para carregar as variáveis do `.env`:
+3. Reaplique o ambiente da branch atual para carregar as novas variáveis
+   (preserve seu `--port-offset`):
 
    ```bash
-   docker compose up -d --no-deps --force-recreate backend
+   python3 Devops/dev.py up
    ```
 
 4. Entre como locador, abra **Novo Anúncio**, selecione um equipamento e clique

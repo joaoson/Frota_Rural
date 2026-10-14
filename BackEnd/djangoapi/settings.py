@@ -250,6 +250,12 @@ SIMPLE_JWT = {
     "CHECK_USER_IS_ACTIVE": False,  # Users model has no is_active field
 }
 
+# Cookies are shared across ports on the same hostname. Separate development
+# stacks use distinct names to keep their browser sessions independent.
+AUTH_REFRESH_COOKIE_NAME = os.getenv('AUTH_REFRESH_COOKIE_NAME', 'refresh_token')
+SESSION_COOKIE_NAME = os.getenv('SESSION_COOKIE_NAME', 'sessionid')
+CSRF_COOKIE_NAME = os.getenv('CSRF_COOKIE_NAME', 'csrftoken')
+
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 

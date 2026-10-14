@@ -252,9 +252,12 @@ def build_suggestion(machine, includes_fuel=False, includes_operator=False):
     if cached:
         data = cached.payload
     else:
-        result = research_module.research_machine(
-            machine.brand, machine.model, machine.year
-        )
+        try:
+            result = research_module.research_machine(
+                machine.brand, machine.model, machine.year
+            )
+        except research_module.ResearchUnavailable as exc:
+            raise SuggestionUnavailable(str(exc)) from exc
         if result is None:
             raise SuggestionUnavailable(
                 "Não foi possível pesquisar o valor de mercado desta máquina."

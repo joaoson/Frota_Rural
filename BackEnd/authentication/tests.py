@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from authentication.models import PasswordResets
 from users.models import Users
@@ -29,6 +29,7 @@ def make_user(status="active", email="jose@teste.com"):
     return user
 
 
+@override_settings(AUTH_REFRESH_COOKIE_NAME='refresh_token')
 class LoginTests(TestCase):
     def login(self, email="jose@teste.com", password=PASSWORD, **extra):
         return self.client.post(
@@ -88,6 +89,7 @@ class LoginTests(TestCase):
         self.assertIn("email", response.json()["errors"])
 
 
+@override_settings(AUTH_REFRESH_COOKIE_NAME='refresh_token')
 class RefreshAndLogoutTests(TestCase):
     def test_refresh_uses_the_cookie_set_on_login(self):
         make_user()
@@ -129,6 +131,71 @@ class RefreshAndLogoutTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["code"], "token_not_valid")
+
+
+class NamespacedSessionTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.local_user = make_user(email='local@teste.com')
+        cls.hosted_user = make_user(email='hosted@teste.com')
+
+    def login(self, user, cookie_name):
+        with override_settings(AUTH_REFRESH_COOKIE_NAME=cookie_name):
+            response = self.client.post('/api/login', {
+                'email': user.email, 'password': PASSWORD,
+            }, content_type='application/json')
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(set(response.cookies), {cookie_name})
+        return response
+
+    def test_two_cookie_names_keep_independent_users_in_the_same_browser(self):
+        self.login(self.local_user, 'frota_local_refresh')
+        self.login(self.hosted_user, 'frota_hosted_refresh')
+        self.assertEqual(set(self.client.cookies), {'frota_local_refresh', 'frota_hosted_refresh'})
+
+        for user, name in ((self.local_user, 'frota_local_refresh'), (self.hosted_user, 'frota_hosted_refresh')):
+            with self.subTest(cookie=name), override_settings(AUTH_REFRESH_COOKIE_NAME=name):
+                response = self.client.post('/api/login/refresh')
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual(AccessToken(response.json()['access'])['user_id'], str(user.pk))
+
+    def test_refresh_rejects_other_namespace_and_legacy_cookie(self):
+        self.login(self.hosted_user, 'frota_hosted_refresh')
+        self.client.cookies['refresh_token'] = self.client.cookies['frota_hosted_refresh'].value
+
+        with override_settings(AUTH_REFRESH_COOKIE_NAME='frota_local_refresh'):
+            response = self.client.post('/api/login/refresh')
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['code'], 'missing_refresh_token')
+
+    def test_logout_only_expires_its_own_namespace(self):
+        self.login(self.local_user, 'frota_local_refresh')
+        self.login(self.hosted_user, 'frota_hosted_refresh')
+        hosted_cookie = self.client.cookies['frota_hosted_refresh'].value
+
+        with override_settings(AUTH_REFRESH_COOKIE_NAME='frota_local_refresh'):
+            response = self.client.post('/api/logout')
+            self.assertEqual(response.status_code, 204)
+            self.assertEqual(set(response.cookies), {'frota_local_refresh'})
+            self.assertEqual(response.cookies['frota_local_refresh']['max-age'], 0)
+            self.assertEqual(response.cookies['frota_local_refresh']['path'], '/api/login')
+            self.assertEqual(self.client.post('/api/login/refresh').status_code, 401)
+
+        self.assertEqual(self.client.cookies['frota_hosted_refresh'].value, hosted_cookie)
+        with override_settings(AUTH_REFRESH_COOKIE_NAME='frota_hosted_refresh'):
+            self.assertEqual(self.client.post('/api/login/refresh').status_code, 200)
+
+    def test_custom_cookie_keeps_existing_security_and_path_contract(self):
+        for debug in (True, False):
+            with self.subTest(debug=debug), override_settings(DEBUG=debug):
+                response = self.login(self.local_user, 'frota_local_refresh')
+                cookie = response.cookies['frota_local_refresh']
+                self.assertTrue(cookie['httponly'])
+                self.assertEqual(cookie['samesite'], 'Lax')
+                self.assertEqual(bool(cookie['secure']), not debug)
+                self.assertEqual(cookie['path'], '/api/login')
+                self.assertGreater(cookie['max-age'], 0)
 
 
 @override_settings(DEBUG=False)
@@ -193,6 +260,7 @@ class PasswordResetTests(TestCase):
 
 
 
+@override_settings(AUTH_REFRESH_COOKIE_NAME='refresh_token')
 class SessionTests(TestCase):
     def setUp(self):
         self.user = Users.objects.create(

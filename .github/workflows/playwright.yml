@@ -1,9 +1,9 @@
 name: Frontend tests
 on:
   push:
-    branches: [develop, main, 'codex/**']
+    branches: [develop, acceptance, main]
   pull_request:
-    branches: [develop, main]
+    branches: [develop, acceptance, main]
   workflow_dispatch:
 
 permissions:
@@ -14,17 +14,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  browser-tests:
-    timeout-minutes: 30
+  config-checks:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     env:
-      E2E_BASE_URL: http://localhost:5173
-      E2E_API_URL: http://localhost:8000/api/
+      COMPOSE_PROJECT_NAME: frota-ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test development environment commands
+        run: python3 -m unittest discover -s Devops/tests -v
+      - name: Validate local Docker configuration
+        # Never infer a hosted mode from main or a detached PR checkout in CI.
+        run: python3 Devops/dev.py local config
+
+  frontend-checks:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FrontEnd/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: FrontEnd
+        run: npm ci
+      - name: Check frontend and browser test types
+        working-directory: FrontEnd
+        run: |
+          npm run lint
+          npm run build
+          npm run test:e2e:typecheck
+          npm test
+
+  browser-tests:
+    needs: config-checks
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: frota-ci
+      # Use only the local base stack, including for main and detached PR refs.
+      COMPOSE_FILE: compose.yaml
+      E2E_BASE_URL: http://localhost:5173
+      E2E_API_URL: http://localhost:8000/api/
+      # This job uses a disposable local database and no live provider credentials.
+      DATABASE_URL: ""
+      DB_SCHEMA: ""
+      DB_SSLMODE: disable
+      DB_SSLROOTCERT: ""
+      RUN_MIGRATIONS: auto
+      STRIPE_SECRET_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      RESEND_API_KEY: ""
+      FIREBASE_STORAGE_BUCKET: ""
+      GROQ_API_KEY: ""
+      GEMINI_API_KEY: ""
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
           cache: npm
           cache-dependency-path: FrontEnd/package-lock.json
       - name: Install frontend dependencies
@@ -39,13 +90,6 @@ jobs:
         run: |
           curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:5173/ > /dev/null
           curl --retry 60 --retry-all-errors --retry-delay 2 --fail --silent --show-error http://localhost:8000/api/schema/swagger-ui > /dev/null
-      - name: Check frontend and browser test types
-        working-directory: FrontEnd
-        run: |
-          npm run lint
-          npm run build
-          npm run test:e2e:typecheck
-          npm test
       - name: Check backend and run regression tests
         run: |
           docker compose exec -T backend python manage.py check

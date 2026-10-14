@@ -13,7 +13,14 @@ import logging
 import os
 from dataclasses import dataclass, asdict
 
+import httpx
+
 logger = logging.getLogger(__name__)
+
+
+class ResearchUnavailable(Exception):
+    """Falha do provedor com uma mensagem segura para exibir ao locador."""
+
 
 MODEL = "claude-opus-5"
 
@@ -222,8 +229,9 @@ def _extract(client, research_text):
 def research_machine(brand, model, year):
     """Pesquisa a máquina e devolve os fatos, ou `None` se não deu.
 
-    Nunca levanta exceção para o chamador: qualquer falha — rede, cota, resposta
-    fora do formato — vira `None`, e o anúncio segue sem sugestão.
+    Falhas conhecidas de cota, tamanho da consulta ou configuração do Groq
+    levantam ResearchUnavailable com uma mensagem segura. Ausência de dados
+    e outras falhas devolvem None; o anúncio pode seguir com preço manual.
     """
     if not is_enabled():
         return None
@@ -250,6 +258,29 @@ def research_machine(brand, model, year):
             if not research_text:
                 return None
             data = _extract(client, research_text)
+    except httpx.HTTPStatusError as exc:
+        if provider != "groq":
+            logger.exception("Falha na pesquisa de preço de %s %s %s", brand, model, year)
+            return None
+        status = exc.response.status_code
+        # Não registrar corpo, URL ou credenciais retornados pelo provedor.
+        logger.warning("Pesquisa Groq indisponível (HTTP %s).", status)
+        if status == 429:
+            raise ResearchUnavailable(
+                "A pesquisa de preços atingiu o limite de consultas. "
+                "Tente novamente mais tarde ou informe o valor manualmente."
+            ) from exc
+        if status == 413:
+            raise ResearchUnavailable(
+                "O serviço de pesquisa não conseguiu processar esta consulta. "
+                "Tente novamente mais tarde ou informe o valor manualmente."
+            ) from exc
+        if status in (401, 403):
+            raise ResearchUnavailable(
+                "A pesquisa de preços está indisponível por um problema de configuração. "
+                "Informe o valor manualmente enquanto o serviço é regularizado."
+            ) from exc
+        return None
     except Exception:
         logger.exception("Falha na pesquisa de preço de %s %s %s", brand, model, year)
         return None

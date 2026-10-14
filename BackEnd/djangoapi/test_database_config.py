@@ -102,6 +102,57 @@ class DatabaseConfigTests(unittest.TestCase):
             self.assertEqual(os.environ['DB_USER'], 'backend-user')
             self.assertEqual(os.environ['POSTGRES_DB'], 'root-fallback')
 
+    def test_disabled_environment_files_do_not_load_database_or_provider_credentials(self):
+        process = {'DJANGO_LOAD_ENV_FILES': ' FALSE ', 'DB_HOST': 'db', 'GROQ_API_KEY': 'explicit-test-key'}
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, process, clear=True):
+            root = Path(folder)
+            backend = root / 'BackEnd'
+            backend.mkdir()
+            (root / '.env').write_text('DATABASE_URL=postgres://u:p@remote.test/db\nSTRIPE_SECRET_KEY=root-test-key\n')
+            (backend / '.env').write_text('DB_SCHEMA=remote\nRESEND_API_KEY=backend-test-key\nGROQ_API_KEY=backend-test-key\n')
+
+            load_environment(backend)
+
+            self.assertEqual(dict(os.environ), process)
+
+    def test_explicit_true_keeps_environment_file_loading(self):
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, {'DJANGO_LOAD_ENV_FILES': 'true'}, clear=True):
+            root = Path(folder)
+            backend = root / 'BackEnd'
+            backend.mkdir()
+            (root / '.env').write_text('DB_NAME=local\n')
+
+            load_environment(backend)
+
+            self.assertEqual(os.environ['DB_NAME'], 'local')
+
+    def test_invalid_environment_file_flag_fails_without_echoing_its_value(self):
+        with patch.dict(os.environ, {'DJANGO_LOAD_ENV_FILES': 'invalid-test-value'}, clear=True):
+            with self.assertRaisesRegex(ImproperlyConfigured, '^DJANGO_LOAD_ENV_FILES must be true or false\\.$'):
+                load_environment('/unused')
+
+    def test_explicit_local_blanks_block_hosted_database_fallbacks(self):
+        local = {
+            'DATABASE_URL': '', 'DB_SCHEMA': '', 'DB_SSLMODE': 'disable',
+            'DB_SSLROOTCERT': '', 'DB_HOST': 'db',
+        }
+        with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ, local, clear=True):
+            root = Path(folder)
+            backend = root / 'BackEnd'
+            backend.mkdir()
+            (backend / '.env').write_text(
+                'DATABASE_URL=postgres://u:p@db.project.supabase.co/postgres\n'
+                'DB_SCHEMA=frota_rural\nDB_SSLMODE=verify-full\nDB_SSLROOTCERT=/remote/ca.crt\n'
+            )
+
+            load_environment(backend)
+            config = database_config()
+
+            self.assertEqual(config['HOST'], 'db')
+            self.assertEqual(config['OPTIONS']['sslmode'], 'disable')
+            self.assertNotIn('options', config['OPTIONS'])
+            self.assertNotIn('sslrootcert', config['OPTIONS'])
+
 
 if __name__ == '__main__':
     unittest.main()

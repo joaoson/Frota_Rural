@@ -1,13 +1,13 @@
 # Integração de precificação e chat com develop
 
-Branch: `codex/retrofit-pricing-chat-develop`.
+Branch: `develop_joaofre_precificacao_chat`.
 
 ## Origem
 
 - Base: `origin/develop` em `c44750f` (nova arquitetura do frontend).
 - Precificação: commits `97907c0`, `a3dbec7` e `7465a3c` da branch
   `feature/sugestao-preco-hora-ia`.
-- Chat: `origin/codex/containerize-development` em `4e779ed` já é ancestral
+- Chat: `origin/develop_joaofre_docker` em `4e779ed` já é ancestral
   de `develop`. A integração mantém sua implementação migrada em `features/chat`.
 - A cópia das alterações locais do mascote foi adaptada para `features/home` e
   `pages/public/Index.tsx`. O checkout original e seus arquivos locais foram preservados.

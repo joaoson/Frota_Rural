@@ -6,36 +6,44 @@ services are intercepted. No Groq, Gemini, Firebase or email keys are required.
 
 ## Run locally
 
-From the repository root, start the Docker stack:
+From the repository root, start an isolated local Docker stack:
 
 ```bash
-docker compose up --build -d
+python3 Devops/dev.py local up
 ```
 
-From `FrontEnd`:
+Install the browser runner dependencies on the host (Node 22.12+):
 
 ```bash
+cd FrontEnd
 npm ci
 npx playwright install
-npm run test:e2e                  # Chromium, Firefox and WebKit
-npm run test:e2e -- --project=chromium
-npm run test:e2e:ui               # interactive runner
-npm run test:e2e:report           # HTML report and failure traces
-npm run test:e2e:typecheck
-npm test                         # existing Vitest tests, separate from E2E
+cd ..
+python3 Devops/dev.py local e2e    # Chromium, Firefox and WebKit
 ```
 
-The defaults match the retrofit Docker stack: frontend `http://localhost:5174`
-and backend `http://localhost:8001/api/`. For the standard Compose ports:
+The helper selects the current checkout's local backend container and the
+matching frontend/API URLs. If the default ports are occupied, use the same
+`--port-offset 2` on both `up` and `e2e` (frontend 5175, API 8002). See the
+[development guide](../../Devops/DEVELOPMENT.md) for environment files and modes.
+
+For individual browsers or the interactive runner, set all three target values
+explicitly from `FrontEnd` (replace the container name with the local project's
+backend shown by `local status`):
 
 ```bash
-E2E_BASE_URL=http://localhost:5173 E2E_API_URL=http://localhost:8000/api/ npm run test:e2e
+E2E_BACKEND_CONTAINER=YOUR_LOCAL_BACKEND E2E_BASE_URL=http://localhost:5175 E2E_API_URL=http://localhost:8002/api/ npm run test:e2e -- --project=chromium
+# Use the same variables with npm run test:e2e:ui for the interactive runner.
+npm run test:e2e:report           # HTML report and failure traces
+npm run test:e2e:typecheck
+npm test                         # Vitest tests, separate from E2E
 ```
 
-Use `localhost` consistently: authentication restores an HttpOnly refresh cookie,
-and chat validates the browser origin. Tests expect the Docker backend service
-in this checkout and `DJANGO_DEBUG=true`. They do not start or reset Docker for
-you. The GitHub Actions workflow starts its own stack with an empty database.
+Raw `npm run test:e2e` retains the legacy defaults (frontend 5174, API 8001);
+the helper overrides them. Use `localhost` consistently: authentication restores
+an HttpOnly refresh cookie, and chat validates the browser origin. Tests require
+a local Docker backend and `DJANGO_DEBUG=true`. They do not start Docker for you.
+GitHub Actions starts its own disposable stack without live provider keys.
 
 ## Coverage
 
@@ -69,24 +77,19 @@ Docker; no test-only HTTP endpoint is added to the application. Fixtures are
 removed in teardown even when assertions fail. Existing demo accounts and
 announcements are not reset. Each retry and browser gets fresh records.
 
-The fixture script refuses a hosted database. When the main backend is connected
-to Supabase, use a separate local backend container and a separate Vite process:
+The fixture script refuses a hosted database. When the main backend uses
+Supabase, run an independent local stack alongside it:
 
 ```bash
-# From the repository root; the existing local db/redis services must be running.
-docker compose --env-file .env -f compose.yaml run --no-deps -d --name frota-e2e-backend --publish 8002:8000 -e DATABASE_URL= -e DB_SCHEMA= -e RUN_MIGRATIONS=false -e FRONTEND_URL=http://localhost:5175 backend python manage.py runserver 0.0.0.0:8000
-docker exec frota-e2e-backend python manage.py migrate --noinput
-# From FrontEnd, in a separate terminal:
-VITE_API_BASE_URL=http://localhost:8002/api/ VITE_WS_BASE_URL=ws://localhost:8002 npm run dev -- --port 5175
-# Run the suite against those local services:
-E2E_BASE_URL=http://localhost:5175 E2E_API_URL=http://localhost:8002/api/ E2E_BACKEND_CONTAINER=frota-e2e-backend npm run test:e2e
+python3 Devops/dev.py local up --port-offset 2
+python3 Devops/dev.py local e2e --port-offset 2
+python3 Devops/dev.py local down --port-offset 2
 ```
 
-`E2E_BACKEND_CONTAINER` selects the container used for fixture creation and
-cleanup. It does not change the database of an already running container. Stop
-and remove only that temporary container when finished; keep data volumes.
-While both backends exist, select containers explicitly with `docker exec`:
-Compose service selection can resolve to the temporary one-off container.
+This stack has its own local database, files, Redis, ports and cookies. `down`
+keeps data volumes. The helper rejects `supabase e2e`, including when a remote
+write flag is supplied. Separate worktrees are needed if source edits must also
+stay independent.
 
 AI requests are blocked by a context-level route by default; individual pricing
 tests supply deterministic success or error responses. A browser success test
@@ -94,10 +97,11 @@ therefore checks the UI/API contract, not the quality of a live AI valuation.
 Keep live-provider checks separate from this suite.
 
 If a run is forcibly killed before teardown, its report includes a `fixture-id`
-attachment. Remove only those records using the recorded UUID, from the repo root:
+attachment. Use `local status` to identify the local backend container. Remove
+only those records using the recorded UUID, from the repo root:
 
 ```bash
-docker compose exec -T backend python - delete THE_FIXTURE_UUID < FrontEnd/tests/support/seed_django.py
+docker exec -i YOUR_LOCAL_BACKEND python - delete THE_FIXTURE_UUID < FrontEnd/tests/support/seed_django.py
 ```
 
 Reports and traces are ignored by Git. Inspect a trace from the HTML report to

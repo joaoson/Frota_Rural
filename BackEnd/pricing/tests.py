@@ -1,15 +1,17 @@
 """Testes da sugestão de valor/hora.
 
 O motor é determinístico e não toca a rede, então dá para fixá-lo em números
-concretos. A pesquisa por IA é substituída em todos os testes de serviço: nenhum
-teste aqui chama a API de verdade.
+concretos. A pesquisa por IA é substituída ou usa transporte HTTP simulado:
+nenhum teste aqui chama a API externa de verdade.
 """
 
+import os
 import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
+import httpx
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -22,7 +24,7 @@ from users.models import Users
 from . import params as P
 from .engine import PricingError, PricingInputs, annual_depreciation_rate, suggest_rate
 from .models import MachineValuations, PricingSuggestions
-from .research import MachineResearch
+from .research import MachineResearch, ResearchUnavailable
 from .service import SuggestionUnavailable, build_suggestion
 
 
@@ -191,6 +193,14 @@ class ServiceTests(TestCase):
         with patch('pricing.research.research_machine', return_value=None):
             with self.assertRaises(SuggestionUnavailable):
                 build_suggestion(self.machine)
+        self.assertEqual(PricingSuggestions.objects.count(), 0)
+
+    def test_falha_do_provedor_preserva_orientacao_sem_persistir(self):
+        message = 'A pesquisa de preços atingiu o limite de consultas. Tente novamente mais tarde.'
+        with patch('pricing.research.research_machine', side_effect=ResearchUnavailable(message)):
+            with self.assertRaisesMessage(SuggestionUnavailable, message):
+                build_suggestion(self.machine)
+        self.assertEqual(MachineValuations.objects.count(), 0)
         self.assertEqual(PricingSuggestions.objects.count(), 0)
 
     def test_pesquisa_sem_fontes_e_descartada(self):
@@ -448,6 +458,46 @@ class EndpointTests(TestCase):
             )
         self.assertEqual(response.status_code, 422)
         self.assertIn('error', response.json())
+
+    @patch.dict(os.environ, {'PRICING_AI_PROVIDER': 'groq', 'GROQ_API_KEY': 'test-groq-private-key'})
+    def test_erros_groq_orientam_sem_expor_detalhes_ou_bloquear_preco_manual(self):
+        self._auth(self.owner)
+        provider_detail = 'internal-provider-detail: test-groq-private-key'
+        for provider_status, expected_message in (
+            (429, 'limite de consultas'),
+            (413, 'não conseguiu processar esta consulta'),
+            (401, 'problema de configuração'),
+            (403, 'problema de configuração'),
+        ):
+            with self.subTest(provider_status=provider_status):
+                requests = []
+
+                def handler(request):
+                    requests.append(request)
+                    return httpx.Response(provider_status, json={'error': {'message': provider_detail}})
+
+                client = httpx.Client(transport=httpx.MockTransport(handler))
+                with patch('pricing.groq.httpx.Client', return_value=client):
+                    response = self.client.post('/api/pricing/suggest', {
+                        'machinery': str(self.machine.id),
+                    }, format='json')
+
+                self.assertEqual(response.status_code, 422)
+                self.assertIn(expected_message, response.json()['error'])
+                self.assertNotIn('internal-provider-detail', response.content.decode())
+                self.assertNotIn('test-groq-private-key', response.content.decode())
+                self.assertEqual(len(requests), 1)
+                self.assertEqual(MachineValuations.objects.count(), 0)
+                self.assertEqual(PricingSuggestions.objects.count(), 0)
+
+        response = self.client.post('/api/postings', {
+            'machinery': str(self.machine.id),
+            'hourly_rate': '210.00',
+            'location_address': 'Sorriso, MT',
+        }, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Postings.objects.get(id=response.json()['id']).hourly_rate, Decimal('210.00'))
+        self.assertEqual(PricingSuggestions.objects.count(), 0)
 
     def test_avaliacao_nao_finita_responde_422_sem_persistir(self):
         self._auth(self.owner)

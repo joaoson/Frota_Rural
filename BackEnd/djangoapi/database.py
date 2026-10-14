@@ -10,7 +10,17 @@ from dotenv import load_dotenv
 
 
 def load_environment(base_dir):
-    """Process variables win, followed by BackEnd/.env, then the root .env."""
+    """Load fallback files unless the process explicitly disables them.
+
+    Process variables win, followed by BackEnd/.env, then the root .env.
+    Isolated development stacks disable these fallbacks and supply one explicit
+    environment file, so mounted provider credentials cannot leak across modes.
+    """
+    load_files = os.getenv('DJANGO_LOAD_ENV_FILES', 'true').strip().lower()
+    if load_files not in {'true', 'false'}:
+        raise ImproperlyConfigured('DJANGO_LOAD_ENV_FILES must be true or false.')
+    if load_files == 'false':
+        return
     base_dir = Path(base_dir)
     load_dotenv(base_dir / '.env', override=False)
     load_dotenv(base_dir.parent / '.env', override=False)

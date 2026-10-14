@@ -4,6 +4,11 @@ Esta integração muda somente o banco. Login/JWT, arquivos e Groq continuam nas
 integrações atuais. O navegador acessa a API Django; não recebe senha do banco,
 `service_role`, chave anônima nem uma nova biblioteca Supabase.
 
+Na branch `main`, `python3 Devops/dev.py up` escolhe esta conexão automaticamente.
+`develop`, `acceptance` e branches de feature usam banco local. Este guia mantém
+modos explícitos nos comandos de manutenção para identificar o destino mesmo
+quando consultado em outra branch. Veja [o início rápido](QUICK_START.md).
+
 ## 1. Guardar a conexão localmente
 
 No projeto Supabase, abra **Connect → Session pooler**, porta **5432**. Copie o
@@ -73,30 +78,31 @@ Nenhuma criação de schema ou alteração de privilégios acontece no startup.
 
 ## 3. Verificar e aplicar migrations explicitamente
 
-Requer Docker Compose **2.24.4 ou superior**. Use os mesmos dois arquivos de
-ambiente e configuração em todos os comandos Supabase. O primeiro comando abaixo
-é somente leitura e imprime host, banco, schema e TLS, sem credenciais:
+Requer Docker Compose **2.24.4+** e Python **3.10+** no host. O script seleciona
+somente `.env.supabase`; acrescente nesse arquivo as chaves das integrações que
+quiser usar. Ele não importa `.env` nem `BackEnd/.env`. Mais opções de portas,
+projetos e isolamento de código estão em [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ```bash
-docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compose.supabase.yaml run --rm --no-deps backend python manage.py verify_database
-docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compose.supabase.yaml run --rm --no-deps backend python manage.py migrate --plan
+python3 Devops/dev.py supabase config
+python3 Devops/dev.py supabase up
+python3 Devops/dev.py supabase check-db
+python3 Devops/dev.py supabase plan-migrations
 ```
 
-Confira se o host é o projeto desejado e se a lista de migrations corresponde ao
-que pretende instalar. Para um banco existente, faça backup antes de mudar sua
-estrutura. Para aplicar a lista revisada:
+`up` constrói as imagens e inicia o app sem migrations automáticas. Os dois
+últimos comandos são somente leitura; o verificador imprime host, banco, schema
+e TLS sem senha. Confira o destino e a lista de migrations. Para um banco
+existente, faça backup antes de mudar sua estrutura. Para aplicar a lista revisada:
 
 ```bash
-docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compose.supabase.yaml run --rm --no-deps backend python manage.py migrate --noinput
-docker compose --env-file .env --env-file .env.supabase -f compose.yaml -f compose.supabase.yaml up --build -d redis backend frontend
+python3 Devops/dev.py supabase migrate --allow-remote
 ```
 
-O override desativa migrations automáticas, monta e executa o script de startup
-atualizado via `/bin/sh` (sem depender de permissão de execução no checkout),
-remove a dependência do PostgreSQL local e mantém Redis no Docker para o chat.
-Se a imagem ainda não existe, execute
-`docker compose build backend` antes dos comandos `run`. Alterações em
-dependências exigem reconstruir a imagem (o `up --build` acima faz isso).
+O override remove a dependência do PostgreSQL local e mantém Redis no Docker
+para o chat. Frontend e API usam portas 5174 e 8001 por padrão. Se outra
+instalação já usa essas portas, escolha outro `--port-offset` em todos os
+comandos; o script cria um projeto separado, sem substituir o antigo.
 
 Isso instala a estrutura em um banco novo; **não copia usuários, anúncios,
 locações ou uploads locais**. A migração de dados existentes é uma operação
@@ -108,17 +114,17 @@ projeto Supabase.
 
 ## Voltar ao banco local e rodar testes
 
-Os comandos sem override usam a `.env` original e o PostgreSQL local:
+Use o ambiente local independente:
 
 ```bash
-docker compose up --build -d
-docker compose exec backend python manage.py test --noinput
+python3 Devops/dev.py local up
+python3 Devops/dev.py local test
 ```
 
-Ao alternar o backend, ambos os bancos permanecem independentes. Não use
-`docker compose down -v` se quiser preservar os dados locais. Um container local
-de PostgreSQL já iniciado pode continuar rodando durante o uso do Supabase; ele
-não é usado pelo backend configurado com `DATABASE_URL`.
+Os bancos, cookies e volumes dos modos permanecem independentes. O comando
+`python3 Devops/dev.py local down` preserva os volumes. Se ambos os modos usam
+este checkout, compartilham as edições do código; use outro worktree para manter
+a versão Supabase estável enquanto experimenta localmente.
 
 ## Configuração sem Docker
 

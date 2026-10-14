@@ -16,6 +16,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the ignored .env.supabase file}
       DB_SCHEMA: ${DB_SCHEMA:-frota_rural}
       DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
       # A remote database is migrated only by an explicit management command.
       RUN_MIGRATIONS: "false"
     depends_on: !override

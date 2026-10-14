@@ -1,7 +1,9 @@
 # Develop merge validation — 2026-09-20
 
-Current integration candidate: `codex/dashboard-flow-audit`.
-Previously validated baseline: `codex/retrofit-pricing-chat-develop`.
+Current integration candidate: `develop_joaofre_locacoes_integradas`.
+Historical dashboard candidate: `develop_joaofre_fluxos_dashboard`.
+Branch names and retention findings: [2026-10-14 audit](BRANCH_AUDIT.md).
+Previously validated baseline: `develop_joaofre_precificacao_chat`.
 Target checked: `origin/develop` at `c44750fccd9e1ce2b1ca9be60451b2e7e15f08b0`.
 
 The candidate already includes that target and adapts pricing, machine readings,
@@ -23,17 +25,17 @@ retrofit tip, but the retrofit already includes the current develop architecture
 | --- | --- | --- |
 | `origin/develop` | `c44750f`, 2026-09-05 | Refactored frontend architecture; integration target |
 | `feature/sugestao-preco-hora-ia` | `7a09e4e`, 2026-09-09 21:41 -03 | Original AI/mascot feature; six conflicts against develop; user edits preserved separately |
-| `origin/codex/retrofit-pricing-chat-develop` | `8ccbb39`, 2026-09-09 21:27 -03 | Docker/Groq implementation adapted to develop, with chat and browser tests |
+| `origin/develop_joaofre_precificacao_chat` | `8ccbb39`, 2026-09-09 21:27 -03 | Docker/Groq implementation adapted to develop, with chat and browser tests |
 | Local retrofit baseline | `e06bcfb`, 2026-09-20 | Adds review fixes to that Docker/Groq implementation |
-| `codex/rental-recurrence-supabase` | `9f59e4b` | Inherits the reviewed retrofit, adds T06 and the live Supabase connection |
-| `codex/rental-notifications` | `2696628` | Adds T05 notifications and safe, repeatable Supabase demo data |
-| `codex/fix-pricing-research` | `1e0b6bf` | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
-| `codex/fix-notification-cancellation` | `81422ac` | Distinguishes canceled notification requests from connection failures |
-| `codex/dashboard-flow-audit` | Current candidate | Repairs dashboard actions, real summaries, account/operator flows, API permissions and integration failures |
+| `develop_joaofre_recorrencia_supabase` | `9f59e4b` | Inherits the reviewed retrofit, adds T06 and the live Supabase connection |
+| `develop_joaofre_notificacoes` | `2696628` | Adds T05 notifications and safe, repeatable Supabase demo data |
+| `develop_joaofre_correcao_precificacao` | `1e0b6bf` | Preserves original search evidence and labels estimates when new-equivalent prices are unavailable |
+| `develop_joaofre_correcao_notificacoes` | `81422ac` | Distinguishes canceled notification requests from connection failures |
+| `develop_joaofre_fluxos_dashboard` | Current candidate | Repairs dashboard actions, real summaries, account/operator flows, API permissions and integration failures |
 
 The running `frota_rural_retrofit` Docker stack mounts this checkout, with the
 frontend on port 5174 and backend on port 8001. Its configured pricing provider
-is Groq. The older `origin/codex/containerize-development` tip is `4e779ed` from
+is Groq. The older `origin/develop_joaofre_docker` tip is `4e779ed` from
 2026-09-02 and is not the latest integrated application.
 
 ## Bugs fixed during review
@@ -381,7 +383,7 @@ with HTTP 200; the frontend and listings API remained available.
 ## Develop integration — 2026-10-14
 
 The PR candidate integrates `origin/develop` at `2680fa9` (backend architecture
-refactor) into `codex/develop-rental-features`. It keeps the new service layer,
+refactor) into `develop_joaofre_locacoes_integradas`. It keeps the new service layer,
 split views, dedicated `rentals`/`reviews` apps, slash-free API routes and
 structured error responses while retaining recurring rentals, notifications,
 pricing estimates, dashboard fixes and the Supabase/Stripe configuration.
@@ -418,3 +420,25 @@ migrations through the [Supabase guide](../Devops/SUPABASE.md). External-provide
 behavior is covered by controlled test doubles in this integration run; a full
 live test-card payment and contract email/OTP delivery remain unverified. Earlier
 sections retain results from the preceding revisions and integration checks.
+
+## Environment selection, CI and Groq errors — 2026-10-14
+
+`Devops/dev.py` now selects local PostgreSQL for `develop`, `acceptance` and
+feature branches; `main` selects Supabase. Explicit modes support CI and
+detached checkouts. Each mode uses its own configuration file and cookie names;
+remote migrations and seed writes remain explicit. GitHub Actions adds separate
+configuration and frontend checks, retains backend/browser coverage on a local
+database, and fixes the document-conversion input and output validation.
+
+Groq quota, request-size and configuration errors now reach the pricing form as
+sanitized HTTP 422 messages. Regression tests cover both research phases, no
+automatic provider fallback, no failed pricing writes, and manual posting after
+an error. The original checkout's working files remain preserved.
+
+Before publication, the full **378-test Django suite** passed on local PostgreSQL
+through `python3 Devops/dev.py test --port-offset 2`; all **19 development-helper
+tests** and the whitespace check passed. Independent review found no blockers in
+the helper, Compose, workflows or environment/cookie isolation. Refreshed
+`origin/develop` remains at `2680fa9` and is already included in this candidate.
+The earlier frontend/browser results remain applicable; they were not rerun for
+the final Groq backend changes. No hosted database was used for these tests.

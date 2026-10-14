@@ -3,3 +3,6 @@ FrontEnd/.env
 videos/
 .env
 .env.supabase
+.env.local
+Devops/__pycache__/
+Devops/tests/__pycache__/

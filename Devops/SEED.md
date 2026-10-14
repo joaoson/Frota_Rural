@@ -1,5 +1,11 @@
 # Dados de demonstração
 
+Para os ambientes isolados, use `python3 Devops/dev.py local seed-preview` e
+`python3 Devops/dev.py local seed`. No modo Supabase, use `supabase seed-preview`
+e `supabase seed --allow-remote` somente após conferir o destino. Acrescente as
+mesmas opções de porta/projeto usadas no `up`; veja [DEVELOPMENT.md](DEVELOPMENT.md).
+Os comandos Compose diretos abaixo continuam disponíveis para instalações anteriores.
+
 O `BackEnd/seed.py` preenche uma instalação de desenvolvimento sem apagar ou
 atualizar os registros existentes. Os IDs são estáveis: executar novamente
 preserva edições, senhas, datas, prazos de reserva e notificações já lidas ou
@@ -48,7 +54,8 @@ temporário.
 
 São contas fictícias, sem privilégio de administrador. O domínio reservado
 `example.test` não recebe e-mails. Para uma senha inicial diferente, defina
-`SEED_DEMO_PASSWORD` no ambiente do processo antes da primeira execução; o seed
+`SEED_DEMO_PASSWORD` no arquivo selecionado pelo helper (ou no ambiente do
+processo na execução nativa) antes da primeira execução; o seed
 nunca redefine senhas já criadas. Não use essas contas como contas reais.
 
 ## Inventário e fluxos
