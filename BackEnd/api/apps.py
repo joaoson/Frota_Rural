@@ -2,12 +2,12 @@ from django.apps import AppConfig
 
 
 class ApiConfig(AppConfig):
-    """App legado, sem models, views ou urls.
+    """Histórico legado e programação de recorrências.
 
-    Continua instalado só por causa do histórico de migrações: contracts, chat
-    e payments dependem de `api.000x`, e remover o app quebraria o grafo em
-    todo banco já migrado. O código que vivia aqui foi distribuído entre os
-    apps `rentals`, `reviews`, `contracts` e `chat`.
+    Contracts, chat e payments dependem de `api.000x`; remover o app quebraria
+    bancos já migrados. Rentals e Reviews vivem nos respectivos apps de domínio.
+    RentalRecurrence mantém sua identidade de migração neste app; suas rotas
+    são expostas pelo app rentals.
     """
 
     name = "api"

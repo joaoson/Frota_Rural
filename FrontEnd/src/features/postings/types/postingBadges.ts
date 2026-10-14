@@ -10,6 +10,8 @@ export function postingStatusBadge(status: string | null): BadgeConfig {
       return { icon: "hourglass_bottom", variant: "pending", label: "Em análise" };
     case "suspended":
       return { icon: "pause_circle", variant: "neutral", label: "Suspenso" };
+    case "draft":
+      return { icon: "edit_note", variant: "neutral", label: "Rascunho" };
     case "inactive":
       return { icon: "visibility_off", variant: "neutral", label: "Inativo" };
     default:

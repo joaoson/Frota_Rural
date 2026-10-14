@@ -1,10 +1,37 @@
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 from rest_framework import serializers
 
 from contracts.models import Contracts
 from rentals.models import Rentals
+from users.enums import UserRole
+from users.models import Users
+
+
+def validate_operator_assignment(operator: Users | None, lessee: Users, *, lock: bool = False) -> Users | None:
+    """Only a current member of the tenant's operator team can join a new booking.
+
+    Old rentals retain their historical operator link. A new assignment, date
+    change or recurrence must check today's relationship and account state.
+    Callers holding reservation locks can also lock the user until commit, so a
+    concurrent team unlink cannot invalidate the check before the rental saves.
+    """
+    if operator is None:
+        return None
+    queryset = Users.objects.all()
+    if lock:
+        queryset = queryset.select_for_update(no_key=True)
+    current = queryset.filter(pk=operator.pk).first()
+    if (current is None or current.role != UserRole.OPERATOR
+            or current.employer_id != lessee.pk
+            or current.status not in (None, "", "active")):
+        raise serializers.ValidationError({
+            "operator": "O operador precisa estar ativo e vinculado à sua equipe. "
+                        "Atualize o vínculo na aba Operadores ou crie uma nova reserva sem esse operador."
+        })
+    return current
 
 
 class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
@@ -28,24 +55,38 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             "status",
         ]
 
-    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+    def validate(self, attrs):
+        """Keep a day free before and after each rental for machine turnaround."""
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
         posting = attrs.get("postings", getattr(self.instance, "postings", None))
-        if start_date is None or end_date is None or posting is None:
+
+        if not start_date or not end_date or not posting:
             return attrs
-
         if end_date < start_date:
+            raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
+
+        if self.instance and not any(field in attrs for field in ('start_date', 'end_date', 'postings')):
+            # Cancellation and meter updates must still work if an expired hold
+            # has since been taken by another renter.
+            return attrs
+        if not self.instance or any(field in attrs for field in ('start_date', 'end_date')):
+            if posting.status != 'active' or posting.machinery.status != 'active':
+                raise serializers.ValidationError({'postings': 'O anúncio e a máquina precisam estar ativos.'})
+            if start_date <= timezone.now():
+                raise serializers.ValidationError({'start_date': 'Escolha uma data futura.'})
+            if (posting.availability_start and start_date < posting.availability_start) or (
+                posting.availability_end and end_date > posting.availability_end
+            ):
+                raise serializers.ValidationError({'start_date': 'O período está fora da disponibilidade do anúncio.'})
+
+        max_reservation_days = posting.max_reservation_days
+        total_days = (end_date.date() - start_date.date()).days + 1
+        if max_reservation_days and total_days > max_reservation_days:
             raise serializers.ValidationError(
-                {"end_date": "A data de fim deve ser posterior à data de início."}
+                {"end_date": f"Este anúncio permite reservas de no máximo {max_reservation_days} dias."}
             )
 
-        max_days = posting.max_reservation_days
-        total_days = (end_date.date() - start_date.date()).days + 1
-        if max_days and total_days > max_days:
-            raise serializers.ValidationError(
-                {"end_date": f"Este anúncio permite reservas de no máximo {max_days} dias."}
-            )
         return attrs
 
 
@@ -59,6 +100,7 @@ class RentalFilterSerializer(serializers.Serializer[Any]):
 
 class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     lessee_name = serializers.CharField(source="lessee.name", read_only=True)
+    lessor_id = serializers.CharField(source="postings.machinery.owner_id", read_only=True)
     lessor_name = serializers.CharField(source="postings.machinery.owner.name", read_only=True)
     machine_brand = serializers.CharField(source="postings.machinery.brand", read_only=True)
     machine_model = serializers.CharField(source="postings.machinery.model", read_only=True)
@@ -88,6 +130,10 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "updated_at",
             "lessee_name",
             "lessor_name",
+            "lessor_id",
+            "recurrence",
+            "recurrence_index",
+            "reservation_expires_at",
             "machine_brand",
             "machine_model",
             "contract_number",

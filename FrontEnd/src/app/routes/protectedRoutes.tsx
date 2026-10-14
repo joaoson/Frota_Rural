@@ -11,24 +11,29 @@ import CNHUpload from "@/pages/documents/CNHUpload";
 import GerenciarAnuncio from "@/pages/postings/GerenciarAnuncio";
 import NovoAnuncio from "@/pages/postings/NovoAnuncio";
 import NovoEquipamento from "@/pages/machines/NovoEquipamento";
+import Reservar from "@/pages/postings/Reservar";
 
 import { adminRoutes } from "./adminRoutes";
 
 export const protectedRoutes: ReactElement = (
   <Route element={<ProtectedRoute />}>
-    <Route path="/dashboard" element={<DashboardLocador />} />
-    <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
-    <Route path="/dashboard-locatario/locacoes/:rentalId" element={<AnaliseLocacao />} />
+    <Route element={<ProtectedRoute allowedRoles={["locatario", "admin"]} />}>
+      <Route path="/reservar/:id" element={<Reservar />} />
+    </Route>
+    <Route element={<ProtectedRoute allowedRoles={["locatario", "operador", "admin"]} />}>
+      <Route path="/dashboard-locatario" element={<DashboardLocatario />} />
+      <Route path="/dashboard-locatario/locacoes/:rentalId" element={<AnaliseLocacao />} />
+    </Route>
 
     <Route path="/mensagens" element={<Mensagens />} />
     <Route path="/mensagens/:threadId" element={<Mensagens />} />
 
     <Route element={<ProtectedRoute allowedRoles={["locador", "admin"]} />}>
+      <Route path="/dashboard" element={<DashboardLocador />} />
       <Route path="/dashboard/novo-equipamento" element={<NovoEquipamento />} />
+      <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
+      <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
     </Route>
-
-    <Route path="/dashboard/novo-anuncio" element={<NovoAnuncio />} />
-    <Route path="/dashboard/gerenciar-anuncio/:id" element={<GerenciarAnuncio />} />
 
     <Route path="/document/cnh" element={<CNHUpload />} />
     <Route path="/document/certification" element={<CertificationUpload />} />

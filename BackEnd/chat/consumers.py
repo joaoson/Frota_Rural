@@ -68,6 +68,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self) -> None:
         user = self.scope.get("user")
         if not isinstance(user, Users) or not user.is_authenticated:
+            # Complete the handshake so browsers receive 4401 and can refresh JWT.
+            protocols = self.scope.get("subprotocols") or []
+            await self.accept(subprotocol="bearer" if "bearer" in protocols else None)
             await self.close(code=4401)
             return
         self.user = user

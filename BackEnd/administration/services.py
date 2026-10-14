@@ -66,9 +66,9 @@ class UserModerationService:
         Postings.objects.filter(machinery__owner=user, status=PostingStatus.ACTIVE).update(
             status=PostingStatus.SUSPENDED
         )
-        Rentals.objects.filter(lessee=user, status=RentalStatus.PENDING).update(
-            status=RentalStatus.CANCELLED
-        )
+        rental_ids = list(Rentals.objects.filter(lessee=user, status=RentalStatus.PENDING).values_list("id", flat=True))
+        Rentals.objects.filter(id__in=rental_ids).update(status=RentalStatus.CANCELLED)
+        Contracts.objects.filter(rental_id__in=rental_ids, status=ContractStatus.PENDING_SIGNATURES).update(status=ContractStatus.CANCELLED)
         return user
 
     @staticmethod

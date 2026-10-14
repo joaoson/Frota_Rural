@@ -6,13 +6,7 @@ from users.enums import UserRole
 
 
 class IsPlatformAdmin(BasePermission):
-    """Só usuários com role `admin`.
-
-    Os endpoints administrativos antigos (advertir, suspender, banir, aprovar e
-    reprovar anúncio) continuam sem permission_class — não foram retrofitados
-    aqui de propósito, para não mudar o comportamento atual do painel. Fica
-    como dívida registrada.
-    """
+    """Only authenticated platform administrators may moderate users and content."""
 
     message = "Acesso restrito a administradores."
 

@@ -10,6 +10,7 @@ from django.db.models import QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, ValidationError
 
+from users.models import Users
 from common.exceptions import Conflict, ServiceUnavailable
 from document_validation.classifier import CnhClassifier
 from document_validation.enums import ValidationStatus
@@ -37,17 +38,20 @@ def _apply_review(document: OperatorLicense | Certification, data: Mapping[str, 
 
 class OperatorLicenseService:
     @staticmethod
-    def get(license_id: UUID) -> OperatorLicense:
+    def get(license_id: UUID, *, actor: Users) -> OperatorLicense:
         try:
-            return OperatorLicense.objects.get(id=license_id)
+            queryset = OperatorLicense.objects.all()
+            if actor.role != "admin":
+                queryset = queryset.filter(user=actor)
+            return queryset.get(id=license_id)
         except OperatorLicense.DoesNotExist as exc:
             raise NotFound("CNH não encontrada.") from exc
 
     @staticmethod
     @transaction.atomic
-    def create(data: Mapping[str, Any]) -> OperatorLicense:
+    def create(data: Mapping[str, Any], *, actor: Users) -> OperatorLicense:
         """Cadastra a CNH, que sempre entra aguardando a análise."""
-        serializer = OperatorLicenseInputSerializer(data=data)
+        serializer = OperatorLicenseInputSerializer(data=data, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         try:
@@ -63,11 +67,11 @@ class OperatorLicenseService:
     @staticmethod
     @transaction.atomic
     def update(
-        license_id: UUID, data: Mapping[str, Any], *, partial: bool = False
+        license_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False
     ) -> OperatorLicense:
         """Qualquer edição invalida a análise anterior: a CNH volta para `pending`."""
-        license_ = OperatorLicenseService.get(license_id)
-        serializer = OperatorLicenseInputSerializer(license_, data=data, partial=partial)
+        license_ = OperatorLicenseService.get(license_id, actor=actor)
+        serializer = OperatorLicenseInputSerializer(license_, data=data, partial=partial, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         try:
             return serializer.save(
@@ -80,23 +84,25 @@ class OperatorLicenseService:
 
     @staticmethod
     @transaction.atomic
-    def delete(license_id: UUID) -> None:
-        OperatorLicenseService.get(license_id).delete()
+    def delete(license_id: UUID, *, actor: Users) -> None:
+        OperatorLicenseService.get(license_id, actor=actor).delete()
 
     @staticmethod
     @transaction.atomic
-    def review(license_id: UUID, data: Mapping[str, Any]) -> OperatorLicense:
-        license_ = OperatorLicenseService.get(license_id)
+    def review(license_id: UUID, data: Mapping[str, Any], *, actor: Users) -> OperatorLicense:
+        license_ = OperatorLicenseService.get(license_id, actor=actor)
         _apply_review(license_, data)
         return license_
 
     @staticmethod
-    def list(filters: Mapping[str, Any]) -> QuerySet[OperatorLicense]:
+    def list(filters: Mapping[str, Any], *, actor: Users) -> QuerySet[OperatorLicense]:
         serializer = DocumentFilterSerializer(data=filters)
         serializer.is_valid(raise_exception=True)
         params: dict[str, Any] = serializer.validated_data
 
         queryset = OperatorLicense.objects.order_by("-created_at", "-id")
+        if actor.role != "admin":
+            queryset = queryset.filter(user=actor)
         if "user" in params:
             queryset = queryset.filter(user_id=params["user"])
         if "validation_status" in params:
@@ -106,17 +112,20 @@ class OperatorLicenseService:
 
 class CertificationService:
     @staticmethod
-    def get(certification_id: UUID) -> Certification:
+    def get(certification_id: UUID, *, actor: Users) -> Certification:
         try:
-            return Certification.objects.get(id=certification_id)
+            queryset = Certification.objects.all()
+            if actor.role != "admin":
+                queryset = queryset.filter(user=actor)
+            return queryset.get(id=certification_id)
         except Certification.DoesNotExist as exc:
             raise NotFound("Certificação não encontrada.") from exc
 
     @staticmethod
     @transaction.atomic
-    def create(data: Mapping[str, Any]) -> Certification:
+    def create(data: Mapping[str, Any], *, actor: Users) -> Certification:
         """Cadastra a certificação, que sempre entra aguardando a análise."""
-        serializer = CertificationInputSerializer(data=data)
+        serializer = CertificationInputSerializer(data=data, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
         try:
@@ -132,11 +141,11 @@ class CertificationService:
     @staticmethod
     @transaction.atomic
     def update(
-        certification_id: UUID, data: Mapping[str, Any], *, partial: bool = False
+        certification_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False
     ) -> Certification:
         """Qualquer edição invalida a análise anterior: volta para `pending`."""
-        certification = CertificationService.get(certification_id)
-        serializer = CertificationInputSerializer(certification, data=data, partial=partial)
+        certification = CertificationService.get(certification_id, actor=actor)
+        serializer = CertificationInputSerializer(certification, data=data, partial=partial, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         try:
             return serializer.save(
@@ -149,23 +158,25 @@ class CertificationService:
 
     @staticmethod
     @transaction.atomic
-    def delete(certification_id: UUID) -> None:
-        CertificationService.get(certification_id).delete()
+    def delete(certification_id: UUID, *, actor: Users) -> None:
+        CertificationService.get(certification_id, actor=actor).delete()
 
     @staticmethod
     @transaction.atomic
-    def review(certification_id: UUID, data: Mapping[str, Any]) -> Certification:
-        certification = CertificationService.get(certification_id)
+    def review(certification_id: UUID, data: Mapping[str, Any], *, actor: Users) -> Certification:
+        certification = CertificationService.get(certification_id, actor=actor)
         _apply_review(certification, data)
         return certification
 
     @staticmethod
-    def list(filters: Mapping[str, Any]) -> QuerySet[Certification]:
+    def list(filters: Mapping[str, Any], *, actor: Users) -> QuerySet[Certification]:
         serializer = DocumentFilterSerializer(data=filters)
         serializer.is_valid(raise_exception=True)
         params: dict[str, Any] = serializer.validated_data
 
         queryset = Certification.objects.order_by("-created_at", "-id")
+        if actor.role != "admin":
+            queryset = queryset.filter(user=actor)
         if "user" in params:
             queryset = queryset.filter(user_id=params["user"])
         if "validation_status" in params:

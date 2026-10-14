@@ -53,6 +53,7 @@ export function detailToDomain(dto: PostingDetailApi): PostingDetail {
     id: dto.id,
     hourlyRate: toNumber(dto.hourly_rate) ?? 0,
     locationAddress: dto.location_address ?? null,
+    locationCep: dto.location_cep ?? null,
     latitude: toNumber(dto.location_lat),
     longitude: toNumber(dto.location_lng),
     availabilityStart: toDate(dto.availability_start),
@@ -81,7 +82,7 @@ export function toWritePayload(
   return {
     machinery: values.machinery,
     hourly_rate: values.hourlyRate,
-    location_cep: values.cep || undefined,
+    location_cep: values.cep || "",
     location_address: values.locationAddress,
     ...toCoordinatesPayload(coords),
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),
@@ -97,7 +98,7 @@ export function toEditPayload(
   return {
     status: values.status,
     hourly_rate: values.hourlyRate,
-    location_cep: values.cep || undefined,
+    location_cep: values.cep || "",
     location_address: values.locationAddress,
     ...toCoordinatesPayload(coords),
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),

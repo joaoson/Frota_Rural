@@ -5,7 +5,10 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
+from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from users.serializer import (
     ChangePasswordInputSerializer,
@@ -60,6 +63,8 @@ class UserCreateView(APIView):
 
 
 class UserListView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar usuários",
@@ -72,24 +77,28 @@ class UserListView(APIView):
 
 
 class UserByEmailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Buscar usuário por e-mail",
         responses={200: UserOutputSerializer, 404: USER_NOT_FOUND},
     )
     def get(self, request: Request, email: str) -> Response:
-        user = UserService.get_by_email(email)
+        user = UserService.get_by_email(email, actor=authenticated_user(request))
         return Response(UserOutputSerializer(user).data, status=status.HTTP_200_OK)
 
 
 class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar usuário",
         responses={200: UserOutputSerializer, 404: USER_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        user = UserService.get(pk)
+        user = UserService.get(pk, actor=authenticated_user(request))
         return Response(UserOutputSerializer(user).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -99,7 +108,7 @@ class UserDetailView(APIView):
         responses={200: UserOutputSerializer, **error_responses(400, 409), 404: USER_NOT_FOUND},
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        user = UserService.update(pk, request.data)
+        user = UserService.update(pk, request.data, actor=authenticated_user(request))
         return Response(UserOutputSerializer(user).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -110,7 +119,7 @@ class UserDetailView(APIView):
         responses={200: UserOutputSerializer, **error_responses(400, 409), 404: USER_NOT_FOUND},
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        user = UserService.update(pk, request.data, partial=True)
+        user = UserService.update(pk, request.data, actor=authenticated_user(request), partial=True)
         return Response(UserOutputSerializer(user).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -123,11 +132,13 @@ class UserDetailView(APIView):
         },
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        UserService.delete(pk)
+        UserService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Alterar senha do usuário",
@@ -150,5 +161,5 @@ class UserChangePasswordView(APIView):
         ],
     )
     def post(self, request: Request, pk: UUID) -> Response:
-        UserService.change_password(pk, request.data)
+        UserService.change_password(pk, request.data, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)

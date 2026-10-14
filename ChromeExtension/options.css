@@ -1,0 +1,35 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #173c29; background: #f7f8f2; }
+* { box-sizing: border-box; }
+body { width: 380px; margin: 0 auto; font-size: 13px; }
+main { padding: 24px; }
+header { display: flex; gap: 12px; align-items: center; }
+.mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 13px; background: #215235; color: #f6dfa0; font-weight: 800; }
+.eyebrow { margin: 0 0 3px; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+h1 { margin: 0; font-size: 20px; letter-spacing: -.5px; }
+.badge { margin-left: auto; border: 1px solid #c7dbc8; border-radius: 20px; padding: 4px 7px; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.intro { color: #647261; line-height: 1.55; margin: 18px 0; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+label { display: block; font-size: 11px; font-weight: 650; margin-bottom: 6px; }
+input[type="url"], input[type="email"], input[type="password"] { width: 100%; padding: 10px 11px; border: 1px solid #d5ddd0; border-radius: 8px; font: inherit; background: #fff; color: #173c29; }
+input:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid #b1831d; outline-offset: 2px; }
+.hint { color: #647261; font-size: 10px; margin: 6px 0 15px; }
+details { border: 1px solid #d5ddd0; border-radius: 10px; background: white; margin-bottom: 8px; overflow: hidden; }
+summary { padding: 12px; cursor: pointer; font-weight: 750; font-size: 12px; }
+summary span { display: block; margin: 3px 0 0 15px; color: #647261; font-weight: 400; font-size: 10px; overflow-wrap: anywhere; }
+.account-fields { padding: 0 12px 12px; }
+.account-fields input { margin-bottom: 10px; }
+.account-fields input:last-child { margin-bottom: 0; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 450; margin-top: 12px; }
+input[type="checkbox"] { accent-color: #215235; width: 15px; height: 15px; margin: 0; }
+.actions { display: flex; gap: 8px; margin-top: 18px; }
+button { border: 1px solid #c7dbc8; background: white; border-radius: 8px; padding: 10px 12px; cursor: pointer; color: #173c29; font: 650 11px system-ui, sans-serif; }
+button:hover { background: #e7f1df; }
+button:disabled { opacity: .55; cursor: wait; }
+.primary { background: #215235; color: white; border-color: #215235; flex: 1; }
+.primary:hover { background: #163f27; }
+.text-button { padding: 10px 0 0; border: 0; background: transparent; color: #647261; font-weight: 400; text-decoration: underline; }
+.text-button:hover { background: transparent; color: #173c29; }
+#status { font-size: 11px; line-height: 1.45; margin: 10px 0 0; }
+#status[data-error="true"] { color: #9c312a; }
+#status:empty { display: none; }
+footer { border-top: 1px solid #d5ddd0; padding-top: 12px; margin-top: 16px; color: #647261; font-size: 10px; line-height: 1.5; }

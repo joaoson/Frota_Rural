@@ -47,16 +47,21 @@ def _create_account(validated: Mapping[str, Any], **server_fields: Any) -> Users
 
 class UserService:
     @staticmethod
-    def get(user_id: UUID) -> Users:
+    def _visible(actor: Users) -> QuerySet[Users]:
+        queryset = Users.objects.all()
+        return queryset if actor.role == UserRole.ADMIN else queryset.filter(pk=actor.pk)
+
+    @staticmethod
+    def get(user_id: UUID, *, actor: Users) -> Users:
         try:
-            return Users.objects.get(id=user_id)
+            return UserService._visible(actor).get(id=user_id)
         except Users.DoesNotExist as exc:
             raise NotFound("Usuário não encontrado.") from exc
 
     @staticmethod
-    def get_by_email(email: str) -> Users:
+    def get_by_email(email: str, *, actor: Users) -> Users:
         try:
-            return Users.objects.get(email=email)
+            return UserService._visible(actor).get(email=email)
         except Users.DoesNotExist as exc:
             raise NotFound("Usuário não encontrado.") from exc
 
@@ -70,8 +75,8 @@ class UserService:
 
     @staticmethod
     @transaction.atomic
-    def update(user_id: UUID, data: Mapping[str, Any], *, partial: bool = False) -> Users:
-        user = UserService.get(user_id)
+    def update(user_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False) -> Users:
+        user = UserService.get(user_id, actor=actor)
         serializer = UserUpdateInputSerializer(user, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
         try:
@@ -81,8 +86,8 @@ class UserService:
 
     @staticmethod
     @transaction.atomic
-    def delete(user_id: UUID) -> None:
-        user = UserService.get(user_id)
+    def delete(user_id: UUID, *, actor: Users) -> None:
+        user = UserService.get(user_id, actor=actor)
         enforce_constraints_now()
         try:
             user.delete()
@@ -95,8 +100,10 @@ class UserService:
 
     @staticmethod
     @transaction.atomic
-    def change_password(user_id: UUID, data: Mapping[str, Any]) -> None:
-        user = UserService.get(user_id)
+    def change_password(user_id: UUID, data: Mapping[str, Any], *, actor: Users) -> None:
+        if user_id != actor.pk:
+            raise NotFound("Usuário não encontrado.")
+        user = UserService.get(user_id, actor=actor)
         serializer = ChangePasswordInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
 

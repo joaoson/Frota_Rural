@@ -2,6 +2,7 @@ from uuid import UUID
 
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,6 +21,8 @@ INVALID_REVIEW = error_response(400, "Dados inválidos ou avaliação já existe
 
 
 class ReviewListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar avaliações",
@@ -53,11 +56,13 @@ class ReviewListView(APIView):
         ],
     )
     def post(self, request: Request) -> Response:
-        review = ReviewService.create(request.data)
+        review = ReviewService.create(request.data, user=request.user)
         return Response(ReviewOutputSerializer(review).data, status=status.HTTP_201_CREATED)
 
 
 class ReviewDetailView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar avaliação",
@@ -79,7 +84,7 @@ class ReviewDetailView(APIView):
         },
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        review = ReviewService.update(pk, request.data)
+        review = ReviewService.update(pk, request.data, user=request.user)
         return Response(ReviewOutputSerializer(review).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -95,7 +100,7 @@ class ReviewDetailView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        review = ReviewService.update(pk, request.data, partial=True)
+        review = ReviewService.update(pk, request.data, user=request.user, partial=True)
         return Response(ReviewOutputSerializer(review).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -108,5 +113,5 @@ class ReviewDetailView(APIView):
         },
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        ReviewService.delete(pk)
+        ReviewService.delete(pk, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

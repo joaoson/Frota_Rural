@@ -1,3 +1,4 @@
+import { documentUrl } from "@/features/documents/api/documentUrl";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
@@ -497,7 +498,7 @@ const Documentos = () => {
 
                 if (!fileUrl) return null;
 
-                const fullUrl = `${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${fileUrl}`;
+                const fullUrl = documentUrl(fileUrl);
                 const isImage = /\.(jpg|jpeg|png|webp)$/i.test(fileUrl);
 
                 return (

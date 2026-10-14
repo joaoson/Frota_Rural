@@ -1,4 +1,7 @@
 import { useCallback, useState } from "react";
+import { useWatch } from "react-hook-form";
+import SugestaoPrecoPanel from "@/features/pricing/components/SugestaoPrecoPanel";
+import { usePricingSuggestion } from "@/features/pricing/hooks/usePricingSuggestion";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -37,6 +40,8 @@ const NovoAnuncio = () => {
   const machines = machinesQuery.data ?? [];
 
   const form = usePostingForm();
+  const machinery = useWatch({ control: form.control, name: "machinery" });
+  const pricing = usePricingSuggestion(machinery);
   const createPosting = useCreatePosting();
   const uploadPhotos = useUploadPostingPhotos();
   // Guardadas no anúncio para o mapa não geocodificar a cada exibição.
@@ -58,26 +63,28 @@ const NovoAnuncio = () => {
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
-    setPhotoFiles((prev) => {
-      const next = [...prev];
-      for (const file of Array.from(files)) {
-        if (!ACCEPT_TYPES.includes(file.type)) {
-          toast.error("Use apenas JPG ou PNG.");
-          continue;
-        }
-        if (file.size > MAX_FILE_BYTES) {
-          toast.error(`"${file.name}" excede 5MB.`);
-          continue;
-        }
-        next.push(file);
+    // FileDropzone clears its input before deferred state updaters run.
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      if (!ACCEPT_TYPES.includes(file.type)) {
+        toast.error("Use apenas JPG ou PNG.");
+        continue;
       }
-      return next;
-    });
+      if (file.size > MAX_FILE_BYTES) {
+        toast.error(`"${file.name}" excede 5MB.`);
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length > 0) setPhotoFiles((prev) => [...prev, ...accepted]);
   }, []);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      const postingId = await createPosting.mutateAsync(toWritePayload(values, coordenadas));
+      const postingId = await createPosting.mutateAsync({
+        ...toWritePayload(values, coordenadas),
+        suggestion_id: pricing.suggestionId,
+      });
 
       if (photoFiles.length > 0) {
         const { failed } = await uploadPhotos.mutateAsync({ postingId, files: photoFiles });
@@ -93,7 +100,7 @@ const NovoAnuncio = () => {
 
       form.reset();
       setPhotoFiles([]);
-      navigate("/dashboard");
+      navigate("/dashboard?tab=anuncios");
     } catch (error) {
       toast.error(
         error instanceof HttpError
@@ -108,7 +115,7 @@ const NovoAnuncio = () => {
 
   return (
     <PageShell>
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to="/dashboard?tab=anuncios">Voltar aos Anúncios</BackLink>
 
       <div className="mb-10">
         <h1 className="font-headline text-3xl font-bold text-primary mb-1">Novo Anúncio</h1>
@@ -137,7 +144,8 @@ const NovoAnuncio = () => {
             ))}
           </select>
           
-          {!machinesQuery.isLoading && machines.length === 0 ? (
+          {machinesQuery.isError && <p role="alert" className="text-sm text-error">Não foi possível carregar sua frota. <button type="button" className="underline font-bold" onClick={() => void machinesQuery.refetch()}>Tentar novamente</button></p>}
+          {!machinesQuery.isLoading && !machinesQuery.isError && machines.length === 0 ? (
             <p className="text-[11px] text-outline font-medium">
               Nenhum equipamento ativo.{" "}
               <Link
@@ -162,6 +170,34 @@ const NovoAnuncio = () => {
           />
         </FormField>
 
+        <div className="space-y-3">
+          <p className="text-[11px] text-outline font-medium">
+            A plataforma fatura 8 h por dia de reserva — este é o valor por hora faturada, não por hora de horímetro.
+          </p>
+          {pricing.suggestion ? (
+            <SugestaoPrecoPanel suggestion={pricing.suggestion}
+              onApply={(value) => {
+                form.setValue("hourlyRate", value, { shouldValidate: true, shouldDirty: true });
+                toast.success("Valor aplicado. Você pode ajustá-lo antes de publicar.");
+              }}
+              onDismiss={pricing.dismiss} />
+          ) : (
+            <button type="button" onClick={pricing.request}
+              disabled={pricing.isPending || !machinery || isBusy}
+              className="w-full border border-primary/40 text-primary dark:text-primary-bright font-bold py-2.5 rounded-lg text-sm hover:bg-primary/5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+              <MaterialIcon icon={pricing.isPending ? "hourglass_top" : "auto_awesome"} size={16} />
+              {pricing.isPending ? "Pesquisando o mercado..." : "Sugerir valor com base no mercado"}
+            </button>
+          )}
+          {pricing.error && (
+            <p role="status" className="text-sm text-on-surface-variant">
+              {pricing.error instanceof HttpError && pricing.error.status === 422
+                ? pricing.error.message
+                : "Erro ao consultar a sugestão de preço. Tente novamente."}
+            </p>
+          )}
+        </div>
+
         <div className="space-y-4">
           <FormField label="CEP">
             <input
@@ -170,6 +206,7 @@ const NovoAnuncio = () => {
               className={inputClass(false)}
               {...cepField}
               onChange={(event) => {
+                setCoordenadas(null);
                 void cepField.onChange(event);
                 void handleCepChange(event.target.value);
               }}
@@ -181,7 +218,7 @@ const NovoAnuncio = () => {
               type="text"
               placeholder="Sorriso, MT"
               className={inputClass(Boolean(errors.locationAddress))}
-              {...form.register("locationAddress")}
+              {...form.register("locationAddress", { onChange: () => { setCoordenadas(null); form.setValue("cep", ""); } })}
             />
           </FormField>
           <MapaLocalizacao
@@ -246,8 +283,7 @@ const NovoAnuncio = () => {
             </ul>
           ) : null}
           <p className="text-[10px] text-outline leading-relaxed">
-            O backend ainda não expõe endpoint para fotos; elas são validadas aqui e poderão ser
-            enviadas quando a API estiver pronta.
+            As fotos serão enviadas após a publicação do anúncio.
           </p>
         </FormField>
 

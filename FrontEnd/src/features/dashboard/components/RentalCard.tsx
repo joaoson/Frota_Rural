@@ -1,4 +1,5 @@
-import { Link } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
@@ -22,6 +23,7 @@ interface Counterparty {
 }
 
 interface ReviewPanel {
+  alreadyReviewed?: boolean;
   buttonLabel: string;
   title: string;
   prompt: string;
@@ -35,18 +37,18 @@ interface ReviewPanel {
   onSubmit: () => void;
 }
 
-interface ReschedulePanel {
-  open: boolean;
-  onToggle: () => void;
-}
-
 interface RentalCardProps {
   rental: RentalCardData;
   counterparty: Counterparty;
   review: ReviewPanel;
   detailsOpen: boolean;
   onToggleDetails: () => void;
-  reschedule?: ReschedulePanel;
+  onCancel?: () => void;
+  cancelling?: boolean;
+  cancelLabel?: string;
+  onScheduleRecurrence?: () => void;
+  paymentAction?: React.ReactNode;
+  recurrenceIndex?: number | null;
   /** Quando presente, "Analisar" vira link para a análise da locação. */
   analysisHref?: string;
 }
@@ -80,15 +82,29 @@ export function RentalCard({
   review,
   detailsOpen,
   onToggleDetails,
-  reschedule,
+  onCancel,
+  cancelling = false,
+  cancelLabel = "Recusar",
   analysisHref,
+  onScheduleRecurrence,
+  paymentAction,
+  recurrenceIndex,
 }: RentalCardProps) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === `#locacao-${rental.id}`) {
+      cardRef.current?.scrollIntoView?.({ block: "center" });
+      cardRef.current?.focus({ preventScroll: true });
+    }
+  }, [rental.id, hash]);
   const badge = rentalStatusBadge(rental.status);
-  const isOpenStage = rental.status === "pending" || rental.status === "active";
-  const isClosedStage = rental.status === "completed" || rental.status === "cancelled";
+  const isOpenStage = ["pending", "awaiting_payment", "active", "signed", "validating"].includes(rental.status ?? "");
+  const isClosedStage = rental.status === "completed" || rental.status === "cancelled" || rental.status === "closed";
 
   return (
-    <div className="bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+    <div ref={cardRef} id={`locacao-${rental.id}`} tabIndex={-1} className="scroll-mt-20 focus:outline-2 focus:outline-primary bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
       <div className="absolute left-0 top-0 bottom-0 w-2 bg-secondary-container" />
       <div className="ml-4 p-6">
         <div className="flex justify-between items-start mb-4">
@@ -113,21 +129,17 @@ export function RentalCard({
           </Field>
         </div>
 
+        {recurrenceIndex != null && <p className="mb-3 text-xs font-bold text-primary">Reserva recorrente · Ocorrência {recurrenceIndex}</p>}
         <div className="flex flex-wrap gap-2">
-          {rental.status === "pending" && (
-            <button className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors">
-              Recusar
+          {onScheduleRecurrence && <button type="button" onClick={onScheduleRecurrence} className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20"><MaterialIcon icon="event_repeat" size={14} /> Programar recorrência</button>}
+          {paymentAction}
+          {rental.status === "pending" && onCancel && (
+            <button type="button" onClick={() => setConfirmCancel(true)} disabled={cancelling} className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50">
+              {cancelLabel}
             </button>
           )}
-          {isOpenStage && (
-            <button
-              onClick={reschedule?.onToggle}
-              className="px-4 bg-transparent text-tertiary py-2 rounded-lg font-bold text-xs hover:bg-tertiary/10 transition-colors flex items-center gap-1 border border-tertiary/50"
-            >
-              <MaterialIcon icon="event_repeat" size={14} /> Reagendar
-            </button>
-          )}
-          {rental.status === "completed" && (
+          {rental.status === "completed" && review.alreadyReviewed && <span className="px-4 py-2 text-xs text-on-surface-variant">Avaliação enviada</span>}
+          {rental.status === "completed" && !review.alreadyReviewed && (
             <button
               onClick={review.onToggle}
               className="px-4 bg-secondary-container/30 text-secondary py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1"
@@ -144,7 +156,7 @@ export function RentalCard({
                 <MaterialIcon icon="analytics" size={14} /> Analisar
               </Link>
             ) : (
-              <button className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
+              <button onClick={onToggleDetails} className="px-4 bg-primary/10 text-primary py-2 rounded-lg font-bold text-xs hover:bg-primary/20 transition-colors flex items-center gap-1 border border-primary/20">
                 <MaterialIcon icon="analytics" size={14} /> Analisar
               </button>
             ))}
@@ -165,7 +177,7 @@ export function RentalCard({
             </h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <DetailRow label="Contrato">
-                <span className="text-on-surface font-bold">{rental.contract}</span>
+                <span className="text-on-surface font-bold">{rental.contract ?? "Ainda não disponível"}</span>
               </DetailRow>
               <DetailRow label={counterparty.label}>
                 <span className="text-on-surface font-bold">{counterparty.name}</span>
@@ -186,43 +198,17 @@ export function RentalCard({
           </div>
         )}
 
-        {reschedule?.open && (
-          <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
-            <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
-              <MaterialIcon icon="event_repeat" size={16} className="text-secondary" /> Solicitar
-              Reagendamento
-            </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-outline">
-                  Nova Data Início
-                </label>
-                <input type="date" className={PANEL_INPUT} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold uppercase tracking-wider text-outline">
-                  Nova Data Fim
-                </label>
-                <input type="date" className={PANEL_INPUT} />
-              </div>
+        {confirmCancel && rental.status === "pending" && onCancel && (
+          <div role="group" aria-label="Confirmar cancelamento da reserva" className="mt-4 rounded-xl border border-error/30 p-4 space-y-3">
+            <p className="text-sm">Cancelar esta reserva? As datas serão liberadas para novas locações.</p>
+            <div className="flex gap-3">
+              <button type="button" disabled={cancelling} onClick={onCancel} className="rounded-lg bg-error text-white px-4 py-2 text-sm disabled:opacity-50">{cancelling ? "Cancelando..." : "Confirmar cancelamento"}</button>
+              <button type="button" disabled={cancelling} onClick={() => setConfirmCancel(false)} className="rounded-lg border px-4 py-2 text-sm">Manter reserva</button>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold uppercase tracking-wider text-outline">
-                Motivo
-              </label>
-              <textarea
-                placeholder="Ex: Chuvas atrasaram o preparo..."
-                rows={2}
-                className={`${PANEL_INPUT} resize-none`}
-              />
-            </div>
-            <button className="w-full bg-primary text-on-primary font-bold py-3 rounded-lg hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm">
-              <MaterialIcon icon="send" size={16} /> Enviar Solicitação
-            </button>
           </div>
         )}
 
-        {review.open && (
+        {review.open && rental.status === "completed" && !review.alreadyReviewed && (
           <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
             <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
               <MaterialIcon icon="star" size={16} className="text-secondary" /> {review.title}

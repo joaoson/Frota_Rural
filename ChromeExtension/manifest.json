@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Frota Rural · Validação",
+  "version": "1.0.0",
+  "description": "Entre como locador, locatário ou admin no Frota Rural local usando contas de teste.",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Frota Rural · Contas de teste",
+    "default_popup": "options.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://localhost/*", "https://127.0.0.1/*"],
+      "js": ["settings.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

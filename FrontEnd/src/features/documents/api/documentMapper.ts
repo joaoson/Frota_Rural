@@ -102,7 +102,7 @@ export function licenseToPayload(
 export function certificationToPayload(
   values: CertificationFormValues,
   userId: string,
-  mediaUrl?: string,
+  mediaUrl?: string | null,
 ): Record<string, unknown> {
   return {
     user: userId,

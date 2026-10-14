@@ -11,6 +11,7 @@ from contracts.models import ContractSignatureOtps
 from contracts.services import ContractService
 from machines.models import Machines
 from postings.models import Postings
+from payments.models import Payments
 from rentals.models import Rentals
 from users.models import Users
 
@@ -52,13 +53,15 @@ class ContractTestCase(TestCase):
             start_date=start,
             end_date=start + timedelta(days=2),
             total_price="2520.00",
-            status="pending",
+            status="active",
             created_at=timezone.now(),
         )
+        Payments.objects.create(rental=self.rental, session_id="cs_contract_test", status="approved", amount="2520.00")
         self.contract = ContractService.create_for_rental(self.rental)
+        self.client.defaults.update(auth(self.lessee))
 
     def sign(self, role, as_user=None, **body):
-        headers = auth(as_user) if as_user else {}
+        headers = auth(as_user or (self.owner if role == "locador" else self.lessee))
         return self.client.post(
             f"/api/contracts/{self.contract.id}/sign",
             {"role": role, "name": "Fulano de Tal", **body},
@@ -69,7 +72,7 @@ class ContractTestCase(TestCase):
 
 @override_settings(CONTRACT_SIGNATURE_REQUIRE_OTP=False)
 class ContractSignatureTests(ContractTestCase):
-    def test_first_signature_keeps_contract_pending_and_activates_rental(self):
+    def test_first_signature_keeps_contract_pending_and_paid_rental_active(self):
         response = self.sign("locatario")
 
         self.assertEqual(response.status_code, 200, response.content)
@@ -103,8 +106,8 @@ class ContractSignatureTests(ContractTestCase):
     def test_authenticated_user_must_be_the_expected_party(self):
         response = self.sign("locador", as_user=self.stranger)
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["code"], "permission_denied")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["code"], "not_found")
         self.contract.refresh_from_db()
         self.assertFalse(self.contract.accepted_by_lessor)
 
@@ -150,7 +153,7 @@ class ContractSignatureTests(ContractTestCase):
 @override_settings(CONTRACT_SIGNATURE_REQUIRE_OTP=True)
 class ContractOtpTests(ContractTestCase):
     def request_otp(self, role="locatario", as_user=None, **patch_kwargs):
-        headers = auth(as_user) if as_user else {}
+        headers = auth(as_user or (self.owner if role == "locador" else self.lessee))
         with patch("contracts.services.send_contract_signature_otp_email", **patch_kwargs) as send:
             response = self.client.post(
                 f"/api/contracts/{self.contract.id}/otp",
@@ -207,5 +210,5 @@ class ContractOtpTests(ContractTestCase):
     def test_other_user_cannot_request_the_code_of_a_party(self):
         response, send = self.request_otp(role="locador", as_user=self.stranger)
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 404)
         send.assert_not_called()

@@ -3,12 +3,17 @@ name: Convert Docx to PDF
 on:
   push:
     branches-ignore: [ main ]
+    paths:
+      - Documentation/bsi-especificacao-do-projeto-frota-rural.docx
+      - .github/workflows/convert_doc_to_pdf.yml
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   convert_to_pdf:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,13 +25,19 @@ jobs:
           sudo apt-get install -y libreoffice
 
       - name: Run Conversion
+        id: convert
         run: |
+          output_dir=$(mktemp -d "$RUNNER_TEMP/document-pdf.XXXXXX")
           soffice --headless --convert-to pdf \
-            "BSI-Especificação do Projeto-Frota Rural.docx" \
-            --outdir .
+            "Documentation/bsi-especificacao-do-projeto-frota-rural.docx" \
+            --outdir "$output_dir"
+          pdf_path="$output_dir/bsi-especificacao-do-projeto-frota-rural.pdf"
+          test -s "$pdf_path"
+          echo "pdf_path=$pdf_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload PDF Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BSI-Especificacao-do-Projeto-Frota-Rural
-          path: "BSI-Especificação do Projeto-Frota Rural.pdf"
+          path: ${{ steps.convert.outputs.pdf_path }}
+          if-no-files-found: error

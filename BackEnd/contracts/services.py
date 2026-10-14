@@ -22,6 +22,9 @@ from contracts.serializer import ContractOtpRequestInputSerializer, ContractSign
 from rentals.enums import RentalStatus
 from rentals.models import Rentals
 from users.models import Users
+from postings.models import Postings
+from payments.availability import tem_conflito
+from notifications.events import notify_rental_event
 
 LEGAL_BASIS = (
     "Assinatura eletrônica simples, com validade entre as partes nos termos "
@@ -43,16 +46,19 @@ class SignatureResult:
 
 class ContractService:
     @staticmethod
-    def _queryset() -> QuerySet[Contracts]:
-        return Contracts.objects.select_related(
+    def _queryset(actor: Users | None = None) -> QuerySet[Contracts]:
+        queryset = Contracts.objects.all()
+        if actor is not None:
+            queryset = queryset.filter(Q(rental__lessee=actor) | Q(rental__postings__machinery__owner=actor))
+        return queryset.select_related(
             "rental__lessee", "rental__postings__machinery__owner"
         )
 
     @staticmethod
-    def get(contract_id: UUID) -> Contracts:
+    def get(contract_id: UUID, *, actor: Users) -> Contracts:
         """Aceita tanto o id do contrato quanto o id da locação associada."""
         contract = (
-            ContractService._queryset().filter(Q(pk=contract_id) | Q(rental_id=contract_id)).first()
+            ContractService._queryset(actor).filter(Q(pk=contract_id) | Q(rental_id=contract_id)).first()
         )
         if contract is None:
             raise NotFound("Contrato não encontrado.")
@@ -79,8 +85,8 @@ class ContractService:
         return contract.rental.postings.machinery.owner
 
     @staticmethod
-    def get_document(contract_id: UUID) -> dict[str, Any]:
-        contract = ContractService.get(contract_id)
+    def get_document(contract_id: UUID, *, actor: Users) -> dict[str, Any]:
+        contract = ContractService.get(contract_id, actor=actor)
         document = build_contract_document(contract)
         signatures = [*contract.signatures.all()]
 
@@ -97,14 +103,14 @@ class ContractService:
         }
 
     @staticmethod
-    def get_evidence(contract_id: UUID) -> dict[str, Any]:
+    def get_evidence(contract_id: UUID, *, actor: Users) -> dict[str, Any]:
         """Trilha de auditoria completa do aceite eletrônico.
 
         Reúne o que a MP 2.200-2/2001 e a Lei 14.063/2020 exigem que se demonstre:
         qual documento foi aceito (hash + versão), por quem, quando, de onde — e a
         conferência do encadeamento que atesta que nada foi alterado depois.
         """
-        contract = ContractService.get(contract_id)
+        contract = ContractService.get(contract_id, actor=actor)
         document = build_contract_document(contract)
         intact, problems = signature_evidence.verify_chain(contract, document)
         return {
@@ -166,15 +172,15 @@ class ContractService:
     # para este método, e anotações escritas depois dele não enxergariam o
     # `list` embutido.
     @staticmethod
-    def list() -> QuerySet[Contracts]:
-        return ContractService._queryset().order_by("-created_at", "-id")
+    def list(*, actor: Users) -> QuerySet[Contracts]:
+        return ContractService._queryset(actor).order_by("-created_at", "-id")
 
 
 class ContractSignatureService:
     @staticmethod
     @transaction.atomic
     def request_otp(
-        contract_id: UUID, data: Mapping[str, Any], *, requester: Users | None
+        contract_id: UUID, data: Mapping[str, Any], *, requester: Users
     ) -> OtpDispatch:
         """Envia por e-mail um código de uso único a ser informado no aceite.
 
@@ -183,7 +189,7 @@ class ContractSignatureService:
         Se o e-mail não sai, o código gravado é desfeito junto: um código que
         ninguém recebeu invalidaria o anterior, que ainda é o válido.
         """
-        contract = ContractService.get(contract_id)
+        contract = ContractService.get(contract_id, actor=requester)
         serializer = ContractOtpRequestInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         role: str = serializer.validated_data["role"]
@@ -231,7 +237,7 @@ class ContractSignatureService:
         contract_id: UUID,
         data: Mapping[str, Any],
         *,
-        requester: Users | None,
+        requester: Users,
         ip_address: str,
         user_agent: str,
     ) -> SignatureResult:
@@ -242,13 +248,14 @@ class ContractSignatureService:
         limite de tentativas mesmo com o aceite recusado. O aceite em si
         (`_record_acceptance`) é atômico.
         """
-        contract = ContractService.get(contract_id)
+        contract = ContractService.get(contract_id, actor=requester)
         serializer = ContractSignInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         validated: dict[str, Any] = serializer.validated_data
         role: str = validated["role"]
 
         ContractSignatureService._ensure_not_signed(contract, role)
+        ContractSignatureService._ensure_payable(contract.rental)
 
         # Quem a plataforma espera naquele papel. A conferência vem antes do OTP:
         # do contrário uma parte errada queimaria o código enviado à parte certa.
@@ -284,10 +291,16 @@ class ContractSignatureService:
         ip_address: str,
         user_agent: str,
     ) -> SignatureResult:
-        # Trava o contrato: as duas partes assinando ao mesmo tempo não podem
-        # sobrescrever o aceite uma da outra.
-        locked = ContractService._queryset().select_for_update(of=("self",)).get(pk=contract.pk)
+        # Match the reservation/payment lock order, then serialize both signatures.
+        posting = Postings.objects.select_related("machinery__owner").select_for_update(
+            of=("self", "machinery")
+        ).get(pk=contract.rental.postings_id)
+        rental = Rentals.objects.select_for_update().get(pk=contract.rental_id)
+        rental.postings = posting
+        locked = Contracts.objects.select_for_update().get(pk=contract.pk)
+        locked.rental = rental
         ContractSignatureService._ensure_not_signed(locked, role)
+        ContractSignatureService._ensure_payable(rental)
 
         # O hash é calculado sobre o documento exatamente como ele é servido em
         # contracts/<id> — é esse conteúdo que a parte leu e aceitou.
@@ -325,6 +338,11 @@ class ContractSignatureService:
 
         rental.save(update_fields=["status"])
         locked.save(update_fields=["accepted_by_lessor", "accepted_by_lessee", "status"])
+        notify_rental_event(rental, f"contract_signed_{role}",
+                            event_key=f"contract:{locked.pk}:signed:{role}", contract=locked)
+        if locked.status == ContractStatus.SIGNED:
+            notify_rental_event(rental, "contract_completed",
+                                event_key=f"contract:{locked.pk}:completed", contract=locked)
         return SignatureResult(contract=locked, signature=signature)
 
     @staticmethod
@@ -362,6 +380,13 @@ class ContractSignatureService:
             raise ValidationError(error)
 
     @staticmethod
+    def _ensure_payable(rental: Rentals) -> None:
+        if rental.status not in (RentalStatus.ACTIVE, RentalStatus.SIGNED) or not rental.payments.filter(status="approved").exists():
+            raise Conflict("Confirme o pagamento desta reserva antes de assinar o contrato.")
+        if tem_conflito(rental.postings_id, rental.start_date, rental.end_date, ignorar=rental.pk):
+            raise Conflict("As datas desta reserva não estão mais disponíveis.")
+
+    @staticmethod
     def _ensure_not_signed(contract: Contracts, role: str) -> None:
         signed = (
             contract.accepted_by_lessee
@@ -372,7 +397,7 @@ class ContractSignatureService:
             raise Conflict("Esta parte já assinou o contrato.", code="already_signed")
 
     @staticmethod
-    def _ensure_requester_is_party(requester: Users | None, party: Users) -> None:
+    def _ensure_requester_is_party(requester: Users, party: Users) -> None:
         if requester is not None and requester.pk != party.pk:
             raise PermissionDenied("Você não é a parte responsável por assinar neste papel.")
 

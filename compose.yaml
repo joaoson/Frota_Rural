@@ -36,11 +36,17 @@ services:
       - path: .env
         required: false
     environment:
+      # The local stack must not inherit a hosted connection from a mounted .env.
+      DATABASE_URL: ""
+      DB_SCHEMA: ""
+      DB_SSLMODE: disable
+      DB_SSLROOTCERT: ""
       DB_NAME: ${POSTGRES_DB:-frota_rural}
       DB_USER: ${POSTGRES_USER:-postgres}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DB_HOST: db
       DB_PORT: 5432
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-auto}
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       ML_PYTHON: /opt/ml-venv/bin/python

@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
 from administration.services import UserModerationService
 from common.schemas import MessageResponseSerializer, error_response
@@ -18,6 +20,8 @@ def _message(text: str) -> Response:
 
 
 class UserWarnView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Advertir usuário",
@@ -45,6 +49,8 @@ class UserWarnView(APIView):
 
 
 class UserSuspendView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Suspender usuário",
@@ -66,6 +72,8 @@ class UserSuspendView(APIView):
 
 
 class UserBanView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Banir usuário",

@@ -5,6 +5,7 @@ import type {
   Contract,
   ContractEvidence,
   Rental,
+  RentalOccupancy,
   SignatureOtp,
   SignatureReceipt,
 } from "../types/rental";
@@ -14,6 +15,7 @@ import {
   type CreateRentalPayload,
   rentalApiSchema,
   rentalListApiSchema,
+  rentalOccupancyApiSchema,
   signatureEvidenceApiSchema,
   signatureOtpApiSchema,
   type SignatureRole,
@@ -26,6 +28,8 @@ import {
   toSignatureOtp,
 } from "./contractMapper";
 
+import { recurrencePreviewSchema, recurrenceCreatedSchema, type RecurrenceInput, type CreateRecurrenceInput, type RecurrencePreview, type RecurrenceCreated } from "../types/recurrence";
+
 const RENTALS_PATH = "rentals";
 const CONTRACTS_PATH = "contracts";
 
@@ -37,8 +41,12 @@ export interface RentalFilter {
 export interface ContractRepository {
   listRentals(filter: RentalFilter): Promise<Rental[]>;
   findRentalById(id: string): Promise<Rental>;
+  cancelRental(id: string): Promise<Rental>;
   listByPosting(postingId: string): Promise<Rental[]>;
+  listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
+  previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview>;
+  createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated>;
   listContracts(): Promise<Contract[]>;
   findContractDocument(id: string): Promise<ContratoData>;
   sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt>;
@@ -72,8 +80,24 @@ export class HttpContractRepository implements ContractRepository {
     return rentalListApiSchema.parse(response.data).map(rentalToDomain);
   }
 
+  async listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]> {
+    const response = await this.http.send<unknown>({
+      method: "GET", path: `postings/${postingId}/ocupacao`,
+    });
+    return rentalOccupancyApiSchema.parse(response.data).ocupados.map((item) => ({
+      id: item.id, status: item.status, startDate: new Date(item.start_date), endDate: new Date(item.end_date),
+    }));
+  }
+
   async findRentalById(id: string): Promise<Rental> {
     const response = await this.http.send<unknown>({ method: "GET", path: `rentals/${id}` });
+    return rentalToDomain(rentalApiSchema.parse(response.data));
+  }
+
+  async cancelRental(id: string): Promise<Rental> {
+    const response = await this.http.send<unknown>({
+      method: "PATCH", path: `rentals/${id}`, body: { status: "cancelled" },
+    });
     return rentalToDomain(rentalApiSchema.parse(response.data));
   }
 
@@ -84,6 +108,21 @@ export class HttpContractRepository implements ContractRepository {
       body: payload,
     });
     return rentalToDomain(rentalApiSchema.parse(response.data));
+  }
+
+  async previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview> {
+    const response = await this.http.send<unknown>({
+      method: "POST", path: `rentals/${id}/recurrence/preview`, body: payload,
+    });
+    return recurrencePreviewSchema.parse(response.data);
+  }
+
+  async createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated> {
+    const response = await this.http.send<unknown>({
+      method: "POST", path: `rentals/${id}/recurrence`, body: payload,
+    });
+    const dto = recurrenceCreatedSchema.parse(response.data);
+    return { ...dto, rentals: dto.rentals.map(rentalToDomain) };
   }
 
   async listContracts(): Promise<Contract[]> {
@@ -117,7 +156,7 @@ export class HttpContractRepository implements ContractRepository {
     });
     const raw = response.data?.signature_evidence;
     return {
-      rental: await this.findRentalById(id),
+      rental: await this.findRentalById((response.data as { rental?: string }).rental ?? id),
       evidence: raw ? toSignatureEvidence(signatureEvidenceApiSchema.parse(raw)) : null,
     };
   }

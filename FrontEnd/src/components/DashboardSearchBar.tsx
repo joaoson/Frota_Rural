@@ -23,6 +23,7 @@ const DashboardSearchBar = ({
         <MaterialIcon icon="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={18} />
         <input
           type="text"
+          aria-label={searchPlaceholder}
           value={searchValue}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={searchPlaceholder}
@@ -30,6 +31,7 @@ const DashboardSearchBar = ({
         />
       </div>
       <select
+        aria-label="Ano"
         value={yearValue}
         onChange={(e) => onYearChange(e.target.value)}
         className="bg-surface-container border-none rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary text-on-surface min-w-[120px]"
@@ -45,4 +47,3 @@ const DashboardSearchBar = ({
 };
 
 export default DashboardSearchBar;
-

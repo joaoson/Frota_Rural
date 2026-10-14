@@ -4,11 +4,22 @@ from rest_framework import serializers
 
 from document_validation.enums import ReviewDecision, ValidationStatus
 from document_validation.models import Certification, OperatorLicense
+from users.models import Users
 
 # --- Entrada ----------------------------------------------------------------
 
 
-class OperatorLicenseInputSerializer(serializers.ModelSerializer[OperatorLicense]):
+class OwnedDocumentInputSerializer(serializers.ModelSerializer[Any]):
+    def validate_user(self, value: Users) -> Users:
+        actor = self.context.get("actor")
+        if self.instance and self.instance.user_id != value.pk:
+            raise serializers.ValidationError("O dono do documento não pode ser alterado.")
+        if actor is not None and value.pk != actor.pk:
+            raise serializers.ValidationError("Cadastre documentos apenas na sua própria conta.")
+        return value
+
+
+class OperatorLicenseInputSerializer(OwnedDocumentInputSerializer):
     """Dados da CNH enviados pelo operador.
 
     `validation_status` e `review_note` não entram: só a análise do
@@ -44,7 +55,7 @@ class OperatorLicenseInputSerializer(serializers.ModelSerializer[OperatorLicense
         ]
 
 
-class CertificationInputSerializer(serializers.ModelSerializer[Certification]):
+class CertificationInputSerializer(OwnedDocumentInputSerializer):
     """Dados da certificação enviados pelo usuário (sem os campos de análise)."""
 
     class Meta:

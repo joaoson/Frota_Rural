@@ -5,6 +5,7 @@ from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.utils import timezone
+from rest_framework_simplejwt.tokens import AccessToken
 
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
@@ -40,6 +41,7 @@ class PostingPhotoUploadTests(TestCase):
             created_at=timezone.now(),
             updated_at=timezone.now(),
         )
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(owner)}"
         self.url = f"/api/postings/{self.posting.id}/photos"
 
     def _image(self, name="foto.jpg", content_type="image/jpeg", size=64):
@@ -152,7 +154,7 @@ class PostingPhotoSerializationTests(TestCase):
             birth_date=date(1985, 5, 5),
         )
         machine = Machines.objects.create(
-            id=uuid.uuid4(), owner=owner, renagro_number="RN-0002", brand="Valtra", model="BH180"
+            id=uuid.uuid4(), owner=owner, renagro_number="RN-0002", brand="Valtra", model="BH180", status="active"
         )
         self.posting = Postings.objects.create(
             id=uuid.uuid4(),

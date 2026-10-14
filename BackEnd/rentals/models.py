@@ -23,8 +23,17 @@ class Rentals(models.Model):
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
+    recurrence = models.ForeignKey(
+        "api.RentalRecurrence", models.PROTECT, related_name="rentals", blank=True, null=True,
+    )
+    recurrence_index = models.PositiveSmallIntegerField(blank=True, null=True)
+    reservation_expires_at = models.DateTimeField(blank=True, null=True)
+
     class Meta:
         db_table = "rentals"
+        constraints = [
+            models.UniqueConstraint(fields=["recurrence", "recurrence_index"], name="unique_recurrence_occurrence"),
+        ]
 
     def __str__(self) -> str:
         return f"Locação {self.id}"

@@ -121,6 +121,14 @@ export class ServerError extends HttpError {
   }
 }
 
+// Aborted by the caller (navigation, query replacement or component unmount).
+// This is control flow, not evidence that the server is unavailable.
+export class RequestCanceledError extends HttpError {
+  constructor(cause?: unknown) {
+    super("request_canceled", "Requisição cancelada.", undefined, cause);
+  }
+}
+
 // Offline, DNS, CORS, timeout
 export class NetworkError extends HttpError {
   constructor(message = "Não foi possível conectar ao servidor.", cause?: unknown) {
