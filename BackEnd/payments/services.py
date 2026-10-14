@@ -129,7 +129,8 @@ class PaymentService:
             event = _stripe(checkout=False).Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET)
         except (ValueError, stripe.SignatureVerificationError) as exc:
             raise ValidationError("Assinatura do webhook inválida.") from exc
-        event_type = event.get("type")
+        # StripeObject supports key access/membership, but is not a dict.
+        event_type = event["type"] if "type" in event else None
         if event_type not in (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED, CHECKOUT_EXPIRED, CHECKOUT_FAILED):
             return
         try:
@@ -138,7 +139,7 @@ class PaymentService:
         except (KeyError, TypeError):
             return
         if event_type in (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED):
-            if session.get("payment_status") == "paid":
+            if "payment_status" in session and session["payment_status"] == "paid":
                 PaymentService._approve(session_id)
         else:
             PaymentService._expire(session_id)

@@ -40,6 +40,8 @@ jobs:
       - name: Install frontend dependencies
         working-directory: FrontEnd
         run: npm ci
+      - name: Check extension configuration
+        run: node --test ChromeExtension/tests/settings.test.cjs
       - name: Check frontend and browser test types
         working-directory: FrontEnd
         run: |
@@ -98,6 +100,10 @@ jobs:
       - name: Test Chromium, Firefox and WebKit
         working-directory: FrontEnd
         run: npm run test:e2e
+      - name: Test unpacked Chrome extension against local Django
+        run: |
+          npm ci --prefix ChromeExtension
+          FROTA_TEST_BACKEND=frota-ci-backend-1 npm run test:browser --prefix ChromeExtension
       - name: Capture container logs
         if: always()
         run: docker compose logs --no-color > FrontEnd/docker-e2e.log

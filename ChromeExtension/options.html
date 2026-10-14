@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Frota Rural · Validação</title>
+    <link rel="stylesheet" href="options.css">
+    <script src="settings.js" defer></script>
+    <script src="options.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="mark" aria-hidden="true">FR</span>
+        <div><p class="eyebrow">FROTA RURAL</p><h1>Contas de teste</h1></div>
+        <span class="badge">LOCAL</span>
+      </header>
+      <p class="intro">Três perfis, um clique. Escolha seu papel diretamente na página de login.</p>
+      <form id="settings-form">
+        <fieldset id="settings-fields" disabled>
+          <label for="app-url">Endereço do projeto</label>
+          <input id="app-url" type="url" required placeholder="http://localhost:5173" aria-describedby="url-hint">
+          <p id="url-hint" class="hint">localhost e 127.0.0.1, na porta informada.</p>
+          <div id="accounts"></div>
+          <label class="check"><input id="auto-submit" type="checkbox"> Entrar ao escolher o perfil</label>
+          <label class="check"><input id="enabled" type="checkbox"> Mostrar os atalhos na página de login</label>
+          <div class="actions">
+            <button type="submit" class="primary">Salvar</button>
+            <button type="button" id="open-login">Salvar e abrir login ↗</button>
+          </div>
+          <button type="button" id="restore" class="text-button">Restaurar contas do seed</button>
+        </fieldset>
+      </form>
+      <p id="status" role="status" aria-live="polite"></p>
+      <footer>Use apenas contas de teste. As credenciais ficam no armazenamento local da extensão, sem criptografia. O login usa a autenticação normal do projeto.</footer>
+    </main>
+  </body>
+</html>

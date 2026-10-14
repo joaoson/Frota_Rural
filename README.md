@@ -309,3 +309,11 @@ Frota_Rural/
 <sub><a href="#-frota-rural">▲ voltar ao topo</a></sub>
 
 </div>
+
+## Extensão Chrome para validação
+
+A pasta [ChromeExtension](ChromeExtension/README.md) adiciona atalhos **Locador**, **Locatário** e **Admin** ao login local. Carregue-a em `chrome://extensions` com **Modo do desenvolvedor → Carregar sem compactação**. Configure a porta e as contas de teste no popup; o seed atual fornece locador e locatário, e a conta admin é configurada separadamente.
+
+## Vídeo de apresentação
+
+[brag-output](brag-output/README.md) reúne o vídeo final, capa, texto de divulgação e a composição editável.

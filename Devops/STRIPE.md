@@ -75,3 +75,22 @@ o encaminhamento sem apagar dados:
 ```bash
 docker stop frota_rural_retrofit-stripe-listener
 ```
+
+## Regressão de leitura do evento
+
+O SDK Stripe retorna `StripeObject`, que não oferece `dict.get()`. Esse uso
+causava HTTP 500 no evento e na sessão, mesmo com assinatura válida. O serviço
+usa acesso por chave e checagem de presença. Os testes usam o parser real do
+SDK com payloads assinados e não acessam banco nem rede:
+
+```bash
+docker exec NOME_DO_BACKEND_LOCAL python manage.py test payments.test_webhook
+```
+
+Nos ambientes de `Devops/dev.py`, as credenciais são carregadas exclusivamente
+pelo arquivo selecionado (`.env.local` ou `.env.supabase`), conforme
+[DEVELOPMENT.md](DEVELOPMENT.md). A configuração acima de `stripe_local.py`
+pertence ao Compose legado que carrega `BackEnd/.env`; não a execute contra um
+backend com `STRIPE_WEBHOOK_SECRET` fornecido pelo ambiente. Nesse caso,
+configure a chave e o segredo do listener no arquivo selecionado e recrie o
+backend com o mesmo modo/offset antes de encaminhar os eventos.
