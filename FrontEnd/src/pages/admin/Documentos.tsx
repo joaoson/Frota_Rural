@@ -495,6 +495,7 @@ const Documentos = () => {
                 <VeracityScore
                   score={(selectedItem.raw as OperatorLicense).veracityScore}
                   autoRejected={(selectedItem.raw as OperatorLicense).autoRejected}
+                  reasons={(selectedItem.raw as OperatorLicense).autoRejectionReasons}
                 />
               )}
 

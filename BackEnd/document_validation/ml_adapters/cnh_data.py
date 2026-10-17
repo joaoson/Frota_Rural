@@ -28,8 +28,9 @@ REVIEW_NOTE = (
     "Corrija e reenvie, ou aguarde a análise manual."
 )
 # Quando é a foto da CNH que contradiz o digitado (não a plausibilidade dos dados).
+# Curta e sem citar campos: o dono só precisa saber que não bateu e o que fazer.
 MISMATCH_NOTE = (
-    "Os dados informados não conferem com o documento enviado{fields}. "
+    "Os dados informados não coincidem com o documento enviado. "
     "Corrija e reenvie, ou aguarde a análise manual."
 )
 
@@ -46,13 +47,15 @@ class DataCheckResult:
     basis: str | None = None
     # Grupos de campos que a foto contradiz de forma inequívoca (vazio se não foi o caso).
     mismatch_fields: list[str] = field(default_factory=list)
+    # Motivos específicos em português, só para o administrador (a `review_note` do dono é genérica).
+    details: list[str] = field(default_factory=list)
     error: str | None = None
 
     @property
     def review_note(self) -> str:
-        """Texto mostrado ao dono da CNH. Cita os campos, nunca as regras nem o limiar."""
+        """Texto mostrado ao dono da CNH. Nunca cita regras, limiar nem valores."""
         if self.mismatch_fields:
-            return MISMATCH_NOTE.format(fields=f" ({', '.join(self.mismatch_fields)})")
+            return MISMATCH_NOTE
         where = f" ({', '.join(self.fields)})" if self.fields else ""
         return REVIEW_NOTE.format(fields=where)
 
@@ -116,4 +119,5 @@ class CnhDataChecker:
             veracity=payload.get("veracity"),
             basis=payload.get("basis"),
             mismatch_fields=[str(item) for item in payload.get("mismatch_fields", [])],
+            details=[str(item) for item in payload.get("details", [])],
         )

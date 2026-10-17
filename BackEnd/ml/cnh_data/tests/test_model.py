@@ -192,3 +192,46 @@ class AssessWithOcrTests(unittest.TestCase):
         self.assertEqual(result["mismatch_fields"], ["números dos documentos"])
         self.assertEqual(result["fields"], ["números dos documentos"])
         self.assertEqual(result["reasons"], [])  # nenhuma regra: foi a consistência
+
+
+class AssessDetailsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        AssessTests.setUpClass.__func__(cls)
+
+    def test_plausible_record_has_no_details(self):
+        self.assertEqual(assess(PLAUSIBLE, self.model, THRESHOLD, TODAY)["details"], [])
+
+    def test_each_violated_rule_is_listed_in_portuguese(self):
+        record = {**PLAUSIBLE, "expiration_date": "2040-05-18", "issue_date": "2022-05-18"}
+
+        details = assess(record, self.model, THRESHOLD, TODAY)["details"]
+
+        self.assertIn("Validade acima de 10 anos", details)
+
+    def test_invalid_date_names_the_field_in_portuguese(self):
+        details = assess({**PLAUSIBLE, "issue_date": "ontem"}, self.model, THRESHOLD, TODAY)[
+            "details"
+        ]
+
+        self.assertIn("Data inválida em data de emissão", details)
+        self.assertFalse(any("issue_date" in text for text in details))
+
+    def test_photo_mismatch_names_the_fields_but_not_the_values(self):
+        ocr = ocr_of(PLAUSIBLE)
+        ocr["fields"]["cpf"] = "11144477735"
+
+        details = assess(PLAUSIBLE, self.model, THRESHOLD, TODAY, ocr=ocr)["details"]
+
+        self.assertEqual(
+            details,
+            ["Divergência entre o formulário e a imagem do documento (leitura por OCR): CPF"],
+        )
+        self.assertNotIn("11144477735", " ".join(details))
+        self.assertNotIn(PLAUSIBLE["cpf"], " ".join(details))
+
+    def test_model_only_suspicion_points_at_the_groups(self):
+        details = assess(WORD_JUNK, self.model, THRESHOLD, TODAY)["details"]
+
+        self.assertEqual(len(details), 1)
+        self.assertTrue(details[0].startswith("Padrão incomum para um cadastro real em:"))

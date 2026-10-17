@@ -804,7 +804,7 @@ const DashboardLocador = () => {
                       </p>
                       {lic.validationStatus === "rejected" && lic.reviewNote && (
                         <p className="text-xs text-error mt-1">
-                          Motivo: {lic.reviewNote}
+                          {lic.reviewNote}
                         </p>
                       )}
                     </div>
@@ -932,7 +932,7 @@ const DashboardLocador = () => {
                       </p>
                       {cert.validationStatus === "rejected" && cert.reviewNote && (
                         <p className="text-xs text-error mt-1">
-                          Motivo: {cert.reviewNote}
+                          {cert.reviewNote}
                         </p>
                       )}
                     </div>

@@ -178,6 +178,10 @@ class PlausibilityModel:
 THRESHOLD = 0.60  # política agressiva: recusa a partir de 60% de chance de ser falso
 
 
+def _capitalize(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
 def assess(
     record: dict[str, Any],
     model: PlausibilityModel,
@@ -191,6 +195,9 @@ def assess(
     `score` é a nota de "dado falso" já combinada (1.0 se alguma regra dura disparou) e
     `veracity` é o índice de 0 a 100 (`veracity.py`). `fields` são os grupos de campos que
     motivaram a suspeita; `mismatch_fields`, os que o OCR contradisse de forma inequívoca.
+    `details` são os motivos específicos, em português, para o administrador (nunca para o
+    dono da CNH): cada regra violada, os campos que não conferem com a foto e, quando nenhum dos
+    dois explica, o padrão incomum apontado pelo modelo. Sem valores digitados.
     """
     hits = evaluate_rules(record, today)
     row = np.asarray([feature_vector(record)], dtype=float)
@@ -214,10 +221,25 @@ def assess(
             groups += [group for group in model.explain(record) if group not in groups]
     mismatch_groups = consistency.groups if verdict.hard_mismatch else []
 
+    details = [_capitalize(hit.message) for hit in hits]
+    if verdict.basis == BASIS_OCR and consistency.mismatched and verdict.is_suspicious:
+        fields = ", ".join(consistency.mismatch_labels)
+        details.append(
+            f"Divergência entre o formulário e a imagem do documento (leitura por OCR): {fields}"
+        )
+    if model_flags and not details:  # regra ou foto já explicam; o modelo só entra quando é ele
+        where = ", ".join(GROUP_LABELS[g] for g in model.explain(record))
+        details.append(
+            "Padrão incomum para um cadastro real"
+            + (f" em: {where}" if where else "")
+            + f" (nota do modelo {model_fake:.2f})"
+        )
+
     return {
         "is_suspicious": verdict.is_suspicious,
         "score": verdict.fake_score,
         "reasons": [hit.message for hit in hits],
+        "details": details if verdict.is_suspicious else [],
         "fields": [GROUP_LABELS[group] for group in groups],
         "veracity": verdict.veracity,
         "basis": verdict.basis,

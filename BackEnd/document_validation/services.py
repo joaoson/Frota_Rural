@@ -130,7 +130,15 @@ def _screen_license(license_: OperatorLicense) -> None:
     license_.validation_status = ValidationStatus.REJECTED
     license_.review_note = result.review_note
     license_.auto_rejected = True
-    license_.save(update_fields=["validation_status", "review_note", "auto_rejected"])
+    license_.auto_rejection_reasons = result.details
+    license_.save(
+        update_fields=[
+            "validation_status",
+            "review_note",
+            "auto_rejected",
+            "auto_rejection_reasons",
+        ]
+    )
 
 
 class OperatorLicenseService:
@@ -184,6 +192,7 @@ class OperatorLicenseService:
                 review_note=None,
                 auto_rejected=False,
                 veracity_score=None,
+                auto_rejection_reasons=[],
                 updated_at=timezone.now(),
             )
         except IntegrityError as exc:

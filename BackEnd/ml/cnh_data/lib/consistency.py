@@ -48,6 +48,22 @@ FIELDS: dict[str, tuple[float, str]] = {
     "father_name": (WEAK_WEIGHT, "father_name"),
     "birth_place": (WEAK_WEIGHT, "birth_place"),
 }
+# Como cada campo aparece no motivo que o administrador lê.
+LABELS = {
+    "cpf": "CPF",
+    "cnh_number": "nº de registro da CNH",
+    "birth_date": "data de nascimento",
+    "first_license_date": "data da 1ª habilitação",
+    "issue_date": "data de emissão",
+    "expiration_date": "data de validade",
+    "issuing_state": "UF de emissão",
+    "category": "categoria",
+    "rg": "RG",
+    "name": "nome",
+    "mother_name": "nome da mãe",
+    "father_name": "nome do pai",
+    "birth_place": "local de nascimento",
+}
 # Campos em que o OCR só vale se não vier marcado como incerto.
 NEEDS_CONFIDENT_READING = frozenset({"rg", "category", "name"})
 DATE_FIELDS = frozenset({"birth_date", "first_license_date", "issue_date", "expiration_date"})
@@ -83,6 +99,11 @@ class Consistency:
         """CPF diverge, ou ao menos duas divergências em campos de peso 1,0."""
         strong = [name for name in self.mismatched if FIELDS[name][0] == STRONG_WEIGHT]
         return "cpf" in strong or len(strong) >= HARD_MISMATCH_COUNT
+
+    @property
+    def mismatch_labels(self) -> list[str]:
+        """Nomes legíveis dos campos que divergem (sem os valores)."""
+        return [LABELS[name] for name in self.mismatched]
 
     @property
     def groups(self) -> list[str]:

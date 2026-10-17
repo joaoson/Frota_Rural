@@ -49,6 +49,14 @@ MIN_SEQUENCE_RUN = 7
 MIN_RG_DIGITS = 5
 
 
+DATE_LABELS = {
+    "birth_date": "data de nascimento",
+    "first_license_date": "data da 1ª habilitação",
+    "issue_date": "data de emissão",
+    "expiration_date": "data de validade",
+}
+
+
 @dataclass(frozen=True)
 class RuleHit:
     code: str
@@ -132,7 +140,7 @@ def _date_hits(record: dict[str, Any], today: date) -> list[RuleHit]:
     parsed = {name: parse_date(record.get(name)) for name in fields}
     for name, value in parsed.items():
         if clean(record.get(name)) and value is None:
-            hits.append(RuleHit("invalid_date", "dates", f"data inválida em {name}"))
+            hits.append(RuleHit("invalid_date", "dates", f"data inválida em {DATE_LABELS[name]}"))
 
     birth = parsed["birth_date"]
     first = parsed["first_license_date"]

@@ -14,6 +14,7 @@ e imprime uma linha JSON:
      "basis": "ocr+plausibility" | "plausibility",   # em que o índice se baseou
      "consistency": {campo: "match"|"mismatch"|"absent"},
      "mismatch_fields": [...],                       # o que o OCR contradiz de forma inequívoca
+     "details": [...],                               # motivos específicos, só para o administrador
      "reasons": [...], "fields": [...]}
 
 Sem `ocr` (ou com poucos campos lidos), vale só a plausibilidade dos dados digitados.
@@ -48,6 +49,7 @@ def _failure(message: str) -> dict[str, Any]:
         "basis": None,
         "consistency": {},
         "mismatch_fields": [],
+        "details": [],
         "error": message,
     }
 

@@ -8,10 +8,12 @@ interface VeracityScoreProps {
   score: number | null;
   /** A CNH foi recusada pelo modelo, não por um administrador. */
   autoRejected: boolean;
+  /** Motivos específicos da recusa automática (vazio se não houve). */
+  reasons?: string[];
 }
 
 /** Índice de veracidade da CNH para o administrador (nunca exibido ao dono do documento). */
-export function VeracityScore({ score, autoRejected }: VeracityScoreProps) {
+export function VeracityScore({ score, autoRejected, reasons = [] }: VeracityScoreProps) {
   const band = score === null ? null : veracityBand(score);
 
   return (
@@ -51,10 +53,18 @@ export function VeracityScore({ score, autoRejected }: VeracityScoreProps) {
       )}
 
       {autoRejected && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-error">
-          <MaterialIcon icon="block" size={14} />
-          Recusada automaticamente pelo modelo. Sua decisão a substitui.
-        </p>
+        <div className="mt-3 border-t border-outline-variant/30 pt-3">
+          <p className="flex items-center gap-1.5 text-xs font-bold text-error">
+            Recusada automaticamente pelo modelo. Sua decisão a substitui.
+          </p>
+          {reasons.length > 0 && (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-on-surface">
+              {reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );

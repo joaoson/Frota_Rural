@@ -42,7 +42,7 @@ antes). O `cnh_data` continua sem importar o `cnh_image`: recebe o OCR como dado
 
 **Índice exposto na API** (`veracity_score` em `OperatorLicenseOutputSerializer`), gravado em `shadow`
 e `enforce`; `off` não avalia nem roda o OCR. O dono da CNH vê só o motivo em `review_note`
-("não conferem com o documento enviado (campos)" quando é a foto que contradiz), nunca valores ou
+("os dados informados não coincidem com o documento enviado" quando é a foto que contradiz, sem citar campos), nunca valores ou
 pesos.
 
 Os pesos, o limite de evidência e as regras de divergência foram **calibrados por simulação**

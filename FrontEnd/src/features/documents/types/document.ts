@@ -57,6 +57,8 @@ export interface OperatorLicense extends ReviewableDocument {
   autoRejected: boolean;
   /** Índice de veracidade dos dados (0 a 100, maior = mais verdadeiro); `null` se não avaliado. */
   veracityScore: number | null;
+  /** Motivos específicos da recusa automática, só para o administrador. */
+  autoRejectionReasons: string[];
 }
 
 export interface Certification extends ReviewableDocument {

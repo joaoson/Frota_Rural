@@ -46,8 +46,8 @@ OperatorLicense.veracity_score = veracity (shadow e enforce)
         │
 suspeita e modo enforce?  ── sim ──►  validation_status = rejected, auto_rejected = true
                                        review_note =
-                                         "Os dados informados não conferem com o documento enviado
-                                          (números dos documentos). Corrija e reenvie, ..."   ← foto contradiz
+                                         "Os dados informados não coincidem com o documento
+                                          enviado. Corrija e reenvie, ..."   ← foto contradiz
                                          ou "... parecem inconsistentes ou falsos (nome, datas). ..."
 ```
 
@@ -216,8 +216,9 @@ modelo (nome raro, cidade fora da lista...) pesa pouco.
 3. a nota combinada chega ao limiar (`ML_PLAUSIBILITY_THRESHOLD`, 0,60).
 
 Uma divergência isolada em um campo forte (um dia de emissão trocado) **não** recusa sozinha. Quando é
-a foto que contradiz o digitado, a mensagem ao dono é "não conferem com o documento enviado (campos)",
-sem valores nem pesos.
+a foto que contradiz o digitado, a mensagem ao dono é curta e não cita campos: "Os dados informados não coincidem com o documento
+enviado. Corrija e reenvie, ou aguarde a análise manual." Os campos que divergem só aparecem para o
+administrador (`details`), sem valores nem pesos.
 
 **O que isto não prova**: consistência não é autenticidade. Quem sobe a foto de uma CNH alheia e
 digita os dados dessa mesma foto passa. O cruzamento pega dados digitados que **não** correspondem
@@ -261,11 +262,19 @@ echo '{"record": {"name": "Asdfghjkl", "cpf": "52998224725", ...}, "ocr": null}'
 ```json
 {"is_suspicious": true, "score": 1.0, "veracity": 0, "basis": "plausibility",
  "reasons": ["nome com teclas vizinhas (asdf...)"], "fields": ["nome"],
- "consistency": {"cpf": "absent", "...": "absent"}, "mismatch_fields": []}
+ "consistency": {"cpf": "absent", "...": "absent"}, "mismatch_fields": [],
+ "details": ["Nome com teclas vizinhas (asdf...)"]}
 ```
 
 - Entrada: `{"record": {...}, "ocr": {"fields": {...}, "uncertain_fields": [...]} | null}`.
   `ocr` é a saída do `cnh_image` (as mesmas chaves do `record`); `null` avalia só a plausibilidade.
+- `details` são os **motivos específicos**, em português, para o administrador: cada regra violada
+  ("Validade acima de 10 anos", "Data inválida em data de emissão"), os campos que não conferem com a
+  foto ("Divergência entre o formulário e a imagem do documento (leitura por OCR): CPF") e, só quando nenhum dos dois explica, o grupo de
+  campos que o modelo achou incomum. Nunca trazem os valores digitados. O Django os guarda em
+  `OperatorLicense.auto_rejection_reasons` e o painel do admin os lista; a `review_note` que o dono vê
+  continua genérica, de propósito (não ensinar a contornar as regras). Como a API ainda não separa
+  admin de dono, o campo também aparece na resposta para o dono.
 - Saída: `score` é a nota de "dado falso" **já combinada** (1.0 se uma regra disparou), e `veracity`
   é `round(100 · (1 − score))`. `basis` diz se o OCR entrou. `consistency` traz o status de cada campo
   comparável (só nomes de campo, nunca valores) e `mismatch_fields` os grupos que a foto contradiz de

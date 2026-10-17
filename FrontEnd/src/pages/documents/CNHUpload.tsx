@@ -41,11 +41,6 @@ const CNH_SITUATIONS = [
   { value: "ppd", label: "PPD" },
 ] as const;
 
-const DOCUMENT_TYPE_LABEL = {
-  cnh_antiga: "antiga",
-  cnh_digital: "digital",
-} as const;
-
 const OCR_UNCERTAIN_HINT = "Lido do documento com pouca certeza: confira antes de enviar.";
 
 const UPLOAD_INSTRUCTIONS = [
@@ -323,9 +318,9 @@ const CNHUpload = () => {
                       size={18}
                     />
                     {validationResult.documentType !== "desconhecido"
-                      ? `CNH ${DOCUMENT_TYPE_LABEL[validationResult.documentType]} reconhecida.${
+                      ? `CNH reconhecida.${
                           filledCount > 0
-                            ? ` Preenchemos ${filledCount} ${filledCount === 1 ? "campo" : "campos"} com os dados do documento: confira antes de enviar.`
+                            ? " Preenchemos alguns campos automaticamente, por favor confira antes de enviar."
                             : " Prossiga com o preenchimento dos dados."
                         }`
                       : validationResult.confidence === "high"

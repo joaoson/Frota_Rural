@@ -50,6 +50,9 @@ class OperatorLicense(models.Model):
         null=True,
         help_text="Índice de veracidade dos dados (0 a 100), calculado pelo modelo de ML.",
     )
+    # Por que o modelo recusou (regras violadas, campos que não conferem com a foto...), para o
+    # administrador. A `review_note` que o dono vê continua genérica. Vazio se não foi recusada.
+    auto_rejection_reasons = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)

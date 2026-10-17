@@ -49,6 +49,7 @@ export const operatorLicenseApiSchema = z.object({
   review_note: z.string().nullish(),
   auto_rejected: z.boolean().nullish(),
   veracity_score: z.number().nullish(),
+  auto_rejection_reasons: z.array(z.string()).nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
 });

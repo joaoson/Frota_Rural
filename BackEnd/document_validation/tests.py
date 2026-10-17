@@ -286,6 +286,10 @@ SUSPICIOUS = DataCheckResult(
 )
 FINE = DataCheckResult()
 CHECK = "document_validation.services.CnhDataChecker.check"
+MISMATCH_EXPECTED_NOTE = (
+    "Os dados informados não coincidem com o documento enviado. "
+    "Corrija e reenvie, ou aguarde a análise manual."
+)
 EXPECTED_NOTE = (
     "Os dados informados parecem inconsistentes ou falsos (nome, datas). "
     "Corrija e reenvie, ou aguarde a análise manual."
@@ -411,6 +415,7 @@ MISMATCH = DataCheckResult(
     veracity=3,
     basis="ocr+plausibility",
     mismatch_fields=["números dos documentos"],
+    details=["Divergência entre o formulário e a imagem do documento (leitura por OCR): CPF"],
 )
 
 
@@ -469,9 +474,28 @@ class OperatorLicenseVeracityTests(LicenseApiMixin, TestCase):
         self.assertEqual(body["validation_status"], "rejected")
         self.assertTrue(body["auto_rejected"])
         self.assertEqual(body["veracity_score"], 3)
-        self.assertIn("não conferem com o documento enviado", body["review_note"])
-        self.assertIn("números dos documentos", body["review_note"])
+        self.assertEqual(body["review_note"], MISMATCH_EXPECTED_NOTE)
+        self.assertNotIn("números dos documentos", body["review_note"])  # sem citar campos
         self.assertNotIn("0.97", body["review_note"])
+
+    def test_the_specific_reasons_are_stored_for_the_admin_only(self):
+        with patch(READ, return_value=OCR_READING), patch(CHECK, return_value=MISMATCH):
+            body = self.post_with_file().json()
+
+        self.assertEqual(
+            body["auto_rejection_reasons"],
+            ["Divergência entre o formulário e a imagem do documento (leitura por OCR): CPF"],
+        )
+        self.assertNotIn("CPF", body["review_note"])  # a nota do dono continua genérica
+
+    def test_editing_clears_the_previous_reasons(self):
+        with patch(READ, return_value=OCR_READING), patch(CHECK, return_value=MISMATCH):
+            license_id = self.post_with_file().json()["id"]
+
+        with patch(CHECK, return_value=FINE):
+            edited = self.edit(license_id, {"name": "Carlos Eduardo Santos"}).json()
+
+        self.assertEqual(edited["auto_rejection_reasons"], [])
 
     def test_without_a_file_there_is_no_ocr_and_the_checker_falls_back(self):
         with patch(READ) as read, patch(CHECK, return_value=FINE) as check:
@@ -686,6 +710,13 @@ class CnhDataCheckerTests(SimpleTestCase):
             "Corrija e reenvie, ou aguarde a análise manual.",
         )
 
+    def test_parses_the_details(self):
+        output = '{"is_suspicious": true, "details": ["Validade acima de 10 anos"]}'
+
+        result, _ = self.run_check(self.completed(output))
+
+        self.assertEqual(result.details, ["Validade acima de 10 anos"])
+
     def test_review_note_for_a_photo_mismatch_names_the_fields_only(self):
         result = DataCheckResult(
             is_suspicious=True, fields=["datas"], mismatch_fields=["números dos documentos"]
@@ -693,8 +724,7 @@ class CnhDataCheckerTests(SimpleTestCase):
 
         self.assertEqual(
             result.review_note,
-            "Os dados informados não conferem com o documento enviado (números dos documentos). "
-            "Corrija e reenvie, ou aguarde a análise manual.",
+            MISMATCH_EXPECTED_NOTE,
         )
 
 
@@ -840,7 +870,7 @@ class OperatorLicensePhotoConsistencyEndToEndTests(LicenseApiMixin, TestCase):
 
         body = self.post(self.payload(file_url=url, **self.form_from(fields))).json()
 
-        self.assertNotIn("não conferem", body["review_note"] or "")
+        self.assertNotIn("não coincidem", body["review_note"] or "")
         self.assertIsInstance(body["veracity_score"], int)
 
     def test_a_cpf_that_contradicts_the_photo_is_refused_with_the_dedicated_note(self):
@@ -851,5 +881,5 @@ class OperatorLicensePhotoConsistencyEndToEndTests(LicenseApiMixin, TestCase):
 
         self.assertEqual(body["validation_status"], "rejected")
         self.assertTrue(body["auto_rejected"])
-        self.assertIn("não conferem com o documento enviado", body["review_note"])
+        self.assertEqual(body["review_note"], MISMATCH_EXPECTED_NOTE)
         self.assertLessEqual(body["veracity_score"], 5)
