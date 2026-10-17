@@ -47,6 +47,8 @@ export const operatorLicenseApiSchema = z.object({
   file_url: z.string().nullish(),
   validation_status: z.string(),
   review_note: z.string().nullish(),
+  auto_rejected: z.boolean().nullish(),
+  veracity_score: z.number().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
 });

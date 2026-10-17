@@ -21,6 +21,7 @@ import {
   useOperatorLicenses,
   useReviewDocument,
 } from "@/features/documents/hooks/useDocuments";
+import { VeracityScore } from "@/features/documents/components/VeracityScore";
 import { documentStatusBadge } from "@/features/documents/types/documentBadges";
 import type { Certification, OperatorLicense } from "@/features/documents/types/document";
 import type { ReviewDocumentPayload } from "@/features/documents/types/documentSchemas";
@@ -489,6 +490,13 @@ const Documentos = () => {
                   {renderUserInfo(selectedUser)}
                 </div>
               </div>
+
+              {selectedItem.type === "license" && (
+                <VeracityScore
+                  score={(selectedItem.raw as OperatorLicense).veracityScore}
+                  autoRejected={(selectedItem.raw as OperatorLicense).autoRejected}
+                />
+              )}
 
               {(() => {
                 const fileUrl =

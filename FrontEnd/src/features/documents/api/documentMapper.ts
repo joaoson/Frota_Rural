@@ -40,6 +40,8 @@ export function licenseToDomain(dto: OperatorLicenseApi): OperatorLicense {
     observations: dto.observations ?? null,
     points: dto.points,
     fileUrl: dto.file_url ?? null,
+    autoRejected: dto.auto_rejected ?? false,
+    veracityScore: dto.veracity_score ?? null,
   };
 }
 

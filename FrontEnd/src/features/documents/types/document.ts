@@ -53,6 +53,10 @@ export interface OperatorLicense extends ReviewableDocument {
   observations: string | null;
   points: number;
   fileUrl: string | null;
+  /** Recusada pelo modelo de ML, não por um administrador. */
+  autoRejected: boolean;
+  /** Índice de veracidade dos dados (0 a 100, maior = mais verdadeiro); `null` se não avaliado. */
+  veracityScore: number | null;
 }
 
 export interface Certification extends ReviewableDocument {
