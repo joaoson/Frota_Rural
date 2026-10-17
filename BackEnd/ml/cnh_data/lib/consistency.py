@@ -20,7 +20,14 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
-from lib.record import birth_city_state, clean, digits_only, parse_date, split_birth_place
+from lib.record import (
+    birth_city_state,
+    clean,
+    digits_only,
+    parse_date,
+    rg_key,
+    split_birth_place,
+)
 from lib.reference import normalize_text
 
 MATCH, MISMATCH, ABSENT = "match", "mismatch", "absent"
@@ -67,7 +74,7 @@ LABELS = {
 # Campos em que o OCR só vale se não vier marcado como incerto.
 NEEDS_CONFIDENT_READING = frozenset({"rg", "category", "name"})
 DATE_FIELDS = frozenset({"birth_date", "first_license_date", "issue_date", "expiration_date"})
-DIGIT_FIELDS = frozenset({"cpf", "cnh_number", "rg"})
+DIGIT_FIELDS = frozenset({"cpf", "cnh_number"})
 
 
 @dataclass(frozen=True)
@@ -145,6 +152,8 @@ def _equal(name: str, typed: str, ocr_text: str) -> bool | None:
         typed_value, ocr_value = parse_date(typed), parse_date(ocr_text)
     elif name in DIGIT_FIELDS:
         typed_value, ocr_value = digits_only(typed), digits_only(ocr_text)
+    elif name == "rg":  # o dígito verificador pode ser "X": entra na comparação
+        typed_value, ocr_value = rg_key(typed), rg_key(ocr_text)
     else:  # issuing_state, category
         typed_value, ocr_value = typed.upper(), ocr_text.upper()
     return None if not typed_value or not ocr_value else typed_value == ocr_value

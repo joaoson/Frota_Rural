@@ -44,6 +44,11 @@ class NumberTests(unittest.TestCase):
         self.assertEqual(validators.parse_rg("732213587 SESP GO"), "732213587")
         self.assertEqual(validators.parse_rg("12.345.678-9"), "123456789")
         self.assertIsNone(validators.parse_rg("SESP GO"))
+        # RG mais antigo, de 7 dígitos + verificador, e verificador "X"
+        self.assertEqual(validators.parse_rg("1.234.567-8"), "12345678")
+        self.assertEqual(validators.parse_rg("12.345.678-X"), "12345678X")
+        self.assertEqual(validators.parse_rg("12.345.678-x SSP SP"), "12345678X")
+        self.assertEqual(validators.parse_rg("130135951SESPPR"), "130135951")
         self.assertIsNone(validators.parse_rg("123"))
 
 

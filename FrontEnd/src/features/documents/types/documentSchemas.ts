@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { cleanRG } from "@/shared/utils/masks/maskRG";
 import { validateRG } from "@/shared/utils/validation/validateRG";
 
 export const ValidationStatus = {
@@ -125,12 +126,8 @@ export const cnhFormSchema = z
       .trim()
       .min(1, "RG é obrigatório.")
       .refine(
-        (value) => validateRG(value.replace(/\D/g, "")),
-        "RG inválido. Verifique os dígitos informados.",
-      )
-      .refine(
-        (value) => /^\d{2}\.\d{3}\.\d{3}-[\dXx]$/.test(value),
-        "O RG deve seguir o formato XX.XXX.XXX-X.",
+        (value) => validateRG(cleanRG(value)),
+        "RG inválido. Informe de 7 a 9 caracteres, como 0.000.000-0 ou 00.000.000-0.",
       ),
     motherName: requiredText("Nome da mãe"),
     fatherName: z.string().trim(),

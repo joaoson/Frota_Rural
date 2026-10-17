@@ -1,6 +1,6 @@
 import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 import { maskDocument } from "@/shared/utils/masks/maskDocument";
-import { maskRG } from "@/shared/utils/masks/maskRG";
+import { cleanRG, maskRG } from "@/shared/utils/masks/maskRG";
 
 import { BirthPlace, type Certification, type CnhValidationResult, type OperatorLicense } from "../types/document";
 import type {
@@ -130,7 +130,7 @@ export function licenseToPayload(
     name: values.name,
     birth_date: values.birthDate,
     cpf: clearSpecialChars(values.cpf),
-    rg: clearSpecialChars(values.rg),
+    rg: cleanRG(values.rg),
     mother_name: values.motherName,
     father_name: values.fatherName || null,
     nationality: values.nationality,

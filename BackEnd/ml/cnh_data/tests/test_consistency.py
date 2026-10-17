@@ -36,6 +36,15 @@ class CompareTests(unittest.TestCase):
 
         self.assertEqual(compare(record, ocr()).mismatched, [])
 
+    def test_rg_comparison_keeps_the_x_check_digit_and_any_length(self):
+        same = compare({**PLAUSIBLE, "rg": "12.345.678-X"}, ocr(rg="12345678X"))
+        older = compare({**PLAUSIBLE, "rg": "1.234.567-8"}, ocr(rg="12345678"))
+        other_check = compare({**PLAUSIBLE, "rg": "12.345.678-9"}, ocr(rg="12345678X"))
+
+        self.assertEqual(same.status["rg"], MATCH)
+        self.assertEqual(older.status["rg"], MATCH)
+        self.assertEqual(other_check.status["rg"], MISMATCH)
+
     def test_no_ocr_compares_nothing(self):
         for source in (None, {}, {"fields": None, "uncertain_fields": []}):
             with self.subTest(source=source):

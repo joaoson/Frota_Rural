@@ -7,7 +7,7 @@ import cnhExample from "@/assets/cnh_example.jpg";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
 import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
-import { useCnhForm } from "@/features/documents/hooks/useDocumentForms";
+import { CNH_FORM_DEFAULTS, useCnhForm } from "@/features/documents/hooks/useDocumentForms";
 import {
   useOperatorLicenses,
   useSaveLicense,
@@ -48,6 +48,7 @@ const UPLOAD_INSTRUCTIONS = [
   "Não envie fotos de telas ou cópias",
   "Não recorte nem cubra partes do documento na foto",
   "Salve o documento sob formato PNG, JPEG ou PDF",
+  "Alternativamente, exporte o seu documento digital em PDF no aplicativo CNH do Brasil"
 ];
 
 const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
@@ -86,9 +87,11 @@ const CNHUpload = () => {
   const [uncertainFields, setUncertainFields] = useState<ReadonlySet<keyof CnhFormValues>>(
     new Set(),
   );
-  // Campos que o último documento preencheu: ao trocar de arquivo voltam ao valor anterior, para
-  // dados de um documento (ex.: naturalidade da CNH digital) não ficarem no cadastro de outro.
-  const filledByDocument = useRef<ReadonlySet<keyof CnhFormValues>>(new Set());
+  // Depois que um documento é processado, o formulário passa a vir só dele: o cadastro salvo (modo
+  // de edição) e o que veio de um documento anterior não podem se misturar com o do novo.
+  const replacedByDocument = useRef(false);
+  // Só vale o resultado do último arquivo anexado (um anexo mais antigo pode responder depois).
+  const latestAttachment = useRef(0);
 
   const licensesQuery = useOperatorLicenses({ userId: userId ?? undefined }, Boolean(userId));
   const saveLicense = useSaveLicense();
@@ -108,7 +111,7 @@ const CNHUpload = () => {
   const isSubmitting = saveLicense.isPending || uploadDocument.isPending;
 
   useEffect(() => {
-    if (!existingLicense) return;
+    if (!existingLicense || replacedByDocument.current) return;
     form.reset({
       ...licenseToFormValues(existingLicense),
       cpf: maskDocument(existingLicense.cpf),
@@ -116,15 +119,12 @@ const CNHUpload = () => {
     });
   }, [existingLicense, form]);
 
-  const clearDocumentFields = () => {
-    for (const key of filledByDocument.current) form.resetField(key);
-    filledByDocument.current = new Set();
-    setUncertainFields(new Set());
-  };
-
-  // Preenche o formulário com o que o OCR leu (só os campos lidos; o resto fica como está).
-  // Nada é enviado: o usuário confere e edita antes de cadastrar.
-  const fillFromDocument = (result: CnhValidationResult) => {
+  // Apaga tudo o que havia no formulário (inclusive o cadastro salvo, ao editar) e o preenche só
+  // com o que o OCR leu do novo documento. O resto fica em branco. Nada é enviado: o usuário
+  // confere e edita antes de cadastrar.
+  const replaceFormWithDocument = (result: CnhValidationResult) => {
+    replacedByDocument.current = true;
+    form.reset(CNH_FORM_DEFAULTS);
     const entries = Object.entries(result.extractedFields) as [
       keyof CnhFormValues,
       CnhFormValues[keyof CnhFormValues],
@@ -132,7 +132,6 @@ const CNHUpload = () => {
     for (const [key, value] of entries) {
       form.setValue(key, value as never, { shouldDirty: true, shouldValidate: true });
     }
-    filledByDocument.current = new Set(entries.map(([key]) => key));
     setUncertainFields(new Set(result.uncertainFields));
   };
 
@@ -140,17 +139,20 @@ const CNHUpload = () => {
     const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (!allowed) return;
 
+    const attachment = ++latestAttachment.current;
     setFile(selected);
     setValidationResult(null);
-    clearDocumentFields();
+    setUncertainFields(new Set());
 
     validateCnh
       .mutateAsync(selected)
       .then((result) => {
+        if (attachment !== latestAttachment.current) return;
         setValidationResult(result);
-        fillFromDocument(result);
+        replaceFormWithDocument(result);
       })
       .catch((error: unknown) => {
+        if (attachment !== latestAttachment.current) return;
         setValidationResult({
           isValid: false,
           confidence: "low",
@@ -421,7 +423,7 @@ const CNHUpload = () => {
                 >
                   <input
                     type="text"
-                    placeholder="00.000.000-0"
+                    placeholder="00.000.000-0 ou 0.000.000-0"
                     className={inputClass(Boolean(errors.rg))}
                     {...masked(form.register("rg"), maskRG)}
                   />

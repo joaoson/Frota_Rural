@@ -97,13 +97,17 @@ def parse_register_number(text: str) -> str | None:
 
 
 def parse_rg(text: str) -> str | None:
-    """Número do documento de identidade: só dígitos (5 a 14), sem o órgão emissor nem a UF.
+    """Número do documento de identidade (5 a 14 dígitos), sem o órgão emissor nem a UF.
 
     A linha costuma ser "732213587 SESP GO": pega o 1º trecho que parece um número (quase
-    só dígitos, ou letras que o OCR confunde com dígitos) e ignora o resto.
+    só dígitos, ou letras que o OCR confunde com dígitos) e ignora o resto. O RG não tem
+    tamanho único (7 a 9 caracteres, com ou sem verificador) e o verificador pode ser `X`
+    ("12.345.678-X"): ele é mantido, em maiúscula, quando é o último caractere do número.
     """
     for raw in re.split(r"[\s/]+", text):
         token = re.sub(r"[.\-]", "", raw)
+        if re.fullmatch(r"\d{5,13}[Xx]", token):
+            return token.upper()
         if leading := re.match(r"\d{5,14}", token):  # número colado ao órgão: "130135951SESPPR"
             return leading.group()
         if len(token) < 5:

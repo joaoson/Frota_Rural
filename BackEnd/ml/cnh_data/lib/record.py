@@ -69,6 +69,11 @@ def digits_only(value: Any) -> str:
     return re.sub(r"\D", "", clean(value))
 
 
+def rg_key(value: Any) -> str:
+    """RG sem pontuação, com o dígito verificador `X` (que `digits_only` descartaria)."""
+    return re.sub(r"[^0-9X]", "", clean(value).upper())
+
+
 def parse_date(value: Any) -> date | None:
     """Data ISO (`YYYY-MM-DD`) ou `None` se vazia/inválida."""
     if isinstance(value, date):

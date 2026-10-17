@@ -65,6 +65,12 @@ class RulesTests(unittest.TestCase):
         self.assertIn("number_sequential", codes(cnh_number="98765432109"))
         self.assertIn("cnh_number_length", codes(cnh_number="123"))
         self.assertIn("rg_too_short", codes(rg="1"))
+
+    def test_rgs_of_different_lengths_and_with_an_x_check_digit_are_not_flagged(self):
+        # RG mais antigo (7 dígitos + verificador), RG atual (8 + verificador) e verificador "X"
+        for rg in ("1.234.567-8", "12.345.678-9", "29.384.756-X", "2938475", "293847561"):
+            with self.subTest(rg=rg):
+                self.assertEqual(codes(rg=rg).intersection({"rg_too_short", "rg_invalid"}), set())
         self.assertIn("number_sequential", codes(rg="1234567"))
         self.assertIn("cpf_invalid", codes(cpf="52998224726"))  # dígito verificador errado
         self.assertIn("cpf_invalid", codes(cpf="11111111111"))
