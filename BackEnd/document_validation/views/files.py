@@ -3,6 +3,8 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
 from common.schemas import error_response, error_responses
 from document_validation.serializer import (
@@ -22,6 +24,8 @@ INVALID_FILE = error_response(400, "Arquivo ausente, de tipo não suportado ou a
 
 
 class DocumentUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Enviar arquivo de documento",
@@ -47,6 +51,8 @@ class DocumentUploadView(APIView):
 
 
 class CnhValidationView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Validar CNH via Inteligência Artificial",

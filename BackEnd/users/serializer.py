@@ -45,8 +45,10 @@ SELF_SIGNUP_ROLES = [
 class UserCreateInputSerializer(serializers.ModelSerializer[Users]):
     """Cadastro público de conta."""
 
+    email = serializers.EmailField(max_length=255, validators=[UniqueValidator(queryset=Users.objects.all(), message=EMAIL_IN_USE_MESSAGE)])
+
     role = serializers.ChoiceField(choices=SELF_SIGNUP_ROLES)
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = serializers.CharField(write_only=True, min_length=8, style={"input_type": "password"})
 
     class Meta:
         model = Users
@@ -60,6 +62,14 @@ class UserUpdateInputSerializer(serializers.ModelSerializer[Users]):
     Papel, status, vínculo e senha ficam de fora: cada um tem fluxo próprio
     (moderação, equipe de operadores, troca de senha).
     """
+
+    email = serializers.EmailField(max_length=255, validators=[UniqueValidator(queryset=Users.objects.all(), message=EMAIL_IN_USE_MESSAGE)])
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        protected = {"role", "status", "employer", "password", "last_login"} & set(self.initial_data)
+        if protected:
+            raise serializers.ValidationError({field: "Este campo não pode ser alterado pelo perfil." for field in protected})
+        return attrs
 
     class Meta:
         model = Users

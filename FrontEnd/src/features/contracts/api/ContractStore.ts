@@ -1,14 +1,18 @@
+import { notificationKeys } from "@/features/notifications/api/NotificationStore";
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type { ContratoData } from "../types/contractDocument";
 import type {
   ContractEvidence,
   Rental,
+  RentalOccupancy,
   SignatureOtp,
   SignatureReceipt,
 } from "../types/rental";
 import type { CreateRentalPayload, SignatureRole } from "../types/rentalSchemas";
 import type { ContractRepository, RentalFilter } from "./ContractRepository";
+
+import type { RecurrenceInput, CreateRecurrenceInput, RecurrencePreview, RecurrenceCreated } from "../types/recurrence";
 
 export const contractKeys = {
   all: ["contracts"] as const,
@@ -49,6 +53,10 @@ export class ContractStore {
     return this.repository.listByPosting(postingId);
   }
 
+  listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]> {
+    return this.repository.listOccupancyByPosting(postingId);
+  }
+
   findRentalById(id: string): Promise<Rental> {
     return this.repository.findRentalById(id);
   }
@@ -57,12 +65,39 @@ export class ContractStore {
     return this.repository.findContractDocument(id);
   }
 
-  createRental(payload: CreateRentalPayload): Promise<Rental> {
-    return this.repository.createRental(payload);
+  async cancelRental(id: string): Promise<Rental> {
+    const rental = await this.repository.cancelRental(id);
+    await this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
+    return rental;
   }
 
-  sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
-    return this.repository.sign(id, role, name, otp);
+  async createRental(payload: CreateRentalPayload): Promise<Rental> {
+    const rental = await this.repository.createRental(payload);
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return rental;
+  }
+
+  previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview> {
+    return this.repository.previewRecurrence(id, payload);
+  }
+
+  async createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated> {
+    const result = await this.repository.createRecurrence(id, payload);
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return result;
+  }
+
+  async sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
+    const receipt = await this.repository.sign(id, role, name, otp);
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.evidence(id) });
+    return receipt;
   }
 
   requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp> {

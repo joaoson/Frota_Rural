@@ -1,4 +1,5 @@
 import type { HttpClient, HttpRequest, HttpResponse } from "../HttpClient";
+import { RequestCanceledError } from "../errors";
 
 export class LoggingHttpClient implements HttpClient {
   private readonly inner: HttpClient;
@@ -20,6 +21,7 @@ export class LoggingHttpClient implements HttpClient {
       );
       return response;
     } catch (error) {
+      if (error instanceof RequestCanceledError) throw error;
       console.error(
         `%cHTTP%c ${label} falhou (${Math.round(performance.now() - startedAt)}ms)`,
         "color:#f85149",

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,6 +15,8 @@ TAGS = ["Pagamentos"]
 
 
 class RentalCheckoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Iniciar pagamento de uma locação",
@@ -28,14 +31,17 @@ class RentalCheckoutView(APIView):
             404: error_response(404, "Locação não encontrada."),
             409: error_response(409, "O período escolhido já está reservado."),
             502: error_response(502, "Falha na comunicação com o Stripe."),
+            503: error_response(503, "Integração de pagamento ainda não configurada."),
         },
     )
     def post(self, request: Request, pk: UUID) -> Response:
-        checkout = PaymentService.create_checkout(pk)
+        checkout = PaymentService.create_checkout(pk, user=request.user)
         return Response(CheckoutOutputSerializer(checkout).data, status=status.HTTP_200_OK)
 
 
 class RentalPaymentStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar o pagamento de uma locação",
@@ -46,5 +52,5 @@ class RentalPaymentStatusView(APIView):
         },
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        payment = PaymentService.get_latest(pk)
+        payment = PaymentService.get_latest(pk, user=request.user)
         return Response(PaymentStatusOutputSerializer(payment).data, status=status.HTTP_200_OK)

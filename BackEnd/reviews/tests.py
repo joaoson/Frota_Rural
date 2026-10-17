@@ -3,6 +3,7 @@ from datetime import date, timedelta
 
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from machines.models import Machines
 from postings.models import Postings
@@ -28,6 +29,8 @@ class ReviewApiTests(TestCase):
     def setUp(self):
         self.owner = make_user("locador", 1)
         self.lessee = make_user("locatario", 2)
+        self.client = APIClient()
+        self.client.force_authenticate(self.lessee)
         machine = Machines.objects.create(id=uuid.uuid4(), owner=self.owner)
         posting = Postings.objects.create(id=uuid.uuid4(), machinery=machine, hourly_rate="100.00")
         self.rental = Rentals.objects.create(

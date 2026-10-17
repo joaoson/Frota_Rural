@@ -5,7 +5,10 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
+from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from document_validation.serializer import (
     DocumentFilterSerializer,
@@ -20,6 +23,8 @@ LICENSE_NOT_FOUND = error_response(404, "CNH não encontrada.")
 
 
 class OperatorLicenseListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar CNHs cadastradas",
@@ -28,7 +33,7 @@ class OperatorLicenseListView(APIView):
         responses={200: OperatorLicenseOutputSerializer(many=True), **error_responses(400)},
     )
     def get(self, request: Request) -> Response:
-        licenses = OperatorLicenseService.list(request.query_params)
+        licenses = OperatorLicenseService.list(request.query_params, actor=authenticated_user(request))
         return Response(
             OperatorLicenseOutputSerializer(licenses, many=True).data, status=status.HTTP_200_OK
         )
@@ -44,20 +49,22 @@ class OperatorLicenseListView(APIView):
         responses={201: OperatorLicenseOutputSerializer, **error_responses(400, 409)},
     )
     def post(self, request: Request) -> Response:
-        license_ = OperatorLicenseService.create(request.data)
+        license_ = OperatorLicenseService.create(request.data, actor=authenticated_user(request))
         return Response(
             OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_201_CREATED
         )
 
 
 class OperatorLicenseDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar CNH",
         responses={200: OperatorLicenseOutputSerializer, 404: LICENSE_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        license_ = OperatorLicenseService.get(pk)
+        license_ = OperatorLicenseService.get(pk, actor=authenticated_user(request))
         return Response(OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -72,7 +79,7 @@ class OperatorLicenseDetailView(APIView):
         },
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        license_ = OperatorLicenseService.update(pk, request.data)
+        license_ = OperatorLicenseService.update(pk, request.data, actor=authenticated_user(request))
         return Response(OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -87,7 +94,7 @@ class OperatorLicenseDetailView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        license_ = OperatorLicenseService.update(pk, request.data, partial=True)
+        license_ = OperatorLicenseService.update(pk, request.data, actor=authenticated_user(request), partial=True)
         return Response(OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -96,11 +103,13 @@ class OperatorLicenseDetailView(APIView):
         responses={204: None, 404: LICENSE_NOT_FOUND},
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        OperatorLicenseService.delete(pk)
+        OperatorLicenseService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class OperatorLicenseReviewView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Analisar CNH",
@@ -126,5 +135,5 @@ class OperatorLicenseReviewView(APIView):
         ],
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        license_ = OperatorLicenseService.review(pk, request.data)
+        license_ = OperatorLicenseService.review(pk, request.data, actor=authenticated_user(request))
         return Response(OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_200_OK)

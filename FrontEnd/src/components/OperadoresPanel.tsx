@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { BadRequestError, HttpError } from "@/shared/http/errors";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { HttpError } from "@/shared/http/errors";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
@@ -22,6 +22,7 @@ import { clearSpecialChars } from "@/shared/utils/clearSpecialChars";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
 import { viaCepClient } from "@/app/container";
 import { formatAddress } from "@/shared/http/ViaCepClient";
+import { validateDocument } from "@/shared/utils/validation/validateDocument";
 import {
   maxBirthDate,
   validatePersonField,
@@ -91,7 +92,7 @@ function operatorToForm(operator: Operator): FormState {
   return {
     name: operator.name,
     birthDate: operator.birthDate,
-    document: maskDocument(operator.document),
+    document: validateDocument(operator.document) ? maskDocument(operator.document) : operator.document,
     email: operator.email,
     phone: maskPhone(operator.phone?.replace(/^\+55/, "") ?? ""),
     cep: maskCEP(operator.cep ?? ""),
@@ -126,19 +127,33 @@ const OperadoresPanel = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const cepRequest = useRef(0);
+  const mutationPending = useRef(false);
+  const formId = useId();
 
   const isEditing = editingId !== null;
+  const originalOperator = operators.find(operator => operator.id === editingId);
+  const originalForm = originalOperator ? operatorToForm(originalOperator) : null;
+  const fieldUnchanged = (field: PersonField, value: string) => originalForm !== null && originalForm[FIELD_TO_FORM_KEY[field]] === value;
+
+  const loadOperators = useCallback(async () => {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      setOperators(await operatorStore.list());
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    operatorStore
-      .list()
-      .then(setOperators)
-      .catch((error: unknown) => {
-        console.error("Erro ao carregar operadores", error);
-        toast.error("Não foi possível carregar seus operadores.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    void loadOperators();
+    return () => { cepRequest.current += 1; };
+  }, [loadOperators]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -151,23 +166,26 @@ const OperadoresPanel = () => {
   }, [operators, search]);
 
   const setField = (field: PersonField, value: string) => {
+    if (["cep", "address", "city", "uf"].includes(field)) cepRequest.current += 1;
     setForm((prev) => ({ ...prev, [FIELD_TO_FORM_KEY[field]]: value }));
     // Só revalida em tempo real o campo que já está marcado como inválido, para
     // não acusar erro enquanto a pessoa ainda está digitando pela primeira vez.
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: validatePersonField(field, value) }));
+      setErrors((prev) => ({ ...prev, [field]: fieldUnchanged(field, value) ? "" : validatePersonField(field, value) }));
     }
   };
 
   const blurField = (field: PersonField, value: string) => {
-    setErrors((prev) => ({ ...prev, [field]: validatePersonField(field, value) }));
+    setErrors((prev) => ({ ...prev, [field]: fieldUnchanged(field, value) ? "" : validatePersonField(field, value) }));
   };
 
   const handleCEPLookup = async (value: string) => {
+    const request = ++cepRequest.current;
     const digits = value.replace(/\D/g, "");
     if (digits.length !== 8) return;
     try {
       const data = await viaCepClient.findByCep(digits);
+      if (request !== cepRequest.current) return;
       if (!data) {
         toast.error("CEP não encontrado.");
         return;
@@ -179,12 +197,15 @@ const OperadoresPanel = () => {
         uf: data.state.toUpperCase(),
       }));
       setErrors((prev) => ({ ...prev, address: "", city: "", uf: "" }));
-    } catch (error) {
-      console.error("Erro ao buscar CEP", error);
+    } catch {
+      if (request === cepRequest.current) toast.error("Não foi possível consultar o CEP. Preencha o endereço manualmente.");
     }
   };
 
   const openCreate = () => {
+    if (mutationPending.current) return;
+    cepRequest.current += 1;
+    setShowPassword(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
     setErrors({});
@@ -192,6 +213,8 @@ const OperadoresPanel = () => {
   };
 
   const openEdit = (operator: Operator) => {
+    if (mutationPending.current) return;
+    cepRequest.current += 1;
     setEditingId(operator.id);
     setForm(operatorToForm(operator));
     setErrors({});
@@ -199,6 +222,7 @@ const OperadoresPanel = () => {
   };
 
   const closeForm = () => {
+    cepRequest.current += 1;
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -207,6 +231,7 @@ const OperadoresPanel = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (mutationPending.current) return;
 
     const fields = isEditing
       ? FORM_FIELDS.filter((field) => field !== "password")
@@ -214,7 +239,8 @@ const OperadoresPanel = () => {
 
     const nextErrors: Partial<Record<PersonField, string>> = {};
     for (const field of fields) {
-      nextErrors[field] = validatePersonField(field, form[FIELD_TO_FORM_KEY[field]]);
+      const value = form[FIELD_TO_FORM_KEY[field]];
+      nextErrors[field] = fieldUnchanged(field, value) ? "" : validatePersonField(field, value);
     }
     setErrors(nextErrors);
 
@@ -226,7 +252,7 @@ const OperadoresPanel = () => {
     const payload = {
       name: form.name.trim(),
       birth_date: form.birthDate,
-      document: clearSpecialChars(form.document),
+      document: originalOperator && fieldUnchanged("document", form.document) ? originalOperator.document : clearSpecialChars(form.document),
       email: form.email.toLowerCase().trim(),
       phone: `+55${clearSpecialChars(form.phone)}`,
       address: form.address.trim(),
@@ -235,6 +261,8 @@ const OperadoresPanel = () => {
       cep: clearSpecialChars(form.cep),
     };
 
+    mutationPending.current = true;
+    cepRequest.current += 1;
     setSaving(true);
     try {
       if (isEditing) {
@@ -259,23 +287,27 @@ const OperadoresPanel = () => {
     } catch (error) {
       // 400 (validação) ou 409 (cadastro simultâneo): os dois trazem o campo em conflito.
       if (error instanceof HttpError && error.firstErrorFor("document")) {
-        setErrors((prev) => ({ ...prev, document: "Este documento já está cadastrado." }));
-        return toast.error("Este documento já está cadastrado.");
+        setErrors((prev) => ({ ...prev, document: error.firstErrorFor("document") }));
+        return toast.error(error.firstErrorFor("document"));
       }
       if (error instanceof HttpError && error.firstErrorFor("email")) {
-        setErrors((prev) => ({ ...prev, email: "Este e-mail já está em uso." }));
-        return toast.error("Este e-mail já está em uso.");
+        setErrors((prev) => ({ ...prev, email: error.firstErrorFor("email") }));
+        return toast.error(error.firstErrorFor("email"));
       }
-      if (error instanceof BadRequestError) {
+      if (error instanceof HttpError) {
         return toast.error(error.message);
       }
       toast.error("Não foi possível salvar o operador. Tente novamente.");
     } finally {
+      mutationPending.current = false;
       setSaving(false);
     }
   };
 
   const handleUnlink = async (operator: Operator) => {
+    if (mutationPending.current) return;
+    mutationPending.current = true;
+    setUnlinking(true);
     try {
       await operatorStore.unlink(operator.id);
       setOperators((prev) => prev.filter((o) => o.id !== operator.id));
@@ -284,6 +316,9 @@ const OperadoresPanel = () => {
     } catch (error) {
       console.error("Erro ao desvincular operador", error);
       toast.error("Não foi possível desvincular o operador.");
+    } finally {
+      mutationPending.current = false;
+      setUnlinking(false);
     }
   };
 
@@ -297,11 +332,13 @@ const OperadoresPanel = () => {
     const value = form[FIELD_TO_FORM_KEY[field]];
     return (
       <div className="space-y-2">
-        <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+        <label htmlFor={`${formId}-${field}`} className="text-[10px] font-bold uppercase tracking-widest text-outline">
           {label}
         </label>
         <input
           {...props}
+          id={`${formId}-${field}`}
+          aria-invalid={Boolean(errors[field])}
           value={value}
           onChange={(e) => {
             const next = mask ? mask(e.target.value) : e.target.value;
@@ -310,7 +347,6 @@ const OperadoresPanel = () => {
           }}
           onBlur={(e) => {
             blurField(field, e.target.value);
-            if (field === "cep") handleCEPLookup(e.target.value);
           }}
           className={inputClass(Boolean(errors[field]))}
         />
@@ -336,6 +372,7 @@ const OperadoresPanel = () => {
         {!showForm && (
           <button
             onClick={openCreate}
+            disabled={saving || unlinking}
             className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 self-start"
           >
             <MaterialIcon icon="person_add" size={18} /> Cadastrar Operador
@@ -358,6 +395,7 @@ const OperadoresPanel = () => {
             </div>
             <button
               onClick={closeForm}
+              disabled={saving || unlinking}
               className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
               aria-label="Fechar formulário"
             >
@@ -366,6 +404,7 @@ const OperadoresPanel = () => {
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+            <fieldset disabled={saving || unlinking} className="space-y-5">
             {renderField("name", "Nome Completo*", {
               type: "text",
               placeholder: "João da Silva",
@@ -419,10 +458,11 @@ const OperadoresPanel = () => {
                 })}
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor={`${formId}-uf`} className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Estado*
                 </label>
                 <select
+                  id={`${formId}-uf`}
                   value={form.uf}
                   onChange={(e) => setField("uf", e.target.value)}
                   onBlur={(e) => blurField("uf", e.target.value)}
@@ -443,11 +483,12 @@ const OperadoresPanel = () => {
 
             {!isEditing && (
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                <label htmlFor={`${formId}-password`} className="text-[10px] font-bold uppercase tracking-widest text-outline">
                   Senha Inicial*
                 </label>
                 <div className="relative">
                   <input
+                    id={`${formId}-password`}
                     type={showPassword ? "text" : "password"}
                     placeholder="Mínimo 8 caracteres"
                     value={form.password}
@@ -501,6 +542,7 @@ const OperadoresPanel = () => {
                 )}
               </button>
             </div>
+            </fieldset>
           </form>
         </div>
       )}
@@ -522,6 +564,11 @@ const OperadoresPanel = () => {
 
       {loading ? (
         <p className="text-sm text-on-surface-variant">Carregando operadores...</p>
+      ) : loadFailed ? (
+        <div role="alert" className="space-y-3">
+          <p>Não foi possível carregar seus operadores.</p>
+          <button onClick={() => void loadOperators()} className="text-primary font-bold">Tentar novamente</button>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="bg-surface-container-low border border-dashed border-outline-variant/50 rounded-2xl p-12 text-center">
           <div className="w-14 h-14 bg-primary/10 text-primary dark:text-primary-bright rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -580,7 +627,7 @@ const OperadoresPanel = () => {
                     Documento
                   </div>
                   <div className="font-bold text-on-surface text-sm">
-                    {maskDocument(operator.document)}
+                    {validateDocument(operator.document) ? maskDocument(operator.document) : operator.document}
                   </div>
                 </div>
                 <div>
@@ -606,13 +653,14 @@ const OperadoresPanel = () => {
               <div className="flex gap-3">
                 <button
                   onClick={() => openEdit(operator)}
+                  disabled={saving || unlinking}
                   className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2"
                 >
                   <MaterialIcon icon="edit" size={16} /> Editar
                 </button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="text-error px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-error/10 transition-colors flex items-center gap-2">
+                    <button disabled={saving || unlinking} className="text-error px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-error/10 transition-colors flex items-center gap-2">
                       <MaterialIcon icon="person_remove" size={16} /> Desvincular
                     </button>
                   </AlertDialogTrigger>

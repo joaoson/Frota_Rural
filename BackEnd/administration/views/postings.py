@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
 from administration.serializer import PostingRejectionInputSerializer
 from administration.services import PostingModerationService
@@ -16,6 +18,8 @@ POSTING_NOT_FOUND = error_response(404, "Anúncio não encontrado.")
 
 
 class PostingApproveView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Aprovar anúncio",
@@ -35,6 +39,8 @@ class PostingApproveView(APIView):
 
 
 class PostingRejectView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Reprovar anúncio",

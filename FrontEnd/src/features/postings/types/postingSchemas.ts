@@ -36,6 +36,7 @@ export type UploadedPhotoApi = z.infer<typeof uploadedPhotoApiSchema>;
 
 export const postingDetailApiSchema = z.object({
   id: z.string(),
+  location_cep: z.string().nullish(),
   hourly_rate: decimalString,
   location_address: z.string().nullish(),
   location_lat: decimalString.nullish(),
@@ -136,6 +137,7 @@ export const postingEditFormSchema = z
 export type PostingEditFormValues = z.infer<typeof postingEditFormSchema>;
 
 export interface PostingWritePayload {
+  suggestion_id?: string;
   machinery?: string;
   hourly_rate?: string;
   location_cep?: string;

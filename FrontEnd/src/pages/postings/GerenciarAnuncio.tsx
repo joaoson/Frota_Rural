@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
+import { useAuth } from "@/contexts/useAuth";
+import { useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
+import { useReceivedReviews } from "@/features/reviews/hooks/useReviews";
+import { averageRating } from "@/features/reviews/types/review";
+import { formatCurrency } from "@/features/dashboard/utils/ownerSummary";
 import MaterialIcon from "@/components/MaterialIcon";
 import {
   AlertDialog,
@@ -21,6 +26,7 @@ import {
   usePosting,
   useUpdatePosting,
 } from "@/features/postings/hooks/usePostings";
+import { postingStatusBadge } from "@/features/postings/types/postingBadges";
 import { postingMachineName } from "@/features/postings/types/posting";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
 import MapaLocalizacao from "@/components/MapaLocalizacao";
@@ -37,6 +43,14 @@ import { maskCEP } from "@/shared/utils/masks/maskCEP";
 const GerenciarAnuncio = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { userId } = useAuth();
+  const rentalsQuery = useRentalsAsLessor(userId);
+  const reviewsQuery = useReceivedReviews(userId);
+  const rentals = (rentalsQuery.data ?? []).filter((rental) => rental.postingId === id);
+  const rentalIds = new Set(rentals.map((rental) => rental.id));
+  const reviews = (reviewsQuery.data ?? []).filter((review) => rentalIds.has(review.rentalId));
+  const rating = averageRating(reviews);
+  const totalCompleted = rentals.filter((rental) => ["completed", "closed"].includes(rental.status ?? "")).reduce((sum, rental) => sum + (rental.totalPrice ?? 0), 0);
 
   const postingQuery = usePosting(id ?? null);
   const updatePosting = useUpdatePosting();
@@ -44,9 +58,14 @@ const GerenciarAnuncio = () => {
   const { lookup } = useCepLookup();
 
   const form = usePostingEditForm();
-  const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
+  const [locatedCoordinates, setCoordenadas] = useState<Coordenadas | null>(null);
   const { errors } = form.formState;
   const posting = postingQuery.data;
+  const moderationLocked = ["rejected", "suspended", "pending_review"].includes(posting?.status ?? "");
+  const locationUnchanged = form.watch("locationAddress") === posting?.locationAddress
+    && form.watch("cep").replace(/\D/g, "") === (posting?.locationCep ?? "").replace(/\D/g, "");
+  const coordenadas = locatedCoordinates ?? (locationUnchanged && posting?.latitude != null && posting.longitude != null
+    ? { lat: posting.latitude, lon: posting.longitude, nomeExibicao: posting.locationAddress ?? "" } : null);
 
   const hoje = new Date().toISOString().split("T")[0];
   const inicioGravado = toDateInput(posting?.availabilityStart ?? null);
@@ -64,20 +83,13 @@ const GerenciarAnuncio = () => {
     form.reset({
       status: posting.status ?? "active",
       hourlyRate: String(posting.hourlyRate),
-      cep: "",
+      cep: maskCEP(posting.locationCep ?? ""),
       locationAddress: posting.locationAddress ?? "",
       availabilityStart: toDateInput(posting.availabilityStart),
       availabilityEnd: toDateInput(posting.availabilityEnd),
       description: posting.description ?? "",
     });
   }, [posting, form]);
-
-  useEffect(() => {
-    if (postingQuery.isError) {
-      toast.error("Não foi possível carregar o anúncio.");
-      navigate("/dashboard");
-    }
-  }, [postingQuery.isError, navigate]);
 
   const handleCepChange = async (value: string) => {
     if (!isCepComplete(value)) return;
@@ -96,7 +108,7 @@ const GerenciarAnuncio = () => {
     try {
       await updatePosting.mutateAsync({ id, payload: toEditPayload(values, coordenadas) });
       toast.success("Anúncio atualizado com sucesso.");
-      navigate("/dashboard");
+      navigate("/dashboard?tab=anuncios");
     } catch (error) {
       toast.error(error instanceof HttpError ? error.message : "Erro ao atualizar o anúncio.");
     }
@@ -107,7 +119,7 @@ const GerenciarAnuncio = () => {
     try {
       await deletePosting.mutateAsync(id);
       toast.success("Anúncio removido.");
-      navigate("/dashboard");
+      navigate("/dashboard?tab=anuncios");
     } catch (error) {
       toast.error(error instanceof HttpError ? error.message : "Erro ao remover anúncio.");
     }
@@ -115,13 +127,16 @@ const GerenciarAnuncio = () => {
 
   const cepField = masked(form.register("cep"), maskCEP);
 
+  if (postingQuery.isError) {
+    return <PageShell width="medium"><BackLink to="/dashboard?tab=anuncios">Voltar aos Anúncios</BackLink><div role="alert">Não foi possível carregar o anúncio. <button type="button" className="font-bold underline" onClick={() => void postingQuery.refetch()}>Tentar novamente</button></div></PageShell>;
+  }
   if (postingQuery.isLoading || !posting) {
     return <FullPageLoading label="Carregando anúncio..." />;
   }
 
   return (
     <PageShell width="medium">
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to="/dashboard?tab=anuncios">Voltar aos Anúncios</BackLink>
 
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="lg:w-2/3">
@@ -141,10 +156,12 @@ const GerenciarAnuncio = () => {
             onSubmit={onSubmit}
             noValidate
           >
-            <FormField label="Status do Anúncio">
-              <select className={inputClass(false)} {...form.register("status")}>
+            <FormField label="Status do Anúncio" error={errors.status?.message} hint={moderationLocked ? `Este anúncio está ${postingStatusBadge(posting.status).label.toLocaleLowerCase("pt-BR")}. Você pode corrigir os dados; a publicação depende da moderação da plataforma.` : undefined}>
+              <select className={inputClass(false)} disabled={moderationLocked} {...form.register("status")}>
                 <option value="active">Ativo (Visível para busca)</option>
                 <option value="inactive">Pausado (Oculto)</option>
+                <option value="draft">Rascunho (Oculto)</option>
+                {posting.status && !["active", "inactive", "draft"].includes(posting.status) && <option value={posting.status}>{postingStatusBadge(posting.status).label}</option>}
               </select>
             </FormField>
 
@@ -166,6 +183,7 @@ const GerenciarAnuncio = () => {
                   className={inputClass(false)}
                   {...cepField}
                   onChange={(event) => {
+                    setCoordenadas(null);
                     void cepField.onChange(event);
                     void handleCepChange(event.target.value);
                   }}
@@ -176,7 +194,7 @@ const GerenciarAnuncio = () => {
                 <input
                   type="text"
                   className={inputClass(Boolean(errors.locationAddress))}
-                  {...form.register("locationAddress")}
+                  {...form.register("locationAddress", { onChange: () => { setCoordenadas(null); form.setValue("cep", ""); } })}
                 />
               </FormField>
 
@@ -224,6 +242,7 @@ const GerenciarAnuncio = () => {
                 <AlertDialogTrigger asChild>
                   <button
                     type="button"
+                    disabled={deletePosting.isPending || updatePosting.isPending}
                     className="px-6 py-3.5 text-sm font-bold rounded-lg border-2 border-error/50 text-error hover:bg-error/10 transition-colors"
                   >
                     Excluir Anúncio
@@ -234,13 +253,14 @@ const GerenciarAnuncio = () => {
                     <AlertDialogTitle>Excluir anúncio?</AlertDialogTitle>
                     <AlertDialogDescription>
                       Esta ação não pode ser desfeita. O anúncio será removido e não aparecerá
-                      mais nos resultados de busca. As locações em andamento não serão afetadas.
+                      mais nos resultados de busca. Anúncios com histórico de locações devem ser pausados para preservar os contratos.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
+                      disabled={deletePosting.isPending || updatePosting.isPending}
                       className="bg-error hover:bg-error/90 text-on-error"
                     >
                       Excluir
@@ -251,7 +271,7 @@ const GerenciarAnuncio = () => {
 
               <button
                 type="submit"
-                disabled={updatePosting.isPending}
+                disabled={updatePosting.isPending || deletePosting.isPending}
                 className="px-8 py-3.5 text-sm font-bold rounded-lg bg-primary text-on-primary hover:shadow-lg transition-all disabled:opacity-60 flex items-center gap-2"
               >
                 <MaterialIcon icon="save" size={18} />
@@ -263,77 +283,15 @@ const GerenciarAnuncio = () => {
 
         <div className="lg:w-1/3">
           <div className="bg-surface-container-low border border-outline-variant/30 rounded-2xl p-6 shadow-sm sticky top-32">
-            <h3 className="font-headline font-bold text-lg text-on-surface mb-6 flex items-center gap-2">
-              <MaterialIcon icon="analytics" className="text-primary" />
-              Estatísticas (Últimos 30 dias)
-            </h3>
-            <div className="space-y-5">
-              <div className="flex justify-between items-center pb-5 border-b border-outline-variant/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center">
-                    <MaterialIcon
-                      icon="visibility"
-                      className="text-outline"
-                      size={20}
-                    />
-                  </div>
-                  <span className="text-sm text-on-surface-variant font-bold">
-                    Visualizações
-                  </span>
-                </div>
-                <span className="font-black text-on-surface text-lg">
-                  1.245
-                </span>
-              </div>
-              <div className="flex justify-between items-center pb-5 border-b border-outline-variant/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center">
-                    <MaterialIcon
-                      icon="event_available"
-                      className="text-outline"
-                      size={20}
-                    />
-                  </div>
-                  <span className="text-sm text-on-surface-variant font-bold">
-                    Locações
-                  </span>
-                </div>
-                <span className="font-black text-on-surface text-lg">14</span>
-              </div>
-              <div className="flex justify-between items-center pb-5 border-b border-outline-variant/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center">
-                    <MaterialIcon
-                      icon="star"
-                      className="text-secondary-container"
-                      size={20}
-                      filled
-                    />
-                  </div>
-                  <span className="text-sm text-on-surface-variant font-bold">
-                    Avaliação Média
-                  </span>
-                </div>
-                <span className="font-black text-on-surface text-lg">4.8</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <MaterialIcon
-                      icon="payments"
-                      className="text-primary"
-                      size={20}
-                    />
-                  </div>
-                  <span className="text-sm text-primary font-bold">
-                    Receita Gerada
-                  </span>
-                </div>
-                <span className="font-black text-primary text-xl">
-                  R$ 18.400
-                </span>
-              </div>
-            </div>
+            <h3 className="font-headline font-bold text-lg text-on-surface mb-6">Histórico do Anúncio</h3>
+            {rentalsQuery.isError || reviewsQuery.isError ? <p role="alert">Não foi possível carregar o histórico. <button type="button" onClick={() => { void rentalsQuery.refetch(); void reviewsQuery.refetch(); }} className="underline">Tentar novamente</button></p>
+              : rentalsQuery.isLoading || reviewsQuery.isLoading ? <p role="status">Carregando histórico...</p>
+              : <dl className="space-y-5">
+                <div><dt className="text-sm text-on-surface-variant">Locações registradas</dt><dd className="font-black text-lg">{rentals.length}</dd></div>
+                <div><dt className="text-sm text-on-surface-variant">Avaliação média recebida</dt><dd className="font-black text-lg">{rating == null ? "Sem avaliações" : rating.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}</dd></div>
+                <div><dt className="text-sm text-on-surface-variant">Valor das locações concluídas</dt><dd className="font-black text-xl text-primary">{formatCurrency(totalCompleted)}</dd></div>
+              </dl>}
+            <p className="mt-4 text-xs text-on-surface-variant">Valores brutos dos contratos, sem confirmação de repasse. Visualizações não são contabilizadas.</p>
           </div>
         </div>
       </div>

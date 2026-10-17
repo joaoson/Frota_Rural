@@ -1,3 +1,4 @@
+import { documentUrl } from "@/features/documents/api/documentUrl";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -292,7 +293,7 @@ const CNHUpload = () => {
               <div className="flex items-center gap-3 border-2 border-dashed border-outline-variant/60 rounded-xl p-3">
                 {existingFileUrl.match(/\.(jpg|jpeg|png|webp)$/i) ? (
                   <img
-                    src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                    src={documentUrl(existingFileUrl)}
                     alt="Documento CNH"
                     className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                   />
@@ -315,7 +316,7 @@ const CNHUpload = () => {
                   </p>
                 </div>
                 <a
-                  href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingFileUrl}`}
+                  href={documentUrl(existingFileUrl)}
                   target="_blank"
                   rel="noopener noreferrer"
                   download

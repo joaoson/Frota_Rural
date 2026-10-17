@@ -1,0 +1,24 @@
+# Requires Docker Compose >= 2.24.4. Read Devops/SUPABASE.md before use.
+services:
+  db:
+    profiles: [local-db]
+
+  backend:
+    # Also protect first startup when an older local image is reused.
+    volumes:
+      - ./Devops/docker/backend/entrypoint.sh:/entrypoint.sh:ro
+    # Git checkouts may mount this script without an executable file mode.
+    command: ["/bin/sh", "/entrypoint.sh"]
+    env_file:
+      - path: .env.supabase
+        required: true
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in the ignored .env.supabase file}
+      DB_SCHEMA: ${DB_SCHEMA:-frota_rural}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
+      # A remote database is migrated only by an explicit management command.
+      RUN_MIGRATIONS: "false"
+    depends_on: !override
+      redis:
+        condition: service_healthy

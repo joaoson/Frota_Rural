@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from datetime import UTC, datetime
 from typing import Any
 
@@ -8,6 +9,7 @@ from rest_framework import serializers
 from djangoapi import firebase_storage
 from postings.enums import PostingStatus
 from postings.models import Postings, PostingsPhotos
+from machines.models import Machines
 
 # created_at é nullable no banco; usado como piso para manter a ordenação estável.
 _EPOCH = datetime.min.replace(tzinfo=UTC)
@@ -32,11 +34,13 @@ class PostingInputSerializer(serializers.ModelSerializer[Postings]):
         max_length=9, required=False, allow_blank=True, allow_null=True
     )
     max_reservation_days = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    suggestion_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
 
     class Meta:
         model = Postings
         fields = [
             "machinery",
+            "suggestion_id",
             "hourly_rate",
             "location_lat",
             "location_lng",
@@ -48,6 +52,39 @@ class PostingInputSerializer(serializers.ModelSerializer[Postings]):
             "description",
             "status",
         ]
+
+    def validate_machinery(self, value: Machines) -> Machines:
+        actor = self.context.get('actor')
+        if self.instance and value.pk != self.instance.machinery_id:
+            raise serializers.ValidationError('A máquina deste anúncio não pode ser alterada.')
+        if actor is not None and value.owner_id != actor.pk:
+            raise serializers.ValidationError('Anuncie apenas máquinas da sua própria frota.')
+        return value
+
+    def validate_status(self, value: str) -> str:
+        current = self.instance.status if self.instance else None
+        moderated = {'rejected', 'suspended', 'pending_review'}
+        if current in moderated and value != current:
+            raise serializers.ValidationError('O status deste anúncio depende da moderação da plataforma.')
+        # Editing details may retain a moderation status, but only the dedicated
+        # audited moderation endpoints may set or clear that status.
+        if self.instance and value == current:
+            return value
+        if value not in {'active', 'inactive', 'draft'}:
+            raise serializers.ValidationError('Selecione ativo, pausado ou rascunho.')
+        return value
+
+    def validate_hourly_rate(self, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise serializers.ValidationError('O preço por hora deve ser maior que zero.')
+        return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        start = attrs.get('availability_start', getattr(self.instance, 'availability_start', None))
+        end = attrs.get('availability_end', getattr(self.instance, 'availability_end', None))
+        if start and end and end < start:
+            raise serializers.ValidationError({'availability_end': 'A data final deve ser posterior à inicial.'})
+        return attrs
 
     def validate_location_cep(self, value: str | None) -> str | None:
         """Normaliza o CEP para 8 dígitos.
@@ -66,6 +103,7 @@ class PostingInputSerializer(serializers.ModelSerializer[Postings]):
 class PostingFilterSerializer(serializers.Serializer[Any]):
     """Query params aceitos na listagem de anúncios."""
 
+    owner = serializers.UUIDField(required=False, help_text="Proprietário do anúncio.")
     machinery = serializers.UUIDField(required=False, help_text="Máquina anunciada.")
     status = serializers.ChoiceField(
         choices=PostingStatus.choices, required=False, help_text="Status do anúncio."

@@ -5,7 +5,9 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
+from common.request import authenticated_user, optional_user
 from common.schemas import error_response, error_responses
 from postings.serializer import (
     PostingDetailOutputSerializer,
@@ -21,6 +23,8 @@ POSTING_NOT_FOUND = error_response(404, "Anúncio não encontrado.")
 
 
 class PostingListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar anúncios",
@@ -33,7 +37,7 @@ class PostingListView(APIView):
         responses={200: PostingListOutputSerializer(many=True), **error_responses(400)},
     )
     def get(self, request: Request) -> Response:
-        postings = PostingService.list(request.query_params)
+        postings = PostingService.list(request.query_params, actor=optional_user(request))
         return Response(
             PostingListOutputSerializer(postings, many=True).data, status=status.HTTP_200_OK
         )
@@ -62,11 +66,13 @@ class PostingListView(APIView):
         ],
     )
     def post(self, request: Request) -> Response:
-        posting = PostingService.create(request.data)
+        posting = PostingService.create(request.data, actor=authenticated_user(request))
         return Response(PostingOutputSerializer(posting).data, status=status.HTTP_201_CREATED)
 
 
 class PostingDetailView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar anúncio",
@@ -74,7 +80,7 @@ class PostingDetailView(APIView):
         responses={200: PostingDetailOutputSerializer, 404: POSTING_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        posting = PostingService.get(pk)
+        posting = PostingService.get(pk, actor=optional_user(request))
         return Response(PostingDetailOutputSerializer(posting).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -88,7 +94,7 @@ class PostingDetailView(APIView):
         },
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        posting = PostingService.update(pk, request.data)
+        posting = PostingService.update(pk, request.data, actor=authenticated_user(request))
         return Response(PostingOutputSerializer(posting).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -103,7 +109,7 @@ class PostingDetailView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        posting = PostingService.update(pk, request.data, partial=True)
+        posting = PostingService.update(pk, request.data, actor=authenticated_user(request), partial=True)
         return Response(PostingOutputSerializer(posting).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -116,5 +122,5 @@ class PostingDetailView(APIView):
         },
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        PostingService.delete(pk)
+        PostingService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)

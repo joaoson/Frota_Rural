@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from contracts.models import Contracts
 from machines.models import Machines
@@ -30,8 +31,10 @@ class RentalApiTests(TestCase):
     def setUp(self):
         self.owner = make_user("locador", 1)
         self.lessee = make_user("locatario", 2)
+        self.client = APIClient()
+        self.client.force_authenticate(self.lessee)
         machine = Machines.objects.create(
-            id=uuid.uuid4(), owner=self.owner, brand="John Deere", model="6135J"
+            id=uuid.uuid4(), owner=self.owner, brand="John Deere", model="6135J", status="active"
         )
         self.posting = Postings.objects.create(
             id=uuid.uuid4(),
@@ -156,8 +159,8 @@ class RentalServiceTests(TestCase):
     def test_contract_failure_rolls_back_the_rental(self):
         owner = make_user("locador", 1)
         lessee = make_user("locatario", 2)
-        machine = Machines.objects.create(id=uuid.uuid4(), owner=owner)
-        posting = Postings.objects.create(id=uuid.uuid4(), machinery=machine, hourly_rate="100.00")
+        machine = Machines.objects.create(id=uuid.uuid4(), owner=owner, status="active")
+        posting = Postings.objects.create(id=uuid.uuid4(), machinery=machine, hourly_rate="100.00", status="active")
         start = timezone.now() + timedelta(days=5)
 
         with (
@@ -173,7 +176,7 @@ class RentalServiceTests(TestCase):
                     "lessee": str(lessee.id),
                     "start_date": start.isoformat(),
                     "end_date": (start + timedelta(days=1)).isoformat(),
-                }
+                }, user=lessee,
             )
 
         self.assertFalse(Rentals.objects.exists())

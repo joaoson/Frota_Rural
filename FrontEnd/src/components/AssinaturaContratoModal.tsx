@@ -422,6 +422,7 @@ export default function AssinaturaContratoModal({
                     </p>
                     <input
                       type="text"
+                      aria-label="Código de confirmação por e-mail"
                       inputMode="numeric"
                       maxLength={6}
                       value={codigoOtp}

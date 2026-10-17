@@ -15,7 +15,7 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   if (isLoading) return null;
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search + location.hash }} />;
   }
 
   if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {

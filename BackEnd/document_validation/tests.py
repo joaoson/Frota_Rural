@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from rest_framework_simplejwt.tokens import AccessToken
 
 from document_validation.models import Certification, OperatorLicense
 from users.models import Users
@@ -28,6 +29,10 @@ def make_user(seq=1):
 class OperatorLicenseTests(TestCase):
     def setUp(self):
         self.user = make_user()
+        self.admin = make_user(99)
+        self.admin.role = "admin"
+        self.admin.save(update_fields=["role"])
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(self.user)}"
 
     def payload(self, **overrides):
         return {
@@ -55,7 +60,8 @@ class OperatorLicenseTests(TestCase):
 
     def review(self, license_id, body):
         return self.client.patch(
-            f"/api/operator-licenses/{license_id}/review", body, content_type="application/json"
+            f"/api/operator-licenses/{license_id}/review", body, content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.admin)}"
         )
 
     def test_create_always_starts_pending_even_if_client_says_approved(self):
@@ -115,8 +121,15 @@ class OperatorLicenseTests(TestCase):
 
 
 class CertificationTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.admin = make_user(99)
+        self.admin.role = "admin"
+        self.admin.save(update_fields=["role"])
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(self.user)}"
+
     def test_create_and_reject_with_note(self):
-        user = make_user()
+        user = self.user
         created = self.client.post(
             "/api/certifications",
             {
@@ -134,6 +147,7 @@ class CertificationTests(TestCase):
             f"/api/certifications/{created.json()['id']}/review",
             {"validation_status": "rejected", "review_note": "Certificado vencido."},
             content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {AccessToken.for_user(self.admin)}",
         )
 
         self.assertEqual(response.status_code, 200, response.content)
@@ -150,6 +164,7 @@ class CertificationTests(TestCase):
 
 class DocumentFileTests(TestCase):
     def setUp(self):
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(make_user())}"
         self.media_root = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.media_root, ignore_errors=True)
 

@@ -16,13 +16,13 @@ from pathlib import Path
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
-from dotenv import load_dotenv
+from .database import database_config, load_environment
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(dotenv_path=str(BASE_DIR / ".env"))
+# Process environment > BackEnd/.env > root .env.
+load_environment(BASE_DIR)
 
 
 # Quick-start development settings - unsuitable for production
@@ -70,6 +70,8 @@ INSTALLED_APPS = [
     "document_validation",
     "chat",
     "payments",
+    "pricing",
+    "notifications",
     "drf_spectacular",
 ]
 
@@ -92,6 +94,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5174",
     "http://127.0.0.1:5174",
 ]
+configured_frontend_origin = os.getenv('FRONTEND_URL', '').rstrip('/')
+if configured_frontend_origin and configured_frontend_origin not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(configured_frontend_origin)
 
 # If you want to allow cookies/sessions to be sent (like for login)
 CORS_ALLOW_CREDENTIALS = True
@@ -155,8 +160,9 @@ AUTH_USER_MODEL = "users.Users"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # 'rest_framework.authentication.BasicAuthentication', ## removed cuz not needed
-        "rest_framework.authentication.SessionAuthentication",
-        "authentication.extensions.authentication.AppJWTAuthentication",
+        # JWT first preserves 401 for expired bearer tokens so clients refresh.
+        'authentication.extensions.authentication.AppJWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Todo erro sai como {"code", "message", "errors"}.
@@ -244,20 +250,16 @@ SIMPLE_JWT = {
     "CHECK_USER_IS_ACTIVE": False,  # Users model has no is_active field
 }
 
+# Cookies are shared across ports on the same hostname. Separate development
+# stacks use distinct names to keep their browser sessions independent.
+AUTH_REFRESH_COOKIE_NAME = os.getenv('AUTH_REFRESH_COOKIE_NAME', 'refresh_token')
+SESSION_COOKIE_NAME = os.getenv('SESSION_COOKIE_NAME', 'sessionid')
+CSRF_COOKIE_NAME = os.getenv('CSRF_COOKIE_NAME', 'csrftoken')
+
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-## THIS NEEDS CHANGING DEPENDING ON YOUR LOCAL INSTACE OF POSTGRESQL
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD"),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
-    }
-}
+DATABASES = {'default': database_config()}
 
 
 # Password validation

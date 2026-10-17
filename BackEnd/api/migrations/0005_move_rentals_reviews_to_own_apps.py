@@ -1,10 +1,11 @@
 from django.db import migrations
+from api.migration_operations import DeleteLegacyRentalState
 
 
 # Contrapartida de rentals.0001 e reviews.0001: os dois últimos modelos do app
-# `api` saem do seu estado. Nenhuma tabela é tocada. Depois desta migração o
-# `api` não tem mais modelos e só continua instalado para preservar o histórico
-# de migrações do qual contracts, chat e payments dependem.
+# `api` saem do seu estado. Nenhuma tabela é tocada. RentalRecurrence, quando
+# instalado pelo ramo de recorrência, permanece no app histórico. Os campos e
+# vínculos adicionados por esse ramo acompanham Rentals para o app de domínio.
 class Migration(migrations.Migration):
     dependencies = [
         ("api", "0004_move_messages_to_chat_app"),
@@ -19,7 +20,7 @@ class Migration(migrations.Migration):
             database_operations=[],
             state_operations=[
                 migrations.DeleteModel(name="Reviews"),
-                migrations.DeleteModel(name="Rentals"),
+                DeleteLegacyRentalState(name="Rentals"),
             ],
         ),
     ]

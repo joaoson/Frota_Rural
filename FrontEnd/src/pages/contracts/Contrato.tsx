@@ -1,4 +1,5 @@
-import { useParams, Link } from "react-router";
+import { useEffect, useRef } from "react";
+import { useParams, useSearchParams, Link } from "react-router";
 import "./Contrato.css";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useContractDocument } from "@/features/contracts/hooks/useContracts";
@@ -60,6 +61,14 @@ export default function Contrato() {
   const documentQuery = useContractDocument(id ?? null);
   const data = documentQuery.data ?? null;
   const loading = documentQuery.isLoading;
+  const [searchParams] = useSearchParams();
+  const printedId = useRef<string | null>(null);
+  const requestedPrint = searchParams.get("print") === "1";
+  useEffect(() => {
+    if (!data || !id || !requestedPrint || printedId.current === id) return;
+    const timer = window.setTimeout(() => { printedId.current = id; window.print(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [data, id, requestedPrint]);
 
   if (loading) {
     return (
@@ -93,7 +102,7 @@ export default function Contrato() {
       <div className="print-btn-wrap no-print">
         <ThemeToggle />
         <button className="print-btn" onClick={() => window.print()}>
-          <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>print</span>
+          <span aria-hidden="true" className="material-symbols-outlined" style={{ fontSize: "16px" }}>print</span>
           Imprimir / Salvar PDF
         </button>
       </div>

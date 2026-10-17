@@ -484,9 +484,23 @@ class ChatConsumerTests(TransactionTestCase):
             application, "/ws/chat", headers=[(b"origin", b"http://localhost:5173")]
         )
         try:
-            connected, code = await comm.connect()
-            self.assertFalse(connected)
-            self.assertEqual(code, 4401)
+            connected, _ = await comm.connect()
+            self.assertTrue(connected, 'accept is required to deliver a close code to browsers')
+            self.assertEqual(await comm.receive_output(), {'type': 'websocket.close', 'code': 4401})
+        finally:
+            await comm.disconnect()
+
+    async def test_expired_token_delivers_4401_after_handshake(self):
+        from djangoapi.asgi import application
+        token = AccessToken.for_user(self.w['lessee'])
+        token.set_exp(lifetime=timedelta(seconds=-1))
+        comm = WebsocketCommunicator(
+            application, '/ws/chat', subprotocols=['bearer', str(token)],
+            headers=[(b'origin', b'http://localhost:5173')],
+        )
+        try:
+            self.assertEqual(await comm.connect(), (True, 'bearer'))
+            self.assertEqual(await comm.receive_output(), {'type': 'websocket.close', 'code': 4401})
         finally:
             await comm.disconnect()
 

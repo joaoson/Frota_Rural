@@ -5,7 +5,9 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
+from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from machines.serializer import (
     MachineFilterSerializer,
@@ -19,6 +21,8 @@ MACHINE_NOT_FOUND = error_response(404, "Máquina não encontrada.")
 
 
 class MachineListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar máquinas",
@@ -73,11 +77,13 @@ class MachineListView(APIView):
         ],
     )
     def post(self, request: Request) -> Response:
-        machine = MachineService.create(request.data)
+        machine = MachineService.create(request.data, actor=authenticated_user(request))
         return Response(MachineOutputSerializer(machine).data, status=status.HTTP_201_CREATED)
 
 
 class MachineDetailView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar máquina",
@@ -98,7 +104,7 @@ class MachineDetailView(APIView):
         },
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        machine = MachineService.update(pk, request.data)
+        machine = MachineService.update(pk, request.data, actor=authenticated_user(request))
         return Response(MachineOutputSerializer(machine).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -113,7 +119,7 @@ class MachineDetailView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        machine = MachineService.update(pk, request.data, partial=True)
+        machine = MachineService.update(pk, request.data, actor=authenticated_user(request), partial=True)
         return Response(MachineOutputSerializer(machine).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -127,5 +133,5 @@ class MachineDetailView(APIView):
         },
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        MachineService.delete(pk)
+        MachineService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)

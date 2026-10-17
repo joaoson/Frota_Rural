@@ -23,16 +23,19 @@ class ReviewService:
         return Reviews.objects.select_related("reviewer", "reviewee")
 
     @staticmethod
-    def get(review_id: UUID) -> Reviews:
+    def get(review_id: UUID, *, user=None, for_write=False) -> Reviews:
         try:
-            return ReviewService._queryset().get(id=review_id)
+            queryset = ReviewService._queryset()
+            if for_write:
+                queryset = queryset.filter(reviewer=user)
+            return queryset.get(id=review_id)
         except Reviews.DoesNotExist as exc:
             raise NotFound("Avaliação não encontrada.") from exc
 
     @staticmethod
     @transaction.atomic
-    def create(data: Mapping[str, Any]) -> Reviews:
-        serializer = ReviewInputSerializer(data=data)
+    def create(data: Mapping[str, Any], *, user) -> Reviews:
+        serializer = ReviewInputSerializer(data=data, context={"user": user})
         serializer.is_valid(raise_exception=True)
         try:
             return serializer.save(id=uuid4(), created_at=timezone.now())
@@ -43,9 +46,9 @@ class ReviewService:
 
     @staticmethod
     @transaction.atomic
-    def update(review_id: UUID, data: Mapping[str, Any], *, partial: bool = False) -> Reviews:
-        review = ReviewService.get(review_id)
-        serializer = ReviewInputSerializer(review, data=data, partial=partial)
+    def update(review_id: UUID, data: Mapping[str, Any], *, user, partial: bool = False) -> Reviews:
+        review = ReviewService.get(review_id, user=user, for_write=True)
+        serializer = ReviewInputSerializer(review, data=data, partial=partial, context={"user": user})
         serializer.is_valid(raise_exception=True)
         try:
             return serializer.save()
@@ -54,8 +57,8 @@ class ReviewService:
 
     @staticmethod
     @transaction.atomic
-    def delete(review_id: UUID) -> None:
-        review = ReviewService.get(review_id)
+    def delete(review_id: UUID, *, user) -> None:
+        review = ReviewService.get(review_id, user=user, for_write=True)
         enforce_constraints_now()
         try:
             review.delete()

@@ -5,7 +5,10 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from administration.permissions import IsPlatformAdmin
 
+from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from document_validation.serializer import (
     CertificationInputSerializer,
@@ -20,6 +23,8 @@ CERTIFICATION_NOT_FOUND = error_response(404, "Certificação não encontrada.")
 
 
 class CertificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar certificações",
@@ -28,7 +33,7 @@ class CertificationListView(APIView):
         responses={200: CertificationOutputSerializer(many=True), **error_responses(400)},
     )
     def get(self, request: Request) -> Response:
-        certifications = CertificationService.list(request.query_params)
+        certifications = CertificationService.list(request.query_params, actor=authenticated_user(request))
         return Response(
             CertificationOutputSerializer(certifications, many=True).data,
             status=status.HTTP_200_OK,
@@ -42,20 +47,22 @@ class CertificationListView(APIView):
         responses={201: CertificationOutputSerializer, **error_responses(400, 409)},
     )
     def post(self, request: Request) -> Response:
-        certification = CertificationService.create(request.data)
+        certification = CertificationService.create(request.data, actor=authenticated_user(request))
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_201_CREATED
         )
 
 
 class CertificationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar certificação",
         responses={200: CertificationOutputSerializer, 404: CERTIFICATION_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        certification = CertificationService.get(pk)
+        certification = CertificationService.get(pk, actor=authenticated_user(request))
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_200_OK
         )
@@ -72,7 +79,7 @@ class CertificationDetailView(APIView):
         },
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        certification = CertificationService.update(pk, request.data)
+        certification = CertificationService.update(pk, request.data, actor=authenticated_user(request))
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_200_OK
         )
@@ -89,7 +96,7 @@ class CertificationDetailView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        certification = CertificationService.update(pk, request.data, partial=True)
+        certification = CertificationService.update(pk, request.data, actor=authenticated_user(request), partial=True)
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_200_OK
         )
@@ -100,11 +107,13 @@ class CertificationDetailView(APIView):
         responses={204: None, 404: CERTIFICATION_NOT_FOUND},
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        CertificationService.delete(pk)
+        CertificationService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CertificationReviewView(APIView):
+    permission_classes = [IsAuthenticated, IsPlatformAdmin]
+
     @extend_schema(
         tags=TAGS,
         summary="Analisar certificação",
@@ -117,7 +126,7 @@ class CertificationReviewView(APIView):
         },
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        certification = CertificationService.review(pk, request.data)
+        certification = CertificationService.review(pk, request.data, actor=authenticated_user(request))
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_200_OK
         )

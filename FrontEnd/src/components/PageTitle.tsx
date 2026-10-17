@@ -11,6 +11,8 @@ const BASE = "Frota Rural";
 const TITULOS: ReadonlyArray<[RegExp, string]> = [
   [/^\/$/, "Início"],
   [/^\/help$/, "Ajuda"],
+  [/^\/termos-de-uso$/, "Termos de uso"],
+  [/^\/privacidade$/, "Privacidade"],
   [/^\/signup\/document-upload$/, "Envio de CNH"],
   [/^\/signup\/profile-upload$/, "Envio de foto de perfil"],
   [/^\/signup$/, "Criar conta"],

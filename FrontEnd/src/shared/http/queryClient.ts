@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 
-import { HttpError } from "./errors";
+import { HttpError, RequestCanceledError } from "./errors";
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({
@@ -9,6 +9,7 @@ export function createQueryClient(): QueryClient {
         staleTime: 30_000,
         refetchOnWindowFocus: false,
         retry: (failureCount, error) => {
+          if (error instanceof RequestCanceledError) return false;
           if (error instanceof HttpError && error.status !== undefined) {
             if (error.status >= 400 && error.status < 500) return false;
           }

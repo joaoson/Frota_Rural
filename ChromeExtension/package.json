@@ -1,0 +1,13 @@
+{
+  "name": "frota-rural-validation-extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Optional browser checks for the unpacked extension; installation requires no build.",
+  "scripts": {
+    "test": "node --test tests/settings.test.cjs",
+    "test:browser": "node --test tests/browser.test.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

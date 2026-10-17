@@ -3,7 +3,9 @@ import { Link } from "react-router";
 import { useAuth } from "@/contexts/useAuth";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useUnreadCount } from "@/features/chat/hooks/useChat";
+import NotificationPopover from "@/components/NotificationPopover";
 import ThemeToggle from "@/components/ThemeToggle";
+import { homeRouteForRole } from "@/shared/utils/homeRoute";
 
 const Navbar = () => {
   const { isAuthenticated, isLoading, userRole, logout } = useAuth();
@@ -21,11 +23,7 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const getDashboardLink = () => {
-    if (userRole === "locatario") return "/dashboard-locatario";
-    if (userRole === "admin") return "/admin";
-    return "/dashboard";
-  };
+  const dashboardLink = homeRouteForRole(userRole);
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-surface-container-lowest/70 backdrop-blur-md shadow-sm">
@@ -40,7 +38,7 @@ const Navbar = () => {
           >
             Explorar Máquinas
           </Link>
-          {userRole !== "locatario" && (
+          {(!isAuthenticated || userRole === "locador" || userRole === "admin") && (
             <Link
               to="/dashboard/novo-equipamento"
               className="text-tertiary font-medium hover:text-primary-container transition-colors duration-200"
@@ -52,6 +50,7 @@ const Navbar = () => {
         
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <NotificationPopover />
 
           {isAuthenticated ? (
             <Link
@@ -85,7 +84,7 @@ const Navbar = () => {
                     <p className="text-xs font-bold text-outline uppercase tracking-wider">Sua Conta</p>
                   </div>
                   <Link
-                    to={getDashboardLink()}
+                    to={dashboardLink}
                     onClick={() => setDropdownOpen(false)}
                     className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 transition-colors"
                   >
@@ -95,7 +94,7 @@ const Navbar = () => {
                     <button
                       onClick={() => {
                         setDropdownOpen(false);
-                        window.location.href = `${getDashboardLink()}?tab=conta`;
+                        window.location.href = `${dashboardLink}?tab=conta`;
                       }}
                       className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 transition-colors"
                     >
@@ -121,7 +120,7 @@ const Navbar = () => {
               </Link>
               <Link
                 to="/signup"
-                className="bg-primary-container text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-all shadow-sm"
+                className="hidden sm:inline-flex bg-primary-container text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-all shadow-sm"
               >
                 Criar Conta
               </Link>

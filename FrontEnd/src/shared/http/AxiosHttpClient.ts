@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 
+import { getApiBaseUrl } from "./apiUrls";
 import type { HttpClient, HttpRequest, HttpResponse } from "./HttpClient";
 import {
   type ApiErrorBody,
@@ -11,24 +12,22 @@ import {
   type HttpErrorDetails,
   NetworkError,
   NotFoundError,
+  RequestCanceledError,
   ServerError,
   UnauthorizedError,
   UnexpectedError,
 } from "./errors";
 
-export const DEFAULT_BASE_URL = "http://localhost:8000/api";
+export { DEFAULT_BASE_URL } from "./apiUrls";
 
-// Erros de regra de negócio sem campo associado. Ficam fora de `fieldErrors`
-// para um formulário não tentar pendurar a mensagem num campo que não existe —
-// e é disso que `AuthRepository.confirmPasswordReset` depende para reconhecer
-// um token inválido.
+// Business-rule errors must not be attached to a nonexistent form field.
 const NON_FIELD_ERRORS = "non_field_errors";
 
 export function createAxiosInstance(baseURL?: string): AxiosInstance {
   return axios.create({
     // withCredentials é obrigatório pois refresh token vive num cookie httpOnly
     // com path=/api/login e só é enviado se as credenciais acompanharem
-    baseURL: baseURL ?? import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL,
+    baseURL: getApiBaseUrl(baseURL),
     withCredentials: true,
     headers: { "Content-Type": "application/json" },
   });
@@ -46,10 +45,12 @@ interface ParsedErrorBody extends HttpErrorDetails {
 }
 
 function stringList(value: unknown): string[] {
+  if (typeof value === "string") return [value];
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-// Parse do corpo único de erro do backend: {"code", "message", "errors"}
+// Accept the structured API envelope and feature endpoints that still return
+// DRF field errors or { error/detail }. Both forms retain useful validation text.
 function parseErrorBody(data: unknown): ParsedErrorBody {
   const fieldErrors: FieldErrors = {};
   const nonFieldErrors: string[] = [];
@@ -57,19 +58,20 @@ function parseErrorBody(data: unknown): ParsedErrorBody {
     return { fieldErrors, nonFieldErrors };
   }
 
-  const body = data as Partial<ApiErrorBody>;
+  const body = data as Partial<ApiErrorBody> & Record<string, unknown>;
   const apiCode = typeof body.code === "string" ? body.code : undefined;
-  const message = typeof body.message === "string" ? body.message : undefined;
+  const message = [body.message, body.error, body.detail].find((value): value is string => typeof value === "string");
 
-  if (body.errors !== null && typeof body.errors === "object") {
-    for (const [field, value] of Object.entries(body.errors as Record<string, unknown>)) {
-      const messages = stringList(value);
-      if (messages.length === 0) continue;
-      if (field === NON_FIELD_ERRORS) {
-        nonFieldErrors.push(...messages);
-      } else {
-        fieldErrors[field] = messages;
-      }
+  const structured = body.errors !== null && typeof body.errors === "object" && !Array.isArray(body.errors);
+  const errors = structured ? body.errors as Record<string, unknown> : body;
+  for (const [field, value] of Object.entries(errors)) {
+    if (!structured && ["code", "message", "error", "detail", "errors"].includes(field)) continue;
+    const messages = stringList(value);
+    if (messages.length === 0) continue;
+    if (field === NON_FIELD_ERRORS) {
+      nonFieldErrors.push(...messages);
+    } else {
+      fieldErrors[field] = messages;
     }
   }
 
@@ -86,6 +88,11 @@ function firstMessage({ fieldErrors, nonFieldErrors }: ParsedErrorBody): string 
 
 export function toHttpError(error: unknown): HttpError {
   if (error instanceof HttpError) return error;
+
+  const isAbortError = (error instanceof Error || error instanceof DOMException) && error.name === "AbortError";
+  if (axios.isCancel(error) || isAbortError) {
+    return new RequestCanceledError(error);
+  }
 
   if (error instanceof AxiosError) {
     const response = error.response;
@@ -107,6 +114,8 @@ export function toHttpError(error: unknown): HttpError {
         return new ForbiddenError(message, error, details);
       case 404:
         return new NotFoundError(message, error, details);
+      case 422:
+        return new HttpError("unprocessable_entity", message ?? "Não foi possível processar os dados.", 422, error, details);
       case 409:
         return new ConflictError(message, error, details);
       default:

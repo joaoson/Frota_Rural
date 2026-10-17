@@ -5,7 +5,9 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
+from common.request import authenticated_user
 from common.schemas import error_response
 from contracts.serializer import (
     ContractDocumentOutputSerializer,
@@ -20,6 +22,8 @@ ACCEPTS_RENTAL_ID = "O identificador aceito é o do contrato **ou** o da locaç�
 
 
 class ContractListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar contratos",
@@ -27,13 +31,15 @@ class ContractListView(APIView):
         responses={200: ContractOutputSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
-        contracts = ContractService.list()
+        contracts = ContractService.list(actor=authenticated_user(request))
         return Response(
             ContractOutputSerializer(contracts, many=True).data, status=status.HTTP_200_OK
         )
 
 
 class ContractDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Visualizar documento do contrato",
@@ -45,11 +51,13 @@ class ContractDetailView(APIView):
         responses={200: ContractDocumentOutputSerializer, 404: CONTRACT_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        document = ContractService.get_document(pk)
+        document = ContractService.get_document(pk, actor=authenticated_user(request))
         return Response(ContractDocumentOutputSerializer(document).data, status=status.HTTP_200_OK)
 
 
 class ContractEvidenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Trilha de auditoria da assinatura",
@@ -61,5 +69,5 @@ class ContractEvidenceView(APIView):
         responses={200: ContractEvidenceOutputSerializer, 404: CONTRACT_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        evidence = ContractService.get_evidence(pk)
+        evidence = ContractService.get_evidence(pk, actor=authenticated_user(request))
         return Response(ContractEvidenceOutputSerializer(evidence).data, status=status.HTTP_200_OK)

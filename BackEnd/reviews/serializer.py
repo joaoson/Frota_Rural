@@ -26,6 +26,26 @@ class ReviewInputSerializer(serializers.ModelSerializer[Reviews]):
         ]
 
 
+    def validate(self, attrs):
+        user = self.context.get('user')
+        rental = attrs.get('rental', getattr(self.instance, 'rental', None))
+        reviewer = attrs.get('reviewer', getattr(self.instance, 'reviewer', None))
+        reviewee = attrs.get('reviewee', getattr(self.instance, 'reviewee', None))
+        if self.instance:
+            for field in ('rental', 'reviewer', 'reviewee'):
+                if field in attrs and attrs[field].pk != getattr(self.instance, f'{field}_id'):
+                    raise serializers.ValidationError({field: 'Este vínculo não pode ser alterado.'})
+        if user and reviewer and reviewer.pk != user.pk:
+            raise serializers.ValidationError({'reviewer': 'Você só pode avaliar em seu próprio nome.'})
+        if rental and reviewer and reviewee:
+            if rental.status != 'completed':
+                raise serializers.ValidationError({'rental': 'A avaliação fica disponível após a conclusão da locação.'})
+            parties = {rental.lessee_id, rental.postings.machinery.owner_id}
+            if reviewer.pk not in parties or reviewee.pk not in parties or reviewer.pk == reviewee.pk:
+                raise serializers.ValidationError({'reviewee': 'Avalie a outra parte desta locação.'})
+        return attrs
+
+
 class ReviewFilterSerializer(serializers.Serializer[Any]):
     """Query params aceitos na listagem de avaliações."""
 

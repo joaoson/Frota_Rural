@@ -1,3 +1,4 @@
+import { documentUrl } from "@/features/documents/api/documentUrl";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -72,7 +73,7 @@ const CertificationUpload = () => {
 
     try {
       const uploadedUrl = file ? await uploadDocument.mutateAsync(file) : undefined;
-      const mediaUrl = uploadedUrl ?? existingMediaUrl ?? undefined;
+      const mediaUrl = uploadedUrl ?? (mediaCleared ? null : existingMediaUrl ?? undefined);
 
       await saveCertification.mutateAsync({
         id,
@@ -199,7 +200,7 @@ const CertificationUpload = () => {
                 <div className="mt-3 flex items-center gap-3 border-2 border-dashed border-outline-variant/60 rounded-xl p-3">
                   {existingMediaUrl.match(/\.(jpg|jpeg|png|webp)$/i) ? (
                     <img
-                      src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
+                      src={documentUrl(existingMediaUrl)}
                       alt="Certificado"
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     />
@@ -223,7 +224,8 @@ const CertificationUpload = () => {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <a
-                      href={`${import.meta.env.VITE_API_BASE_URL?.replace("/api/", "") || "http://localhost:8000"}${existingMediaUrl}`}
+                      aria-label="Abrir arquivo do certificado"
+                      href={documentUrl(existingMediaUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       download
@@ -233,6 +235,7 @@ const CertificationUpload = () => {
                     </a>
                     <button
                       type="button"
+                      aria-label="Remover arquivo do certificado"
                       onClick={() => setMediaCleared(true)}
                       className="flex items-center px-2 py-2 rounded-lg text-on-surface hover:bg-primary/5 transition-colors cursor-pointer"
                     >

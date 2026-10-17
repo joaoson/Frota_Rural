@@ -2,6 +2,7 @@ from uuid import UUID
 
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -22,6 +23,8 @@ INVALID_RENTAL = error_response(
 
 
 class RentalListView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Listar locações",
@@ -30,7 +33,7 @@ class RentalListView(APIView):
         responses={200: RentalOutputSerializer(many=True), **error_responses(400)},
     )
     def get(self, request: Request) -> Response:
-        rentals = RentalService.list(request.query_params)
+        rentals = RentalService.list(request.query_params, user=request.user)
         return Response(RentalOutputSerializer(rentals, many=True).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -58,18 +61,20 @@ class RentalListView(APIView):
         ],
     )
     def post(self, request: Request) -> Response:
-        rental = RentalService.create(request.data)
+        rental = RentalService.create(request.data, user=request.user)
         return Response(RentalOutputSerializer(rental).data, status=status.HTTP_201_CREATED)
 
 
 class RentalDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Consultar locação",
         responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
-        rental = RentalService.get(pk)
+        rental = RentalService.get(pk, user=request.user)
         return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -79,7 +84,7 @@ class RentalDetailView(APIView):
         responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
     )
     def put(self, request: Request, pk: UUID) -> Response:
-        rental = RentalService.update(pk, request.data)
+        rental = RentalService.update(pk, request.data, user=request.user)
         return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -90,7 +95,7 @@ class RentalDetailView(APIView):
         responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
     )
     def patch(self, request: Request, pk: UUID) -> Response:
-        rental = RentalService.update(pk, request.data, partial=True)
+        rental = RentalService.update(pk, request.data, user=request.user, partial=True)
         return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -103,5 +108,5 @@ class RentalDetailView(APIView):
         },
     )
     def delete(self, request: Request, pk: UUID) -> Response:
-        RentalService.delete(pk)
+        RentalService.delete(pk, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

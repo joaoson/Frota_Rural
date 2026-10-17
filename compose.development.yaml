@@ -1,0 +1,31 @@
+# Selected by Devops/dev.py after compose.yaml and, optionally, compose.supabase.yaml.
+# These settings apply only to the explicit, isolated development environments.
+services:
+  db:
+    ports: !override
+      - "127.0.0.1:${FROTA_DATABASE_PORT:?}:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:${FROTA_REDIS_PORT:?}:6379"
+  backend:
+    env_file: !override
+      - path: ${FROTA_ENV_FILE:?}
+        required: true
+    environment:
+      # Only the selected env_file supplies integration credentials. Ignore mounted .env files.
+      DJANGO_LOAD_ENV_FILES: "false"
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-isolated-development-only}
+      DJANGO_SERVER_MODE: dev
+      FRONTEND_URL: http://localhost:${FROTA_FRONTEND_PORT:?}
+      AUTH_REFRESH_COOKIE_NAME: ${FROTA_COOKIE_PREFIX:?}_refresh
+      SESSION_COOKIE_NAME: ${FROTA_COOKIE_PREFIX:?}_session
+      CSRF_COOKIE_NAME: ${FROTA_COOKIE_PREFIX:?}_csrf
+    ports: !override
+      - "127.0.0.1:${FROTA_BACKEND_PORT:?}:8000"
+  frontend:
+    environment:
+      VITE_API_BASE_URL: http://localhost:${FROTA_BACKEND_PORT:?}/api
+      VITE_WS_BASE_URL: ws://localhost:${FROTA_BACKEND_PORT:?}
+    ports: !override
+      - "127.0.0.1:${FROTA_FRONTEND_PORT:?}:5173"

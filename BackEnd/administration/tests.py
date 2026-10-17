@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework_simplejwt.tokens import AccessToken
 
 from administration.models import PostingModeration
 from administration.services import UserModerationService
@@ -30,6 +31,8 @@ def make_user(role, seq, status="active"):
 
 class ModerationTestCase(TestCase):
     def setUp(self):
+        self.admin = make_user("admin", 99)
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(self.admin)}"
         self.owner = make_user("locador", 1)
         self.lessee = make_user("locatario", 2)
         machine = Machines.objects.create(id=uuid.uuid4(), owner=self.owner)
@@ -94,6 +97,8 @@ class UserModerationTests(ModerationTestCase):
         self.rental.refresh_from_db()
         self.assertEqual(self.posting.status, "suspended")
         self.assertEqual(self.rental.status, "cancelled")
+        self.contract.refresh_from_db()
+        self.assertEqual(self.contract.status, "cancelled")
 
     def test_cannot_warn_a_banned_user(self):
         banned = make_user("locatario", 3, status="banned")

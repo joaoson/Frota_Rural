@@ -217,6 +217,7 @@ __marimo__/
 
 # Local virtual environment
 .env
+.env.stripe-*
 .idea
 
 # ML Training

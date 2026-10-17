@@ -11,6 +11,7 @@ from common.db import enforce_constraints_now
 from common.exceptions import Conflict
 from machines.enums import MachineStatus
 from machines.models import Machines
+from users.models import Users
 from machines.serializer import MachineFilterSerializer, MachineInputSerializer
 
 CONFLICT_MESSAGE = "Dados em conflito com uma máquina já cadastrada (ex.: número Renagro)."
@@ -18,9 +19,12 @@ CONFLICT_MESSAGE = "Dados em conflito com uma máquina já cadastrada (ex.: núm
 
 class MachineService:
     @staticmethod
-    def get(machine_id: UUID) -> Machines:
+    def get(machine_id: UUID, *, actor: Users | None = None) -> Machines:
         try:
-            return Machines.objects.get(id=machine_id)
+            queryset = Machines.objects.all()
+            if actor is not None:
+                queryset = queryset.filter(owner=actor)
+            return queryset.get(id=machine_id)
         except Machines.DoesNotExist as exc:
             raise NotFound("Máquina não encontrada.") from exc
 
@@ -43,10 +47,12 @@ class MachineService:
 
     @staticmethod
     @transaction.atomic
-    def create(data: Mapping[str, Any]) -> Machines:
-        serializer = MachineInputSerializer(data=data)
+    def create(data: Mapping[str, Any], *, actor: Users) -> Machines:
+        serializer = MachineInputSerializer(data=data, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
         now = timezone.now()
+        if serializer.validated_data.get("hour_meter") is not None:
+            serializer.validated_data["hour_meter_updated_at"] = now
         try:
             return serializer.save(
                 id=uuid4(),
@@ -61,20 +67,25 @@ class MachineService:
 
     @staticmethod
     @transaction.atomic
-    def update(machine_id: UUID, data: Mapping[str, Any], *, partial: bool = False) -> Machines:
-        machine = MachineService.get(machine_id)
-        serializer = MachineInputSerializer(machine, data=data, partial=partial)
+    def update(machine_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False) -> Machines:
+        machine = MachineService.get(machine_id, actor=actor)
+        serializer = MachineInputSerializer(machine, data=data, partial=partial, context={"actor": actor})
         serializer.is_valid(raise_exception=True)
+        now = timezone.now()
+        if "hour_meter" in serializer.validated_data and serializer.validated_data["hour_meter"] != machine.hour_meter:
+            serializer.validated_data["hour_meter_updated_at"] = now
         try:
-            return serializer.save(updated_at=timezone.now())
+            return serializer.save(updated_at=now)
         except IntegrityError as exc:
             raise Conflict(CONFLICT_MESSAGE) from exc
 
     @staticmethod
     @transaction.atomic
-    def delete(machine_id: UUID) -> None:
-        machine = MachineService.get(machine_id)
+    def delete(machine_id: UUID, *, actor: Users) -> None:
+        machine = MachineService.get(machine_id, actor=actor)
         enforce_constraints_now()
+        if machine.postings_set.exists():
+            raise Conflict("A máquina possui anúncios vinculados e não pode ser excluída.", code="has_dependents")
         try:
             machine.delete()
         except IntegrityError as exc:

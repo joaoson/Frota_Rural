@@ -5,8 +5,9 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
-from common.request import optional_user
+from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from contracts import signature_evidence
 from contracts.serializer import (
@@ -20,6 +21,8 @@ from contracts.views.contracts import ACCEPTS_RENTAL_ID, CONTRACT_NOT_FOUND, TAG
 
 
 class ContractSignatureOtpView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Solicitar código de assinatura",
@@ -39,12 +42,14 @@ class ContractSignatureOtpView(APIView):
     )
     def post(self, request: Request, pk: UUID) -> Response:
         dispatch = ContractSignatureService.request_otp(
-            pk, request.data, requester=optional_user(request)
+            pk, request.data, requester=authenticated_user(request)
         )
         return Response(ContractOtpOutputSerializer(dispatch).data, status=status.HTTP_200_OK)
 
 
 class ContractSignView(APIView):
+    permission_classes = [IsAuthenticated]
+
     @extend_schema(
         tags=TAGS,
         summary="Assinar contrato digitalmente",
@@ -89,7 +94,7 @@ class ContractSignView(APIView):
         result = ContractSignatureService.sign(
             pk,
             request.data,
-            requester=optional_user(request),
+            requester=authenticated_user(request),
             ip_address=signature_evidence.client_ip(request),
             user_agent=signature_evidence.client_user_agent(request),
         )

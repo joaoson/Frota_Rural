@@ -19,7 +19,6 @@ TAGS = ["Autenticação"]
 
 # O refresh token vive só neste cookie HttpOnly, restrito às rotas de login:
 # o JavaScript do front nunca tem acesso a ele.
-REFRESH_COOKIE_NAME = "refresh_token"
 REFRESH_COOKIE_PATH = "/api/login"
 
 
@@ -65,7 +64,7 @@ class LoginView(PublicAuthView):
             status=status.HTTP_200_OK,
         )
         response.set_cookie(
-            key=REFRESH_COOKIE_NAME,
+            key=settings.AUTH_REFRESH_COOKIE_NAME,
             value=tokens.refresh,
             max_age=int(jwt_settings.REFRESH_TOKEN_LIFETIME.total_seconds()),
             httponly=True,
@@ -91,7 +90,7 @@ class RefreshTokenView(PublicAuthView):
         },
     )
     def post(self, request: Request) -> Response:
-        access = AuthService.refresh(request.COOKIES.get(REFRESH_COOKIE_NAME))
+        access = AuthService.refresh(request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME))
         return Response(
             AccessTokenOutputSerializer({"access": access}).data, status=status.HTTP_200_OK
         )
@@ -101,13 +100,13 @@ class LogoutView(PublicAuthView):
     @extend_schema(
         tags=TAGS,
         summary="Realizar logout",
-        description="Remove o cookie `refresh_token`, encerrando a sessão no cliente. Não exige corpo na requisição.",
+        description="Remove o cookie de renovação configurado para esta aplicação, encerrando a sessão no cliente. Não exige corpo na requisição.",
         request=None,
         responses={204: None},
     )
     def post(self, request: Request) -> Response:
         response = Response(status=status.HTTP_204_NO_CONTENT)
-        response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
+        response.delete_cookie(settings.AUTH_REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)
         return response
 
 
