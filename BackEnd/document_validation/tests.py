@@ -795,6 +795,10 @@ class CnhOcrEndToEndTests(TestCase):
     documento pessoal real.
     """
 
+    def setUp(self):
+        user = make_user(7)
+        self.client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {AccessToken.for_user(user)}"
+
     def post(self, path: Path, content_type: str):
         upload = SimpleUploadedFile(path.name, path.read_bytes(), content_type=content_type)
         return self.client.post("/api/operator-licenses/validate-document", {"file": upload})
