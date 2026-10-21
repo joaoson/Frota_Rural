@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
+import { documentsRouteForRole } from "@/shared/utils/homeRoute";
 import {
   certificationToFormValues,
   certificationToPayload,
@@ -34,7 +35,8 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof CertificationFormValues>> 
 };
 
 const CertificationUpload = () => {
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
+  const documentsRoute = documentsRouteForRole(userRole);
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
@@ -83,7 +85,7 @@ const CertificationUpload = () => {
       toast.success(
         isEditing ? "Certificação atualizada com sucesso." : "Certificação cadastrada com sucesso.",
       );
-      navigate("/dashboard");
+      navigate(documentsRoute);
     } catch (error) {
       if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
@@ -98,7 +100,7 @@ const CertificationUpload = () => {
 
   return (
     <PageShell responsive>
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to={documentsRoute}>Voltar aos Documentos</BackLink>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">

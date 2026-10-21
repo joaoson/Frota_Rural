@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import cnhExample from "@/assets/cnh_example.jpg";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
+import { documentsRouteForRole } from "@/shared/utils/homeRoute";
 import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
 import { CNH_FORM_DEFAULTS, useCnhForm } from "@/features/documents/hooks/useDocumentForms";
 import {
@@ -76,7 +77,8 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
 };
 
 const CNHUpload = () => {
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
+  const documentsRoute = documentsRouteForRole(userRole);
   const navigate = useNavigate();
 
   const today = new Date().toISOString().split("T")[0];
@@ -186,7 +188,7 @@ const CNHUpload = () => {
       });
 
       toast.success(isEditing ? "CNH atualizada com sucesso." : "CNH cadastrada com sucesso.");
-      navigate("/dashboard");
+      navigate(documentsRoute);
     } catch (error) {
       if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
@@ -201,7 +203,7 @@ const CNHUpload = () => {
 
   return (
     <PageShell responsive>
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to={documentsRoute}>Voltar aos Documentos</BackLink>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">

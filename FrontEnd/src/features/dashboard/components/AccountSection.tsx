@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Link } from "react-router";
 
 import { useChangePassword, useUpdateProfile } from "@/features/users/hooks/useUsers";
 import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
@@ -183,15 +182,6 @@ export function AccountSection({
   return (
     <div className="space-y-6">
       <PageHeader title="Minha Conta" subtitle="Edite suas informações de cadastro" compact />
-      {user?.role === "operador" && (
-        <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 space-y-3">
-          <h2 className="font-headline text-xl font-bold">Meus documentos</h2>
-          <div className="flex flex-wrap gap-4">
-            <Link to="/document/cnh" className="font-bold text-primary hover:underline">Enviar ou atualizar CNH</Link>
-            <Link to="/document/certification" className="font-bold text-primary hover:underline">Enviar certificação</Link>
-          </div>
-        </section>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <form
