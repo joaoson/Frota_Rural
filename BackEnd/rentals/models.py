@@ -17,6 +17,16 @@ class Rentals(models.Model):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     total_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    # Cotação congelada na reserva (ADR 0002): a tarifa atual do anúncio não
+    # altera o valor acordado de uma locação existente.
+    hourly_rate_snapshot = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    daily_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    billable_days = models.PositiveIntegerField(blank=True, null=True)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    platform_fee_rate = models.DecimalField(max_digits=5, decimal_places=4, blank=True, null=True)
+    platform_fee = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    priced_at = models.DateTimeField(blank=True, null=True)
+    # Leituras de horímetro: só métricas de uso, nunca entram no preço.
     initial_hour_meter = models.IntegerField(blank=True, null=True)
     final_hour_meter = models.IntegerField(blank=True, null=True)
     status = models.TextField(choices=RentalStatus.choices, blank=True, null=True)

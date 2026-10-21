@@ -2,6 +2,7 @@ import type {
   Contract,
   ContractEvidence,
   Rental,
+  RentalQuote,
   SignatureEvidence,
   SignatureOtp,
 } from "../types/rental";
@@ -9,6 +10,7 @@ import type {
   ContractApi,
   ContractEvidenceApi,
   RentalApi,
+  RentalQuoteApi,
   SignatureEvidenceApi,
   SignatureOtpApi,
 } from "../types/rentalSchemas";
@@ -45,12 +47,29 @@ export function rentalToDomain(dto: RentalApi): Rental {
     startDate: toDate(dto.start_date),
     endDate: toDate(dto.end_date),
     totalPrice: toNumber(dto.total_price),
+    dailyRate: toNumber(dto.daily_rate),
+    billableDays: dto.billable_days ?? null,
+    subtotal: toNumber(dto.subtotal),
+    platformFee: toNumber(dto.platform_fee),
     initialHourMeter: dto.initial_hour_meter ?? null,
     finalHourMeter: dto.final_hour_meter ?? null,
     status: dto.status ?? null,
     acceptedByLessor: Boolean(dto.accepted_by_lessor),
     acceptedByLessee: Boolean(dto.accepted_by_lessee),
     contractStatus: dto.contract_status ?? null,
+  };
+}
+
+export function quoteToDomain(dto: RentalQuoteApi): RentalQuote {
+  return {
+    hourlyRate: Number(dto.tarifa_hora),
+    hoursPerDay: dto.horas_por_diaria,
+    dailyRate: Number(dto.valor_diaria),
+    days: dto.diarias,
+    subtotal: Number(dto.subtotal),
+    feeRate: Number(dto.taxa_percentual),
+    fee: Number(dto.taxa_valor),
+    total: Number(dto.total),
   };
 }
 

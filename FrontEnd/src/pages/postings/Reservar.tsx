@@ -9,7 +9,7 @@ import type { PostingDetail } from "@/features/postings/types/posting";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
-import type { RentalOccupancy, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { RentalOccupancy, RentalQuote, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 import { HttpError } from "@/shared/http/errors";
 
@@ -384,6 +384,7 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [cotacao, setCotacao] = useState<RentalQuote | null>(null);
 
   useEffect(() => {
     const requestedStart = searchParams.get("inicio");
@@ -461,6 +462,19 @@ const Reservar = () => {
       })
       .finally(() => setCarregandoDisponibilidade(false));
   }, [id]);
+
+  // O valor exibido é o do servidor: o mesmo cálculo que a reserva congela.
+  useEffect(() => {
+    setCotacao(null);
+    if (!id || !dataInicio || !dataFim || dataFim < dataInicio) return;
+    let ignored = false;
+    contractStore
+      .quotePosting(id, toRentalDateTime(dataInicio, "start"), toRentalDateTime(dataFim, "end"))
+      .then((value) => { if (!ignored) setCotacao(value); })
+      // Sem a cotação, a prévia local continua visível; o servidor fixa o valor ao reservar.
+      .catch((erro: unknown) => console.error("Erro ao calcular o valor:", erro));
+    return () => { ignored = true; };
+  }, [id, dataInicio, dataFim]);
 
   useEffect(() => {
     const { locacaoId, resultado } = retornoStripe;
@@ -572,16 +586,27 @@ const Reservar = () => {
   }, [retornoStripe, id]);
 
   const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Maquinário";
-  const valorDiaria = anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0;
+  const valorDiaria = createdRental?.dailyRate ?? cotacao?.dailyRate
+    ?? (anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0);
   const maxReservationDays = anuncio?.maxReservationDays ?? null;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
+    // Uma reserva criada tem a cotação congelada; antes dela vale a do servidor.
+    if (createdRental?.totalPrice != null && createdRental.subtotal != null && createdRental.platformFee != null) {
+      return {
+        diarias: createdRental.billableDays ?? calcularDiarias(dataInicio, dataFim),
+        subtotal: createdRental.subtotal, taxa: createdRental.platformFee, total: createdRental.totalPrice,
+      };
+    }
+    if (cotacao && !createdRental) {
+      return { diarias: cotacao.days, subtotal: cotacao.subtotal, taxa: cotacao.fee, total: cotacao.total };
+    }
     const dias = calcularDiarias(dataInicio, dataFim);
     const computedTotal = dias * valorDiaria * (1 + TAXA_PLATAFORMA);
     const reservationTotal = createdRental?.totalPrice ?? computedTotal;
     const sub = reservationTotal / (1 + TAXA_PLATAFORMA);
     return { diarias: dias, subtotal: sub, taxa: reservationTotal - sub, total: reservationTotal };
-  }, [dataInicio, dataFim, valorDiaria, createdRental]);
+  }, [dataInicio, dataFim, valorDiaria, createdRental, cotacao]);
 
   const datasBloqueadas = useMemo(() => {
     const bloqueadas = new Set<string>();

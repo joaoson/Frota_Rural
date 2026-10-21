@@ -33,3 +33,26 @@ class OccupiedPeriodSerializer(serializers.Serializer[Any]):
 
 class OccupancyOutputSerializer(serializers.Serializer[Any]):
     ocupados = OccupiedPeriodSerializer(many=True)
+
+
+class QuoteInputSerializer(serializers.Serializer[Any]):
+    start_date = serializers.DateTimeField(help_text="Início da locação.")
+    end_date = serializers.DateTimeField(help_text="Fim da locação.")
+
+    def validate(self, attrs):
+        if attrs["end_date"] < attrs["start_date"]:
+            raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
+        return attrs
+
+
+class QuoteOutputSerializer(serializers.Serializer[Any]):
+    """Preço por diária fixa (tarifa × 8 h); o horímetro não entra no cálculo."""
+
+    tarifa_hora = serializers.DecimalField(max_digits=10, decimal_places=2)
+    horas_por_diaria = serializers.IntegerField()
+    valor_diaria = serializers.DecimalField(max_digits=10, decimal_places=2)
+    diarias = serializers.IntegerField()
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
+    taxa_percentual = serializers.DecimalField(max_digits=5, decimal_places=4)
+    taxa_valor = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)

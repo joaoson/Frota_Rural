@@ -7,10 +7,10 @@ import { ServerError } from "@/shared/http/errors";
 import { rentalToDomain } from "@/features/contracts/api/contractMapper";
 import { isPaid } from "../types/payment";
 
-const mocks = vi.hoisted(() => ({ createRental: vi.fn(), createCheckout: vi.fn(), getStatus: vi.fn(), findRentalById: vi.fn(), findContractDocument: vi.fn(), listByPosting: vi.fn(), listOccupancyByPosting: vi.fn(), findPosting: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createRental: vi.fn(), createCheckout: vi.fn(), getStatus: vi.fn(), findRentalById: vi.fn(), findContractDocument: vi.fn(), listByPosting: vi.fn(), listOccupancyByPosting: vi.fn(), quotePosting: vi.fn(), findPosting: vi.fn() }));
 vi.mock("@/app/container", () => ({
   paymentStore: { getStatus: mocks.getStatus, createCheckout: mocks.createCheckout },
-  contractStore: { createRental: mocks.createRental, listByPosting: mocks.listByPosting, listOccupancyByPosting: mocks.listOccupancyByPosting, findRentalById: mocks.findRentalById, findContractDocument: mocks.findContractDocument },
+  contractStore: { createRental: mocks.createRental, listByPosting: mocks.listByPosting, listOccupancyByPosting: mocks.listOccupancyByPosting, quotePosting: mocks.quotePosting, findRentalById: mocks.findRentalById, findContractDocument: mocks.findContractDocument },
   postingStore: { findById: mocks.findPosting },
 }));
 vi.mock("@/components/Navbar", () => ({ default: () => null }));
@@ -19,6 +19,7 @@ vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "tenant-a" }) }
 
 beforeEach(() => {
   mocks.listOccupancyByPosting.mockResolvedValue([]);
+  mocks.quotePosting.mockResolvedValue({ hourlyRate: 100, hoursPerDay: 8, dailyRate: 800, days: 1, subtotal: 800, feeRate: 0.05, fee: 40, total: 840 });
   mocks.findPosting.mockResolvedValue({ id: "posting-a", hourlyRate: 100, machineBrand: "John Deere", machineModel: "5075E" });
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
 });
@@ -72,6 +73,23 @@ describe("public occupancy calendar", () => {
     expect(blockedDays.every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
     expect(mocks.listOccupancyByPosting).toHaveBeenCalledWith("posting-a");
     expect(mocks.listByPosting).not.toHaveBeenCalled();
+  });
+});
+
+describe("server price quote", () => {
+  it("shows the server's fixed daily price instead of recomputing it from the listing", async () => {
+    // The listing says R$100/h, but the server quote is authoritative (e.g. the rate changed).
+    mocks.quotePosting.mockResolvedValue({ hourlyRate: 125, hoursPerDay: 8, dailyRate: 1000, days: 1, subtotal: 1000, feeRate: 0.05, fee: 50, total: 1050 });
+    window.history.replaceState({}, "", "/reservar/posting-a");
+    renderBooking();
+    const day = (await screen.findAllByTitle("Selecionar data"))[0];
+    fireEvent.click(day); fireEvent.click(day);
+    expect((await screen.findAllByText(/1\.050,00/)).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/840,00/)).toBeNull();
+    const [postingId, start, end] = mocks.quotePosting.mock.lastCall ?? [];
+    expect(postingId).toBe("posting-a");
+    expect(start).toMatch(/T08:00:00Z$/);
+    expect(end).toMatch(/T18:00:00Z$/);
   });
 });
 

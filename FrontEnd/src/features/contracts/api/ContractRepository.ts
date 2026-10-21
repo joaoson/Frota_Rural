@@ -6,6 +6,7 @@ import type {
   ContractEvidence,
   Rental,
   RentalOccupancy,
+  RentalQuote,
   SignatureOtp,
   SignatureReceipt,
 } from "../types/rental";
@@ -16,12 +17,14 @@ import {
   rentalApiSchema,
   rentalListApiSchema,
   rentalOccupancyApiSchema,
+  rentalQuoteApiSchema,
   signatureEvidenceApiSchema,
   signatureOtpApiSchema,
   type SignatureRole,
 } from "../types/rentalSchemas";
 import {
   contractToDomain,
+  quoteToDomain,
   rentalToDomain,
   toContractEvidence,
   toSignatureEvidence,
@@ -44,6 +47,7 @@ export interface ContractRepository {
   cancelRental(id: string): Promise<Rental>;
   listByPosting(postingId: string): Promise<Rental[]>;
   listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]>;
+  quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
   previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview>;
   createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated>;
@@ -87,6 +91,14 @@ export class HttpContractRepository implements ContractRepository {
     return rentalOccupancyApiSchema.parse(response.data).ocupados.map((item) => ({
       id: item.id, status: item.status, startDate: new Date(item.start_date), endDate: new Date(item.end_date),
     }));
+  }
+
+  async quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote> {
+    const response = await this.http.send<unknown>({
+      method: "GET", path: `postings/${postingId}/cotacao`,
+      query: { start_date: startDate, end_date: endDate },
+    });
+    return quoteToDomain(rentalQuoteApiSchema.parse(response.data));
   }
 
   async findRentalById(id: string): Promise<Rental> {

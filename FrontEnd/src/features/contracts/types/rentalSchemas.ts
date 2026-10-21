@@ -12,6 +12,10 @@ export const rentalApiSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   total_price: z.string().nullish(),
+  daily_rate: z.string().nullish(),
+  billable_days: z.number().int().nullish(),
+  subtotal: z.string().nullish(),
+  platform_fee: z.string().nullish(),
   initial_hour_meter: z.number().nullish(),
   final_hour_meter: z.number().nullish(),
   status: z.string().nullish(),
@@ -30,6 +34,17 @@ export const rentalApiSchema = z.object({
 });
 export type RentalApi = z.infer<typeof rentalApiSchema>;
 export const rentalListApiSchema = z.array(rentalApiSchema);
+export const rentalQuoteApiSchema = z.object({
+  tarifa_hora: z.string(),
+  horas_por_diaria: z.number().int(),
+  valor_diaria: z.string(),
+  diarias: z.number().int(),
+  subtotal: z.string(),
+  taxa_percentual: z.string(),
+  taxa_valor: z.string(),
+  total: z.string(),
+});
+export type RentalQuoteApi = z.infer<typeof rentalQuoteApiSchema>;
 export const rentalOccupancyApiSchema = z.object({
   ocupados: z.array(z.object({
     id: z.string(), start_date: z.iso.datetime({ offset: true }),

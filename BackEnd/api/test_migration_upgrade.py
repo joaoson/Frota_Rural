@@ -111,3 +111,50 @@ class RentalMigrationUpgradeTests(TransactionTestCase):
         self.assertNotIn(("api", "rentalrecurrence"), state.models)
         self.seed_history(state, recurrence=False)
         self.assert_upgraded(recurrence=False)
+
+
+class RentalPriceSnapshotMigrationTests(TransactionTestCase):
+    """rentals.0003 freezes the agreed price of existing rentals (ADR 0002)."""
+
+    def setUp(self):
+        self.latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(self.latest))
+
+    def test_backfill_uses_the_approved_payment_as_the_agreed_amount(self):
+        state = MigrationExecutor(connection).migrate([("rentals", "0002_enum_choices")])
+        apps = state.apps
+        User = apps.get_model("users", "Users")
+        owner, tenant = [User.objects.create(
+            id=uuid.uuid4(), name=role, email=f"{role}@snapshot.test", document=f"snapshot-{role}",
+            role=role, address="Test street", birth_date=date(1990, 1, 1),
+        ) for role in ("locador", "locatario")]
+        machine = apps.get_model("machines", "Machines").objects.create(id=uuid.uuid4(), owner_id=owner.pk)
+        posting = apps.get_model("postings", "Postings").objects.create(
+            id=uuid.uuid4(), machinery_id=machine.pk, hourly_rate="300.00", status="active",
+        )
+        Rental = apps.get_model("rentals", "Rentals")
+        start = timezone.now() + timedelta(days=10)
+        # The audit defect: repriced to R$5.040 while R$3.024 was actually paid.
+        repriced, unpaid = [Rental.objects.create(
+            id=uuid.uuid4(), postings_id=posting.pk, lessee_id=tenant.pk, start_date=start + timedelta(days=offset),
+            end_date=start + timedelta(days=offset + 1), total_price=total, status=status,
+            created_at=timezone.now(),
+        ) for offset, total, status in ((0, "5040.00", "active"), (7, "2520.00", "pending"))]
+        apps.get_model("payments", "Payments").objects.create(
+            id=uuid.uuid4(), rental_id=repriced.pk, session_id="cs_snapshot", amount="3024.00", status="approved",
+        )
+
+        MigrationExecutor(connection).migrate(self.latest)
+        from rentals.models import Rentals
+
+        repriced = Rentals.objects.get(pk=repriced.pk)
+        self.assertEqual(repriced.total_price, Decimal("3024.00"))
+        self.assertEqual(repriced.subtotal, Decimal("2880.00"))
+        self.assertEqual(repriced.platform_fee, Decimal("144.00"))
+        self.assertEqual(repriced.daily_rate, Decimal("1440.00"))
+        self.assertEqual(repriced.hourly_rate_snapshot, Decimal("180.00"))
+        self.assertEqual(repriced.billable_days, 2)
+        self.assertIsNotNone(repriced.priced_at)
+        unpaid = Rentals.objects.get(pk=unpaid.pk)
+        self.assertEqual(unpaid.total_price, Decimal("2520.00"))
+        self.assertEqual(unpaid.hourly_rate_snapshot, Decimal("150.00"))

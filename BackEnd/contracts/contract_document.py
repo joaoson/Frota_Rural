@@ -4,16 +4,13 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 from contracts.models import Contracts
+from payments.pricing import HORAS_POR_DIARIA
 from users.models import Users
 
 DOCUMENT_VERSION = "1.0.0"
 
 # Rótulo fixo do tipo de operação intermediada pela plataforma.
 TIPO_SERVICO = "Locação de Maquinário"
-
-# Jornada diária usada para estimar as horas contratadas. Fonte única da regra:
-# o frontend exibe a mesma estimativa a partir do documento devolvido pela API.
-HORAS_ESTIMADAS_POR_DIA = 8
 
 CPF_DIGITS = 11
 CNPJ_DIGITS = 14
@@ -160,10 +157,13 @@ def build_contract_document(contract: Contracts) -> dict[str, Any]:
     lessor = machine.owner
     lessee = rental.lessee
 
-    dias = _prazo_em_dias(rental.start_date, rental.end_date)
-    horas = HORAS_ESTIMADAS_POR_DIA * dias
+    # Os valores vêm da cotação congelada na reserva (ADR 0002), não da tarifa
+    # atual do anúncio. Locações sem cotação gravada usam o cálculo antigo.
+    tarifa = rental.hourly_rate_snapshot if rental.hourly_rate_snapshot is not None else posting.hourly_rate
+    dias = rental.billable_days or _prazo_em_dias(rental.start_date, rental.end_date)
+    horas = HORAS_POR_DIARIA * dias
     valor_locacao, valor_taxa, percentual_taxa = _composicao_valores(
-        rental.total_price, posting.hourly_rate, horas
+        rental.total_price, tarifa, horas
     )
     municipio, uf = _municipio_uf(lessee)
 
@@ -175,7 +175,7 @@ def build_contract_document(contract: Contracts) -> dict[str, Any]:
             "data_inicio": rental.start_date.strftime("%Y-%m-%d") if rental.start_date else "",
             "data_fim": rental.end_date.strftime("%Y-%m-%d") if rental.end_date else "",
             "prazo_dias": dias,
-            "valor_unitario": _format_brl(posting.hourly_rate),
+            "valor_unitario": _format_brl(tarifa),
             "estimativa_horas": horas,
             "valor_locacao": valor_locacao,
             "valor_taxa_plataforma": valor_taxa,

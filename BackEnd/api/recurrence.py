@@ -14,7 +14,7 @@ from rentals.models import Rentals
 from rentals.serializer import validate_operator_assignment
 from contracts.models import Contracts
 from payments.availability import INTERVALO_DE_LIMPEZA, MINUTOS_DE_RESERVA, tem_conflito
-from payments.pricing import calcular_total
+from payments.pricing import cotar
 from postings.models import Postings
 from users.models import Users
 from notifications.events import notify_rental_event
@@ -110,10 +110,10 @@ def build_preview(source, data, *, lock_operator=False):
                 'detail': 'Uma ocorrência conflita com uma reserva ou com o intervalo de limpeza da máquina.',
                 'occurrence': index + 1, 'start_date': str(day),
             })
-        total = calcular_total(Rentals(postings=posting, start_date=start, end_date=end))
-        if total <= 0 or total > Decimal('99999999.99'):
+        quote = cotar(posting, start, end)
+        if quote.total <= 0 or quote.total > Decimal('99999999.99'):
             raise serializers.ValidationError({'detail': 'O anúncio precisa ter um preço válido para a reserva.'})
-        dates.append({'start_date': start, 'end_date': end, 'total_price': total})
+        dates.append({'start_date': start, 'end_date': end, 'total_price': quote.total, 'quote': quote})
     return {
         'source_rental': source.pk,
         'frequency': data['frequency'],
@@ -127,7 +127,10 @@ def preview_response(preview):
     return {
         **preview,
         'total_price': str(preview['total_price']),
-        'dates': [{**row, 'total_price': str(row['total_price'])} for row in preview['dates']],
+        'dates': [
+            {'start_date': row['start_date'], 'end_date': row['end_date'], 'total_price': str(row['total_price'])}
+            for row in preview['dates']
+        ],
     }
 
 
@@ -165,7 +168,10 @@ def create_recurrence(source_id, user, data):
             id=uuid.uuid4(), postings=posting, lessee=user, operator=source.operator,
             recurrence=series, recurrence_index=index,
             status='pending', created_at=now, updated_at=now,
-            reservation_expires_at=now + timedelta(minutes=MINUTOS_DE_RESERVA), **row,
+            reservation_expires_at=now + timedelta(minutes=MINUTOS_DE_RESERVA),
+            start_date=row['start_date'], end_date=row['end_date'],
+            # Each occurrence keeps its own frozen quote, like a single booking.
+            **row['quote'].snapshot(),
         )
         contract = Contracts.objects.create(
             id=uuid.uuid4(), rental=rental, accepted_by_lessor=False,

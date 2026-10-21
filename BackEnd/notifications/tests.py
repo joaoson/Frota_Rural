@@ -198,7 +198,8 @@ class RentalNotificationTests(NotificationFixtures, TestCase):
         self.assertEqual(Notification.objects.filter(title='Reserva cancelada').count(), 2)
 
     def test_lessor_completion_notifies_both_parties(self):
-        self.source.status = 'active'
+        # Completion requires both signatures (ADR 0002); the fixture contract is signed.
+        self.source.status = 'signed'
         self.source.save(update_fields=['status'])
         self.client.force_authenticate(self.owner)
         response = self.client.patch(f'/api/rentals/{self.source.pk}', {'status': 'completed'}, format='json')

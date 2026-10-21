@@ -6,6 +6,7 @@ import type {
   ContractEvidence,
   Rental,
   RentalOccupancy,
+  RentalQuote,
   SignatureOtp,
   SignatureReceipt,
 } from "../types/rental";
@@ -55,6 +56,11 @@ export class ContractStore {
 
   listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]> {
     return this.repository.listOccupancyByPosting(postingId);
+  }
+
+  /** Valor do servidor para o período; é o mesmo que a reserva congela. */
+  quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote> {
+    return this.repository.quotePosting(postingId, startDate, endDate);
   }
 
   findRentalById(id: string): Promise<Rental> {

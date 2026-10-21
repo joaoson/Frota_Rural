@@ -14,7 +14,7 @@ from contracts.models import Contracts
 from contracts.services import ContractService
 from notifications.events import notify_rental_event
 from payments.availability import MINUTOS_DE_RESERVA, tem_conflito
-from payments.pricing import calcular_total
+from payments.pricing import Cotacao, cotar
 from postings.models import Postings
 from rentals.enums import RentalStatus
 from rentals.models import Rentals
@@ -40,11 +40,11 @@ class RentalService:
             raise NotFound("Locação não encontrada.") from exc
 
     @staticmethod
-    def _price(rental: Rentals) -> Decimal:
-        total = calcular_total(rental)
-        if not total.is_finite() or total <= 0 or total > Decimal("99999999.99"):
+    def quote(posting: Postings, start_date, end_date) -> Cotacao:
+        quote = cotar(posting, start_date, end_date)
+        if not quote.total.is_finite() or quote.total <= 0 or quote.total > Decimal("99999999.99"):
             raise ValidationError("O anúncio precisa ter um preço válido para a reserva.")
-        return total
+        return quote
 
     @staticmethod
     @transaction.atomic
@@ -64,10 +64,10 @@ class RentalService:
         serializer.validate(validated)
         validated["operator"] = validate_operator_assignment(validated.get("operator"), user, lock=True)
         RentalService._ensure_period_available(posting, validated["start_date"], validated["end_date"])
-        total = RentalService._price(Rentals(**validated))
+        quote = RentalService.quote(posting, validated["start_date"], validated["end_date"])
         now = timezone.now()
         rental = serializer.save(
-            id=uuid4(), status=RentalStatus.PENDING, total_price=total,
+            id=uuid4(), status=RentalStatus.PENDING, **quote.snapshot(),
             created_at=now, updated_at=now,
             reservation_expires_at=now + timedelta(minutes=MINUTOS_DE_RESERVA),
         )
@@ -91,9 +91,11 @@ class RentalService:
         next_status = data.get("status", rental.status)
         if next_status != rental.status:
             cancellable = rental.status == RentalStatus.PENDING and not rental.payments.exclude(status="expired").exists()
-            completable = (user.pk == posting.machinery.owner_id
-                           and rental.status in (RentalStatus.ACTIVE, RentalStatus.SIGNED)
-                           and rental.end_date <= timezone.now())
+            is_owner = user.pk == posting.machinery.owner_id
+            if next_status == RentalStatus.COMPLETED and is_owner and rental.status == RentalStatus.ACTIVE:
+                raise Conflict("A locação só pode ser concluída depois que as duas partes assinarem o contrato.")
+            # Readings are usage metrics only: completion never depends on them.
+            completable = is_owner and rental.status == RentalStatus.SIGNED and rental.end_date <= timezone.now()
             if not ((next_status == RentalStatus.CANCELLED and cancellable)
                     or (next_status == RentalStatus.COMPLETED and completable)):
                 raise Conflict("Esta alteração exige o fluxo de pagamento ou assinatura correspondente.")
@@ -116,13 +118,16 @@ class RentalService:
         changed = any(getattr(rental, field) != value for field, value in validated.items())
         save_fields = {"updated_at": timezone.now()}
         # A status/meter-only change remains possible after an unpaid hold expires.
-        if any(field in validated for field in ("start_date", "end_date", "postings")):
+        if any(field in validated for field in ("start_date", "end_date")):
             start = validated.get("start_date", rental.start_date)
             end = validated.get("end_date", rental.end_date)
             RentalService._ensure_period_available(posting, start, end, ignore_rental_id=rental.pk)
-            total = RentalService._price(Rentals(postings=posting, start_date=start, end_date=end))
-            save_fields["total_price"] = total
-            changed = changed or rental.total_price != total
+            # Only an unpaid pending booking reaches this point (checked above).
+            # The agreed price changes only when the tenant picks other dates.
+            if (start, end) != (rental.start_date, rental.end_date):
+                quote = RentalService.quote(posting, start, end)
+                save_fields.update(quote.snapshot())
+                changed = changed or rental.total_price != quote.total
         rental = serializer.save(**save_fields)
         if previous_status != rental.status and rental.status == RentalStatus.CANCELLED:
             Contracts.objects.filter(rental=rental).update(status="cancelled")

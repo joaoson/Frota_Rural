@@ -15,6 +15,7 @@ from postings.models import Postings
 from users.models import Users
 
 from .availability import tem_conflito
+from .pricing import cotar
 from .models import Payments
 from payments.services import PaymentService
 import stripe
@@ -91,6 +92,39 @@ class CheckoutReservationTests(TestCase):
         kwargs = provider.return_value.checkout.Session.create.call_args.kwargs
         self.assertEqual(kwargs['line_items'][0]['price_data']['unit_amount'], 302400)
         self.assertIn('expires_at', kwargs)
+
+    def freeze_quote(self, *, hold_active):
+        for field, value in cotar(Postings(hourly_rate='180.00'), self.rental.start_date, self.rental.end_date).snapshot().items():
+            setattr(self.rental, field, value)
+        self.rental.reservation_expires_at = timezone.now() + (timedelta(minutes=20) if hold_active else -timedelta(hours=1))
+        self.rental.save()
+        self.posting.hourly_rate = '300.00'
+        self.posting.save(update_fields=['hourly_rate'])
+
+    @patch('payments.services._stripe')
+    def test_checkout_charges_the_frozen_quote_while_the_hold_lasts(self, provider):
+        self.freeze_quote(hold_active=True)
+        provider.return_value.checkout.Session.create.return_value = self.session
+        response = self.client.post(self.checkout_url)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['amount'], '3024.00')
+        kwargs = provider.return_value.checkout.Session.create.call_args.kwargs
+        self.assertEqual(kwargs['line_items'][0]['price_data']['unit_amount'], 302400)
+        self.rental.refresh_from_db()
+        self.assertEqual(self.rental.hourly_rate_snapshot, Decimal('180.00'))
+        self.assertEqual(Payments.objects.get().amount, Decimal('3024.00'))
+
+    @patch('payments.services._stripe')
+    def test_lapsed_hold_requotes_with_the_current_listing_rate(self, provider):
+        self.freeze_quote(hold_active=False)
+        provider.return_value.checkout.Session.create.return_value = self.session
+        response = self.client.post(self.checkout_url)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['amount'], '5040.00')
+        self.rental.refresh_from_db()
+        self.assertEqual(self.rental.total_price, Decimal('5040.00'))
+        self.assertEqual(self.rental.hourly_rate_snapshot, Decimal('300.00'))
+        self.assertEqual(self.rental.daily_rate, Decimal('2400.00'))
 
     @patch('payments.services._stripe')
     def test_checkout_retry_reuses_open_session(self, provider):

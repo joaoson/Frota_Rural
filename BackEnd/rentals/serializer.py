@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from contracts.models import Contracts
+from machines.serializer import HOUR_METER_MAX
 from rentals.models import Rentals
 from users.enums import UserRole
 from users.models import Users
@@ -39,6 +40,7 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
 
     Aqui fica só a validação que depende do próprio payload. A checagem de
     conflito com outras reservas consulta o banco e mora no `RentalService`.
+    O valor não é gravável: a cotação é calculada e congelada pelo servidor.
     """
 
     class Meta:
@@ -49,14 +51,41 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             "operator",
             "start_date",
             "end_date",
-            "total_price",
             "initial_hour_meter",
             "final_hour_meter",
             "status",
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance is not None:
+            # Os vínculos não mudam após a criação (o RentalService recusa um valor
+            # diferente). Repetir o mesmo valor não pode valer como pedido de
+            # alteração, nem disparar novo cálculo de preço.
+            for field in ("postings", "lessee"):
+                self.fields.pop(field)
+
+    @staticmethod
+    def _validate_hour_meter(value: int | None) -> int | None:
+        if value is not None and not 0 <= value <= HOUR_METER_MAX:
+            raise serializers.ValidationError(f"A leitura do horímetro deve estar entre 0 e {HOUR_METER_MAX} horas.")
+        return value
+
+    def validate_initial_hour_meter(self, value: int | None) -> int | None:
+        return self._validate_hour_meter(value)
+
+    def validate_final_hour_meter(self, value: int | None) -> int | None:
+        return self._validate_hour_meter(value)
+
     def validate(self, attrs):
         """Keep a day free before and after each rental for machine turnaround."""
+        initial = attrs.get("initial_hour_meter", getattr(self.instance, "initial_hour_meter", None))
+        final = attrs.get("final_hour_meter", getattr(self.instance, "final_hour_meter", None))
+        if initial is not None and final is not None and final < initial:
+            raise serializers.ValidationError(
+                {"final_hour_meter": "A leitura final do horímetro não pode ser menor que a inicial."}
+            )
+
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
         posting = attrs.get("postings", getattr(self.instance, "postings", None))
@@ -66,7 +95,7 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
         if end_date < start_date:
             raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
 
-        if self.instance and not any(field in attrs for field in ('start_date', 'end_date', 'postings')):
+        if self.instance and not any(field in attrs for field in ('start_date', 'end_date')):
             # Cancellation and meter updates must still work if an expired hold
             # has since been taken by another renter.
             return attrs
@@ -123,6 +152,12 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "start_date",
             "end_date",
             "total_price",
+            "hourly_rate_snapshot",
+            "daily_rate",
+            "billable_days",
+            "subtotal",
+            "platform_fee_rate",
+            "platform_fee",
             "initial_hour_meter",
             "final_hour_meter",
             "status",

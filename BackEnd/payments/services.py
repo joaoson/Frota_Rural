@@ -13,9 +13,10 @@ from rest_framework.exceptions import NotFound, ValidationError
 from common.exceptions import BadGateway, Conflict, ServiceUnavailable
 from contracts.models import Contracts
 from notifications.events import notify_rental_event
-from payments.availability import MINUTOS_DE_RESERVA, periodos_ocupados, tem_conflito
+from payments.availability import MINUTOS_DE_RESERVA, periodos_ocupados, reserva_retida, tem_conflito
 from payments.models import Payments
-from payments.pricing import calcular_total
+from payments.serializer import QuoteInputSerializer
+from payments.pricing import Cotacao, cotar
 from postings.models import Postings
 from rentals.models import Rentals
 
@@ -70,7 +71,12 @@ class PaymentService:
             raise Conflict("O período não atende mais à disponibilidade do anúncio.")
         if tem_conflito(rental.postings_id, rental.start_date, rental.end_date, ignorar=rental.id):
             raise Conflict("O período escolhido já está reservado.", code="period_unavailable")
-        total = calcular_total(rental)
+        # The quote frozen at booking is the agreed price while the hold lasts.
+        # A lapsed hold had to be revalidated above, so it takes today's rate.
+        quote = None
+        if rental.priced_at is None or rental.total_price is None or not reserva_retida(rental):
+            quote = cotar(posting, rental.start_date, rental.end_date)
+        total = quote.total if quote else Decimal(rental.total_price)
         if not total.is_finite() or total <= 0 or total > Decimal("99999999.99"):
             raise ValidationError("Não foi possível calcular o valor da locação.")
         machine = posting.machinery
@@ -105,7 +111,9 @@ class PaymentService:
             )
         except stripe.StripeError as exc:
             raise BadGateway("Não foi possível iniciar o pagamento.") from exc
-        PaymentService._register_checkout(rental, session_id=session.id, total=total, expires_at=session.expires_at)
+        PaymentService._register_checkout(
+            rental, session_id=session.id, total=total, expires_at=session.expires_at, quote=quote,
+        )
         return CheckoutSession(url=str(session.url), amount=total)
 
     @staticmethod
@@ -120,6 +128,16 @@ class PaymentService:
     @staticmethod
     def list_occupied_periods(posting_id: UUID):
         return periodos_ocupados(posting_id)
+
+    @staticmethod
+    def quote(posting_id: UUID, data) -> Cotacao:
+        """Mesma cotação que a reserva congela, para a tela exibir o valor do servidor."""
+        serializer = QuoteInputSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        posting = Postings.objects.filter(pk=posting_id).first()
+        if posting is None:
+            raise NotFound("Anúncio não encontrado.")
+        return cotar(posting, serializer.validated_data["start_date"], serializer.validated_data["end_date"])
 
     @staticmethod
     def handle_webhook(payload: bytes, signature: str) -> None:
@@ -145,13 +163,15 @@ class PaymentService:
             PaymentService._expire(session_id)
 
     @staticmethod
-    def _register_checkout(rental, *, session_id, total, expires_at):
+    def _register_checkout(rental, *, session_id, total, expires_at, quote=None):
         payment = Payments.objects.create(rental=rental, session_id=session_id, amount=total)
-        rental.total_price = total
+        snapshot = quote.snapshot() if quote else {"total_price": total}
+        for field, value in snapshot.items():
+            setattr(rental, field, value)
         rental.status = "awaiting_payment"
         rental.reservation_expires_at = datetime.fromtimestamp(expires_at, datetime_timezone.utc)
         rental.updated_at = timezone.now()
-        rental.save(update_fields=["total_price", "status", "reservation_expires_at", "updated_at"])
+        rental.save(update_fields=[*snapshot, "status", "reservation_expires_at", "updated_at"])
         notify_rental_event(rental, "payment_pending", event_key=f"payment:{payment.pk}:pending")
 
     @staticmethod

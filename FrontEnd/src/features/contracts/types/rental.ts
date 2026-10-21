@@ -19,12 +19,29 @@ export interface Rental {
   startDate: Date | null;
   endDate: Date | null;
   totalPrice: number | null;
+  /** Cotação congelada na reserva; o horímetro não altera o valor. */
+  dailyRate?: number | null;
+  billableDays?: number | null;
+  subtotal?: number | null;
+  platformFee?: number | null;
   initialHourMeter: number | null;
   finalHourMeter: number | null;
   status: string | null;
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
   contractStatus: string | null;
+}
+
+/** Preço calculado no servidor: diária fixa (tarifa × 8 h) por dia de calendário. */
+export interface RentalQuote {
+  hourlyRate: number;
+  hoursPerDay: number;
+  dailyRate: number;
+  days: number;
+  subtotal: number;
+  feeRate: number;
+  fee: number;
+  total: number;
 }
 
 /** Visão pública da disponibilidade, sem dados pessoais da locação. */
