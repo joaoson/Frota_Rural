@@ -1,4 +1,5 @@
 from users.views.operators import OperatorDetailView, OperatorListView
+from users.views.photos import UserPhotoUploadView
 from users.views.users import (
     UserByEmailView,
     UserChangePasswordView,
@@ -15,4 +16,5 @@ __all__ = [
     "UserCreateView",
     "UserDetailView",
     "UserListView",
+    "UserPhotoUploadView",
 ]

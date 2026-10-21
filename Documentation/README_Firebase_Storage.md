@@ -1,6 +1,6 @@
-# Guia de Configuração: Firebase Storage (fotos dos anúncios)
+# Guia de Configuração: Firebase Storage (fotos dos anúncios e perfis)
 
-As fotos dos anúncios são enviadas pelo navegador ao backend Django, que as repassa
+As fotos dos anúncios e de perfil são enviadas pelo navegador ao backend Django, que as repassa
 ao **Firebase Storage** usando o SDK Admin. O banco guarda apenas o **caminho** do
 objeto (ex.: `postings/<posting_id>/<uuid>.jpg`) — a URL pública é montada em tempo
 de resposta pelos serializers.
@@ -40,7 +40,21 @@ Ainda em **Storage**, o nome do bucket aparece no topo da página, no formato
 
 ## 4. Definir as regras de segurança
 
-Em **Storage → Regras**, cole o conteúdo abaixo e publique:
+Em **Storage → Regras**, publique o arquivo versionado
+[`Devops/firebase/storage.rules`](../Devops/firebase/storage.rules), reproduzido abaixo.
+Ele inclui os dois prefixos: `postings/` e `profiles/`. Publicar somente a regra dos
+anúncios permite salvar a foto de perfil pelo backend, mas a leitura pelo navegador
+retorna `403` e o avatar volta às iniciais.
+
+Com a Firebase CLI autenticada, também é possível publicar a configuração versionada:
+
+```bash
+cd Devops/firebase
+firebase deploy --only storage --project <id-do-projeto>
+```
+
+Revise as regras existentes antes de publicar em outro projeto para preservar
+eventuais prefixos adicionais.
 
 ```
 rules_version = '2';
@@ -51,6 +65,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;  // escrita só pelo backend, que ignora estas regras
     }
+    // Fotos de perfil usam o mesmo acesso público das fotos de anúncio.
+    match /profiles/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
     match /{allPaths=**} {
       allow read, write: if false;
     }
@@ -60,7 +79,7 @@ service firebase.storage {
 
 O SDK Admin usado pelo Django **não passa por estas regras** — ele autentica com a
 service account e tem acesso total. As regras valem apenas para acesso direto do
-navegador, que aqui é somente leitura das fotos de anúncio.
+navegador, que aqui é somente leitura das fotos de anúncio e de perfil.
 
 ## 5. Gerar a chave da service account
 
@@ -103,6 +122,28 @@ python manage.py runserver
 4. Confirme no console do Firebase, em **Storage → Arquivos**, que os objetos foram
    criados sob `postings/<posting_id>/`.
 
+## Fotos de perfil
+
+Aplique a migration `users.0006_users_profile_photo` antes de usar o recurso.
+Em **Dashboard → Minha Conta → Alterar foto**, selecione JPG, PNG ou WEBP de até
+5 MB. O envio é imediato e atualiza a foto da conta, a barra lateral e a navbar.
+Contas sem foto, ou cuja imagem não carregue, continuam mostrando as iniciais.
+
+`POST /api/users/<uuid>/photo` recebe o campo multipart `image` e retorna o usuário
+com `profile_photo_url`. Somente o titular autenticado pode enviar sua foto.
+O banco guarda `users.profile_photo = "profiles/<user_id>/<uuid>.<ext>"`; o
+serializer monta a URL com o bucket configurado, como nas fotos de anúncio.
+O PATCH de perfil não aceita caminhos ou URLs de imagem fornecidos pelo cliente.
+
+O upload ocorre fora da transação de banco. A substituição usa um bloqueio na
+linha do usuário e remove a foto antiga somente depois do commit. Se a gravação
+falhar, tenta remover o novo objeto; falhas de limpeza são registradas em log.
+Publique também a regra de leitura de `profiles/` acima para exibir as fotos.
+
+O frontend segue componente → hook → store → repository → cliente HTTP injetado.
+O store atualiza o cache do usuário após o upload; formulários de dados pessoais
+permanecem independentes do envio da foto.
+
 ## Solução de problemas
 
 | Sintoma | Causa provável |
@@ -117,7 +158,12 @@ python manage.py runserver
 | Item | Local |
 | --- | --- |
 | Cliente do Storage | `BackEnd/djangoapi/firebase_storage.py` |
-| Endpoint de upload | `POST /api/postings/<uuid>/photos/` (`BackEnd/postings/views.py`) |
+| Endpoint de upload | `POST /api/postings/<uuid>/photos` (`BackEnd/postings/views/photos.py`) |
 | Montagem da URL pública | `BackEnd/postings/serializer.py` |
 | Testes | `BackEnd/postings/tests.py` |
-| Envio pelo frontend | `FrontEnd/src/services/PostingService/PostingService.ts` |
+| Envio pelo frontend | `FrontEnd/src/features/postings/api/PostingRepository.ts` |
+| Validação compartilhada de imagens | `BackEnd/common/images.py` |
+| Upload de perfil | `BackEnd/users/views/photos.py` → `BackEnd/users/services.py` |
+| URL de perfil | `BackEnd/users/serializer.py` |
+| Frontend de perfil | `FrontEnd/src/features/users/{components,hooks,api,types}/` |
+| Testes de perfil | `BackEnd/users/test_photos.py`, `FrontEnd/src/features/users/tests/` |

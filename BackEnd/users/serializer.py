@@ -3,6 +3,7 @@ from typing import Any
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from djangoapi import firebase_storage
 from users.enums import UserRole
 from users.models import Users
 
@@ -66,9 +67,9 @@ class UserUpdateInputSerializer(serializers.ModelSerializer[Users]):
     email = serializers.EmailField(max_length=255, validators=[UniqueValidator(queryset=Users.objects.all(), message=EMAIL_IN_USE_MESSAGE)])
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        protected = {"role", "status", "employer", "password", "last_login"} & set(self.initial_data)
+        protected = {"role", "status", "employer", "password", "last_login", "profile_photo", "profile_photo_url"} & set(self.initial_data)
         if protected:
-            raise serializers.ValidationError({field: "Este campo não pode ser alterado pelo perfil." for field in protected})
+            raise serializers.ValidationError(dict.fromkeys(protected, "Este campo não pode ser alterado pelo perfil."))
         return attrs
 
     class Meta:
@@ -109,6 +110,11 @@ class OperatorUpdateInputSerializer(serializers.ModelSerializer[Users]):
 
 
 class UserOutputSerializer(serializers.ModelSerializer[Users]):
+    profile_photo_url = serializers.SerializerMethodField()
+
+    def get_profile_photo_url(self, obj: Users) -> str | None:
+        return firebase_storage.public_url(obj.profile_photo)
+
     class Meta:
         model = Users
         fields = [
@@ -117,6 +123,7 @@ class UserOutputSerializer(serializers.ModelSerializer[Users]):
             "document",
             "email",
             "phone",
+            "profile_photo_url",
             "role",
             "address",
             "city",

@@ -11,3 +11,18 @@ Create one 2048x2048 PNG with genuinely transparent background (alpha), consisti
 Character identity: oversized rounded caramel-tan head, recognizably capybara broad boxy rounded muzzle with two tiny nostrils, tiny round ears, huge soulful glossy dark brown eyes, short velvety fur, plump little body, stubby legs and paws. Deep forest green cotton work overalls (#0A3701), golden amber neckerchief (#FEB734), bare rounded paws. NO hat. Sweet, grounded, warm, Brazilian countryside companion. Sophisticated plush-like sculpting, tactile fabric seams, warm subsurface scattering, soft cinematic studio key light and gentle rim light. Not flat vector, not clay blobs, not photoreal animal.
 Exact grid: upper-left = welcoming, standing front three-quarter with eyes open and one paw raised to greet; upper-right = delighted celebration, both paws raised and joyful closed crescent eyes; lower-left = curious, leaning slightly and holding one paw above eyes as if looking into distance; lower-right = reassuring wink with tiny paw thumbs-up.
 In EVERY cell: full body and all paws fit entirely within the central 80% of the cell with generous clear transparent margins. Same camera, same scale, same outfit and colors, consistent character model, feet baseline at 90% of each cell, head at 10%. Neutral camera with slight elevated angle. No background, no floor plane, no props, no words, no watermark. True isolated transparent renders for CSS sprite animation.
+
+## Chat profile portrait
+
+`capivara-profile.jpg` is the front-facing head-and-shoulders avatar used by the
+homepage chat launcher and header. Generated with the Higgsfield plugin on
+2026-10-15 using GPT Image 2.5, with `capivara-3d-poses.png` as the identity
+reference. Generation ID: `edf5f38a-a261-4896-a133-7229c44763bc`.
+The square output was resized to a local 512 × 512 JPEG for delivery; circular
+cropping is applied by CSS. The hero continues to use the existing pose sheet.
+
+Portrait brief: one centered, eye-level capybara facing directly forward;
+caramel fur, large brown eyes, broad rounded muzzle, small ears, a gentle smile,
+green overall straps and amber neckerchief. Head and shoulders only, no hat or
+hands. Soft 3D studio lighting, solid cream background, no text or border,
+with ears and eyes safely inside a circular crop and a readable face at 44 px.

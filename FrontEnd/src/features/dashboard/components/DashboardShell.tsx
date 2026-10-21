@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 import NotificationPopover from "@/components/NotificationPopover";
 import ThemeToggle from "@/components/ThemeToggle";
+import { UserAvatar } from "@/shared/components/UserAvatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ interface DashboardShellProps<Tab extends string> {
   onLogout: () => void;
   logoutTab: Tab;
   initials: string;
+  profilePhotoUrl?: string | null;
   accountName: React.ReactNode;
   accountRole: React.ReactNode;
   avatarClassName?: string;
@@ -42,6 +44,7 @@ export function DashboardShell<Tab extends string>({
   onLogout,
   logoutTab,
   initials,
+  profilePhotoUrl,
   accountName,
   accountRole,
   avatarClassName = "bg-primary-container text-on-primary",
@@ -123,11 +126,11 @@ export function DashboardShell<Tab extends string>({
 
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-headline font-bold text-sm ${avatarClassName}`}
-            >
-              {initials}
-            </div>
+            <UserAvatar
+              photoUrl={profilePhotoUrl}
+              initials={initials}
+              className={`w-10 h-10 text-sm ${avatarClassName}`}
+            />
             <div>
               <div className="font-bold text-sm text-on-surface">{accountName}</div>
               <div className="text-[11px] text-on-surface-variant">{accountRole}</div>
@@ -154,7 +157,7 @@ export function DashboardShell<Tab extends string>({
           </div>
         </header>
 
-        <div className="p-8 max-w-[1200px]">{children}</div>
+        <div className="max-w-[1200px] p-4 sm:p-6 xl:p-8">{children}</div>
       </main>
     </div>
   );

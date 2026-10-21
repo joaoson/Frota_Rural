@@ -7,13 +7,14 @@ import type { User } from '@/features/users/types/user';
 
 const mocks = vi.hoisted(() => ({ update: vi.fn(), password: vi.fn(), lookup: vi.fn(), list: vi.fn(), updateOperator: vi.fn(), toastError: vi.fn() }));
 vi.mock('@/features/users/hooks/useUsers', () => ({
+  useUploadProfilePhoto: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProfile: () => ({ mutateAsync: mocks.update, isPending: false }),
   useChangePassword: () => ({ mutateAsync: mocks.password, isPending: false }),
 }));
 vi.mock('@/shared/hooks/useCepLookup', () => ({ useCepLookup: () => ({ lookup: mocks.lookup }) }));
 vi.mock('@/app/container', () => ({ operatorStore: { list: mocks.list, update: mocks.updateOperator }, viaCepClient: { findByCep: mocks.lookup } }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: mocks.toastError } }));
-const user: User = { id: 'user-1', name: 'Ana Silva', email: 'ana@example.test', document: '52998224725', phone: '+5511999999999', address: 'Rua inicial', city: 'São Paulo', state: 'SP', cep: '01001000', role: 'locador', birthDate: '1990-01-01', status: 'active', createdAt: null };
+const user: User = { id: 'user-1', name: 'Ana Silva', email: 'ana@example.test', document: '52998224725', phone: '+5511999999999', address: 'Rua inicial', city: 'São Paulo', state: 'SP', cep: '01001000', role: 'locador', birthDate: '1990-01-01', status: 'active', createdAt: null, profilePhotoUrl: null };
 const address = (city: string) => ({ city, state: 'SP', street: `Rua ${city}`, neighborhood: '', cep: '01001000', complement: '' });
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { resolve, promise }; }
 beforeEach(() => { vi.resetAllMocks(); mocks.list.mockResolvedValue([]); });
@@ -45,7 +46,7 @@ describe('account and operator actions', () => {
     mocks.update.mockRejectedValueOnce(new BadRequestError('Dados inválidos', undefined, { fieldErrors: { document: ['CPF inválido.'] } }));
     fireEvent.submit(form);
     await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('CPF inválido.'));
-    expect(screen.queryByText('Alterar foto')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Alterar foto' }).getAttribute('type')).toBe('button');
   });
   it('shows new-password validation instead of incorrectly blaming the current password', async () => {
     mocks.password.mockRejectedValueOnce(new BadRequestError('Dados inválidos', undefined, { fieldErrors: { new_password: ['A senha é muito comum.'] } }));

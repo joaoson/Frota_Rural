@@ -1,5 +1,6 @@
 import uuid
 from datetime import date
+from typing import TypedDict
 
 from django.test import Client, TestCase
 from rest_framework_simplejwt.tokens import AccessToken
@@ -7,7 +8,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from users.models import Users
 
 
-def make_user(role, name, seq):
+def make_user(role: str, name: str, seq: int) -> Users:
     return Users.objects.create(
         id=uuid.uuid4(),
         name=name,
@@ -20,7 +21,11 @@ def make_user(role, name, seq):
     )
 
 
-def auth(user):
+class AuthHeaders(TypedDict):
+    HTTP_AUTHORIZATION: str
+
+
+def auth(user: Users) -> AuthHeaders:
     return {"HTTP_AUTHORIZATION": f"Bearer {AccessToken.for_user(user)}"}
 
 

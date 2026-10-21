@@ -1,6 +1,7 @@
+import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/useAuth";
@@ -46,7 +47,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import DashboardPagination from "@/components/DashboardPagination";
 import DashboardSearchBar from "@/components/DashboardSearchBar";
 import MaterialIcon from "@/components/MaterialIcon";
 import EditEquipamentoModal, {
@@ -84,6 +84,8 @@ const DashboardLocador = () => {
   const { userId, logout } = useAuth();
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hash } = useLocation();
+  const focusedRentalId = hash.startsWith("#locacao-") ? hash.slice("#locacao-".length) : undefined;
   const requestedTab = searchParams.get("tab");
   const tab: Tab = sidebarItems.find((item) => item.tab === requestedTab)?.tab ?? "dashboard";
   const setTab = (next: Tab) => setSearchParams({ tab: next });
@@ -235,23 +237,6 @@ const DashboardLocador = () => {
   const visibleActiveRentals = filteredRentals.filter((rental) => activeRentals.some((active) => active.id === rental.id));
   const visiblePastRentals = filteredRentals.filter((rental) => pastRentals.some((past) => past.id === rental.id));
 
-  const [frotaPage, setFrotaPage] = useState(1);
-  const [anunciosPage, setAnunciosPage] = useState(1);
-  const frotaPerPage = 2;
-  const anunciosPerPage = 2;
-  const frotaTotalPages = Math.max(1, Math.ceil(filteredMachines.length / frotaPerPage));
-  const currentFrotaPage = Math.min(frotaPage, frotaTotalPages);
-  const anunciosTotalPages = Math.max(1, Math.ceil(filteredPostings.length / anunciosPerPage));
-  const currentAnunciosPage = Math.min(anunciosPage, anunciosTotalPages);
-  const paginatedFrota = filteredMachines.slice(
-    (currentFrotaPage - 1) * frotaPerPage,
-    currentFrotaPage * frotaPerPage,
-  );
-  const paginatedAnuncios = filteredPostings.slice(
-    (currentAnunciosPage - 1) * anunciosPerPage,
-    currentAnunciosPage * anunciosPerPage,
-  );
-
   const submitReview = async (rental: (typeof rentals)[number]) => {
     if (!userId || !rental.lesseeId || hasReviewedRental(givenReviews, rental.id)) return;
     if (!reviewComment.trim()) {
@@ -278,10 +263,11 @@ const DashboardLocador = () => {
     }
   };
 
-  const renderRentalCard = (r: (typeof rentals)[number]) => (
+  const renderRentalCard = (r: (typeof rentals)[number], view: DashboardView) => (
     <RentalCard
       key={r.id}
       rental={r}
+      view={view}
       counterparty={{
         label: "Locatário",
         name: r.lessee,
@@ -321,6 +307,7 @@ const DashboardLocador = () => {
       onLogout={logout}
       logoutTab="sair"
       initials={user ? getInitials(user.name) : "…"}
+      profilePhotoUrl={user?.profilePhotoUrl}
       accountName={user?.name ?? "…"}
       accountRole={<span className="capitalize">{user?.role ?? "…"}</span>}
     >
@@ -370,7 +357,7 @@ const DashboardLocador = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
               {
                 label: "LOCAÇÕES EM ABERTO",
@@ -607,17 +594,17 @@ const DashboardLocador = () => {
                 Ver todas <MaterialIcon icon="arrow_forward" size={14} />
               </button>
             </div>
-            <div className="space-y-3">
-              {rentals.map((r) => {
+            <DashboardCollection label="Minhas locações" items={rentals} defaultView="list"
+              renderItem={(r, view) => {
                 const badge = rentalStatusBadge(r.status);
                 return (
                   <Link
                     to={`/dashboard?tab=reservas#locacao-${r.id}`}
                     key={r.id}
-                    className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow"
+                    className={`bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-4 sm:p-5 flex flex-col gap-4 ${view === "list" ? "@xl/collection:flex-row @xl/collection:items-center" : ""} justify-between hover:shadow-md transition-shadow`}
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center">
+                      <div className="w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-surface-container-high flex items-center justify-center">
                         <MaterialIcon
                           icon="agriculture"
                           className="text-primary"
@@ -643,8 +630,8 @@ const DashboardLocador = () => {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
+              }}
+            />
           </div>
         </div>
       )}
@@ -652,7 +639,7 @@ const DashboardLocador = () => {
       {/* Minha Frota */}
       {tab === "frota" && (
         <div className="space-y-6">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-wrap justify-between items-start gap-4">
             <div>
               <h1 className="font-headline text-3xl font-bold text-primary">
                 Minha Frota
@@ -672,21 +659,21 @@ const DashboardLocador = () => {
 
           <DashboardSearchBar
             searchValue={searchText}
-            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); }}
             yearValue={year}
-            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); }}
             years={yearOptions(machines.map((machine) => machine.year))}
             searchPlaceholder="Buscar por marca, modelo ou registro..."
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {paginatedFrota.map((m) => (
+          <DashboardCollection label="Minha frota" items={filteredMachines} resetKey={JSON.stringify([searchText, year])}
+            renderItem={(m) => (
               <div
                 key={m.id}
-                className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-start justify-between group hover:shadow-xl transition-all duration-300 shadow-sm"
+                className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 flex flex-wrap items-start justify-between gap-4 group hover:shadow-xl transition-all duration-300 shadow-sm"
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <div className="w-14 h-14 shrink-0 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                     <MaterialIcon
                       icon="agriculture"
                       className="text-primary"
@@ -718,14 +705,10 @@ const DashboardLocador = () => {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-          {filteredMachines.length === 0 && !machinesQuery.isLoading && !machinesQuery.isError && <p role="status">Nenhum equipamento encontrado.</p>}
-          <DashboardPagination
-            currentPage={currentFrotaPage}
-            totalPages={frotaTotalPages}
-            onPageChange={setFrotaPage}
+            )}
           />
+          {filteredMachines.length === 0 && !machinesQuery.isLoading && !machinesQuery.isError && <p role="status">Nenhum equipamento encontrado.</p>}
+
         </div>
       )}
 
@@ -734,7 +717,7 @@ const DashboardLocador = () => {
         <div className="space-y-10">
           {/* ── Habilitação (CNH) ──────────────────────────────── */}
           <div className="space-y-6">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-wrap justify-between items-start gap-4">
               <div>
                 <h1 className="font-headline text-3xl font-bold text-primary">
                   Habilitação (CNH)
@@ -768,13 +751,13 @@ const DashboardLocador = () => {
                 </p>
               </div>
             ) : (
-              licenses.map((lic) => (
+              <DashboardCollection label="CNH" items={licenses} defaultView="list" renderItem={(lic) => (
                 <div
                   key={lic.id}
-                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 flex flex-wrap gap-4 items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
                 >
                   <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <div className="w-14 h-14 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center">
                       <MaterialIcon
                         icon="id_card"
                         className="text-primary"
@@ -860,13 +843,13 @@ const DashboardLocador = () => {
                     </AlertDialog>
                   </div>
                 </div>
-              ))
+              )} />
             )}
           </div>
 
           {/* ── Certificações ──────────────────────────────────── */}
           <div className="space-y-6">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-wrap justify-between items-start gap-4">
               <div>
                 <h1 className="font-headline text-3xl font-bold text-primary">
                   Certificações
@@ -896,13 +879,13 @@ const DashboardLocador = () => {
                 </p>
               </div>
             ) : (
-              certifications.map((cert) => (
+              <DashboardCollection label="Certificações" items={certifications} defaultView="list" renderItem={(cert) => (
                 <div
                   key={cert.id}
-                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 flex items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
+                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 flex flex-wrap gap-4 items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
                 >
                   <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <div className="w-14 h-14 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center">
                       <MaterialIcon
                         icon="workspace_premium"
                         className="text-primary"
@@ -992,7 +975,7 @@ const DashboardLocador = () => {
                     </AlertDialog>
                   </div>
                 </div>
-              ))
+              )} />
             )}
           </div>
         </div>
@@ -1001,7 +984,7 @@ const DashboardLocador = () => {
       {/* Anúncios */}
       {tab === "anuncios" ? (
         <div className="space-y-6">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-wrap justify-between items-start gap-4">
             <div>
               <h1 className="font-headline text-3xl font-bold text-primary">
                 Anúncios
@@ -1020,19 +1003,19 @@ const DashboardLocador = () => {
           </div>
           <DashboardSearchBar
             searchValue={searchText}
-            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); }}
             yearValue={year}
-            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); }}
             years={yearOptions(postings.map((posting) => posting.year))}
             searchPlaceholder="Buscar por maquinário ou localização..."
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {paginatedAnuncios.map((p) => (
+          <DashboardCollection label="Anúncios" items={filteredPostings} resetKey={JSON.stringify([searchText, year])}
+            renderItem={(p, view) => (
               <div
                 key={p.id}
-                className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 shadow-sm"
+                className={`bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 shadow-sm ${view === "list" ? "@xl/collection:flex" : ""}`}
               >
-                <div className="h-40 bg-gradient-to-br from-primary/10 via-secondary-container/10 to-tertiary/10 overflow-hidden flex items-center justify-center">
+                <div className={`h-40 shrink-0 bg-gradient-to-br from-primary/10 via-secondary-container/10 to-tertiary/10 overflow-hidden flex items-center justify-center ${view === "list" ? "@xl/collection:w-48 @xl/collection:h-auto" : ""}`}>
                   {p.photo ? <img src={p.photo} alt={p.machine} className="h-full w-full object-cover" /> : <div className="w-14 h-14 bg-surface-container-lowest/70 rounded-2xl flex items-center justify-center border border-outline-variant/20 backdrop-blur-sm">
                     <MaterialIcon
                       icon="precision_manufacturing"
@@ -1041,8 +1024,8 @@ const DashboardLocador = () => {
                     />
                   </div>}
                 </div>
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-2">
+                <div className="min-w-0 flex-1 p-5">
+                  <div className="flex flex-wrap gap-2 justify-between items-start mb-2">
                     <h4 className="font-headline font-bold text-on-surface">
                       {p.machine}
                     </h4>
@@ -1068,14 +1051,10 @@ const DashboardLocador = () => {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-          {filteredPostings.length === 0 && !postingsQuery.isLoading && !postingsQuery.isError && <p role="status">Nenhum anúncio encontrado.</p>}
-          <DashboardPagination
-            currentPage={currentAnunciosPage}
-            totalPages={anunciosTotalPages}
-            onPageChange={setAnunciosPage}
+            )}
           />
+          {filteredPostings.length === 0 && !postingsQuery.isLoading && !postingsQuery.isError && <p role="status">Nenhum anúncio encontrado.</p>}
+
         </div>
       ) : null}
 
@@ -1094,44 +1073,21 @@ const DashboardLocador = () => {
 
           <DashboardSearchBar
             searchValue={searchText}
-            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); }}
             yearValue={year}
-            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); }}
             years={yearOptions(rentals.map((rental) => rental.year))}
             searchPlaceholder="Buscar por locatário, maquinário ou contrato..."
           />
 
-          {visibleActiveRentals.length > 0 ? (
-            <div className="space-y-4">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon
-                  icon="play_circle"
-                  size={20}
-                  className="text-primary"
-                />{" "}
-                Locações em Andamento
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {visibleActiveRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          ) : null}
-
-          {visiblePastRentals.length > 0 ? (
-            <div className="space-y-4 mt-8">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon
-                  icon="history"
-                  size={20}
-                  className="text-on-surface-variant"
-                />{" "}
-                Locações Passadas
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {visiblePastRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          ) : null}
+          <DashboardCollection
+            label="Locações"
+            items={[...visibleActiveRentals, ...visiblePastRentals]}
+            resetKey={JSON.stringify([searchText, year])}
+            focusItemId={focusedRentalId}
+            getGroup={(rental) => ["completed", "cancelled", "closed"].includes(rental.status ?? "") ? "Locações Passadas" : "Locações em Andamento"}
+            renderItem={renderRentalCard}
+          />
 
           {filteredRentals.length === 0 && !rentalsQuery.isError && !rentalsQuery.isLoading && <p role="status">Nenhuma locação encontrada.</p>}
         </div>
@@ -1151,13 +1107,13 @@ const DashboardLocador = () => {
           </div>
           <DashboardSearchBar
             searchValue={searchText}
-            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onSearchChange={(value) => { setSearch((current) => ({ ...current, [tab]: value })); }}
             yearValue={year}
-            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); setFrotaPage(1); setAnunciosPage(1); }}
+            onYearChange={(value) => { setYears((current) => ({ ...current, [tab]: value })); }}
             years={yearOptions(contracts.map((rental) => rental.year))}
             searchPlaceholder="Buscar por contrato, locatário ou maquinário..."
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
               <button
                 key={f}
@@ -1174,14 +1130,15 @@ const DashboardLocador = () => {
             ))}
           </div>
           {filteredContracts.length === 0 && !rentalsQuery.isError && !rentalsQuery.isLoading && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
-          {filteredContracts.map((c) => (
+          <DashboardCollection label="Contratos" items={filteredContracts} defaultView="list" resetKey={JSON.stringify([searchText, year, contractFilter])}
+            renderItem={(c, view) => (
             <div
               key={c.id}
-              className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
+              className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 shrink-0 bg-surface-container-high rounded-xl flex items-center justify-center">
                     <MaterialIcon
                       icon="description"
                       className="text-primary"
@@ -1205,7 +1162,7 @@ const DashboardLocador = () => {
                       ? { icon: "payments", variant: "pending", label: "Aguardando Pagamento" }
                       : { icon: "description", variant: "pending", label: "Assinatura Pendente" }} />
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
+              <div className={`grid grid-cols-1 @sm/collection:grid-cols-2 ${view === "list" ? "@3xl/collection:grid-cols-4" : ""} gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4`}>
                 <div>
                   <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                     Locatário
@@ -1239,7 +1196,7 @@ const DashboardLocador = () => {
                   </div>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
                   <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                 </Link>
@@ -1253,7 +1210,8 @@ const DashboardLocador = () => {
                 ) : null}
               </div>
             </div>
-          ))}
+          )}
+          />
 
         </div>
       ) : null}

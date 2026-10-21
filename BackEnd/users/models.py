@@ -31,6 +31,8 @@ class Users(AbstractBaseUser):
     email = models.CharField(unique=True, max_length=255)
     # password field provided by AbstractBaseUser
     phone = models.CharField(max_length=20, blank=True, null=True)
+    # Caminho no bucket; a URL pública é montada pelo serializer.
+    profile_photo = models.CharField(max_length=500, blank=True, null=True)
     role = models.TextField(choices=UserRole.choices)
     address = models.TextField()
     # Município e UF chegam do cadastro em campos próprios; o contrato depende

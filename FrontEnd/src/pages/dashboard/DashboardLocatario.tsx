@@ -1,5 +1,6 @@
+import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { useAuth } from "@/contexts/useAuth";
 import { AccountSection } from "@/features/dashboard/components/AccountSection";
@@ -69,6 +70,8 @@ const DashboardLocatario = () => {
   const visibleItems = isOperator ? sidebarItems.filter(item => ["chat", "notificacoes", "conta", "sair"].includes(item.tab)) : sidebarItems;
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hash } = useLocation();
+  const focusedRentalId = hash.startsWith("#locacao-") ? hash.slice("#locacao-".length) : undefined;
   const requestedTab = searchParams.get("tab");
   const tab: Tab = visibleItems.find((item) => item.tab === requestedTab)?.tab ?? (isOperator ? "conta" : "dashboard");
   const setTab = (next: Tab) => setSearchParams({ tab: next });
@@ -181,10 +184,11 @@ const DashboardLocatario = () => {
     }
   };
 
-  const renderRentalCard = (r: (typeof rentals)[number]) => (
+  const renderRentalCard = (r: (typeof rentals)[number], view: DashboardView) => (
     <RentalCard
       key={r.id}
       rental={r}
+      view={view}
       recurrenceIndex={r.recurrenceIndex}
       onScheduleRecurrence={() => { setRecurrenceSource(r.source); setRecurrenceOpen(true); }}
       paymentAction={(r.status === "pending" || r.status === "awaiting_payment") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
@@ -225,6 +229,7 @@ const DashboardLocatario = () => {
       onLogout={logout}
       logoutTab="sair"
       initials={user ? getInitials(user.name) : "…"}
+      profilePhotoUrl={user?.profilePhotoUrl}
       accountName={user ? `${user.name.split(" ")[0]} ${user.name.split(" ").slice(-1)[0]}` : "…"}
       accountRole={isOperator ? "Operador" : "Locatário"}
       avatarClassName="bg-tertiary-container text-on-tertiary"
@@ -240,7 +245,7 @@ const DashboardLocatario = () => {
             <p className="text-on-surface-variant text-sm mt-3">Veja o resumo das suas locações</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
               { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(r => r.status === "active").length), sub: "em andamento", icon: "event_available" },
               { label: "CONTRATOS", value: String(allContracts.filter(r => r.acceptedByLessor && r.acceptedByLessee).length), sub: "assinados por ambas as partes", icon: "description" },
@@ -325,13 +330,13 @@ const DashboardLocatario = () => {
                 Ver todas <MaterialIcon icon="arrow_forward" size={14} />
               </button>
             </div>
-            <div className="space-y-3">
-              {rentals.map((r) => {
+            <DashboardCollection label="Minhas locações" items={rentals} defaultView="list"
+              renderItem={(r, view) => {
                 const badge = rentalStatusBadge(r.status);
                 return (
-                  <Link key={r.id} to={`/dashboard-locatario?tab=locacoes#locacao-${r.id}`} className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                  <Link key={r.id} to={`/dashboard-locatario?tab=locacoes#locacao-${r.id}`} className={`bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-4 sm:p-5 flex flex-col gap-4 ${view === "list" ? "@xl/collection:flex-row @xl/collection:items-center" : ""} justify-between hover:shadow-md transition-shadow`}>
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high">
+                      <div className="w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-surface-container-high">
                         <MaterialIcon icon="agriculture" className="text-primary p-2" size={32} />
                       </div>
                       <div>
@@ -345,8 +350,8 @@ const DashboardLocatario = () => {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
+              }}
+            />
           </div>
         </div>
       )}
@@ -373,27 +378,14 @@ const DashboardLocatario = () => {
           />
 
           {!rentalsQuery.isLoading && !rentalsQuery.isError && filteredRentals.length === 0 && <p role="status">Nenhuma locação encontrada.</p>}
-          {activeRentals.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon icon="play_circle" size={20} className="text-primary" /> Locações em Andamento
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {activeRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          )}
-
-          {pastRentals.length > 0 && (
-            <div className="space-y-4 mt-8">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon icon="history" size={20} className="text-on-surface-variant" /> Locações Passadas
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {pastRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          )}
+          <DashboardCollection
+            label="Locações"
+            items={[...activeRentals, ...pastRentals]}
+            resetKey={JSON.stringify([rentalSearch, rentalYear])}
+            focusItemId={focusedRentalId}
+            getGroup={(rental) => ["completed", "cancelled", "closed"].includes(rental.status ?? "") ? "Locações Passadas" : "Locações em Andamento"}
+            renderItem={renderRentalCard}
+          />
         </div>
       )}
 
@@ -413,7 +405,7 @@ const DashboardLocatario = () => {
             years={years}
             searchPlaceholder="Buscar por contrato, locador ou maquinário..."
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
               <button key={f} type="button" onClick={() => setContractFilter(f)} aria-pressed={contractFilter === f} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${f === contractFilter ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}>
                 {f}
@@ -421,11 +413,12 @@ const DashboardLocatario = () => {
             ))}
           </div>
           {contracts.length === 0 && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
-          {contracts.map((c) => (
-            <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
-              <div className="flex items-start justify-between mb-4">
+          <DashboardCollection label="Contratos" items={contracts} defaultView="list" resetKey={JSON.stringify([contractSearch, contractYear, contractFilter])}
+            renderItem={(c, view) => (
+            <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 shrink-0 bg-surface-container-high rounded-xl flex items-center justify-center">
                     <MaterialIcon icon="description" className="text-primary" size={24} />
                   </div>
                   <div>
@@ -437,7 +430,7 @@ const DashboardLocatario = () => {
                   {situacaoAssinatura(c).encerrado ? "Encerrado" : situacaoAssinatura(c).completo ? "Assinado" : "Assinatura Pendente"}
                 </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
+              <div className={`grid grid-cols-1 @sm/collection:grid-cols-2 ${view === "list" ? "@3xl/collection:grid-cols-4" : ""} gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4`}>
                 <div>
                   <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Locador</div>
                   <div className="font-bold text-tertiary text-sm">{c.owner}</div>
@@ -455,7 +448,7 @@ const DashboardLocatario = () => {
                   <div className="font-bold text-on-surface text-sm">{c.machine}</div>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
                   <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                 </Link>
@@ -466,7 +459,8 @@ const DashboardLocatario = () => {
                 </Link>
               </div>
             </div>
-          ))}
+          )}
+          />
         </div>
       )}
 

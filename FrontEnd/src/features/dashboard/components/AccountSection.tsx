@@ -3,10 +3,12 @@ import { toast } from "sonner";
 import { Link } from "react-router";
 
 import { useChangePassword, useUpdateProfile } from "@/features/users/hooks/useUsers";
+import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
 import type { User } from "@/features/users/types/user";
 import { FormField } from "@/shared/components/FormField";
 import { PageHeader } from "@/shared/components/PageHeader";
 import { PasswordField } from "@/shared/components/PasswordField";
+import { UserAvatar } from "@/shared/components/UserAvatar";
 import { useCepLookup } from "@/shared/hooks/useCepLookup";
 import { formatAddress } from "@/shared/http/ViaCepClient";
 import { BRAZILIAN_STATES } from "@/shared/utils/brazilianStates";
@@ -199,16 +201,15 @@ export function AccountSection({
           <h2 className="font-headline text-xl font-bold text-tertiary">Dados Pessoais</h2>
 
           <div className="flex items-center gap-6 pb-2">
-            <div>
-              <div
-                className={`w-20 h-20 rounded-full flex items-center justify-center font-headline font-bold text-2xl ${avatarClassName}`}
-              >
-                {user ? getInitials(user.name) : "…"}
-              </div>
-            </div>
+            <UserAvatar
+              photoUrl={user?.profilePhotoUrl}
+              initials={user ? getInitials(user.name) : "…"}
+              className={`w-20 h-20 text-2xl ${avatarClassName}`}
+            />
             <div>
               <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
               <div className="text-sm text-on-surface-variant mb-2">{roleLabel}</div>
+              <ProfilePhotoUpload userId={user ? userId : null} />
             </div>
           </div>
 

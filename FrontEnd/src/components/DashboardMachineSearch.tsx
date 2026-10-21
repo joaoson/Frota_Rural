@@ -1,3 +1,4 @@
+import { DashboardCollection } from "@/features/dashboard/components/DashboardCollection";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { postingStore } from "@/app/container";
@@ -87,18 +88,18 @@ const DashboardMachineSearch = () => {
       {error && <p className="py-10 text-center text-error">Não foi possível carregar os equipamentos. Tente novamente.</p>}
       {!loading && !error && <p className="text-sm text-on-surface-variant"><strong className="text-primary">{results.length}</strong> equipamento{results.length !== 1 ? "s" : ""} disponível{results.length !== 1 ? "is" : ""}</p>}
       {!loading && !error && results.length === 0 && <div className="rounded-2xl bg-surface-container-low p-10 text-center text-on-surface-variant">Nenhum equipamento encontrado para estes filtros.</div>}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        {results.map((posting) => {
+      <DashboardCollection label="Equipamentos disponíveis" items={results} resetKey={JSON.stringify([search, activity, location, maxPrice, startDate, endDate])}
+        renderItem={(posting, view) => {
           const title = [posting.machineBrand, posting.machineModel].filter(Boolean).join(" ") || "Maquinário";
-          return <article key={posting.id} className="overflow-hidden rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm">
-            <img src={posting.primaryPhotoUrl ?? FALLBACK_IMAGE} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }} alt={title} className="h-40 w-full object-cover" />
-            <div className="p-5 space-y-3"><div><h2 className="font-bold text-on-surface">{title}</h2><p className="text-xs text-on-surface-variant">{posting.locationAddress || "Localização não informada"}</p></div>
-              <div className="flex justify-between text-sm"><span>{posting.machineUsagePurpose || "Atividade não informada"}</span><strong className="text-primary">{Number(posting.hourlyRate).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/h</strong></div>
+          return <article key={posting.id} className={`overflow-hidden rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm ${view === "list" ? "@xl/collection:flex" : ""}`}>
+            <img src={posting.primaryPhotoUrl ?? FALLBACK_IMAGE} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGE; }} alt={title} className={`h-40 w-full object-cover ${view === "list" ? "@xl/collection:w-48 @xl/collection:h-auto @xl/collection:shrink-0" : ""}`} />
+            <div className="min-w-0 flex-1 p-5 space-y-3"><div><h2 className="font-bold text-on-surface">{title}</h2><p className="text-xs text-on-surface-variant">{posting.locationAddress || "Localização não informada"}</p></div>
+              <div className="flex flex-wrap gap-2 justify-between text-sm"><span>{posting.machineUsagePurpose || "Atividade não informada"}</span><strong className="text-primary">{Number(posting.hourlyRate).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/h</strong></div>
               <Link to={`/anuncio/${posting.id}`} className="flex justify-center rounded-lg bg-primary py-2.5 text-sm font-bold text-on-primary">Ver disponibilidade</Link>
             </div>
           </article>;
-        })}
-      </div>
+        }}
+      />
     </div>
   );
 };

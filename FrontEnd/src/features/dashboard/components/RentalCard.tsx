@@ -5,6 +5,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StarRating } from "@/shared/components/StarRating";
+import type { DashboardView } from "./DashboardCollection";
 
 export interface RentalCardData {
   id: string;
@@ -39,6 +40,7 @@ interface ReviewPanel {
 
 interface RentalCardProps {
   rental: RentalCardData;
+  view?: DashboardView;
   counterparty: Counterparty;
   review: ReviewPanel;
   detailsOpen: boolean;
@@ -78,6 +80,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 export function RentalCard({
   rental,
+  view = "grid",
   counterparty,
   review,
   detailsOpen,
@@ -104,15 +107,15 @@ export function RentalCard({
   const isClosedStage = rental.status === "completed" || rental.status === "cancelled" || rental.status === "closed";
 
   return (
-    <div ref={cardRef} id={`locacao-${rental.id}`} tabIndex={-1} className="scroll-mt-20 focus:outline-2 focus:outline-primary bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+    <div ref={cardRef} id={`locacao-${rental.id}`} tabIndex={-1} className="@container/rental scroll-mt-20 focus:outline-2 focus:outline-primary bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
       <div className="absolute left-0 top-0 bottom-0 w-2 bg-secondary-container" />
-      <div className="ml-4 p-6">
-        <div className="flex justify-between items-start mb-4">
+      <div className="ml-2 p-4 sm:ml-4 sm:p-6">
+        <div className="flex flex-wrap justify-between items-start gap-2 mb-4">
           <StatusBadge config={badge} />
           <span className="text-sm font-bold text-outline">{rental.contract}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 mb-4">
+        <div className={`grid grid-cols-1 @sm/rental:grid-cols-2 ${view === "list" ? "@3xl/rental:grid-cols-4" : ""} gap-3 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/20 mb-4`}>
           <Field label={counterparty.label}>
             <div className={`font-bold text-sm flex items-center gap-1 ${counterparty.className}`}>
               <MaterialIcon icon={counterparty.icon} size={14} /> {counterparty.name}
@@ -175,7 +178,7 @@ export function RentalCard({
             <h4 className="font-headline font-bold text-on-surface text-sm">
               Detalhes da Locação
             </h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 @sm/rental:grid-cols-2 gap-3 text-sm">
               <DetailRow label="Contrato">
                 <span className="text-on-surface font-bold">{rental.contract ?? "Ainda não disponível"}</span>
               </DetailRow>
@@ -201,7 +204,7 @@ export function RentalCard({
         {confirmCancel && rental.status === "pending" && onCancel && (
           <div role="group" aria-label="Confirmar cancelamento da reserva" className="mt-4 rounded-xl border border-error/30 p-4 space-y-3">
             <p className="text-sm">Cancelar esta reserva? As datas serão liberadas para novas locações.</p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button type="button" disabled={cancelling} onClick={onCancel} className="rounded-lg bg-error text-white px-4 py-2 text-sm disabled:opacity-50">{cancelling ? "Cancelando..." : "Confirmar cancelamento"}</button>
               <button type="button" disabled={cancelling} onClick={() => setConfirmCancel(false)} className="rounded-lg border px-4 py-2 text-sm">Manter reserva</button>
             </div>

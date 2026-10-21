@@ -8,6 +8,7 @@ from users.views import (
     UserCreateView,
     UserDetailView,
     UserListView,
+    UserPhotoUploadView,
 )
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path("users/operators", OperatorListView.as_view(), name="operators"),
     path("users/operators/<uuid:pk>", OperatorDetailView.as_view(), name="operator_detail"),
     path("users/<uuid:pk>", UserDetailView.as_view(), name="user_detail"),
+    path("users/<uuid:pk>/photo", UserPhotoUploadView.as_view(), name="user_photo"),
     path(
         "users/<uuid:pk>/change-password",
         UserChangePasswordView.as_view(),

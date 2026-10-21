@@ -45,6 +45,14 @@ export class UserStore {
     return this.repository.changePassword(id, currentPassword, newPassword);
   }
 
+  async uploadPhoto(id: string, file: File): Promise<User> {
+    const user = await this.repository.uploadPhoto(id, file);
+    // A conta e a barra lateral usam a mesma entrada de cache.
+    await this.queryClient.cancelQueries({ queryKey: userKeys.detail(id) });
+    this.queryClient.setQueryData(userKeys.detail(id), user);
+    return user;
+  }
+
   async invalidateDetail(id: string): Promise<void> {
     await this.queryClient.invalidateQueries({ queryKey: userKeys.detail(id) });
   }

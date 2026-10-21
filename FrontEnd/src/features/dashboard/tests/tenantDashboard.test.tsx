@@ -62,3 +62,27 @@ it("operators open their account without requesting a tenant's rental list", () 
   expect(mocks.query).toHaveBeenCalledWith(null);
   expect(screen.queryByText("Minhas Locações")).toBeNull();
 });
+
+it("supports page size and view controls on the tenant overview, rentals, and contracts", () => {
+  mocks.rentals = Array.from({ length: 13 }, (_, index) => ({ ...pending, id: `rental-${index}`, machineModel: `Modelo ${index}` }));
+  for (const tab of ["dashboard", "locacoes", "contratos"]) {
+    show(tab);
+    expect(screen.getByText("1–6 de 13 itens")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getByText("7–12 de 13 itens")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Grade" }));
+    expect(screen.getByRole("button", { name: "Grade" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(screen.getByLabelText("Itens por página"), { target: { value: "24" } });
+    expect(screen.getByText("1–13 de 13 itens")).toBeTruthy();
+    expect(screen.queryByRole("navigation")).toBeNull();
+    cleanup();
+  }
+});
+
+it("opens a tenant rental deep link on its containing page", () => {
+  mocks.rentals = Array.from({ length: 14 }, (_, index) => ({ ...completed, id: `rental-${index}`, machineModel: `Modelo ${index}` }));
+  render(<MemoryRouter initialEntries={["/dashboard-locatario?tab=locacoes#locacao-rental-13"]}><DashboardLocatario /></MemoryRouter>);
+  expect(screen.getByText("John Deere Modelo 13")).toBeTruthy();
+  expect(screen.getByText("13–14 de 14 itens")).toBeTruthy();
+  expect(screen.queryByText("John Deere Modelo 0")).toBeNull();
+});
