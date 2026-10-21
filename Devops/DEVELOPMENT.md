@@ -50,8 +50,9 @@ abertos sem que o login de um substitua o cookie do outro.
 Para adicionar dados fictícios ao ambiente local iniciado, execute
 `python3 Devops/dev.py seed-preview --mode local` e depois
 `python3 Devops/dev.py seed --mode local` (preservando seu offset).
-O seed cria contas fictícias: `joao.silva@example.test` (locador) e
-`maria.oliveira@example.test` (locatário), senha inicial `Teste1234`. Preserva os
+O seed cria contas fictícias: `joao.silva@example.test` (locador),
+`maria.oliveira@example.test` (locatário) e `admin@example.test` (administrador),
+senha inicial `Teste1234`. Preserva os
 registros existentes. Veja o [inventário](SEED.md).
 
 ## Portas ocupadas e várias cópias do código

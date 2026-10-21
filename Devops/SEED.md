@@ -51,20 +51,27 @@ temporário.
 | Locatário Pedro | `pedro.costa@example.test` | `Teste1234` |
 | Operador de Maria | `carlos.santos@example.test` | `Teste1234` |
 | Operadora de Pedro | `fernanda.lima@example.test` | `Teste1234` |
+| Administrador | `admin@example.test` | `Teste1234` |
 
-São contas fictícias, sem privilégio de administrador. O domínio reservado
+São contas fictícias. O perfil `admin` permite gerenciar usuários e moderação
+na aplicação, com entrada em `/admin/users`. O domínio reservado
 `example.test` não recebe e-mails. Para uma senha inicial diferente, defina
 `SEED_DEMO_PASSWORD` no arquivo selecionado pelo helper (ou no ambiente do
 processo na execução nativa) antes da primeira execução; o seed
 nunca redefine senhas já criadas. Não use essas contas como contas reais.
 
+Se `admin@example.test` já foi criado fora do seed, ele terá outro ID e a
+verificação de conflito interromperá a execução sem alterar dados. A conta
+existente pode continuar sendo usada na extensão com suas próprias credenciais;
+o seed não a substitui nem promove contas existentes a administrador.
+
 ## Inventário e fluxos
 
-Uma instalação vazia recebe 88 registros:
+Uma instalação vazia recebe 89 registros:
 
 | Dados | Quantidade |
 | --- | ---: |
-| Usuários | 6 |
+| Usuários | 7 |
 | Certificações fictícias aguardando análise | 2 |
 | Máquinas | 20 |
 | Anúncios ativos | 20 |

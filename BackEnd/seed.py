@@ -52,6 +52,8 @@ USERS = (
     ('Ana Pereira', 'ana.pereira@example.test', 'locador'),
     ('Pedro Costa', 'pedro.costa@example.test', 'locatario'),
     ('Fernanda Lima', 'fernanda.lima@example.test', 'operador'),
+    # Append new accounts to preserve the stable IDs and existing relationships.
+    ('Administrador Frota Rural', 'admin@example.test', 'admin'),
 )
 MACHINES = (
     ('John Deere', '8R 410', 2022, 'Plantio e cultivo', 410),
@@ -230,7 +232,7 @@ def main(argv=None):
     action = 'A criar' if args.dry_run else 'Criados'
     for table in sorted(set(result['created']) | set(result['existing'])):
         print(f"{table}: {action.lower()} {result['created'].get(table, 0)}; preservados {result['existing'].get(table, 0)}")
-    print('Demonstração: joao.silva@example.test (locador); maria.oliveira@example.test (locatário).')
+    print('Demonstração: joao.silva@example.test (locador); maria.oliveira@example.test (locatário); admin@example.test (admin).')
     print('Senha inicial: SEED_DEMO_PASSWORD, se definida, ou a senha documentada em Devops/SEED.md. Senhas existentes são preservadas.')
 
 

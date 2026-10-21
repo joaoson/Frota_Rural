@@ -17,7 +17,7 @@ from notifications.models import Notification
 from payments.models import Payments
 from payments.pricing import calcular_total
 from postings.models import Postings, PostingsPhotos
-from seed import SeedConflict, seed_database, seed_id
+from seed import USERS, SeedConflict, seed_database, seed_id
 from users.models import Users
 
 
@@ -26,13 +26,13 @@ class DevelopmentSeedTests(TestCase):
         now = timezone.now()
         result = seed_database(allow_remote=True, now=now)
         self.assertEqual(result['created'], {
-            'users': 6, 'certifications': 2, 'machines': 20, 'postings': 20,
+            'users': 7, 'certifications': 2, 'machines': 20, 'postings': 20,
             'rentals': 8, 'messages': 8, 'reviews': 4, 'contracts': 4,
             'notifications': 16,
         })
         self.assertTrue(Users.objects.get(email='joao.silva@example.test').check_password('Teste1234'))
         self.assertTrue(Users.objects.get(email='maria.oliveira@example.test').check_password('Teste1234'))
-        self.assertFalse(Users.objects.filter(role='admin').exists())
+        self.assertEqual(Users.objects.filter(role='admin').count(), 1)
         self.assertEqual(Users.objects.filter(role='operador', employer__role='locatario').count(), 2)
         for machine in Machines.objects.all():
             self.assertRegex(machine.renagro_number, r'^BR\d{10}$')
@@ -76,7 +76,7 @@ class DevelopmentSeedTests(TestCase):
         notification.save()
         result = seed_database(allow_remote=True, now=now + timedelta(days=2))
         self.assertEqual(sum(result['created'].values()), 0)
-        self.assertEqual(sum(result['existing'].values()), 88)
+        self.assertEqual(sum(result['existing'].values()), 89)
         user.refresh_from_db()
         rental.refresh_from_db()
         notification.refresh_from_db()
@@ -103,7 +103,7 @@ class DevelopmentSeedTests(TestCase):
         seed_database(allow_remote=True)
         self.assertEqual(Users.objects.filter(pk=owner.pk).values().get(), original_user)
         self.assertEqual(Machines.objects.filter(pk=machine.pk).values().get(), original_machine)
-        self.assertEqual(Users.objects.count(), 7)
+        self.assertEqual(Users.objects.count(), 8)
         self.assertEqual(Machines.objects.count(), 21)
         self.assertFalse(Notification.objects.filter(recipient=owner).exists())
 
@@ -127,7 +127,7 @@ class DevelopmentSeedTests(TestCase):
         with patch('seed.make_password') as hash_password:
             preview = seed_database(dry_run=True)
         hash_password.assert_not_called()
-        self.assertEqual(sum(preview['created'].values()), 88)
+        self.assertEqual(sum(preview['created'].values()), 89)
         self.assertFalse(Users.objects.exists())
         self.assertFalse(Notification.objects.exists())
         actual = seed_database(allow_remote=True)
@@ -148,3 +148,50 @@ class DevelopmentSeedTests(TestCase):
             self.assertEqual(notification.kind, 'rental')
             self.assertIsNone(notification.read_at)
             self.assertEqual(notification.posting_id, rental.postings_id)
+
+    def test_seed_admin_can_login_and_access_admin_only_users(self):
+        seed_database(allow_remote=True)
+        for email, expected_status in (
+            ('admin@example.test', 200),
+            ('joao.silva@example.test', 403),
+        ):
+            with self.subTest(email=email):
+                login = self.client.post('/api/login', {
+                    'email': email, 'password': 'Teste1234',
+                }, content_type='application/json')
+                self.assertEqual(login.status_code, 200)
+                response = self.client.get('/api/users',
+                    HTTP_AUTHORIZATION=f"Bearer {login.json()['access']}")
+                self.assertEqual(response.status_code, expected_status)
+
+    def test_upgrade_adds_only_admin_and_rerun_preserves_admin_changes(self):
+        with patch('seed.USERS', USERS[:-1]):
+            seed_database(allow_remote=True)
+        original_users = list(Users.objects.order_by('id').values())
+        result = seed_database(allow_remote=True)
+        self.assertEqual(result['created'], {'users': 1})
+        self.assertEqual(sum(result['existing'].values()), 88)
+        self.assertEqual(list(Users.objects.exclude(email='admin@example.test')
+            .order_by('id').values()), original_users)
+        admin = Users.objects.get(email='admin@example.test')
+        self.assertEqual(admin.pk, seed_id('user', 6))
+        self.assertEqual(admin.role, 'admin')
+        self.assertTrue(admin.check_password('Teste1234'))
+        admin.set_password('ChangedAdminPassword-123')
+        admin.role = 'locador'
+        admin.status = 'suspended'
+        admin.save()
+        seed_database(allow_remote=True)
+        admin.refresh_from_db()
+        self.assertTrue(admin.check_password('ChangedAdminPassword-123'))
+        self.assertEqual(admin.role, 'locador')
+        self.assertEqual(admin.status, 'suspended')
+
+    def test_admin_email_collision_does_not_promote_existing_account(self):
+        owner = self.real_user('ADMIN@example.test')
+        original = Users.objects.filter(pk=owner.pk).values().get()
+        with self.assertRaises(SeedConflict):
+            seed_database(allow_remote=True)
+        self.assertEqual(Users.objects.count(), 1)
+        self.assertEqual(Users.objects.filter(pk=owner.pk).values().get(), original)
+        self.assertFalse(Machines.objects.exists())
