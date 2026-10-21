@@ -14,9 +14,12 @@ from contracts.models import Contracts
 from contracts.services import ContractService
 from notifications.events import notify_rental_event
 from payments.availability import MINUTOS_DE_RESERVA, tem_conflito
+from payments.enums import OPEN_PAYMENT_STATUSES
 from payments.pricing import Cotacao, cotar
 from postings.models import Postings
-from rentals.enums import RentalStatus
+from rentals import policy
+from rentals.enums import MeterReadingKind, RentalStatus
+from rentals.meter import MeterService
 from rentals.models import Rentals
 from rentals.serializer import RentalFilterSerializer, RentalInputSerializer, validate_operator_assignment
 
@@ -30,7 +33,9 @@ class RentalService:
     def _queryset(user) -> QuerySet[Rentals]:
         return Rentals.objects.filter(
             Q(lessee=user) | Q(postings__machinery__owner=user)
-        ).select_related("lessee", "postings__machinery__owner", "contracts")
+        ).select_related("lessee", "postings__machinery__owner", "contracts").prefetch_related(
+            "payments", "meter_readings",
+        )
 
     @staticmethod
     def get(rental_id: UUID, *, user) -> Rentals:
@@ -56,12 +61,14 @@ class RentalService:
             raise PermissionDenied("Você só pode criar reservas em seu próprio nome.")
         if validated.get("status", RentalStatus.PENDING) != RentalStatus.PENDING:
             raise ValidationError({"status": "Novas reservas precisam aguardar o pagamento."})
-        if any(field in validated for field in ("initial_hour_meter", "final_hour_meter")):
+        if any(field in data for field in ("initial_hour_meter", "final_hour_meter")):
             raise ValidationError("Leituras de horímetro não fazem parte de uma nova reserva.")
         # The same posting + machinery locks protect recurrence and checkout.
         posting = Postings.objects.select_for_update().select_related("machinery").get(pk=validated["postings"].pk)
         validated["postings"] = posting
+        policy.ensure_can_book(user, posting)
         serializer.validate(validated)
+        policy.ensure_lead_time(validated["start_date"])
         validated["operator"] = validate_operator_assignment(validated.get("operator"), user, lock=True)
         RentalService._ensure_period_available(posting, validated["start_date"], validated["end_date"])
         quote = RentalService.quote(posting, validated["start_date"], validated["end_date"])
@@ -90,7 +97,8 @@ class RentalService:
             raise ValidationError({"total_price": "O valor é calculado pelo servidor."})
         next_status = data.get("status", rental.status)
         if next_status != rental.status:
-            cancellable = rental.status == RentalStatus.PENDING and not rental.payments.exclude(status="expired").exists()
+            cancellable = (rental.status == RentalStatus.PENDING
+                           and not rental.payments.filter(status__in=OPEN_PAYMENT_STATUSES).exists())
             is_owner = user.pk == posting.machinery.owner_id
             if next_status == RentalStatus.COMPLETED and is_owner and rental.status == RentalStatus.ACTIVE:
                 raise Conflict("A locação só pode ser concluída depois que as duas partes assinarem o contrato.")
@@ -102,11 +110,18 @@ class RentalService:
         if any(field in data for field in ("start_date", "end_date", "operator")):
             if user.pk != rental.lessee_id:
                 raise PermissionDenied("Somente o locatário pode alterar os dados de uma reserva pendente.")
-            if rental.status != RentalStatus.PENDING or rental.payments.exclude(status="expired").exists():
+            if rental.status != RentalStatus.PENDING or rental.payments.filter(status__in=OPEN_PAYMENT_STATUSES).exists():
                 raise Conflict("Uma reserva em pagamento ou confirmada não pode ter seus dados alterados.")
         if any(field in data for field in ("initial_hour_meter", "final_hour_meter")):
-            if user.pk != posting.machinery.owner_id or rental.status not in (RentalStatus.ACTIVE, RentalStatus.SIGNED):
-                raise PermissionDenied("Somente o locador pode registrar leituras de uma reserva confirmada.")
+            raise ValidationError({"detail": (
+                "Registre as leituras do horímetro em /api/rentals/<id>/meter-readings: "
+                "elas são validadas e ficam no histórico da locação."
+            )})
+        if "notes" in data:
+            if user.pk != rental.lessee_id:
+                raise PermissionDenied("Somente o locatário pode alterar as observações da reserva.")
+            if rental.status in (RentalStatus.CANCELLED, RentalStatus.COMPLETED, RentalStatus.CLOSED):
+                raise Conflict("As observações de uma locação encerrada não podem ser alteradas.")
         serializer = RentalInputSerializer(rental, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
         validated = serializer.validated_data
@@ -125,6 +140,7 @@ class RentalService:
             # Only an unpaid pending booking reaches this point (checked above).
             # The agreed price changes only when the tenant picks other dates.
             if (start, end) != (rental.start_date, rental.end_date):
+                policy.ensure_lead_time(start)
                 quote = RentalService.quote(posting, start, end)
                 save_fields.update(quote.snapshot())
                 changed = changed or rental.total_price != quote.total
@@ -141,6 +157,16 @@ class RentalService:
                 event_key += f":{uuid4()}"
             notify_rental_event(rental, event, event_key=event_key)
         return rental
+
+    @staticmethod
+    @transaction.atomic
+    def complete(rental_id: UUID, data: Mapping[str, Any], *, user) -> Rentals:
+        """Conclusão pelo locador; a leitura de devolução é opcional e só informativa."""
+        if data.get("final_hour_meter") not in (None, ""):
+            MeterService.record(rental_id, {
+                "kind": MeterReadingKind.CHECK_OUT, "value": data["final_hour_meter"], "note": data.get("note", ""),
+            }, user=user)
+        return RentalService.update(rental_id, {"status": RentalStatus.COMPLETED}, user=user, partial=True)
 
     @staticmethod
     def delete(rental_id: UUID, *, user) -> None:

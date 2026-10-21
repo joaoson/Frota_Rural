@@ -6,17 +6,12 @@ from django.db.models import Q, QuerySet
 from django.utils import timezone
 
 from postings.models import Postings
-from rentals.enums import RentalStatus
+from rentals import lifecycle
 from rentals.models import Rentals
 
-STATUS_OCUPADOS = (
-    RentalStatus.ACTIVE,
-    RentalStatus.SIGNED,
-    RentalStatus.COMPLETED,
-    RentalStatus.CLOSED,
-)
+STATUS_OCUPADOS = lifecycle.OCCUPYING
 # Reservas ainda não pagas seguram o período só por alguns minutos.
-STATUS_PROVISORIOS = (RentalStatus.PENDING, RentalStatus.AWAITING_PAYMENT)
+STATUS_PROVISORIOS = lifecycle.PROVISIONAL
 MINUTOS_DE_RESERVA = 30
 INTERVALO_DE_LIMPEZA = timedelta(days=1)
 

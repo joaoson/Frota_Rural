@@ -10,6 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import APIException, NotFound
 
 from api.models import RentalRecurrence
+from rentals import policy
 from rentals.models import Rentals
 from rentals.serializer import validate_operator_assignment
 from contracts.models import Contracts
@@ -74,6 +75,9 @@ def build_preview(source, data, *, lock_operator=False):
     source.operator = validate_operator_assignment(source.operator, source.lessee, lock=lock_operator)
     if data['first_start_date'] <= timezone.localdate():
         raise serializers.ValidationError({'first_start_date': 'Escolha uma data futura.'})
+    # Same booking rules as a single reservation; the first occurrence is the earliest.
+    policy.ensure_can_book(source.lessee, posting)
+    policy.ensure_lead_time(data['first_start_date'], field='first_start_date')
     duration = source.end_date - source.start_date
     if duration < timedelta(0):
         raise serializers.ValidationError({'detail': 'A locação original possui um período inválido.'})

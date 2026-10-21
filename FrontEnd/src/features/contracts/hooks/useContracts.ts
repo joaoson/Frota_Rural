@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { contractStore } from "@/app/container";
 
 import type {
+  MeterReadingKind,
+  MeterRecordResult,
   Rental,
   SignatureOtp,
   SignatureReceipt,
@@ -70,4 +72,21 @@ export function useContractEvidence(id: string | null) {
 
 export function useCancelRental() {
   return useMutation<Rental, Error, string>({ mutationFn: (id) => contractStore.cancelRental(id) });
+}
+
+export function useRecordMeterReading() {
+  return useMutation<MeterRecordResult, Error, { id: string; kind: MeterReadingKind; value: number; note?: string }>({
+    mutationFn: ({ id, kind, value, note }) => contractStore.recordMeterReading(id, kind, value, note),
+  });
+}
+
+export function useCompleteRental() {
+  return useMutation<Rental, Error, { id: string; finalHourMeter?: number }>({
+    mutationFn: ({ id, finalHourMeter }) => contractStore.completeRental(id, finalHourMeter),
+  });
+}
+
+/** Uso registrado pelo horímetro nas locações concluídas da máquina (só o dono). */
+export function useMachineUsage(machineId: string | null) {
+  return useQuery({ ...contractStore.machineUsageOptions(machineId ?? ""), enabled: Boolean(machineId) });
 }

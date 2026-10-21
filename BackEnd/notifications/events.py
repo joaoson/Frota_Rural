@@ -14,6 +14,8 @@ EVENTS = {
     'rental_updated': ('rental', 'Locação atualizada', 'As informações da locação foram atualizadas. Confira os dados da reserva.'),
     'rental_cancelled': ('rental', 'Reserva cancelada', 'A reserva foi cancelada.'),
     'rental_completed': ('rental', 'Locação concluída', 'O locador registrou a conclusão da locação.'),
+    'meter_check_in_recorded': ('rental', 'Horímetro registrado na retirada', 'O locador registrou a leitura do horímetro na retirada. É só acompanhamento de uso: o valor da locação não muda.'),
+    'meter_check_out_recorded': ('rental', 'Horímetro registrado na devolução', 'O locador registrou a leitura do horímetro na devolução. É só acompanhamento de uso: o valor da locação não muda.'),
     'payment_pending': ('payment', 'Pagamento aguardando confirmação', 'O pagamento foi iniciado. A confirmação será informada aqui.'),
     'payment_approved': ('payment', 'Pagamento confirmado', 'O pagamento foi confirmado e a reserva está ativa. O contrato está disponível para assinatura.'),
     'payment_expired': ('payment', 'Prazo de pagamento encerrado', 'Uma tentativa de pagamento expirou ou não foi concluída. Confira a situação atual da reserva.'),

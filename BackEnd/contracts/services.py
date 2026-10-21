@@ -20,6 +20,7 @@ from contracts.enums import ContractStatus, SignatureRole
 from contracts.models import Contracts, ContractRevisions, ContractSignatureOtps, ContractSignatures
 from contracts.revisions import ensure_current_revision
 from contracts.serializer import ContractOtpRequestInputSerializer, ContractSignInputSerializer
+from rentals import lifecycle
 from rentals.enums import RentalStatus
 from rentals.models import Rentals
 from users.models import Users
@@ -453,7 +454,7 @@ class ContractSignatureService:
 
     @staticmethod
     def _ensure_payable(rental: Rentals) -> None:
-        if rental.status not in (RentalStatus.ACTIVE, RentalStatus.SIGNED) or not rental.payments.filter(status="approved").exists():
+        if rental.status not in lifecycle.PAID or not rental.payments.filter(status="approved").exists():
             raise Conflict("Confirme o pagamento desta reserva antes de assinar o contrato.")
         if tem_conflito(rental.postings_id, rental.start_date, rental.end_date, ignorar=rental.pk):
             raise Conflict("As datas desta reserva não estão mais disponíveis.")

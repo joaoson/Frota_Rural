@@ -1,4 +1,5 @@
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
+import { canDo, isConfirmedRental, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
@@ -110,6 +111,10 @@ const DashboardLocatario = () => {
             ? `${rental.startDate.toLocaleDateString("pt-BR")} a ${rental.endDate.toLocaleDateString("pt-BR")}`
             : "",
         status: rental.status,
+        phase: rental.phase,
+        allowedActions: rental.allowedActions,
+        notes: rental.notes,
+        meter: rental.meter,
         total: (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
           style: "currency",
           currency: "BRL",
@@ -134,8 +139,8 @@ const DashboardLocatario = () => {
   const allContracts = rentals.filter(r => r.hasContract);
   const contracts = allContracts.filter(r => matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
   const filteredRentals = rentals.filter(r => matches(r, rentalSearch, rentalYear));
-  const activeRentals = filteredRentals.filter(r => ["pending", "awaiting_payment", "active", "signed", "validating"].includes(r.status ?? ""));
-  const pastRentals = filteredRentals.filter(r => ["completed", "cancelled", "closed"].includes(r.status ?? ""));
+  const activeRentals = filteredRentals.filter(isOpenRental);
+  const pastRentals = filteredRentals.filter(r => !isOpenRental(r));
   const today = new Date();
   const spendData = Array.from({ length: 6 }, (_, index) => {
     const month = new Date(today.getFullYear(), today.getMonth() - 5 + index, 1);
@@ -191,7 +196,7 @@ const DashboardLocatario = () => {
       view={view}
       recurrenceIndex={r.recurrenceIndex}
       onScheduleRecurrence={() => { setRecurrenceSource(r.source); setRecurrenceOpen(true); }}
-      paymentAction={(r.status === "pending" || r.status === "awaiting_payment") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
+      paymentAction={canDo(r, "pay") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
       counterparty={{
         label: "Locador",
         name: r.owner,
@@ -247,7 +252,7 @@ const DashboardLocatario = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
-              { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(r => r.status === "active").length), sub: "em andamento", icon: "event_available" },
+              { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(isConfirmedRental).length), sub: "pagas e em andamento", icon: "event_available" },
               { label: "CONTRATOS", value: String(allContracts.filter(r => r.acceptedByLessor && r.acceptedByLessee).length), sub: "assinados por ambas as partes", icon: "description" },
               { label: "LOCAÇÕES TOTAIS", value: String(rentals.length), sub: "reservas registradas", icon: "inventory_2" },
               { label: "VALOR CONTRATADO NO MÊS", value: formatCurrency(spendData[5].value), sub: today.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }), icon: "payments" },
@@ -383,7 +388,7 @@ const DashboardLocatario = () => {
             items={[...activeRentals, ...pastRentals]}
             resetKey={JSON.stringify([rentalSearch, rentalYear])}
             focusItemId={focusedRentalId}
-            getGroup={(rental) => ["completed", "cancelled", "closed"].includes(rental.status ?? "") ? "Locações Passadas" : "Locações em Andamento"}
+            getGroup={(rental) => isOpenRental(rental) ? "Locações em Andamento" : "Locações Passadas"}
             renderItem={renderRentalCard}
           />
         </div>
@@ -452,7 +457,7 @@ const DashboardLocatario = () => {
                 <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
                   <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                 </Link>
-                {(c.status === "pending" || c.status === "awaiting_payment") && <RentalPaymentButton rentalId={c.id} />}
+                {canDo(c, "pay") && <RentalPaymentButton rentalId={c.id} />}
                 {situacaoAssinatura(c).podeAssinarComoLocatario && <button type="button" onClick={() => setSigningRental(c.id)} className="bg-primary/10 text-primary px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2"><MaterialIcon icon="draw" size={16} /> Assinar Contrato</button>}
                 <Link to={`/contrato/${c.id}?print=1`} className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
                   <MaterialIcon icon="download" size={16} /> Imprimir / Salvar PDF

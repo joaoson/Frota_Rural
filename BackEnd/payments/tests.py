@@ -346,13 +346,22 @@ class CheckoutTests(PaymentTestCase):
         self.assertEqual(response.json()["code"], "period_unavailable")
         create.assert_not_called()
 
-    def test_stripe_failure_returns_502_and_records_nothing(self):
-        with patch(CREATE_SESSION, side_effect=stripe.StripeError("fora do ar")):
+    def test_uncertain_stripe_failure_keeps_a_retryable_attempt_without_a_session(self):
+        with patch(CREATE_SESSION, side_effect=stripe.APIConnectionError("rede caiu")) as create:
             response = self.checkout()
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["code"], "external_service_error")
-        self.assertFalse(Payments.objects.exists())
+        attempt = Payments.objects.get()
+        self.assertEqual((attempt.status, attempt.session_id), ("creating", None))
+        self.assertEqual(create.call_args.kwargs["idempotency_key"], attempt.idempotency_key)
+        # Internal attempts are not a payment the tenant can follow.
+        self.assertEqual(self.client.get(f"/api/rentals/{self.rental.id}/payment").status_code, 404)
+
+    def test_definitive_stripe_refusal_marks_the_attempt_failed(self):
+        with patch(CREATE_SESSION, side_effect=stripe.InvalidRequestError("parâmetro inválido", param="x")):
+            self.assertEqual(self.checkout().status_code, 502)
+        self.assertEqual(Payments.objects.get().status, "failed")
 
     def test_unknown_rental_returns_404(self):
         response = self.checkout(rental_id=uuid.uuid4())

@@ -5,8 +5,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from contracts.models import Contracts
-from machines.serializer import HOUR_METER_MAX
-from rentals.models import Rentals
+from rentals import lifecycle
+from rentals.meter import usage_summary
+from rentals.models import RentalMeterReadings, Rentals
 from users.enums import UserRole
 from users.models import Users
 
@@ -51,10 +52,10 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             "operator",
             "start_date",
             "end_date",
-            "initial_hour_meter",
-            "final_hour_meter",
+            "notes",
             "status",
         ]
+        extra_kwargs = {"notes": {"max_length": 1000, "allow_blank": True, "required": False}}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,27 +66,8 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             for field in ("postings", "lessee"):
                 self.fields.pop(field)
 
-    @staticmethod
-    def _validate_hour_meter(value: int | None) -> int | None:
-        if value is not None and not 0 <= value <= HOUR_METER_MAX:
-            raise serializers.ValidationError(f"A leitura do horímetro deve estar entre 0 e {HOUR_METER_MAX} horas.")
-        return value
-
-    def validate_initial_hour_meter(self, value: int | None) -> int | None:
-        return self._validate_hour_meter(value)
-
-    def validate_final_hour_meter(self, value: int | None) -> int | None:
-        return self._validate_hour_meter(value)
-
     def validate(self, attrs):
         """Keep a day free before and after each rental for machine turnaround."""
-        initial = attrs.get("initial_hour_meter", getattr(self.instance, "initial_hour_meter", None))
-        final = attrs.get("final_hour_meter", getattr(self.instance, "final_hour_meter", None))
-        if initial is not None and final is not None and final < initial:
-            raise serializers.ValidationError(
-                {"final_hour_meter": "A leitura final do horímetro não pode ser menor que a inicial."}
-            )
-
         start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
         end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
         posting = attrs.get("postings", getattr(self.instance, "postings", None))
@@ -96,8 +78,8 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
 
         if self.instance and not any(field in attrs for field in ('start_date', 'end_date')):
-            # Cancellation and meter updates must still work if an expired hold
-            # has since been taken by another renter.
+            # Cancellation and notes must still work if an expired hold has
+            # since been taken by another renter.
             return attrs
         if not self.instance or any(field in attrs for field in ('start_date', 'end_date')):
             if posting.status != 'active' or posting.machinery.status != 'active':
@@ -141,6 +123,15 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     contract_status = serializers.SerializerMethodField()
     accepted_by_lessor = serializers.SerializerMethodField()
     accepted_by_lessee = serializers.SerializerMethodField()
+    # Leitura única do ciclo de vida (rentals.lifecycle): as telas não decidem por status.
+    phase = serializers.SerializerMethodField()
+    phase_label = serializers.SerializerMethodField()
+    allowed_actions = serializers.SerializerMethodField(
+        help_text="Ações que o usuário autenticado pode executar agora (vazio sem usuário no contexto)."
+    )
+    meter = serializers.SerializerMethodField(
+        help_text="Leituras vigentes do horímetro e horas usadas. Informativo: não altera o valor."
+    )
 
     class Meta:
         model = Rentals
@@ -160,7 +151,12 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "platform_fee",
             "initial_hour_meter",
             "final_hour_meter",
+            "meter",
             "status",
+            "phase",
+            "phase_label",
+            "allowed_actions",
+            "notes",
             "created_at",
             "updated_at",
             "lessee_name",
@@ -206,3 +202,22 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     def get_accepted_by_lessee(self, obj: Rentals) -> bool:
         contract = self._contract(obj)
         return bool(contract.accepted_by_lessee) if contract else False
+
+    def get_phase(self, obj: Rentals) -> str:
+        return lifecycle.phase(obj).value
+
+    def get_phase_label(self, obj: Rentals) -> str:
+        return lifecycle.phase(obj).label
+
+    def get_meter(self, obj: Rentals) -> dict[str, Any]:
+        return usage_summary(obj)
+
+    def get_allowed_actions(self, obj: Rentals) -> list[str]:
+        return lifecycle.allowed_actions(obj, self.context.get("user"))
+
+
+class RentalMeterReadingOutputSerializer(serializers.ModelSerializer[RentalMeterReadings]):
+    class Meta:
+        model = RentalMeterReadings
+        fields = ["id", "rental", "kind", "value", "note", "recorded_by", "recorded_at", "supersedes"]
+        read_only_fields = fields

@@ -257,9 +257,9 @@ When a rental completes with a check-out reading above `machines.hour_meter`, up
 | B | Contract revisions + backend clause template + honest text (**implemented 2026-10-21**: legacy 1.0.0 contracts keep their old wording and two-flag flow; the operator clauses 1.2/5.2 were left as they were) | 1.2, 1.5 | A |
 | C | OTP binding + trusted proxy IP (**implemented 2026-10-21**: setting named `CONTRACT_TRUSTED_PROXIES`; a changed email is rejected at signing instead of invalidating codes in the profile update) | 1.3 | B (revision FK) |
 | D | Chat reliability (**implemented 2026-10-21**) | 4.1 | — (parallel) |
-| E | Lifecycle module + booking policy + notes | 4.2, 4.3 | A |
-| F | Meter readings, completion, usage metrics | 3.x | A, E |
-| G | Payment attempts + reconciliation | 2.1 | A |
+| E | Lifecycle module + booking policy + notes (**implemented 2026-10-21**: policy exposed at `GET /api/rentals/policy`) | 4.2, 4.3 | A |
+| F | Meter readings, completion, usage metrics (**implemented 2026-10-21**: 3.4 left off, so readings never touch the machine meter or price suggestions) | 3.x | A, E |
+| G | Payment attempts + reconciliation (**implemented 2026-10-21**: attempts without a session never block cancellation) | 2.1 | A |
 | H | Cancellation/refund + signature deadline + clause 9 text | 2.2, 2.3 | B, G |
 | I | Date-change amendments + clause 2 text | 2.4 | B, E |
 | — | Phase 5 items | 5 | as needed |

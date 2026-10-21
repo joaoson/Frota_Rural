@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
-import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
+import type { MeterReadingKind, RentalMeter } from "@/features/contracts/types/rental";
+import { canDo, isOpenRental, rentalPhaseBadge } from "@/features/contracts/types/rentalLifecycle";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { StarRating } from "@/shared/components/StarRating";
 import type { DashboardView } from "./DashboardCollection";
@@ -10,6 +11,11 @@ import type { DashboardView } from "./DashboardCollection";
 export interface RentalCardData {
   id: string;
   status: string | null;
+  /** Fase e ações vindas do servidor; sem elas o cartão usa a regra antiga por status. */
+  phase?: string | null;
+  allowedActions?: string[];
+  notes?: string;
+  meter?: RentalMeter | null;
   contract: string | null;
   machine: string;
   period: string;
@@ -53,6 +59,21 @@ interface RentalCardProps {
   recurrenceIndex?: number | null;
   /** Quando presente, "Analisar" vira link para a análise da locação. */
   analysisHref?: string;
+  /** Locador: registra leitura do horímetro. Devolve true quando gravou. */
+  onRecordReading?: (kind: MeterReadingKind, value: number, note: string) => Promise<boolean>;
+  /** Locador: conclui a locação, com a leitura de devolução opcional. */
+  onComplete?: (finalHourMeter?: number) => Promise<boolean>;
+  meterBusy?: boolean;
+}
+
+const HOUR_METER_MAX = 60000;
+const METER_NOTICE = "As leituras do horímetro são só acompanhamento de uso: não alteram o valor da locação.";
+
+/** "" vira undefined; inteiro de 0 a 60.000 vira número; o resto é inválido (null). */
+function parseReading(raw: string): number | undefined | null {
+  if (raw.trim() === "") return undefined;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value <= HOUR_METER_MAX ? value : null;
 }
 
 const PANEL_INPUT =
@@ -92,8 +113,15 @@ export function RentalCard({
   onScheduleRecurrence,
   paymentAction,
   recurrenceIndex,
+  onRecordReading,
+  onComplete,
+  meterBusy = false,
 }: RentalCardProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [meterForm, setMeterForm] = useState<MeterReadingKind | "complete" | null>(null);
+  const [meterValue, setMeterValue] = useState("");
+  const [meterNote, setMeterNote] = useState("");
+  const [meterError, setMeterError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const { hash } = useLocation();
   useEffect(() => {
@@ -102,9 +130,34 @@ export function RentalCard({
       cardRef.current?.focus({ preventScroll: true });
     }
   }, [rental.id, hash]);
-  const badge = rentalStatusBadge(rental.status);
-  const isOpenStage = ["pending", "awaiting_payment", "active", "signed", "validating"].includes(rental.status ?? "");
-  const isClosedStage = rental.status === "completed" || rental.status === "cancelled" || rental.status === "closed";
+  const badge = rentalPhaseBadge(rental);
+  const isOpenStage = isOpenRental(rental);
+  const isClosedStage = !isOpenStage;
+  const canCancel = canDo(rental, "cancel");
+  const canReview = canDo(rental, "review");
+  const meter = rental.meter ?? null;
+  // A leitura de devolução na conclusão só cabe depois de uma retirada registrada.
+  const askReadingOnComplete = Boolean(meter?.checkIn && !meter?.checkOut);
+
+  const openMeterForm = (form: MeterReadingKind | "complete") => {
+    setMeterForm(form);
+    setMeterValue("");
+    setMeterNote("");
+    setMeterError(null);
+  };
+
+  const submitMeterForm = async () => {
+    if (!meterForm) return;
+    const value = parseReading(meterValue);
+    if (value === null || (meterForm !== "complete" && value === undefined)) {
+      setMeterError(`Informe a leitura em horas inteiras, de 0 a ${HOUR_METER_MAX.toLocaleString("pt-BR")}.`);
+      return;
+    }
+    const done = meterForm === "complete"
+      ? await onComplete?.(value)
+      : await onRecordReading?.(meterForm, value as number, meterNote.trim());
+    if (done) setMeterForm(null);
+  };
 
   return (
     <div ref={cardRef} id={`locacao-${rental.id}`} tabIndex={-1} className="@container/rental scroll-mt-20 focus:outline-2 focus:outline-primary bg-surface-container-low rounded-2xl border border-outline-variant/30 relative overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
@@ -136,13 +189,28 @@ export function RentalCard({
         <div className="flex flex-wrap gap-2">
           {onScheduleRecurrence && <button type="button" onClick={onScheduleRecurrence} className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20"><MaterialIcon icon="event_repeat" size={14} /> Programar recorrência</button>}
           {paymentAction}
-          {rental.status === "pending" && onCancel && (
+          {onRecordReading && canDo(rental, "record_check_in") && (
+            <button type="button" onClick={() => openMeterForm("check_in")} className="flex items-center gap-1 rounded-lg border border-primary/30 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/10">
+              <MaterialIcon icon="speed" size={14} /> {meter?.checkIn ? "Corrigir leitura de retirada" : "Registrar retirada"}
+            </button>
+          )}
+          {onRecordReading && canDo(rental, "record_check_out") && (
+            <button type="button" onClick={() => openMeterForm("check_out")} className="flex items-center gap-1 rounded-lg border border-primary/30 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/10">
+              <MaterialIcon icon="speed" size={14} /> {meter?.checkOut ? "Corrigir leitura de devolução" : "Registrar devolução"}
+            </button>
+          )}
+          {onComplete && canDo(rental, "complete") && (
+            <button type="button" onClick={() => openMeterForm("complete")} className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-xs font-bold text-on-primary hover:shadow-md">
+              <MaterialIcon icon="task_alt" size={14} /> Concluir locação
+            </button>
+          )}
+          {canCancel && onCancel && (
             <button type="button" onClick={() => setConfirmCancel(true)} disabled={cancelling} className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50">
               {cancelLabel}
             </button>
           )}
-          {rental.status === "completed" && review.alreadyReviewed && <span className="px-4 py-2 text-xs text-on-surface-variant">Avaliação enviada</span>}
-          {rental.status === "completed" && !review.alreadyReviewed && (
+          {canReview && review.alreadyReviewed && <span className="px-4 py-2 text-xs text-on-surface-variant">Avaliação enviada</span>}
+          {canReview && !review.alreadyReviewed && (
             <button
               onClick={review.onToggle}
               className="px-4 bg-secondary-container/30 text-secondary py-2 rounded-lg font-bold text-xs hover:bg-secondary-container/50 transition-colors flex items-center gap-1"
@@ -198,10 +266,65 @@ export function RentalCard({
                 <span className="text-on-surface font-bold">{badge.label}</span>
               </DetailRow>
             </div>
+            {meter && (meter.checkIn || meter.checkOut) ? (
+              <div className="grid grid-cols-1 @sm/rental:grid-cols-2 gap-3 text-sm">
+                <DetailRow label="Horímetro">
+                  <span className="text-on-surface font-bold">
+                    Retirada {meter.checkIn ? `${meter.checkIn.value.toLocaleString("pt-BR")} h` : "—"} ·
+                    Devolução {meter.checkOut ? `${meter.checkOut.value.toLocaleString("pt-BR")} h` : "—"}
+                  </span>
+                </DetailRow>
+                {meter.hoursUsed !== null && (
+                  <DetailRow label="Uso registrado">
+                    <span className="text-on-surface font-bold">
+                      {meter.hoursUsed.toLocaleString("pt-BR")} h
+                      {meter.referenceHours ? ` (referência: ${meter.referenceHours} h)` : ""}
+                    </span>{" "}
+                    <span className="text-xs text-on-surface-variant">· informativo, não altera o valor</span>
+                  </DetailRow>
+                )}
+              </div>
+            ) : null}
+            {rental.notes ? (
+              <DetailRow label="Observações do locatário">
+                <span className="text-on-surface whitespace-pre-line">{rental.notes}</span>
+              </DetailRow>
+            ) : null}
           </div>
         )}
 
-        {confirmCancel && rental.status === "pending" && onCancel && (
+        {meterForm && (
+          <div role="group" aria-label={meterForm === "complete" ? "Concluir locação" : "Registrar leitura do horímetro"} className="mt-4 rounded-xl border border-primary/30 p-4 space-y-3">
+            <p className="text-sm font-bold text-on-surface">
+              {meterForm === "complete"
+                ? "Concluir esta locação?"
+                : meterForm === "check_in" ? "Leitura do horímetro na retirada" : "Leitura do horímetro na devolução"}
+            </p>
+            <p className="text-xs text-on-surface-variant">{METER_NOTICE}</p>
+            {(meterForm !== "complete" || askReadingOnComplete) && (
+              <label className="block text-xs font-bold text-outline">
+                {meterForm === "complete" ? "Leitura de devolução (opcional, em horas)" : "Leitura (horas)"}
+                <input type="number" inputMode="numeric" min={0} max={HOUR_METER_MAX} step={1} value={meterValue}
+                  onChange={(event) => { setMeterValue(event.target.value); setMeterError(null); }} className={`${PANEL_INPUT} mt-1`} />
+              </label>
+            )}
+            {meterForm !== "complete" && (
+              <label className="block text-xs font-bold text-outline">
+                Observação (opcional)
+                <input type="text" maxLength={500} value={meterNote} onChange={(event) => setMeterNote(event.target.value)} className={`${PANEL_INPUT} mt-1`} />
+              </label>
+            )}
+            {meterError && <p role="alert" className="text-xs text-error">{meterError}</p>}
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={meterBusy} onClick={() => void submitMeterForm()} className="rounded-lg bg-primary text-on-primary px-4 py-2 text-sm font-bold disabled:opacity-50">
+                {meterBusy ? "Salvando..." : meterForm === "complete" ? "Confirmar conclusão" : "Salvar leitura"}
+              </button>
+              <button type="button" disabled={meterBusy} onClick={() => setMeterForm(null)} className="rounded-lg border px-4 py-2 text-sm">Voltar</button>
+            </div>
+          </div>
+        )}
+
+        {confirmCancel && canCancel && onCancel && (
           <div role="group" aria-label="Confirmar cancelamento da reserva" className="mt-4 rounded-xl border border-error/30 p-4 space-y-3">
             <p className="text-sm">Cancelar esta reserva? As datas serão liberadas para novas locações.</p>
             <div className="flex flex-wrap gap-3">
@@ -211,7 +334,7 @@ export function RentalCard({
           </div>
         )}
 
-        {review.open && rental.status === "completed" && !review.alreadyReviewed && (
+        {review.open && canReview && !review.alreadyReviewed && (
           <div className="mt-4 bg-secondary-fixed/20 border border-secondary-container/30 rounded-xl p-5 space-y-4 animate-in fade-in">
             <h4 className="font-headline font-bold text-on-surface text-sm flex items-center gap-2">
               <MaterialIcon icon="star" size={16} className="text-secondary" /> {review.title}

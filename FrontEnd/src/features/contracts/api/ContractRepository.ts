@@ -2,8 +2,12 @@ import type { HttpClient } from "@/shared/http/HttpClient";
 
 import type { ContratoData } from "../types/contractDocument";
 import type {
+  BookingPolicy,
   Contract,
   ContractEvidence,
+  MachineUsage,
+  MeterReadingKind,
+  MeterRecordResult,
   Rental,
   RentalOccupancy,
   RentalQuote,
@@ -48,6 +52,10 @@ export interface ContractRepository {
   listByPosting(postingId: string): Promise<Rental[]>;
   listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]>;
   quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote>;
+  bookingPolicy(): Promise<BookingPolicy>;
+  recordMeterReading(id: string, kind: MeterReadingKind, value: number, note?: string): Promise<MeterRecordResult>;
+  completeRental(id: string, finalHourMeter?: number): Promise<Rental>;
+  machineUsage(machineId: string): Promise<MachineUsage>;
   createRental(payload: CreateRentalPayload): Promise<Rental>;
   previewRecurrence(id: string, payload: RecurrenceInput): Promise<RecurrencePreview>;
   createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated>;
@@ -99,6 +107,46 @@ export class HttpContractRepository implements ContractRepository {
       query: { start_date: startDate, end_date: endDate },
     });
     return quoteToDomain(rentalQuoteApiSchema.parse(response.data));
+  }
+
+  async bookingPolicy(): Promise<BookingPolicy> {
+    const response = await this.http.send<{ antecedencia_minima_dias: number; data_minima_inicio: string }>({
+      method: "GET", path: "rentals/policy",
+    });
+    return { minNoticeDays: response.data.antecedencia_minima_dias, earliestStartDate: response.data.data_minima_inicio };
+  }
+
+  async recordMeterReading(id: string, kind: MeterReadingKind, value: number, note = ""): Promise<MeterRecordResult> {
+    const response = await this.http.send<{ rental: unknown; warnings?: string[] }>({
+      method: "POST", path: `${RENTALS_PATH}/${id}/meter-readings`, body: { kind, value, note },
+    });
+    return { rental: rentalToDomain(rentalApiSchema.parse(response.data.rental)), warnings: response.data.warnings ?? [] };
+  }
+
+  async completeRental(id: string, finalHourMeter?: number): Promise<Rental> {
+    const response = await this.http.send<unknown>({
+      method: "POST", path: `${RENTALS_PATH}/${id}/complete`,
+      body: finalHourMeter === undefined ? {} : { final_hour_meter: finalHourMeter },
+    });
+    return rentalToDomain(rentalApiSchema.parse(response.data));
+  }
+
+  async machineUsage(machineId: string): Promise<MachineUsage> {
+    const response = await this.http.send<{
+      locacoes_concluidas: number; diarias: number; locacoes_com_leitura: number; horas_registradas: number;
+      media_horas_por_diaria: string | null; referencia_horas_por_diaria: number;
+      ultima_leitura: { valor: number; registrada_em: string } | null;
+    }>({ method: "GET", path: `machines/${machineId}/usage` });
+    const data = response.data;
+    return {
+      completedRentals: data.locacoes_concluidas, days: data.diarias, measuredRentals: data.locacoes_com_leitura,
+      hoursRecorded: data.horas_registradas,
+      averageHoursPerDay: data.media_horas_por_diaria === null ? null : Number(data.media_horas_por_diaria),
+      referenceHoursPerDay: data.referencia_horas_por_diaria,
+      lastReading: data.ultima_leitura
+        ? { value: data.ultima_leitura.valor, recordedAt: new Date(data.ultima_leitura.registrada_em) }
+        : null,
+    };
   }
 
   async findRentalById(id: string): Promise<Rental> {

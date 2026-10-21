@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+const meterReadingApiSchema = z.object({
+  id: z.string(), value: z.number(), note: z.string().nullish(), recorded_at: z.string(), recorded_by: z.string().nullish(),
+});
+export const rentalMeterApiSchema = z.object({
+  check_in: meterReadingApiSchema.nullable(),
+  check_out: meterReadingApiSchema.nullable(),
+  hours_used: z.number().nullable(),
+  reference_hours: z.number().nullable(),
+});
+
 export const rentalApiSchema = z.object({
   id: z.string(),
   postings: z.string(),
@@ -19,6 +29,11 @@ export const rentalApiSchema = z.object({
   initial_hour_meter: z.number().nullish(),
   final_hour_meter: z.number().nullish(),
   status: z.string().nullish(),
+  phase: z.string().nullish(),
+  phase_label: z.string().nullish(),
+  allowed_actions: z.array(z.string()).nullish(),
+  notes: z.string().nullish(),
+  meter: rentalMeterApiSchema.nullish(),
   // Estado do aceite: `status` sozinho não distingue quem já assinou.
   accepted_by_lessor: z.boolean().nullish(),
   accepted_by_lessee: z.boolean().nullish(),
@@ -71,6 +86,8 @@ export interface CreateRentalPayload {
   end_date: string;
   total_price: number;
   status: string;
+  /** Observações para a retirada; vão ao locador, não ao contrato. */
+  notes?: string;
 }
 
 export type SignatureRole = "locador" | "locatario";

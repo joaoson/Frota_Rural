@@ -1,11 +1,13 @@
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
+import { isAwaitingPayment, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/useAuth";
-import { useCancelRental, useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
+import { useCancelRental, useCompleteRental, useRecordMeterReading, useRentalsAsLessor } from "@/features/contracts/hooks/useContracts";
+import { MachineUsageLine } from "@/features/machines/components/MachineUsageLine";
 import { rentalMachineName, rentalHasContract } from "@/features/contracts/types/rental";
 import { situacaoAssinatura } from "@/features/contracts/types/rental";
 import { rentalStatusBadge } from "@/features/contracts/types/rentalBadges";
@@ -110,6 +112,8 @@ const DashboardLocador = () => {
   const createReview = useCreateReview();
   const updateMachine = useUpdateMachine();
   const cancelRental = useCancelRental();
+  const recordReading = useRecordMeterReading();
+  const completeRental = useCompleteRental();
 
   const receivedReviews: Review[] = receivedQuery.data ?? [];
   const givenReviews: Review[] = givenQuery.data ?? [];
@@ -162,6 +166,11 @@ const DashboardLocador = () => {
             ? `${r.startDate.toLocaleDateString("pt-BR")} a ${r.endDate.toLocaleDateString("pt-BR")}`
             : "",
         status: r.status,
+        phase: r.phase,
+        allowedActions: r.allowedActions,
+        notes: r.notes,
+        meter: r.meter,
+        source: r,
         total: (r.totalPrice ?? 0).toLocaleString("pt-BR", {
           style: "currency",
           currency: "BRL",
@@ -219,20 +228,8 @@ const DashboardLocador = () => {
   const filteredRentals = rentals.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract));
   const filteredContracts = contracts.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
 
-  const activeRentals = useMemo(
-    () =>
-      rentals.filter(
-        (r) => ["pending", "awaiting_payment", "active", "signed", "validating"].includes(r.status ?? ""),
-      ),
-    [rentals],
-  );
-  const pastRentals = useMemo(
-    () =>
-      rentals.filter(
-        (r) => ["completed", "cancelled", "closed"].includes(r.status ?? ""),
-      ),
-    [rentals],
-  );
+  const activeRentals = useMemo(() => rentals.filter(isOpenRental), [rentals]);
+  const pastRentals = useMemo(() => rentals.filter((r) => !isOpenRental(r)), [rentals]);
 
   const visibleActiveRentals = filteredRentals.filter((rental) => activeRentals.some((active) => active.id === rental.id));
   const visiblePastRentals = filteredRentals.filter((rental) => pastRentals.some((past) => past.id === rental.id));
@@ -280,6 +277,28 @@ const DashboardLocador = () => {
         catch (error) { toast.error(error instanceof HttpError ? error.message : "Não foi possível recusar a reserva."); }
       }}
       cancelling={cancelRental.isPending}
+      meterBusy={recordReading.isPending || completeRental.isPending}
+      onRecordReading={async (kind, value, note) => {
+        try {
+          const { warnings } = await recordReading.mutateAsync({ id: r.id, kind, value, note });
+          toast.success("Leitura do horímetro registrada.");
+          warnings.forEach((warning) => toast.warning(warning));
+          return true;
+        } catch (error) {
+          toast.error(error instanceof HttpError ? error.message : "Não foi possível registrar a leitura.");
+          return false;
+        }
+      }}
+      onComplete={async (finalHourMeter) => {
+        try {
+          await completeRental.mutateAsync({ id: r.id, finalHourMeter });
+          toast.success("Locação concluída.");
+          return true;
+        } catch (error) {
+          toast.error(error instanceof HttpError ? error.message : "Não foi possível concluir a locação.");
+          return false;
+        }
+      }}
       detailsOpen={showDetalhes === r.id}
       onToggleDetails={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)}
       review={{
@@ -690,6 +709,7 @@ const DashboardLocador = () => {
                     <p className="text-xs text-outline font-medium tracking-wide uppercase mt-1">
                       Finalidade: {m.purpose || "Não informada"}
                     </p>
+                    <MachineUsageLine machineId={m.id} />
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -1085,7 +1105,7 @@ const DashboardLocador = () => {
             items={[...visibleActiveRentals, ...visiblePastRentals]}
             resetKey={JSON.stringify([searchText, year])}
             focusItemId={focusedRentalId}
-            getGroup={(rental) => ["completed", "cancelled", "closed"].includes(rental.status ?? "") ? "Locações Passadas" : "Locações em Andamento"}
+            getGroup={(rental) => isOpenRental(rental) ? "Locações em Andamento" : "Locações Passadas"}
             renderItem={renderRentalCard}
           />
 
@@ -1158,7 +1178,7 @@ const DashboardLocador = () => {
                   ? { icon: "check_circle", variant: "neutral", label: "Encerrado" }
                   : situacaoAssinatura(c).completo
                     ? { icon: "verified", variant: "success", label: "Assinado" }
-                    : ["pending", "awaiting_payment"].includes(c.status ?? "")
+                    : isAwaitingPayment(c)
                       ? { icon: "payments", variant: "pending", label: "Aguardando Pagamento" }
                       : { icon: "description", variant: "pending", label: "Assinatura Pendente" }} />
               </div>

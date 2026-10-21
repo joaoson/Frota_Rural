@@ -4,13 +4,13 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import DashboardLocador from "../DashboardLocador";
 
-const mocks = vi.hoisted(() => ({ review: vi.fn(), cancel: vi.fn(), postings: vi.fn(), machines: [] as object[], rentals: [] as object[], reviews: [] as object[], given: [] as object[] }));
+const mocks = vi.hoisted(() => ({ record: vi.fn(), complete: vi.fn(), review: vi.fn(), cancel: vi.fn(), postings: vi.fn(), machines: [] as object[], rentals: [] as object[], reviews: [] as object[], given: [] as object[] }));
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "owner-a", logout: vi.fn() }) }));
 vi.mock("@/features/users/hooks/useUsers", () => ({ useUser: () => ({ data: { id: "owner-a", name: "João", role: "locador" } }) }));
 vi.mock("@/features/machines/hooks/useMachines", () => ({ useMachines: () => ({ data: mocks.machines }) }));
 vi.mock("@/features/machines/hooks/useUpdateMachine", () => ({ useUpdateMachine: () => ({ mutateAsync: vi.fn() }) }));
 vi.mock("@/features/postings/hooks/usePostings", () => ({ usePostings: (...args: unknown[]) => { mocks.postings(...args); return { data: [] }; } }));
-vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessor: () => ({ data: mocks.rentals }), useCancelRental: () => ({ mutateAsync: mocks.cancel }) }));
+vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessor: () => ({ data: mocks.rentals }), useCancelRental: () => ({ mutateAsync: mocks.cancel }), useRecordMeterReading: () => ({ mutateAsync: mocks.record, isPending: false }), useCompleteRental: () => ({ mutateAsync: mocks.complete, isPending: false }), useMachineUsage: () => ({ data: undefined }) }));
 vi.mock("@/features/reviews/hooks/useReviews", () => ({ useCreateReview: () => ({ mutateAsync: mocks.review }), useReceivedReviews: () => ({ data: mocks.reviews }), useWrittenReviews: () => ({ data: mocks.given }) }));
 vi.mock("@/features/documents/hooks/useDocuments", () => ({ useCertifications: () => ({ data: [] }), useOperatorLicenses: () => ({ data: [] }) }));
 vi.mock("@/app/container", () => ({ documentStore: {} }));
@@ -89,4 +89,11 @@ it("opens an owner rental deep link on its containing page", () => {
   expect(screen.getByText("John Deere Modelo 13")).toBeTruthy();
   expect(screen.getByText("13–14 de 14 itens")).toBeTruthy();
   expect(screen.queryByText("John Deere Modelo 0")).toBeNull();
+});
+
+it("counts open rentals with the same lifecycle meaning as the tenant", () => {
+  mocks.rentals = [rental, { ...rental, id: "unpaid", status: "pending" }, { ...rental, id: "paid", status: "active" },
+    { ...rental, id: "in-use", status: "signed", phase: "em_uso" }, { ...rental, id: "gone", status: "cancelled" }];
+  open("dashboard");
+  expect(within(screen.getByText("LOCAÇÕES EM ABERTO").parentElement!.parentElement!).getByText("3")).toBeTruthy();
 });

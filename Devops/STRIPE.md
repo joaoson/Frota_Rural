@@ -81,7 +81,7 @@ docker stop frota_rural_retrofit-stripe-listener
 O SDK Stripe retorna `StripeObject`, que não oferece `dict.get()`. Esse uso
 causava HTTP 500 no evento e na sessão, mesmo com assinatura válida. O serviço
 usa acesso por chave e checagem de presença. Os testes usam o parser real do
-SDK com payloads assinados e não acessam banco nem rede:
+SDK com payloads assinados e não acessam a rede:
 
 ```bash
 docker exec NOME_DO_BACKEND_LOCAL python manage.py test payments.test_webhook
@@ -94,3 +94,24 @@ pertence ao Compose legado que carrega `BackEnd/.env`; não a execute contra um
 backend com `STRIPE_WEBHOOK_SECRET` fornecido pelo ambiente. Nesse caso,
 configure a chave e o segredo do listener no arquivo selecionado e recrie o
 backend com o mesmo modo/offset antes de encaminhar os eventos.
+
+## Tentativas duráveis e conciliação
+
+Cada checkout grava antes uma tentativa em `payments` (status `creating`) com a
+chave de idempotência `checkout:<locação>:<n>` e os parâmetros exatos da sessão. O
+Stripe é chamado fora dos locks da reserva; se a resposta se perder, uma nova
+tentativa do locatário repete a mesma chave e recebe a mesma sessão, sem criar
+outra. A sessão leva `payment_id` em `metadata`, então o webhook liga a sessão à
+tentativa mesmo quando a gravação local falhou. Cada evento recebido fica em
+`payment_events` e é aplicado uma única vez.
+
+O que a resposta síncrona e o webhook não fecharam é resolvido por:
+
+```bash
+docker exec NOME_DO_BACKEND_LOCAL python manage.py reconcile_payments
+```
+
+O comando repete tentativas incertas com a mesma chave, expira no Stripe sessões
+de reservas já canceladas, aplica pagamentos ou expirações cujo webhook não
+chegou e lista os pagamentos em revisão. Ele é idempotente; em produção, rode-o
+periodicamente (cron ou job agendado), já que o projeto não tem agendador próprio.

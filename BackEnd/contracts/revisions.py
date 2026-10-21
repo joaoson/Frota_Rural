@@ -11,7 +11,7 @@ from contracts import signature_evidence
 from contracts.contract_document import build_contract_document
 from contracts.enums import ContractStatus, RevisionReason
 from contracts.models import Contracts, ContractRevisions
-from rentals.enums import RentalStatus
+from rentals import lifecycle
 
 
 def freeze_revision(contract: Contracts, *, reason: str = RevisionReason.INITIAL) -> ContractRevisions:
@@ -40,7 +40,7 @@ def freeze_revision(contract: Contracts, *, reason: str = RevisionReason.INITIAL
 def _is_paid(contract: Contracts) -> bool:
     rental = contract.rental
     return (contract.status == ContractStatus.PENDING_SIGNATURES
-            and rental.status in (RentalStatus.ACTIVE, RentalStatus.SIGNED)
+            and rental.status in lifecycle.PAID
             and rental.payments.filter(status="approved").exists())
 
 

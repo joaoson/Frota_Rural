@@ -8,14 +8,22 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.schemas import error_response, error_responses
+from rentals.meter import MeterReadingInputSerializer, MeterService
 from rentals.serializer import (
     RentalFilterSerializer,
     RentalInputSerializer,
+    RentalMeterReadingOutputSerializer,
     RentalOutputSerializer,
 )
+from rentals import policy
 from rentals.services import RentalService
 
 TAGS = ["Locações"]
+
+
+def _context(request: Request) -> dict[str, object]:
+    """`allowed_actions` depende de quem pergunta."""
+    return {"user": request.user}
 RENTAL_NOT_FOUND = error_response(404, "Locação não encontrada.")
 INVALID_RENTAL = error_response(
     400, "Dados inválidos, período acima do limite do anúncio ou em conflito com outra reserva."
@@ -34,7 +42,8 @@ class RentalListView(APIView):
     )
     def get(self, request: Request) -> Response:
         rentals = RentalService.list(request.query_params, user=request.user)
-        return Response(RentalOutputSerializer(rentals, many=True).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rentals, many=True, context=_context(request)).data,
+                        status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
@@ -62,7 +71,7 @@ class RentalListView(APIView):
     )
     def post(self, request: Request) -> Response:
         rental = RentalService.create(request.data, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_201_CREATED)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_201_CREATED)
 
 
 class RentalDetailView(APIView):
@@ -75,7 +84,7 @@ class RentalDetailView(APIView):
     )
     def get(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.get(pk, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
@@ -85,7 +94,7 @@ class RentalDetailView(APIView):
     )
     def put(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.update(pk, request.data, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
@@ -96,7 +105,7 @@ class RentalDetailView(APIView):
     )
     def patch(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.update(pk, request.data, user=request.user, partial=True)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
@@ -110,3 +119,96 @@ class RentalDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         RentalService.delete(pk, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BookingPolicyView(APIView):
+    @extend_schema(
+        tags=TAGS,
+        summary="Regras de reserva",
+        description=(
+            "Antecedência mínima aplicada pelo servidor à reserva avulsa, à troca de datas e à "
+            "recorrência. A tela de reserva usa estes valores em vez de repetir a regra."
+        ),
+        responses={200: None},
+    )
+    def get(self, request: Request) -> Response:
+        return Response({
+            "antecedencia_minima_dias": policy.ANTECEDENCIA_MINIMA_DIAS,
+            "data_minima_inicio": policy.earliest_start_date().isoformat(),
+        }, status=status.HTTP_200_OK)
+
+
+class RentalMeterReadingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Leituras do horímetro da locação",
+        description="Histórico das leituras de retirada e devolução, inclusive as corrigidas.",
+        responses={200: RentalMeterReadingOutputSerializer(many=True), 404: RENTAL_NOT_FOUND},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        readings = MeterService.readings(pk, user=request.user)
+        return Response(RentalMeterReadingOutputSerializer(readings, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Registrar leitura do horímetro",
+        description=(
+            "O locador registra a leitura de retirada (`check_in`) e a de devolução (`check_out`) de uma "
+            "locação assinada, a partir do primeiro dia. Uma nova leitura do mesmo tipo corrige a anterior. "
+            "As leituras são só métricas de uso: não alteram o valor, o pagamento nem a conclusão."
+        ),
+        request=MeterReadingInputSerializer,
+        responses={
+            201: None,
+            400: error_response(400, "Leitura negativa, acima de 60.000 h ou de devolução menor que a de retirada."),
+            403: error_response(403, "Somente o locador registra as leituras."),
+            404: RENTAL_NOT_FOUND,
+            409: error_response(409, "Locação ainda não assinada, já concluída ou antes do primeiro dia."),
+        },
+    )
+    def post(self, request: Request, pk: UUID) -> Response:
+        result = MeterService.record(pk, request.data, user=request.user)
+        rental = RentalService.get(pk, user=request.user)
+        return Response({
+            "reading": RentalMeterReadingOutputSerializer(result.reading).data,
+            "warnings": list(result.warnings),
+            "rental": RentalOutputSerializer(rental, context=_context(request)).data,
+        }, status=status.HTTP_201_CREATED)
+
+
+class RentalCompleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Concluir locação",
+        description=(
+            "O locador conclui uma locação assinada pelas duas partes depois da data de fim. A leitura de "
+            "devolução (`final_hour_meter`) é opcional e só informativa."
+        ),
+        request=None,
+        responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND,
+                   409: error_response(409, "Contrato sem as duas assinaturas ou período ainda em andamento.")},
+    )
+    def post(self, request: Request, pk: UUID) -> Response:
+        rental = RentalService.complete(pk, request.data, user=request.user)
+        rental = RentalService.get(rental.pk, user=request.user)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
+
+
+class MachineUsageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Máquinas"],
+        summary="Uso registrado da máquina",
+        description=(
+            "Locações concluídas, diárias e horas registradas pelo horímetro, com a média por diária ao lado "
+            "da referência de 8 h. Só o dono da máquina consulta. Informativo: não altera preços."
+        ),
+        responses={200: None, 404: error_response(404, "Máquina não encontrada.")},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        return Response(MeterService.machine_usage(pk, user=request.user), status=status.HTTP_200_OK)

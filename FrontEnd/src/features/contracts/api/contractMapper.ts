@@ -1,6 +1,7 @@
 import type {
   Contract,
   ContractEvidence,
+  MeterReading,
   Rental,
   RentalQuote,
   SignatureEvidence,
@@ -25,6 +26,10 @@ function toNumber(value: string | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function readingToDomain(dto: NonNullable<NonNullable<RentalApi["meter"]>["check_in"]>): MeterReading {
+  return { id: dto.id, value: dto.value, note: dto.note ?? "", recordedAt: new Date(dto.recorded_at) };
 }
 
 export function rentalToDomain(dto: RentalApi): Rental {
@@ -54,6 +59,18 @@ export function rentalToDomain(dto: RentalApi): Rental {
     initialHourMeter: dto.initial_hour_meter ?? null,
     finalHourMeter: dto.final_hour_meter ?? null,
     status: dto.status ?? null,
+    phase: dto.phase ?? null,
+    phaseLabel: dto.phase_label ?? null,
+    ...(dto.allowed_actions ? { allowedActions: dto.allowed_actions } : {}),
+    notes: dto.notes ?? "",
+    meter: dto.meter
+      ? {
+          checkIn: dto.meter.check_in ? readingToDomain(dto.meter.check_in) : null,
+          checkOut: dto.meter.check_out ? readingToDomain(dto.meter.check_out) : null,
+          hoursUsed: dto.meter.hours_used,
+          referenceHours: dto.meter.reference_hours,
+        }
+      : null,
     acceptedByLessor: Boolean(dto.accepted_by_lessor),
     acceptedByLessee: Boolean(dto.accepted_by_lessee),
     contractStatus: dto.contract_status ?? null,

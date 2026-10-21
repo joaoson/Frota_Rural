@@ -3,7 +3,11 @@ import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type { ContratoData } from "../types/contractDocument";
 import type {
+  BookingPolicy,
   ContractEvidence,
+  MachineUsage,
+  MeterReadingKind,
+  MeterRecordResult,
   Rental,
   RentalOccupancy,
   RentalQuote,
@@ -20,6 +24,7 @@ export const contractKeys = {
   rentals: () => [...contractKeys.all, "rentals"] as const,
   rentalList: (filter: RentalFilter) => [...contractKeys.rentals(), filter] as const,
   document: (id: string) => [...contractKeys.all, "document", id] as const,
+  machineUsage: (machineId: string) => [...contractKeys.all, "machine-usage", machineId] as const,
   evidence: (id: string) => [...contractKeys.all, "evidence", id] as const,
 };
 
@@ -61,6 +66,30 @@ export class ContractStore {
   /** Valor do servidor para o período; é o mesmo que a reserva congela. */
   quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote> {
     return this.repository.quotePosting(postingId, startDate, endDate);
+  }
+
+  /** Antecedência mínima do servidor, a mesma para reserva, troca de datas e recorrência. */
+  bookingPolicy(): Promise<BookingPolicy> {
+    return this.repository.bookingPolicy();
+  }
+
+  async recordMeterReading(id: string, kind: MeterReadingKind, value: number, note?: string): Promise<MeterRecordResult> {
+    const result = await this.repository.recordMeterReading(id, kind, value, note);
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return result;
+  }
+
+  async completeRental(id: string, finalHourMeter?: number): Promise<Rental> {
+    const rental = await this.repository.completeRental(id, finalHourMeter);
+    void this.invalidateRentals();
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    void this.queryClient.invalidateQueries({ queryKey: [...contractKeys.all, "machine-usage"] });
+    return rental;
+  }
+
+  machineUsageOptions(machineId: string): UseQueryOptions<MachineUsage, Error, MachineUsage, ReturnType<typeof contractKeys.machineUsage>> {
+    return { queryKey: contractKeys.machineUsage(machineId), queryFn: () => this.repository.machineUsage(machineId) };
   }
 
   findRentalById(id: string): Promise<Rental> {

@@ -9,7 +9,7 @@ import type { PostingDetail } from "@/features/postings/types/posting";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
-import type { RentalOccupancy, RentalQuote, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { BookingPolicy, RentalOccupancy, RentalQuote, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 import { HttpError } from "@/shared/http/errors";
 
@@ -385,6 +385,7 @@ const Reservar = () => {
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [cotacao, setCotacao] = useState<RentalQuote | null>(null);
+  const [politica, setPolitica] = useState<BookingPolicy | null>(null);
 
   useEffect(() => {
     const requestedStart = searchParams.get("inicio");
@@ -392,11 +393,20 @@ const Reservar = () => {
     if (searchParams.get("extensao") === "1") setObservacoes("Solicitação de extensão da locação anterior.");
   }, [searchParams]);
 
+  // A antecedência mínima é do servidor; a conta local só vale até ela chegar.
+  useEffect(() => {
+    let ignored = false;
+    contractStore.bookingPolicy()
+      .then((value) => { if (!ignored) setPolitica(value); })
+      .catch(() => {});
+    return () => { ignored = true; };
+  }, []);
   const minStartDate = useMemo(() => {
+    if (politica) return politica.earliestStartDate;
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return d.toISOString().split("T")[0];
-  }, []);
+  }, [politica]);
 
   // Etapa 3 — assinatura
   const [aceitouTermos, setAceitouTermos] = useState(false);
@@ -655,7 +665,7 @@ const Reservar = () => {
       return;
     }
     if (dataInicio < minStartDate) {
-      toast.error("A data de início deve ser a partir de uma semana após o dia de hoje.");
+      toast.error(`A locação precisa começar a partir de ${formatarData(minStartDate)}.`);
       return;
     }
     if (diarias <= 0) {
@@ -687,6 +697,7 @@ const Reservar = () => {
           start_date: toRentalDateTime(dataInicio, "start"),
           end_date: toRentalDateTime(dataFim, "end"),
           total_price: total, status: "pending",
+          ...(observacoes.trim() ? { notes: observacoes.trim() } : {}),
         });
         // Keep the server-issued reservation before contacting the provider:
         // retrying or refreshing must never create another rental for these dates.
@@ -992,6 +1003,7 @@ const Reservar = () => {
                       Observações (opcional)
                     </label>
                     <textarea id="observacoes-opcional"
+                      maxLength={1000}
                       rows={4}
                       value={observacoes}
                       onChange={(e) => setObservacoes(e.target.value)}

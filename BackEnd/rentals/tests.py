@@ -161,7 +161,7 @@ class RentalServiceTests(TestCase):
         lessee = make_user("locatario", 2)
         machine = Machines.objects.create(id=uuid.uuid4(), owner=owner, status="active")
         posting = Postings.objects.create(id=uuid.uuid4(), machinery=machine, hourly_rate="100.00", status="active")
-        start = timezone.now() + timedelta(days=5)
+        start = timezone.now() + timedelta(days=10)  # beyond the 7-day minimum notice
 
         with (
             patch(

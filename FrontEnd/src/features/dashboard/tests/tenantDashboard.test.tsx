@@ -86,3 +86,12 @@ it("opens a tenant rental deep link on its containing page", () => {
   expect(screen.getByText("13–14 de 14 itens")).toBeTruthy();
   expect(screen.queryByText("John Deere Modelo 0")).toBeNull();
 });
+
+it("counts paid, unfinished rentals as active on the overview", () => {
+  mocks.rentals = [completed, pending, { ...pending, id: "paid", status: "active", phase: "aguardando_assinaturas" },
+    { ...pending, id: "in-use", status: "signed", phase: "em_uso" }];
+  show("dashboard");
+  const card = screen.getByText("LOCAÇÕES ATIVAS").parentElement!.parentElement!;
+  expect(card.textContent).toContain("2");
+  expect(card.textContent).toContain("pagas e em andamento");
+});
