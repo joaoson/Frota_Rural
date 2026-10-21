@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
+from common.api_documentation import API_DESCRIPTION
 from .database import database_config, load_environment
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -172,22 +173,13 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Frota Rural API",
-    "DESCRIPTION": (
-        "Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na "
-        "conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).\n\n"
-        "## Autenticação\n\n"
-        "A API usa **JWT (Bearer token)**. Para testar os endpoints protegidos por aqui:\n\n"
-        "1. Chame `POST /api/login` com e-mail e senha.\n"
-        "2. Copie o valor de `access` da resposta.\n"
-        "3. Clique em **Authorize** (canto superior direito) e cole o token.\n\n"
-        "O token de acesso expira em 15 minutos; use `POST /api/login/refresh` para renová-lo."
-    ),
+    "DESCRIPTION": API_DESCRIPTION,
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "CONTACT": {"name": "Equipe Frota Rural", "url": "https://github.com/joaoson/Frota_Rural"},
     "SERVERS": [
-        {"url": "http://127.0.0.1:8000", "description": "Ambiente local de desenvolvimento"},
+        {"url": "/", "description": "Mesmo endereço e porta desta documentação"},
     ],
     "SORT_OPERATIONS": False,
     "PREPROCESSING_HOOKS": ["common.schema.canonical_endpoints"],
@@ -219,6 +211,7 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
         "displayRequestDuration": True,
+        "withCredentials": True,
         "docExpansion": "none",
         "filter": True,
     },
@@ -228,10 +221,15 @@ SPECTACULAR_SETTINGS = {
     "TAGS": [
         {"name": "Autenticação", "description": "Login, refresh, logout e recuperação de senha."},
         {"name": "Usuários", "description": "Cadastro, consulta e manutenção de contas."},
+        {"name": "Operadores", "description": "Vínculos dos operadores com a equipe do locatário."},
         {"name": "Maquinário", "description": "Equipamentos cadastrados pelos locadores."},
+        {"name": "Máquinas", "description": "Métricas de utilização do maquinário pelo locador."},
         {"name": "Anúncios", "description": "Publicação de maquinário disponível para locação."},
         {"name": "Locações", "description": "Reservas e ciclo de vida das locações."},
         {"name": "Contratos", "description": "Geração e assinatura dos contratos de locação."},
+        {"name": "Pagamentos", "description": "Cotação, checkout, confirmação de pagamentos e webhook Stripe."},
+        {"name": "Precificação", "description": "Simulação do preço por diária e consulta da ocupação do anúncio."},
+        {"name": "Notificações", "description": "Avisos privados de reservas, pagamentos e contratos para o destinatário."},
         {"name": "Avaliações", "description": "Reputação de locadores e locatários."},
         {"name": "Mensagens", "description": "Chat entre locadores, locatários e operadores."},
         {

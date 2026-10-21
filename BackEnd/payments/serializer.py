@@ -9,7 +9,7 @@ from rentals.enums import RentalStatus
 class CheckoutOutputSerializer(serializers.Serializer[Any]):
     url = serializers.CharField(help_text="Página de pagamento do Stripe.")
     amount = serializers.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor cobrado, recalculado no servidor."
+        max_digits=10, decimal_places=2, help_text="Valor em reais preservado na cotação da reserva; não é informado pelo cliente."
     )
 
 

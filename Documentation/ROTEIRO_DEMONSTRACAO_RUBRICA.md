@@ -95,7 +95,9 @@ Não repetir uma interrupção em ambiente compartilhado. Se a banca pedir exerc
 
 **Como explicar:** “O contrato HTTP tem 106 operações canônicas em 72 caminhos. A CI valida o OpenAPI e um teste exige sumário, descrição, agrupamento e respostas em cada operação. O README explica ambiente e execução; WebSocket e endpoints operacionais têm guias próprios.”
 
-**Pendência antes de apresentar payloads como executáveis:** o exemplo de reserva ainda envia `total_price`, que o servidor calcula e recusa como entrada; os exemplos de assinatura precisam incluir a revisão correta. Até corrigir e registrar request/response válidos, defender **dois dos três itens**, nível de **60%**. Para dados de exemplo, usar registros persistidos no ambiente de demonstração, identificados como fictícios.
+**Atualização do Swagger em 21/10/2026:** reserva sem preço enviado pelo cliente; OTP e assinatura com `revision_id`; exemplos de aditivo, recorrência, cancelamento e horímetro; respostas JSON antes ausentes agora descritas. O guia inicial explica quais IDs guardar e como trocar de conta. O “Try it out” usa a porta em que a página foi aberta.
+
+**Como demonstrar os payloads:** mostre o exemplo de reserva e a suíte [test_documented_examples.py](../BackEnd/common/tests/test_documented_examples.py), que carrega os exemplos do OpenAPI e os executa pela API com registros fictícios persistidos no banco de teste. O conjunto de validação teve **21 testes aprovados**, incluindo assinatura com OTP pelas duas partes e recorrência sem duplicação. Veja o [roteiro detalhado](README_Servicos_Backend.md#exemplos-executáveis-e-apresentação). Isso resolve a incompatibilidade técnica apontada na comparação anterior e acrescenta evidência para o item b; o nível máximo depende de a banca aceitar dados de teste como “dados reais”. E-mail e pagamento externo não foram exercitados por essa suíte.
 
 ## Cobertura automatizada do backend
 
@@ -147,4 +149,4 @@ Ajustar ao tempo autorizado pela banca. As falas podem ser divididas entre os in
 - **“Está monitorado em produção?”** A evidência apresentada é da stack local isolada. Mostrar exatamente esse alcance.
 - **“Por que migrações ainda estão em 30%?”** A ferramenta e os testes estão demonstrados; os níveis superiores exigem frequência por sprint, ainda sem denominador oficial conciliado.
 - **“Todos os cards Done comprovam os 80%?”** Não. O aceite exige matriz do escopo acordado e suas evidências. Há fechamentos retrospectivos e diferenças documentadas.
-- **“OpenAPI válido significa que qualquer exemplo funciona?”** Não. O schema é validado estruturalmente; exemplos de reserva e assinatura precisam da revisão apontada nesta comparação.
+- **“OpenAPI válido significa que qualquer exemplo funciona?”** Não. Além da validação estrutural, agora executamos os exemplos críticos por testes da API. No Swagger, UUIDs, datas e OTPs ainda precisam ser substituídos pelos valores do ambiente e da revisão lida.

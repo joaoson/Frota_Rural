@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from django.conf import settings
-from drf_spectacular.utils import OpenApiExample, extend_schema
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.permissions import AllowAny, BasePermission
@@ -52,7 +52,8 @@ class LoginView(PublicAuthView):
             OpenApiExample(
                 "Exemplo de Login",
                 summary="Credenciais de acesso",
-                value={"email": "contato@tratoresecia.com.br", "password": "senha_forte_456"},
+                description="Use as credenciais de uma conta de teste cadastrada; estes valores são ilustrativos.",
+                value={"email": "locatario@example.test", "password": "senha-de-teste"},
                 request_only=True,
             )
         ],
@@ -115,10 +116,11 @@ class LogoutView(PublicAuthView):
     summary="Verificar token JWT",
     description=(
         "Confirma se um access token continua válido e não expirou. "
-        "Responde 200 com corpo vazio quando o token é válido."
+        "Recebe {token: <access token>} e responde 200 com o objeto JSON vazio {} quando válido."
     ),
     responses={
-        200: None,
+        200: OpenApiResponse(response={"type": "object", "additionalProperties": False}, description="Token válido; objeto JSON vazio {}."),
+        400: error_response(400, "Campo token ausente."),
         401: error_response(401, "Token inválido ou expirado."),
     },
 )

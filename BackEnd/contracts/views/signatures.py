@@ -28,7 +28,11 @@ class ContractSignatureOtpView(APIView):
         summary="Solicitar código de assinatura",
         description=(
             "Envia ao e-mail da parte um código de uso único que precisa ser informado no aceite. "
-            "Cada novo pedido invalida o código anterior daquele papel.\n\n"
+            "Exige pagamento confirmado e prazo de assinatura vigente. Primeiro leia "
+            "GET /api/contracts/{id} e envie `revisao.id` em `revision_id`; o código fica "
+            "vinculado à revisão e ao usuário autenticado. Cada novo pedido invalida o código "
+            "anterior daquele papel. A resposta informa o e-mail mascarado e a validade em "
+            "segundos, nunca o código. Substitua o UUID ilustrativo pela revisão lida.\n\n"
             f"{ACCEPTS_RENTAL_ID}"
         ),
         request=ContractOtpRequestInputSerializer,
@@ -37,8 +41,12 @@ class ContractSignatureOtpView(APIView):
             400: error_response(400, "Papel inválido ou parte sem e-mail cadastrado."),
             403: error_response(403, "O usuário autenticado não é a parte daquele papel."),
             404: CONTRACT_NOT_FOUND,
+            409: error_response(409, "Revisão ausente/desatualizada (stale_revision), prazo encerrado, pagamento pendente ou parte já assinou."),
             **error_responses(502),
         },
+        examples=[OpenApiExample("Código para a revisão lida", value={
+            "role": "locatario", "revision_id": "3b0ca71c-8eed-45b0-9c31-6f2d5ec18c71",
+        }, request_only=True)],
     )
     def post(self, request: Request, pk: UUID) -> Response:
         dispatch = ContractSignatureService.request_otp(
@@ -57,7 +65,13 @@ class ContractSignView(APIView):
             "Registra o aceite do locador ou do locatário com a evidência do momento (hash do "
             "documento, IP, user-agent e OTP). Enquanto só uma parte assinou, o contrato fica em "
             "`pending_signatures` e a locação em `active`; quando ambas assinam, os dois passam a "
-            f"`signed`.\n\n{ACCEPTS_RENTAL_ID}"
+            "`signed`.\n\n"
+            "Antes de assinar, leia GET /api/contracts/{id}, informe `revisao.id` em "
+            "`revision_id` e peça o OTP para essa revisão. Substitua os códigos ilustrativos "
+            "pelo código recebido por e-mail; cada parte usa a própria conta. Pagamento "
+            "confirmado e prazo vigente são pré-requisitos. Se receber `stale_revision`, "
+            "releia o documento e solicite outro OTP antes de aceitar.\n\n"
+            f"{ACCEPTS_RENTAL_ID}"
         ),
         request=ContractSignInputSerializer,
         responses={
@@ -65,7 +79,7 @@ class ContractSignView(APIView):
             400: error_response(400, "Papel inválido ou código ausente, expirado ou incorreto."),
             403: error_response(403, "O usuário autenticado não é a parte daquele papel."),
             404: CONTRACT_NOT_FOUND,
-            409: error_response(409, "Esta parte já assinou o contrato."),
+            409: error_response(409, "Parte já assinou (already_signed), revisão desatualizada (stale_revision), prazo encerrado ou pagamento pendente."),
         },
         examples=[
             OpenApiExample(
@@ -73,8 +87,9 @@ class ContractSignView(APIView):
                 summary="Exemplo de assinatura da parte que vai alugar",
                 value={
                     "role": "locatario",
-                    "name": "João da Silva - CPF 123.456.789-00",
+                    "name": "Locatário de demonstração",
                     "otp": "482913",
+                    "revision_id": "3b0ca71c-8eed-45b0-9c31-6f2d5ec18c71",
                 },
                 request_only=True,
             ),
@@ -83,8 +98,9 @@ class ContractSignView(APIView):
                 summary="Exemplo de assinatura do dono da máquina",
                 value={
                     "role": "locador",
-                    "name": "Tratores & Cia - CNPJ 12.345.678/0001-99",
+                    "name": "Locador de demonstração",
                     "otp": "105377",
+                    "revision_id": "3b0ca71c-8eed-45b0-9c31-6f2d5ec18c71",
                 },
                 request_only=True,
             ),

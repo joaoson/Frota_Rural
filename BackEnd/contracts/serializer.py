@@ -19,7 +19,7 @@ class ContractOtpRequestInputSerializer(serializers.Serializer[Any]):
     revision_id = serializers.UUIDField(
         required=False,
         allow_null=True,
-        help_text="`revisao.id` do documento que a parte leu; o código só vale para essa revisão.",
+        help_text="`revisao.id` do documento que a parte leu. Obrigatório quando há revisão congelada; o código só vale para essa revisão. Ausência ou divergência retorna stale_revision (409).",
     )
 
 
