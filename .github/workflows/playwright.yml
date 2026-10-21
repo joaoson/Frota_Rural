@@ -106,6 +106,10 @@ jobs:
       - name: Install browser dependencies
         working-directory: FrontEnd
         run: npx playwright install --with-deps
+      - name: Let the backend container write coverage reports
+        # The checkout belongs to the runner user, while the backend runs as appuser (uid 1000)
+        # with BackEnd mounted at /app: without this, coverage cannot create /app/.coverage.
+        run: mkdir -p BackEnd/coverage-report && chmod a+rwx BackEnd BackEnd/coverage-report
       - name: Start isolated Docker stack
         run: docker compose up --build -d
       - name: Wait for frontend and backend
