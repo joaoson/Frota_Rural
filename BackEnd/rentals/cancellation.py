@@ -22,6 +22,15 @@ class CancellationInputSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=1000, allow_blank=True, required=False, default="")
 
 
+class CancellationQuoteSerializer(serializers.Serializer):
+    allowed = serializers.BooleanField()
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    retained_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    reason_code = serializers.CharField()
+    policy_text = serializers.CharField()
+    policy_version = serializers.CharField()
+
+
 class CancellationService:
     @staticmethod
     def get(rental_id, *, user):

@@ -1,3 +1,4 @@
+import { useDashboardPreference, searchMapPreference, yearMapPreference, contractPreference } from "@/features/dashboard/hooks/useDashboardPreference";
 import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { isAwaitingPayment, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
@@ -221,16 +222,16 @@ const DashboardLocador = () => {
   const revenueData = summary.months;
   const ratingsData = summary.months;
   const ratingAverage = averageRating(receivedReviews);
-  const [search, setSearch] = useState<Partial<Record<Tab, string>>>({});
-  const [years, setYears] = useState<Partial<Record<Tab, string>>>({});
-  const [contractFilter, setContractFilter] = useState("Todos");
+  const [search, setSearch] = useDashboardPreference<Record<string, string>>(userId, "owner:search", searchMapPreference, {});
+  const [years, setYears] = useDashboardPreference<Record<string, string>>(userId, "owner:years", yearMapPreference, {});
+  const [contractFilter, setContractFilter] = useDashboardPreference<string>(userId, "owner:contracts", contractPreference, "Todos");
   const searchText = search[tab] ?? "";
   const year = years[tab] ?? "Todos";
   const matchesYear = (value?: number | null) => year === "Todos" || String(value) === year;
   const filteredMachines = machines.filter((m) => matchesYear(m.year) && matchesSearch(searchText, m.brand, m.model, m.renagro));
   const filteredPostings = postings.filter((p) => matchesYear(p.year) && matchesSearch(searchText, p.machine, p.location));
-  const filteredRentals = rentals.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract));
-  const filteredContracts = contracts.filter((r) => matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
+  const filteredRentals = rentals.filter((r) => r.id === focusedRentalId || matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract));
+  const filteredContracts = contracts.filter((r) => r.id === focusedRentalId || matchesYear(r.year) && matchesSearch(searchText, r.machine, r.lessee, r.contract) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
 
   const activeRentals = useMemo(() => rentals.filter(isOpenRental), [rentals]);
   const pastRentals = useMemo(() => rentals.filter((r) => !isOpenRental(r)), [rentals]);
@@ -698,7 +699,7 @@ const DashboardLocador = () => {
                 key={m.id}
                 className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 flex flex-wrap items-start justify-between gap-4 group hover:shadow-xl transition-all duration-300 shadow-sm"
               >
-                <div className="flex items-start gap-4">
+                <div className="flex min-w-0 max-w-full items-start gap-4">
                   <div className="w-14 h-14 shrink-0 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
                     <MaterialIcon
                       icon="agriculture"

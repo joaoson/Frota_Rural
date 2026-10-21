@@ -82,6 +82,7 @@ class UserByEmailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Buscar usuário por e-mail",
+        description="Consulta um perfil por endereço de e-mail respeitando as permissões e os campos públicos do serviço.",
         responses={200: UserOutputSerializer, 404: USER_NOT_FOUND},
     )
     def get(self, request: Request, email: str) -> Response:
@@ -95,6 +96,7 @@ class UserDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar usuário",
+        description="Retorna os campos de perfil permitidos para o usuário autenticado.",
         responses={200: UserOutputSerializer, 404: USER_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -104,6 +106,7 @@ class UserDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir dados do perfil",
+        description="Valida e substitui os campos editáveis do próprio perfil, sujeito às permissões administrativas.",
         request=UserUpdateInputSerializer,
         responses={200: UserOutputSerializer, **error_responses(400, 409), 404: USER_NOT_FOUND},
     )
@@ -125,6 +128,7 @@ class UserDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir usuário",
+        description="Remove o usuário quando permitido pelas regras de autorização e integridade dos vínculos existentes.",
         responses={
             204: None,
             404: USER_NOT_FOUND,

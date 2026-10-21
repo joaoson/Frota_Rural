@@ -1,3 +1,4 @@
+import { useDashboardPreference, searchPreference, yearPreference, contractPreference } from "@/features/dashboard/hooks/useDashboardPreference";
 import { contractStore } from "@/app/container";
 import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
@@ -78,11 +79,11 @@ const DashboardLocatario = () => {
   const requestedTab = searchParams.get("tab");
   const tab: Tab = visibleItems.find((item) => item.tab === requestedTab)?.tab ?? (isOperator ? "conta" : "dashboard");
   const setTab = (next: Tab) => setSearchParams({ tab: next });
-  const [rentalSearch, setRentalSearch] = useState("");
-  const [rentalYear, setRentalYear] = useState("Todos");
-  const [contractSearch, setContractSearch] = useState("");
-  const [contractYear, setContractYear] = useState("Todos");
-  const [contractFilter, setContractFilter] = useState("Todos");
+  const [rentalSearch, setRentalSearch] = useDashboardPreference<string>(userId, "tenant:rentalSearch", searchPreference, "");
+  const [rentalYear, setRentalYear] = useDashboardPreference<string>(userId, "tenant:rentalYear", yearPreference, "Todos");
+  const [contractSearch, setContractSearch] = useDashboardPreference<string>(userId, "tenant:contractSearch", searchPreference, "");
+  const [contractYear, setContractYear] = useDashboardPreference<string>(userId, "tenant:contractYear", yearPreference, "Todos");
+  const [contractFilter, setContractFilter] = useDashboardPreference<string>(userId, "tenant:contractFilter", contractPreference, "Todos");
   const [signingRental, setSigningRental] = useState<string | null>(null);
   const [amendmentRentalId, setAmendmentRentalId] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
@@ -142,8 +143,8 @@ const DashboardLocatario = () => {
     (year === "Todos" || String(r.source.startDate?.getFullYear()) === year);
   const years = ["Todos", ...Array.from(new Set(rentals.flatMap(r => r.source.startDate ? [String(r.source.startDate.getFullYear())] : []))).sort().reverse()];
   const allContracts = rentals.filter(r => r.hasContract);
-  const contracts = allContracts.filter(r => matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
-  const filteredRentals = rentals.filter(r => matches(r, rentalSearch, rentalYear));
+  const contracts = allContracts.filter(r => r.id === focusedRentalId || matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
+  const filteredRentals = rentals.filter(r => r.id === focusedRentalId || matches(r, rentalSearch, rentalYear));
   const activeRentals = filteredRentals.filter(isOpenRental);
   const pastRentals = filteredRentals.filter(r => !isOpenRental(r));
   const today = new Date();

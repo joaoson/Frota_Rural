@@ -2,7 +2,7 @@
 branch = True
 source = .
 relative_files = True
-data_file = /app/.coverage
+data_file = .coverage
 omit =
     */migrations/*
     */tests/*
@@ -17,13 +17,14 @@ omit =
 [report]
 precision = 2
 show_missing = True
+fail_under = 90
 
 [html]
-directory = /app/coverage-report
+directory = coverage-report
 title = Frota Rural - Backend Django
 
 [json]
-output = /app/coverage-report/coverage.json
+output = coverage-report/coverage.json
 
 [xml]
-output = /app/coverage-report/coverage.xml
+output = coverage-report/coverage.xml

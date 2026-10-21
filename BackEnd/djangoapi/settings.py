@@ -76,6 +76,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "common.observability.ObservabilityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # Add this at the VERY TOP
     "django.middleware.common.CommonMiddleware",  # Must be after CorsMiddleware
     "django.middleware.security.SecurityMiddleware",
@@ -189,10 +190,13 @@ SPECTACULAR_SETTINGS = {
         {"url": "http://127.0.0.1:8000", "description": "Ambiente local de desenvolvimento"},
     ],
     "SORT_OPERATIONS": False,
+    "PREPROCESSING_HOOKS": ["common.schema.canonical_endpoints"],
     # Vários campos se chamam `status` (ou `role`) com conjuntos de opções
     # diferentes. Sem os nomes explícitos o drf-spectacular gera componentes com
     # sufixo aleatório (StatusDe3Enum). Cada entrada aponta para o TextChoices.
     "ENUM_NAME_OVERRIDES": {
+        "MeterReadingKindEnum": "rentals.enums.MeterReadingKind",
+        "NotificationKindEnum": ["rental", "payment", "contract"],
         "ValidationStatusEnum": "document_validation.enums.ValidationStatus",
         "ReviewDecisionEnum": "document_validation.enums.ReviewDecision",
         "LicenseCategoryEnum": "document_validation.enums.LicenseCategory",
@@ -355,3 +359,15 @@ CHAT_BANNED_WORDS = [
 CHAT_MAX_MESSAGE_LENGTH = int(os.getenv("CHAT_MAX_MESSAGE_LENGTH", "4000"))
 CHAT_RATE_LIMIT_MESSAGES = int(os.getenv("CHAT_RATE_LIMIT_MESSAGES", "20"))
 CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "10"))
+
+# Telemetry remains private unless an explicit scrape credential is configured.
+METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
+METRICS_TOKEN_FILE = os.getenv("METRICS_TOKEN_FILE", "")
+CORS_EXPOSE_HEADERS = ["X-Request-ID"]
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"request_json": {"()": "common.observability.RequestLogFormatter"}},
+    "handlers": {"request_console": {"class": "logging.StreamHandler", "formatter": "request_json"}},
+    "loggers": {"frota.requests": {"handlers": ["request_console"], "level": "INFO", "propagate": False}},
+}

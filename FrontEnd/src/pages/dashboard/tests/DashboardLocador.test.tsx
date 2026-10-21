@@ -24,7 +24,7 @@ vi.mock("recharts", () => ({ ResponsiveContainer: () => null, Area: () => null, 
 
 const rental = { id: "rental-a", lesseeId: "tenant-a", lesseeName: "Maria", machineBrand: "John Deere", machineModel: "S790", totalPrice: 1200, startDate: new Date(2026, 8, 1), endDate: new Date(2026, 8, 2), createdAt: new Date(2026, 7, 30), status: "completed", contractId: null, contractNumber: null, contractStatus: null, acceptedByLessor: false, acceptedByLessee: false };
 function open(tab: string) { render(<MemoryRouter initialEntries={[`/dashboard?tab=${tab}`]}><DashboardLocador /></MemoryRouter>); }
-beforeEach(() => { mocks.review.mockReset().mockResolvedValue(undefined); mocks.postings.mockClear(); mocks.rentals = [rental]; mocks.reviews = []; mocks.given = []; mocks.machines = [{ id: "machine-a", brand: "John Deere", model: "S790", year: 2020, status: "active" }, { id: "machine-b", brand: "Case", model: "Magnum", year: 2024, status: "maintenance" }]; });
+beforeEach(() => { localStorage.clear(); mocks.review.mockReset().mockResolvedValue(undefined); mocks.postings.mockClear(); mocks.rentals = [rental]; mocks.reviews = []; mocks.given = []; mocks.machines = [{ id: "machine-a", brand: "John Deere", model: "S790", year: 2020, status: "active" }, { id: "machine-b", brand: "Case", model: "Magnum", year: 2024, status: "maintenance" }]; });
 afterEach(cleanup);
 
 it("submits the selected rental and its tenant, then prevents duplicate reviews", async () => {

@@ -83,3 +83,5 @@ typing-inspection==0.4.4
 ujson==5.13.0
 urllib3==2.6.3
 zope.interface==8.6
+
+prometheus-client==0.24.1

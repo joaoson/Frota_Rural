@@ -61,6 +61,7 @@ class OperatorLicenseDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar CNH",
+        description="Consulta um documento de habilitação de acordo com as permissões do titular ou administrador.",
         responses={200: OperatorLicenseOutputSerializer, 404: LICENSE_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -100,6 +101,7 @@ class OperatorLicenseDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir CNH",
+        description="Exclui o documento de habilitação autorizado e seus dados de análise.",
         responses={204: None, 404: LICENSE_NOT_FOUND},
     )
     def delete(self, request: Request, pk: UUID) -> Response:

@@ -86,6 +86,7 @@ class PostingDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir anúncio",
+        description="Substitui os campos editáveis de anúncio pertencente ao locador autenticado. Contratos existentes preservam seus valores acordados.",
         request=PostingInputSerializer,
         responses={
             200: PostingOutputSerializer,
@@ -115,6 +116,7 @@ class PostingDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir anúncio",
+        description="Remove anúncio autorizado quando seus vínculos permitem a exclusão.",
         responses={
             204: None,
             404: POSTING_NOT_FOUND,

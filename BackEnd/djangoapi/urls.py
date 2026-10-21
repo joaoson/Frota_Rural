@@ -21,9 +21,14 @@ from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
+from common.observability import liveness, readiness, metrics
+
 BASE_PATH = "api/"
 
 urlpatterns = [
+    path("health/live", liveness, name="health_live"),
+    path("health/ready", readiness, name="health_ready"),
+    path("metrics", metrics, name="metrics"),
     path("admin/", admin.site.urls),
     path(BASE_PATH, include("rentals.urls")),
     path(BASE_PATH, include("reviews.urls")),

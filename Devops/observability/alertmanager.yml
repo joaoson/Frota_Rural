@@ -1,0 +1,9 @@
+route:
+  receiver: local-console
+  group_by: [alertname, dependency]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+# Alerts remain visible in the local UI. Add an approved receiver for remote operations.
+receivers:
+  - name: local-console

@@ -87,6 +87,7 @@ class MachineDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar máquina",
+        description="Consulta os dados cadastrais da máquina identificada pelo UUID.",
         responses={200: MachineOutputSerializer, 404: MACHINE_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -96,6 +97,7 @@ class MachineDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir máquina",
+        description="Substitui os campos editáveis de uma máquina do locador autenticado.",
         request=MachineInputSerializer,
         responses={
             200: MachineOutputSerializer,

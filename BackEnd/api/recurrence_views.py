@@ -8,6 +8,8 @@ from api.recurrence import (
     RecurrenceCreateRequestSerializer, RecurrencePreviewRequestSerializer,
     build_preview, create_recurrence, preview_response, series_response, source_for_user,
 )
+from common.schemas import error_responses
+
 from rentals.serializer import RentalOutputSerializer
 
 
@@ -38,7 +40,8 @@ class RecurrenceResponseSerializer(serializers.Serializer):
 
 @extend_schema(
     tags=['Locações'], summary='Prévia da recorrência de uma locação',
-    request=RecurrencePreviewRequestSerializer, responses={200: RecurrencePreviewResponseSerializer},
+    description='Simula 2 a 12 novas reservas semanais, quinzenais ou mensais usando preços atuais. Apenas o locatário da origem pode solicitar. A prévia não bloqueia datas.',
+    request=RecurrencePreviewRequestSerializer, responses={200: RecurrencePreviewResponseSerializer, **error_responses(400, 401, 403, 404, 409)},
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -51,7 +54,8 @@ def recurrence_preview(request, pk):
 
 @extend_schema(
     tags=['Locações'], summary='Programar recorrência de aluguel',
-    request=RecurrenceCreateRequestSerializer, responses={201: RecurrenceResponseSerializer},
+    description='Revalida toda a série em transação única. idempotency_key recupera a mesma tentativa após falha de rede; conflito em qualquer ocorrência impede criação parcial. Cada reserva exige pagamento próprio antes da expiração, sem débito automático.',
+    request=RecurrenceCreateRequestSerializer, responses={201: RecurrenceResponseSerializer, **error_responses(400, 401, 403, 404, 409)},
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

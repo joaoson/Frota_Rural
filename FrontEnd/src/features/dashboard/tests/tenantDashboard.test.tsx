@@ -23,7 +23,7 @@ vi.mock("recharts", () => Object.fromEntries(["AreaChart", "Area", "BarChart", "
 
 const completed = rentalToDomain({ id: "rental-a", postings: "posting-a", lessee: "tenant-a", lessor_id: "owner-a", lessor_name: "João Silva", machine_brand: "John Deere", machine_model: "S790", start_date: "2026-09-01T08:00:00Z", end_date: "2026-09-02T18:00:00Z", total_price: "2000", status: "completed" });
 const pending = rentalToDomain({ id: "rental-b", postings: "posting-b", lessee: "tenant-a", lessor_id: "owner-b", lessor_name: "Ana Pereira", machine_brand: "Case", machine_model: "Puma", start_date: "2026-09-25T08:00:00Z", end_date: "2026-09-26T18:00:00Z", total_price: "900", status: "pending", contract_id: "contract-b", contract_status: "pending", contract_number: "FR-B" });
-beforeEach(() => { mocks.userRole = "locatario"; mocks.rentals = [completed, pending]; mocks.reviews = []; mocks.create.mockResolvedValue({}); mocks.cancel.mockResolvedValue({}); });
+beforeEach(() => { localStorage.clear(); mocks.userRole = "locatario"; mocks.rentals = [completed, pending]; mocks.reviews = []; mocks.create.mockResolvedValue({}); mocks.cancel.mockResolvedValue({}); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const show = (tab: string) => render(<MemoryRouter initialEntries={[`/dashboard-locatario?tab=${tab}`]}><DashboardLocatario /></MemoryRouter>);
 

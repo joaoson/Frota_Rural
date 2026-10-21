@@ -19,6 +19,7 @@ class PostingRecommendationView(APIView):
 
     @extend_schema(
         tags=["Anúncios"], summary="Encontrar máquinas pela busca guiada",
+        description="Recebe requisitos da atividade rural e recomenda anúncios compatíveis; pode usar provedor de IA e informa limitações da recomendação.",
         request=RecommendationInputSerializer,
         responses={200: RecommendationOutputSerializer, **error_responses(400)},
     )

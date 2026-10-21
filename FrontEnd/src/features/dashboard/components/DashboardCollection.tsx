@@ -1,7 +1,13 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { z } from "zod";
+import { AuthContext } from "@/contexts/authContextValue";
+import { useDashboardPreference } from "../hooks/useDashboardPreference";
+import { useContext, useId, useRef, useState, type ReactNode } from "react";
 
 import DashboardPagination from "@/components/DashboardPagination";
 import MaterialIcon from "@/components/MaterialIcon";
+
+const viewSchema = z.enum(["list", "grid"]);
+const sizeSchema = z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(48)]);
 
 export type DashboardView = "list" | "grid";
 
@@ -15,7 +21,7 @@ interface DashboardCollectionProps<T> {
   getGroup?: (item: T) => string;
 }
 
-/** Presentation state stays local; filtering and fetching belong to the caller. */
+/** Preferences persist per account; pagination stays local to each collection. */
 export function DashboardCollection<T extends { id: string }>({
   label,
   items,
@@ -27,8 +33,9 @@ export function DashboardCollection<T extends { id: string }>({
 }: DashboardCollectionProps<T>) {
   const sizeId = useId();
   const sectionRef = useRef<HTMLElement>(null);
-  const [view, setView] = useState(defaultView);
-  const [pageSize, setPageSize] = useState(6);
+  const userId = useContext(AuthContext)?.userId ?? null;
+  const [view, setView] = useDashboardPreference<DashboardView>(userId, `${label}:view`, viewSchema, defaultView);
+  const [pageSize, setPageSize] = useDashboardPreference<number>(userId, `${label}:size`, sizeSchema, 6);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const focusIndex = items.findIndex((item) => item.id === focusItemId);
   const resolvedFocusId = focusIndex >= 0 ? focusItemId : undefined;
@@ -92,7 +99,7 @@ export function DashboardCollection<T extends { id: string }>({
         <div key={group} className="space-y-4">
           {group && <h2 className="font-headline text-lg font-bold text-on-surface">{group}</h2>}
           <div className={view === "grid" ? "grid grid-cols-1 gap-4 @3xl/collection:grid-cols-2" : "grid grid-cols-1 gap-4"}>
-            {records.map((item) => <div key={item.id} className="min-w-0 break-words [&>*]:h-full">{renderItem(item, view)}</div>)}
+            {records.map((item) => <div key={item.id} className="min-w-0 [overflow-wrap:anywhere] [&>*]:h-full">{renderItem(item, view)}</div>)}
           </div>
         </div>
       ))}

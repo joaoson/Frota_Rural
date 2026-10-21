@@ -1,3 +1,5 @@
+from datetime import datetime
+from drf_spectacular.utils import extend_schema_field
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -190,10 +192,11 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
         except ObjectDoesNotExist:
             return None
 
-    def get_signature_deadline(self, obj):
+    def get_signature_deadline(self, obj) -> datetime | None:
         contract = self._contract(obj)
         return contract.signature_deadline if contract else None
 
+    @extend_schema_field({"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}, "amount": {"type": "string"}, "status": {"type": "string"}}}})
     def get_refunds(self, obj):
         from payments.models import Refunds
         return [{"id": str(refund.pk), "amount": str(refund.amount), "status": refund.status}

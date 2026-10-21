@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { AuthContext } from "@/contexts/authContextValue";
+import { resetDashboardPreferences } from "../hooks/useDashboardPreference";
+import { useContext, useState } from "react";
 import { Link } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
@@ -50,6 +52,7 @@ export function DashboardShell<Tab extends string>({
   avatarClassName = "bg-primary-container text-on-primary",
   children,
 }: DashboardShellProps<Tab>) {
+  const userId = useContext(AuthContext)?.userId;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -75,7 +78,7 @@ export function DashboardShell<Tab extends string>({
           </Link>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 space-y-1">
           {items.map((item) => {
             const buttonEl = (
               <button
@@ -152,6 +155,11 @@ export function DashboardShell<Tab extends string>({
             </button>
           </div>
           <div className="flex items-center gap-2">
+            {userId && <button type="button" onClick={() => resetDashboardPreferences(userId)}
+              title="Limpar filtros e restaurar a visualização salva neste navegador"
+              className="min-h-11 rounded-lg px-2 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high">
+              Restaurar painel
+            </button>}
             <ThemeToggle />
             <NotificationPopover />
           </div>

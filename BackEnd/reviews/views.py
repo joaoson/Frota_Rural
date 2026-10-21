@@ -66,6 +66,7 @@ class ReviewDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar avaliação",
+        description="Retorna uma avaliação identificada pelo UUID.",
         responses={200: ReviewOutputSerializer, 404: REVIEW_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -75,6 +76,7 @@ class ReviewDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir avaliação",
+        description="Substitui os campos editáveis de uma avaliação após validar a autoria e as permissões.",
         request=ReviewInputSerializer,
         responses={
             200: ReviewOutputSerializer,
@@ -106,6 +108,7 @@ class ReviewDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir avaliação",
+        description="Exclui a avaliação após validar a autoria e as permissões.",
         responses={
             204: None,
             404: REVIEW_NOT_FOUND,

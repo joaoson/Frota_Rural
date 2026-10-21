@@ -1,7 +1,7 @@
-name: Frontend tests
+name: Quality and browser tests
 on:
   push:
-    branches: [develop, acceptance, main]
+    branches: [develop, acceptance, main, develop_joaofre_locacoes_integradas]
   pull_request:
     branches: [develop, acceptance, main]
   workflow_dispatch:
@@ -27,6 +27,18 @@ jobs:
         # Never infer a hosted mode from main or a detached PR checkout in CI.
         run: python3 Devops/dev.py local config
 
+  observability-checks:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate monitoring configuration
+        run: |
+          python3 Devops/observability/setup.py
+          docker compose --env-file /dev/null -f compose.yaml -f compose.observability.yaml config --quiet
+          docker run --rm --entrypoint promtool -v "$PWD/Devops/observability:/rules:ro" -w /rules prom/prometheus:v3.2.1 test rules alerts.test.yml
+          docker run --rm --entrypoint amtool -v "$PWD/Devops/observability:/rules:ro" prom/alertmanager:v0.28.1 check-config /rules/alertmanager.yml
+
   frontend-checks:
     timeout-minutes: 10
     runs-on: ubuntu-latest
@@ -48,7 +60,15 @@ jobs:
           npm run lint
           npm run build
           npm run test:e2e:typecheck
-          npm test
+          npm run test:coverage
+      - name: Publish frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: test-reports/frontend/
+          if-no-files-found: error
+          retention-days: 30
 
   browser-tests:
     needs: config-checks
@@ -96,7 +116,25 @@ jobs:
         run: |
           docker compose exec -T backend python manage.py check
           docker compose exec -T backend python manage.py makemigrations --check --dry-run
-          docker compose exec -T backend python manage.py test --noinput
+          docker compose exec -T backend python -m pip install -r docs/requirements-coverage.txt
+          docker compose exec -T backend python -m coverage run manage.py test --noinput
+      - name: Generate backend coverage reports
+        if: always()
+        run: |
+          docker compose exec -T backend python -m coverage html --fail-under=0
+          docker compose exec -T backend python -m coverage json --fail-under=0
+          docker compose exec -T backend python -m coverage xml --fail-under=0
+          docker compose exec -T backend python -m coverage report
+      - name: Validate and export API documentation
+        run: docker compose exec -T backend python manage.py spectacular --validate --fail-on-warn --format openapi-json --file coverage-report/openapi.json
+      - name: Publish backend coverage and OpenAPI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-and-openapi
+          path: BackEnd/coverage-report/
+          if-no-files-found: error
+          retention-days: 30
       - name: Test Chromium, Firefox and WebKit
         working-directory: FrontEnd
         run: npm run test:e2e

@@ -59,6 +59,7 @@ class CertificationDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar certificação",
+        description="Consulta os dados da certificação conforme a permissão do usuário.",
         responses={200: CertificationOutputSerializer, 404: CERTIFICATION_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -104,6 +105,7 @@ class CertificationDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir certificação",
+        description="Exclui uma certificação após verificar o acesso do usuário.",
         responses={204: None, 404: CERTIFICATION_NOT_FOUND},
     )
     def delete(self, request: Request, pk: UUID) -> Response:

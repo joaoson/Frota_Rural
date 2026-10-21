@@ -1,6 +1,7 @@
 """One lifecycle meaning and one booking policy for every path (plan steps 4.2 and 4.3)."""
 
 import uuid
+from unittest.mock import patch
 from datetime import datetime, time, timedelta
 
 from django.test import TestCase
@@ -25,12 +26,14 @@ class BookingPolicyTests(RecurrenceFixtures, TestCase):
 
     def test_single_booking_needs_seven_days_of_notice(self):
         today = timezone.localdate()
-        for days in (0, 1, 6):
-            with self.subTest(days=days):
-                response = self.post(self.booking(today + timedelta(days=days)))
-                self.assertEqual(response.status_code, 400, response.data)
-                self.assertIn("7 dias de antecedência", str(response.data))
-        self.assertEqual(self.post(self.booking(today + timedelta(days=7))).status_code, 201)
+        # Freeze before 08:00 so same-day input exercises notice, not past dates.
+        with patch("django.utils.timezone.now", return_value=timezone.make_aware(datetime.combine(today, time.min))):
+            for days in (0, 1, 6):
+                with self.subTest(days=days):
+                    response = self.post(self.booking(today + timedelta(days=days)))
+                    self.assertEqual(response.status_code, 400, response.data)
+                    self.assertIn("7 dias de antecedência", str(response.data))
+            self.assertEqual(self.post(self.booking(today + timedelta(days=7))).status_code, 201)
 
     def test_notice_is_counted_in_server_dates_at_the_day_boundary(self):
         earliest = policy.earliest_start_date()

@@ -1,0 +1,31 @@
+groups:
+  - name: frota-rural
+    rules:
+      - alert: FrotaBackendDown
+        expr: up{job="frota-backend"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "API Frota Rural indisponível para coleta"
+          description: "Confira o processo ASGI, conectividade e credencial de /metrics."
+      - alert: FrotaDependencyDown
+        expr: frota_dependency_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Dependência {{ $labels.dependency }} indisponível"
+          description: "Confira /health/ready e os serviços PostgreSQL/Redis."
+      - alert: FrotaHighErrorRate
+        expr: sum(rate(frota_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(frota_http_requests_total[5m])), 0.001) > 0.05 and sum(increase(frota_http_requests_total[5m])) >= 20
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Mais de 5% de erros HTTP 5xx"
+          description: "Correlacione a rota e o X-Request-ID com os logs JSON do backend."
+      - alert: FrotaHighLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(frota_http_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Latência p95 acima de um segundo"
+          description: "Confira consultas ao banco e disponibilidade dos provedores externos."

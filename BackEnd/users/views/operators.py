@@ -61,6 +61,7 @@ class OperatorDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar um operador da minha equipe",
+        description="Retorna somente um operador vinculado ao usuário autenticado.",
         responses={200: OperatorOutputSerializer, 404: OPERATOR_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:

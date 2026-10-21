@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from rentals.cancellation import CancellationInputSerializer, CancellationQuoteSerializer
+
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -80,6 +82,7 @@ class RentalDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar locação",
+        description="Consulta uma reserva visível para o participante ou administrador, com preço acordado, contrato, leituras e ações permitidas.",
         responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
@@ -89,6 +92,7 @@ class RentalDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir locação",
+        description="Atualiza os campos permitidos de uma locação do usuário. Alterações que afetam um acordo protegido exigem as ações explícitas do contrato.",
         request=RentalInputSerializer,
         responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
     )
@@ -110,6 +114,7 @@ class RentalDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Excluir locação",
+        description="Exclui apenas uma reserva elegível conforme as regras do serviço. Para cancelamento e estorno use a ação cancel.",
         responses={
             204: None,
             404: RENTAL_NOT_FOUND,
@@ -217,7 +222,9 @@ class MachineUsageView(APIView):
 class RentalCancellationView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=TAGS, summary="Simular cancelamento e estorno")
+    @extend_schema(tags=TAGS, summary="Simular cancelamento e estorno",
+                   description="Calcula a elegibilidade, valor a devolver e retenção conforme a política preservada na reserva. Não cancela nem solicita estorno.",
+                   responses={200: CancellationQuoteSerializer, 401: error_response(401), 404: error_response(404)})
     def get(self, request, pk):
         from rentals.cancellation import CancellationService
         rental = CancellationService.get(pk, user=request.user)
@@ -227,7 +234,10 @@ class RentalCancellationView(APIView):
 class RentalCancelView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=TAGS, summary="Cancelar locação e solicitar estorno", responses={200: RentalOutputSerializer})
+    @extend_schema(tags=TAGS, summary="Cancelar locação e solicitar estorno",
+                   description="Cancela e libera as datas; registra uma obrigação durável de estorno. O campo refunds distingue solicitação de devolução confirmada. Repetir não duplica a obrigação.",
+                   request=CancellationInputSerializer,
+                   responses={200: RentalOutputSerializer, 400: error_response(400), 401: error_response(401), 404: error_response(404), 409: error_response(409)})
     def post(self, request, pk):
         from rentals.cancellation import CancellationService
         rental = CancellationService.cancel(pk, request.data, user=request.user)
