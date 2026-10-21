@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import MaterialIcon from "@/components/MaterialIcon";
@@ -6,14 +6,22 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/useAuth";
 import { useChatEvents, useChatSocketContext } from "@/contexts/useChatSocket";
 
-import type { ChatMessage, ChatThread } from "@/features/chat/types/chat";
+import type { ChatMessage, ChatThread, MessagePage } from "@/features/chat/types/chat";
+import type { MessageCursor } from "@/features/chat/types/chatSchemas";
 import { useChatActions } from "@/features/chat/hooks/useChat";
+import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import MessageBubble, { type BubbleStatus } from "@/features/chat/components/MessageBubble";
 import MessageComposer from "@/features/chat/components/MessageComposer";
 import ReportMessageDialog from "@/features/chat/components/ReportMessageDialog";
 import ThreadList from "@/features/chat/components/ThreadList";
 
 const SEND_TIMEOUT_MS = 10_000;
+const PAGE_SIZE = 50;
+const READ_DEBOUNCE_MS = 400;
+
+/** Bolhas otimistas ainda não têm id do servidor e não servem de cursor. */
+const isConfirmed = (m: ChatMessage) => !m.id.startsWith("pending-");
+const ascending = (page: MessagePage) => (page.order === "asc" ? page.results : [...page.results].reverse());
 
 export default function Mensagens() {
   const chat = useChatActions();
@@ -22,15 +30,24 @@ export default function Mensagens() {
   const navigate = useNavigate();
   const { userId } = useAuth();
 
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [loadingThreads, setLoadingThreads] = useState(true);
+  const inbox = useChatThreads();
+  const { threads, markThreadRead } = inbox;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pending, setPending] = useState<Record<string, BubbleStatus>>({});
   const [typingPeer, setTypingPeer] = useState(false);
   const [reporting, setReporting] = useState<ChatMessage | null>(null);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
+  // Altura da lista antes de inserir mensagens antigas no topo: mantém a leitura no lugar.
+  const prependedFrom = useRef<number | null>(null);
+  const lastMessageId = useRef<string | undefined>(undefined);
+  // Cada conversa aberta ganha uma geração; respostas atrasadas da anterior são descartadas.
+  const generation = useRef(0);
+  const readTimer = useRef<number | null>(null);
 
   // Conversa recém-aberta ainda não está no inbox (que só lista threads com
   // mensagem), por isso o fallback buscado direto pelo thread_id.
@@ -73,18 +90,72 @@ export default function Mensagens() {
 
   const socket = useChatSocketContext();
 
+  /** Marca como lido o que chegou com a conversa aberta e a aba visível. */
+  const markVisibleRead = useCallback((tid: string) => {
+    if (document.visibilityState !== "visible") return;
+    if (readTimer.current !== null) window.clearTimeout(readTimer.current);
+    readTimer.current = window.setTimeout(() => {
+      readTimer.current = null;
+      markThreadRead(tid);
+      // Pelo socket o servidor também devolve o recibo e o novo contador; o REST é o fallback.
+      if (socket.sendRead(tid)) return;
+      chat.markRead(tid).then(() => chat.refreshUnread()).catch(() => {});
+    }, READ_DEBOUNCE_MS);
+  }, [socket, chat, markThreadRead]);
+
+  /** O channel layer não guarda histórico: o que chegou com o socket caído só volta por aqui. */
+  const catchUp = useCallback(async (tid: string, current: number) => {
+    try {
+      const confirmed = [...messagesRef.current].reverse().find(isConfirmed);
+      if (!confirmed) {
+        // Conversa vazia, ou só com envios pendentes: relê a página recente.
+        const page = await chat.listMessages(tid, { limit: PAGE_SIZE });
+        if (current !== generation.current) return;
+        ascending(page).forEach(upsert);
+        setHasOlder(page.hasMore);
+      } else {
+        let cursor: MessageCursor = { after: confirmed.sentAt, after_id: confirmed.id, limit: 200 };
+        for (;;) {
+          const page = await chat.listMessages(tid, cursor);
+          if (current !== generation.current) return;
+          const batch = ascending(page);
+          batch.forEach(upsert);
+          if (!page.hasMore || batch.length === 0) break;
+          const tail = batch[batch.length - 1];
+          cursor = { after: tail.sentAt, after_id: tail.id, limit: 200 };
+        }
+      }
+      markVisibleRead(tid);
+    } catch {
+      /* a próxima reconexão tenta de novo; o que está na tela continua */
+    }
+  }, [chat, upsert, markVisibleRead]);
+
   useChatEvents({
     onMessage: (tid, message) => {
-      if (tid === threadId) upsert(message);
-      void refreshThreads();
+      if (tid !== threadId) return;
+      upsert(message);
+      if (message.senderId !== userId) markVisibleRead(tid);
     },
-    onRead: (tid, readerId, ids) => {
-      if (tid !== threadId || readerId === userId) return;
-      setMessages((prev) =>
-        prev.map((m) =>
-          ids.includes(m.id) ? { ...m, readAt: new Date().toISOString() } : m,
-        ),
-      );
+    // Confirmação do próprio envio, inclusive de um reenvio cujo eco se perdeu.
+    onAck: (tid, _clientId, message) => {
+      if (tid === threadId) upsert(message);
+    },
+    onError: (error) => {
+      const { clientId } = error;
+      if (!clientId || (error.threadId && error.threadId !== threadId)) return;
+      setPending((p) => (clientId in p ? { ...p, [clientId]: "failed" } : p));
+      toast.error(error.message);
+      if (error.code === "forbidden" && threadId) {
+        // Locação cancelada ou anúncio pausado com a conversa aberta: relê a permissão.
+        void chat.getThread(threadId).then(setFetchedThread).catch(() => {});
+        void inbox.refresh();
+      }
+    },
+    onRead: (tid, _readerId, ids) => {
+      if (tid !== threadId) return;
+      const now = new Date().toISOString();
+      setMessages((prev) => prev.map((m) => (ids.includes(m.id) ? { ...m, readAt: m.readAt ?? now } : m)));
     },
     onHidden: (tid, messageId) => {
       if (tid !== threadId) return;
@@ -95,75 +166,97 @@ export default function Mensagens() {
     onTyping: (tid, _userId, isTyping) => {
       if (tid === threadId) setTypingPeer(isTyping);
     },
-    onThreadUpdated: () => void refreshThreads(),
-    // O channel layer não guarda histórico: o que chegou com o socket caído só
-    // volta por aqui.
     onResync: (ids) => {
       if (!threadId || !ids.includes(threadId)) return;
-      const last = messagesRef.current[messagesRef.current.length - 1];
-      if (!last) return;
-      void (async () => {
-        let cursor = { after: last.sentAt, after_id: last.id, limit: 200 };
-        for (;;) {
-          const page = await chat.listMessages(threadId, cursor);
-          page.results.forEach(upsert);
-          if (!page.hasMore || page.results.length === 0) break;
-          const tail = page.results[page.results.length - 1];
-          cursor = { after: tail.sentAt, after_id: tail.id, limit: 200 };
-        }
-      })();
+      void catchUp(threadId, generation.current);
     },
   });
-
-  const refreshThreads = useCallback(async () => {
-    try {
-      const page = await chat.listThreads({ limit: 50 });
-      setThreads(page.results);
-    } catch {
-      /* inbox stale é melhor do que tela quebrada */
-    } finally {
-      setLoadingThreads(false);
-    }
-  }, [chat]);
-
-  useEffect(() => {
-    void refreshThreads();
-  }, [refreshThreads]);
 
   useEffect(() => {
     if (!threadId) {
       setMessages([]);
       return;
     }
-    let cancelled = false;
+    const current = ++generation.current;
     setTypingPeer(false);
+    setMessages([]);
+    setHasOlder(false);
+    lastMessageId.current = undefined;
     void (async () => {
       try {
         const [thread, page] = await Promise.all([
           chat.getThread(threadId),
-          chat.listMessages(threadId, { limit: 50 }),
+          chat.listMessages(threadId, { limit: PAGE_SIZE }),
         ]);
-        if (cancelled) return;
+        if (current !== generation.current) return;
         setFetchedThread(thread);
-        setMessages([...page.results].reverse()); // vem desc, exibimos asc
+        setMessages(ascending(page));
+        setHasOlder(page.hasMore);
         socket.subscribe(threadId);
-        const marked = await chat.markRead(threadId);
-        chat.setUnread({ unreadTotal: marked.unreadTotal, unreadThreads: 0 });
-        void refreshThreads();
+        await chat.markRead(threadId);
+        markThreadRead(threadId);
+        void chat.refreshUnread();
       } catch (error) {
+        if (current !== generation.current) return;
         toast.error(error instanceof Error ? error.message : "Não foi possível abrir a conversa.");
       }
     })();
     return () => {
-      cancelled = true;
       socket.unsubscribe(threadId);
+      if (readTimer.current !== null) window.clearTimeout(readTimer.current);
+      readTimer.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);
 
+  // Voltar à aba com mensagens recebidas ainda não lidas marca a leitura.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    if (!threadId) return;
+    const onVisible = () => {
+      if (messagesRef.current.some((m) => isConfirmed(m) && m.senderId !== userId && !m.readAt)) {
+        markVisibleRead(threadId);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [threadId, userId, markVisibleRead]);
+
+  // Desce até o fim só quando chega mensagem nova no fim; ao carregar o
+  // histórico antigo, mantém a posição de leitura.
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (prependedFrom.current !== null && container) {
+      container.scrollTop += container.scrollHeight - prependedFrom.current;
+      prependedFrom.current = null;
+      return;
+    }
+    const last = messages[messages.length - 1]?.id;
+    if (last !== lastMessageId.current) {
+      lastMessageId.current = last;
+      bottomRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const loadOlder = async () => {
+    const oldest = messagesRef.current.find(isConfirmed);
+    if (!threadId || !oldest || loadingOlder) return;
+    const current = generation.current;
+    setLoadingOlder(true);
+    try {
+      const page = await chat.listMessages(threadId, { before: oldest.sentAt, before_id: oldest.id, limit: PAGE_SIZE });
+      if (current !== generation.current) return;
+      prependedFrom.current = scrollRef.current?.scrollHeight ?? null;
+      setMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id));
+        return [...ascending(page).filter((m) => !known.has(m.id)), ...prev];
+      });
+      setHasOlder(page.hasMore);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível carregar mensagens anteriores.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const deliver = useCallback(
     (content: string, clientId: string) => {
@@ -229,9 +322,27 @@ export default function Mensagens() {
           <ThreadList
             threads={threads}
             activeId={threadId}
-            loading={loadingThreads}
+            loading={inbox.loading}
             onSelect={(t) => navigate(`/mensagens/${encodeURIComponent(t.threadId)}`)}
           />
+          {inbox.error ? (
+            <p className="p-4 text-xs text-error">
+              {inbox.error}{" "}
+              <button type="button" className="font-bold underline" onClick={() => void inbox.refresh()}>
+                Tentar novamente
+              </button>
+            </p>
+          ) : null}
+          {inbox.hasMore ? (
+            <button
+              type="button"
+              onClick={() => void inbox.loadMore()}
+              disabled={inbox.loadingMore}
+              className="w-full p-3 text-sm font-bold text-primary hover:bg-surface-container-high disabled:opacity-60"
+            >
+              {inbox.loadingMore ? "Carregando..." : "Carregar mais conversas"}
+            </button>
+          ) : null}
           </div>
         </aside>
 
@@ -262,7 +373,19 @@ export default function Mensagens() {
                 </div>
               </header>
 
-              <div className="flex-1 space-y-2 overflow-y-auto p-4">
+              <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
+                {hasOlder ? (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => void loadOlder()}
+                      disabled={loadingOlder}
+                      className="rounded-full border border-outline-variant/40 px-4 py-1.5 text-xs font-bold text-primary hover:bg-surface-container-high disabled:opacity-60"
+                    >
+                      {loadingOlder ? "Carregando..." : "Carregar mensagens anteriores"}
+                    </button>
+                  </div>
+                ) : null}
                 {messages.map((m) => (
                   <MessageBubble
                     key={m.id}

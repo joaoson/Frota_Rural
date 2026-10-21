@@ -21,8 +21,9 @@ class RentalCheckoutView(APIView):
         tags=TAGS,
         summary="Iniciar pagamento de uma locação",
         description=(
-            "Confere se o período continua livre, recalcula o valor no servidor a partir "
-            "da diária do anúncio e devolve a URL da página de pagamento do Stripe."
+            "Confere a disponibilidade, usa o preço preservado na reserva e devolve a URL do Stripe. "
+            "Uma tentativa durável permite retomar a mesma operação após falha de rede; "
+            "o webhook confirma o pagamento. O redirecionamento de sucesso não comprova quitação."
         ),
         request=None,
         responses={

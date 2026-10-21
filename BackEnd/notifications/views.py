@@ -6,6 +6,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from common.schemas import error_responses
+
 from .models import Notification
 from .serializers import (NotificationListQuerySerializer, NotificationPageSerializer,
                           NotificationReadAllSerializer, NotificationReadSerializer, NotificationSerializer)
@@ -15,7 +17,9 @@ def inbox(user):
     return Notification.objects.filter(recipient=user, dismissed_at__isnull=True)
 
 
-@extend_schema(tags=['Notificações'], parameters=[NotificationListQuerySerializer], responses=NotificationPageSerializer)
+@extend_schema(tags=['Notificações'], summary='Listar notificações',
+               description='Caixa do usuário autenticado, sem avisos excluídos; filtros kind/unread e paginação limit/offset. unread_count representa toda a caixa, independente dos filtros.',
+               parameters=[NotificationListQuerySerializer], responses={200: NotificationPageSerializer, **error_responses(400, 401)})
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def notifications_list(request):
@@ -34,7 +38,12 @@ def notifications_list(request):
                      'count': count, 'unread_count': unread_count})
 
 
-@extend_schema(tags=['Notificações'], request=NotificationReadSerializer, responses=NotificationSerializer)
+@extend_schema(methods=['PATCH'], tags=['Notificações'], summary='Alterar leitura da notificação',
+               description='Marca ou desmarca leitura apenas de aviso do próprio usuário. Avisos excluídos não podem ser reabertos.',
+               request=NotificationReadSerializer, responses={200: NotificationSerializer, **error_responses(400, 401, 404)})
+@extend_schema(methods=['DELETE'], tags=['Notificações'], summary='Excluir da caixa de notificações',
+               description='Oculta o aviso do próprio usuário. Operação repetível; eventos duplicados não fazem o aviso reaparecer.',
+               request=None, responses={204: None, **error_responses(401, 404)})
 @api_view(['PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 @transaction.atomic
@@ -57,7 +66,9 @@ def notification_detail(request, pk):
     return Response(NotificationSerializer(notification).data)
 
 
-@extend_schema(tags=['Notificações'], request=None, responses=NotificationReadAllSerializer)
+@extend_schema(tags=['Notificações'], summary='Marcar todas como lidas',
+               description='Atualiza os avisos visíveis do usuário; devolve a quantidade alterada e a contagem de não lidos após a atualização.',
+               request=None, responses={200: NotificationReadAllSerializer, **error_responses(401)})
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def notifications_read_all(request):

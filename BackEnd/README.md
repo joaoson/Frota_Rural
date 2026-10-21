@@ -1,3 +1,5 @@
+> API atual: [guia dos serviços](../Documentation/README_Servicos_Backend.md), [catálogo](../Documentation/SERVICOS_BACKEND_CATALOGO.md), [cobertura e evidências](../Documentation/EVIDENCIAS_QUALIDADE.md), [migrações](../Documentation/README_Database_Migrations.md) e [observabilidade](../Devops/OBSERVABILIDADE.md).
+
 # Frota Rural - BackEnd
 
 Um backend baseado em Django para o projeto Frota Rural.
@@ -204,33 +206,14 @@ Saída (JSON):
 }
 ```
 
-## Endereço base da API
+## Endereço base e documentação da API
 
-O endereço base da API é:
-
-```
-http://127.0.0.1:8000/api
-```
-
-Você pode ver todas as rotas no arquivo djangoapi/urls.py.
-
-As requisições podem ser feitas via Postman (ou qualquer cliente HTTP). A collection está em `docs/postman/Frota_Rural_API.postman_collection.json`.
-
-Exemplo de requisição POST para criar um usuário (rota: users/create):
-
-Request body (JSON):
-
-```json
-{
-  "name": "João Silva2",
-  "document": "123.456.789-02",
-  "email": "joao.silva@example.com",
-  "password_hash": "pbkdf2_sha256$720000$randomsalt$hashedpassword",
-  "phone": "+5511999999999",
-  "role": "locador",
-  "status": "active"
-}
-```
+A API local usa `http://127.0.0.1:8000/api` (ajuste a porta conforme o ambiente).
+Consulte o [guia dos serviços](../Documentation/README_Servicos_Backend.md) e o
+[catálogo de operações](../Documentation/SERVICOS_BACKEND_CATALOGO.md).
+Swagger está em `/api/schema/swagger-ui`; ele informa campos, autenticação,
+exemplos e erros conforme os serializers atuais. Senhas de cadastro são enviadas
+no campo definido pelo serializer, nunca como um hash produzido pelo cliente.
 
 ## Notas Adicionais
 

@@ -7,6 +7,7 @@ import type {
 } from "../types/posting";
 import type { PostingWritePayload } from "../types/postingSchemas";
 import type { PostingFilter, PostingRepository } from "./PostingRepository";
+import type { MachineNeeds, MachineRecommendations } from "../types/recommendation";
 
 export const postingKeys = {
   all: ["postings"] as const,
@@ -59,6 +60,11 @@ export class PostingStore {
 
   list(filter?: PostingFilter): Promise<PostingListItem[]> {
     return this.repository.list(filter);
+  }
+
+  recommend(needs: MachineNeeds): Promise<MachineRecommendations> {
+    // Availability is checked on every explicit search, not retained as a promise.
+    return this.repository.recommend(needs);
   }
 
   uploadPhotos(postingId: string, files: File[]): Promise<UploadPhotosResult> {

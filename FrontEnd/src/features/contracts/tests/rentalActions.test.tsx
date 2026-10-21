@@ -18,15 +18,21 @@ it("cancels through the server and refreshes rentals and notifications", async (
   const cache = new QueryClient(); const invalidate = vi.spyOn(cache, "invalidateQueries");
   const store = new ContractStore(new HttpContractRepository({ send } as HttpClient), cache);
   expect(await store.cancelRental("rental-a")).toMatchObject({ status: "cancelled" });
-  expect(send).toHaveBeenCalledWith({ method: "PATCH", path: "rentals/rental-a", body: { status: "cancelled" } });
+  expect(send).toHaveBeenCalledWith({ method: "POST", path: "rentals/rental-a/cancel", body: { reason: "" } });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["contracts", "rentals"] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["notifications"] });
 });
-it("resolves the rental returned by signing even when called with a contract ID", async () => {
-  const send = vi.fn().mockResolvedValueOnce({ status: 200, data: { id: "contract-a", rental: dto.id } }).mockResolvedValueOnce({ status: 200, data: { ...dto, status: "signed" } });
+it("signs the revision that was read and takes the rental from the same response", async () => {
+  const send = vi.fn().mockResolvedValueOnce({ status: 200, data: { id: "contract-a", rental: dto.id, rental_details: { ...dto, status: "signed" } } });
   const repository = new HttpContractRepository({ send } as HttpClient);
-  expect((await repository.sign("contract-a", "locatario", "Maria Silva", "123456")).rental?.id).toBe(dto.id);
-  expect(send).toHaveBeenLastCalledWith({ method: "GET", path: "rentals/rental-a" });
+  const receipt = await repository.sign("contract-a", "locatario", "Maria Silva", "123456", "revision-1");
+  expect(receipt.rental).toMatchObject({ id: dto.id, status: "signed" });
+  // A second read that failed would make a recorded acceptance look refused.
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(send).toHaveBeenCalledWith({
+    method: "POST", path: "contracts/contract-a/sign",
+    body: { role: "locatario", name: "Maria Silva", revision_id: "revision-1", otp: "123456" },
+  });
 });
 it("does not offer signing before payment or after cancellation", () => {
   const pending = { status: "pending", acceptedByLessor: false, acceptedByLessee: false };

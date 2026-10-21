@@ -9,7 +9,7 @@ from rentals.enums import RentalStatus
 class CheckoutOutputSerializer(serializers.Serializer[Any]):
     url = serializers.CharField(help_text="Página de pagamento do Stripe.")
     amount = serializers.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Valor cobrado, recalculado no servidor."
+        max_digits=10, decimal_places=2, help_text="Valor em reais preservado na cotação da reserva; não é informado pelo cliente."
     )
 
 
@@ -33,3 +33,26 @@ class OccupiedPeriodSerializer(serializers.Serializer[Any]):
 
 class OccupancyOutputSerializer(serializers.Serializer[Any]):
     ocupados = OccupiedPeriodSerializer(many=True)
+
+
+class QuoteInputSerializer(serializers.Serializer[Any]):
+    start_date = serializers.DateTimeField(help_text="Início da locação.")
+    end_date = serializers.DateTimeField(help_text="Fim da locação.")
+
+    def validate(self, attrs):
+        if attrs["end_date"] < attrs["start_date"]:
+            raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
+        return attrs
+
+
+class QuoteOutputSerializer(serializers.Serializer[Any]):
+    """Preço por diária fixa (tarifa × 8 h); o horímetro não entra no cálculo."""
+
+    tarifa_hora = serializers.DecimalField(max_digits=10, decimal_places=2)
+    horas_por_diaria = serializers.IntegerField()
+    valor_diaria = serializers.DecimalField(max_digits=10, decimal_places=2)
+    diarias = serializers.IntegerField()
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2)
+    taxa_percentual = serializers.DecimalField(max_digits=5, decimal_places=4)
+    taxa_valor = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)

@@ -8,6 +8,7 @@ import { LoadingState } from "@/shared/components/LoadingState";
 import { ErrorState } from "@/shared/components/ErrorState";
 import { PageShell } from "@/shared/components/PageShell";
 import { usePostings } from "@/features/postings/hooks/usePostings";
+import { PostingSearchEmptyState } from "@/features/postings/components/PostingSearchEmptyState";
 import { postingMachineName, type PostingListItem } from "@/features/postings/types/posting";
 
 const ITENS_POR_PAGINA = 9;
@@ -308,18 +309,7 @@ const BuscarMaquinario = () => {
 
         {/* Sem resultados */}
         {!loading && !erro && temFiltro && resultados.length === 0 && (
-          <div className="text-center py-20 bg-surface-container-lowest rounded-[24px] border border-outline-variant/30">
-            <div className="bg-surface-container w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <MaterialIcon icon="search_off" size={32} className="text-primary dark:text-primary-bright" />
-            </div>
-            <h3 className="text-xl font-bold text-on-surface mb-2">Nenhum equipamento encontrado</h3>
-            <p className="text-on-surface-variant text-sm max-w-sm mx-auto">
-              Não encontramos anúncios para os filtros selecionados. Tente ajustar a localização, o período ou o tipo de atividade.
-            </p>
-            <Button variant="outline" onClick={handleLimpar} className="mt-6 gap-2">
-              <MaterialIcon icon="close" size={16} /> Limpar filtros
-            </Button>
-          </div>
+          <PostingSearchEmptyState onClear={handleLimpar} />
         )}
 
         {/* Grid de cards */}

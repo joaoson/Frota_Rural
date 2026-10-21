@@ -27,7 +27,7 @@ class ContractListView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Listar contratos",
-        description="Retorna todos os contratos gerados no sistema, já com locatário, anúncio e maquinário resolvidos.",
+        description="Retorna os contratos visíveis para o usuário autenticado (participante ou administrador), com locatário, anúncio e maquinário resolvidos.",
         responses={200: ContractOutputSerializer(many=True)},
     )
     def get(self, request: Request) -> Response:
@@ -46,7 +46,9 @@ class ContractDetailView(APIView):
         description=(
             "Retorna os dados já agregados e formatados (valores em pt-BR, datas e prazos "
             "calculados) prontos para renderizar o PDF do contrato de locação, junto do resumo "
-            f"das assinaturas já registradas.\n\n{ACCEPTS_RENTAL_ID}"
+            "das assinaturas já registradas. Após o pagamento, `revisao.id` identifica o texto "
+            "congelado: envie esse UUID em `revision_id` tanto no pedido de OTP quanto na assinatura. "
+            f"Uma aprovação de aditivo gera nova revisão e exige novos aceites.\n\n{ACCEPTS_RENTAL_ID}"
         ),
         responses={200: ContractDocumentOutputSerializer, 404: CONTRACT_NOT_FOUND},
     )

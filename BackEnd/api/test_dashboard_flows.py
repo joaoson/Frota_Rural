@@ -162,7 +162,7 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         rental.lessee = self.tenant
         rental.save()
         contract = Contracts.objects.create(id=uuid.uuid4(), rental=rental, status='pending_signatures')
-        response = self.client.patch(f'/api/rentals/{rental.pk}', {'status': 'cancelled'}, format='json')
+        response = self.client.post(f'/api/rentals/{rental.pk}/cancel', {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         contract.refresh_from_db()
         self.assertEqual(contract.status, 'cancelled')

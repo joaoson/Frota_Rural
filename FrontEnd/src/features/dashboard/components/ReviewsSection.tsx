@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { toast } from "sonner";
 
-import DashboardPagination from "@/components/DashboardPagination";
+import { DashboardCollection } from "./DashboardCollection";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useDeleteReview } from "@/features/reviews/hooks/useReviews";
 import type { Review } from "@/features/reviews/types/review";
@@ -24,11 +23,11 @@ function ReviewCard({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-md transition-shadow shadow-sm">
-      <div className="flex items-start justify-between mb-3">
+    <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 hover:shadow-md transition-shadow shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
           <div
-            className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold ${avatarClassName}`}
+            className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${avatarClassName}`}
           >
             {name?.slice(0, 2).toUpperCase() || "NA"}
           </div>
@@ -60,12 +59,6 @@ interface ReviewsSectionProps {
 
 export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSectionProps) {
   const deleteReview = useDeleteReview();
-  const [receivedPage, setReceivedPage] = useState(1);
-  const [givenPage, setGivenPage] = useState(1);
-  const receivedPages = Math.max(1, Math.ceil(receivedReviews.length / 5));
-  const givenPages = Math.max(1, Math.ceil(givenReviews.length / 5));
-  const currentReceived = Math.min(receivedPage, receivedPages);
-  const currentGiven = Math.min(givenPage, givenPages);
 
   return (
     <div className="space-y-8">
@@ -75,9 +68,8 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
         <h2 className="font-headline text-xl font-bold text-tertiary mb-4 flex items-center gap-2">
           <MaterialIcon icon="inbox" size={22} className="text-primary" /> Avaliações Recebidas
         </h2>
-        <div className="space-y-4">
-          {receivedReviews.length > 0 ? (
-            receivedReviews.slice((currentReceived - 1) * 5, currentReceived * 5).map((review) => (
+        <DashboardCollection label="Avaliações recebidas" items={receivedReviews} defaultView="list"
+          renderItem={(review) => (
               <ReviewCard
                 key={review.id}
                 name={review.reviewerName}
@@ -86,21 +78,17 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
                 comment={review.comment}
                 avatarClassName="bg-secondary-container/30 text-tertiary"
               />
-            ))
-          ) : (
-            <p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>
           )}
-        </div>
-        <DashboardPagination currentPage={currentReceived} totalPages={receivedPages} onPageChange={setReceivedPage} />
+        />
+        {receivedReviews.length === 0 && (<p className="text-sm text-on-surface-variant">Nenhuma avaliação recebida ainda.</p>)}
       </div>
 
       <div>
         <h2 className="font-headline text-xl font-bold text-tertiary mb-4 flex items-center gap-2">
           <MaterialIcon icon="outbox" size={22} className="text-primary" /> Avaliações Fornecidas
         </h2>
-        <div className="space-y-4">
-          {givenReviews.length > 0 ? (
-            givenReviews.slice((currentGiven - 1) * 5, currentGiven * 5).map((review) => (
+        <DashboardCollection label="Avaliações fornecidas" items={givenReviews} defaultView="list"
+          renderItem={(review) => (
               <ReviewCard
                 key={review.id}
                 name={review.revieweeName}
@@ -125,14 +113,11 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
                   </button>
                 }
               />
-            ))
-          ) : (
-            <p className="text-sm text-on-surface-variant">
-              Você ainda não forneceu nenhuma avaliação.
-            </p>
           )}
-        </div>
-        <DashboardPagination currentPage={currentGiven} totalPages={givenPages} onPageChange={setGivenPage} />
+        />
+        {givenReviews.length === 0 && (<p className="text-sm text-on-surface-variant">
+              Você ainda não forneceu nenhuma avaliação.
+            </p>)}
       </div>
 
     </div>

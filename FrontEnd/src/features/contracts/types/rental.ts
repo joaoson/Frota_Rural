@@ -1,3 +1,4 @@
+import type { RentalRefund } from "./management";
 import type { SignatureRole } from "./rentalSchemas";
 
 export interface Rental {
@@ -16,15 +17,82 @@ export interface Rental {
   machineModel: string | null;
   contractNumber: string | null;
   contractId?: string | null;
+  signatureDeadline?: Date | null;
+  refunds?: RentalRefund[];
   startDate: Date | null;
   endDate: Date | null;
   totalPrice: number | null;
+  /** Cotação congelada na reserva; o horímetro não altera o valor. */
+  dailyRate?: number | null;
+  billableDays?: number | null;
+  subtotal?: number | null;
+  platformFee?: number | null;
   initialHourMeter: number | null;
   finalHourMeter: number | null;
   status: string | null;
+  /** Leitura do servidor (`rentals/lifecycle.py`); ver `rentalLifecycle.ts`. */
+  phase?: string | null;
+  phaseLabel?: string | null;
+  /** O que o usuário autenticado pode fazer agora. */
+  allowedActions?: string[];
+  notes?: string;
+  /** Leituras do horímetro: só acompanhamento de uso, nunca alteram o valor. */
+  meter?: RentalMeter | null;
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
   contractStatus: string | null;
+}
+
+/** Preço calculado no servidor: diária fixa (tarifa × 8 h) por dia de calendário. */
+export interface RentalQuote {
+  hourlyRate: number;
+  hoursPerDay: number;
+  dailyRate: number;
+  days: number;
+  subtotal: number;
+  feeRate: number;
+  fee: number;
+  total: number;
+}
+
+export type MeterReadingKind = "check_in" | "check_out";
+
+export interface MeterReading {
+  id: string;
+  value: number;
+  note: string;
+  recordedAt: Date;
+}
+
+export interface RentalMeter {
+  checkIn: MeterReading | null;
+  checkOut: MeterReading | null;
+  hoursUsed: number | null;
+  /** 8 h por diária contratada: só referência para comparar o uso. */
+  referenceHours: number | null;
+}
+
+export interface MeterRecordResult {
+  rental: Rental;
+  /** Avisos que não impedem o registro (ex.: leitura menor que o horímetro da máquina). */
+  warnings: string[];
+}
+
+export interface MachineUsage {
+  completedRentals: number;
+  days: number;
+  measuredRentals: number;
+  hoursRecorded: number;
+  averageHoursPerDay: number | null;
+  referenceHoursPerDay: number;
+  lastReading: { value: number; recordedAt: Date } | null;
+}
+
+/** Antecedência mínima aplicada pelo servidor a toda reserva. */
+export interface BookingPolicy {
+  minNoticeDays: number;
+  /** YYYY-MM-DD */
+  earliestStartDate: string;
 }
 
 /** Visão pública da disponibilidade, sem dados pessoais da locação. */
@@ -47,17 +115,19 @@ export function situacaoAssinatura(rental: {
   status: string | null;
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
+  signatureDeadline?: Date | null;
 }) {
   const encerrado = ENCERRADOS.includes(rental.status ?? "");
   const completo = rental.acceptedByLessor && rental.acceptedByLessee;
+  const prazoAberto = !rental.signatureDeadline || rental.signatureDeadline.getTime() > Date.now();
   const pagamentoConfirmado = rental.status === "active" || rental.status === "signed";
   return {
     encerrado,
     assinadoPeloLocador: rental.acceptedByLessor,
     assinadoPeloLocatario: rental.acceptedByLessee,
     completo,
-    podeAssinarComoLocador: pagamentoConfirmado && !encerrado && !rental.acceptedByLessor,
-    podeAssinarComoLocatario: pagamentoConfirmado && !encerrado && !rental.acceptedByLessee,
+    podeAssinarComoLocador: pagamentoConfirmado && prazoAberto && !encerrado && !rental.acceptedByLessor,
+    podeAssinarComoLocatario: pagamentoConfirmado && prazoAberto && !encerrado && !rental.acceptedByLessee,
     grupo: encerrado ? "Encerrados" : completo ? "Assinados" : "Pendentes",
   };
 }

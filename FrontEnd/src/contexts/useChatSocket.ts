@@ -31,6 +31,8 @@ export function useChatEvents(handlers: ChatSocketHandlers) {
     () =>
       addListener({
         onMessage: (...args) => ref.current.onMessage?.(...args),
+        onAck: (...args) => ref.current.onAck?.(...args),
+        onError: (...args) => ref.current.onError?.(...args),
         onRead: (...args) => ref.current.onRead?.(...args),
         onHidden: (...args) => ref.current.onHidden?.(...args),
         onTyping: (...args) => ref.current.onTyping?.(...args),

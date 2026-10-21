@@ -14,6 +14,9 @@ const daysBetween = (start: string, end: string) => Math.max(1, Math.round((toDa
 import { chatStore } from "@/app/container";
 import { toast } from "sonner";
 
+/** Referência de uso por diária; o preço é fixo por diária (ADR 0002). */
+const HORAS_POR_DIARIA = 8;
+
 const formatDate = (value: string) => toDate(value).toLocaleDateString("pt-BR");
 
 const AnaliseLocacao = () => {
@@ -78,6 +81,39 @@ const AnaliseLocacao = () => {
       </section>
 
       <section className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm"><div className="mb-6 flex items-start justify-between"><div><h2 className="font-headline text-xl font-bold text-on-surface">Evolução financeira</h2><p className="text-sm text-on-surface-variant">Projeção proporcional ao período contratado; não representa pagamentos recebidos</p></div><strong className="text-primary">{analytics.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></div><div className="h-64"><ResponsiveContainer width="100%" height="100%"><AreaChart data={analytics.chart}><defs><linearGradient id="rentalValue" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--primary)" stopOpacity={.35} /><stop offset="100%" stopColor="var(--primary)" stopOpacity={0} /></linearGradient></defs><CartesianGrid strokeDasharray="3 3" opacity={.25} /><XAxis dataKey="dia" tickLine={false} axisLine={false} /><YAxis tickFormatter={(v) => `R$${v}`} tickLine={false} axisLine={false} /><Tooltip formatter={(value) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} /><Area type="monotone" dataKey="valor" stroke="var(--primary)" fill="url(#rentalValue)" strokeWidth={3} /></AreaChart></ResponsiveContainer></div></section>
+
+      <section aria-labelledby="uso-equipamento" className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 id="uso-equipamento" className="font-headline text-xl font-bold text-on-surface">Uso do equipamento</h2>
+            <p className="text-sm text-on-surface-variant">Informativo — as leituras do horímetro não alteram o valor da locação.</p>
+          </div>
+        </div>
+        {rental.meter?.checkIn || rental.meter?.checkOut ? (
+          <dl className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Retirada", value: rental.meter.checkIn ? `${rental.meter.checkIn.value.toLocaleString("pt-BR")} h` : "—" },
+              { label: "Devolução", value: rental.meter.checkOut ? `${rental.meter.checkOut.value.toLocaleString("pt-BR")} h` : "—" },
+              { label: "Horas usadas", value: rental.meter.hoursUsed !== null ? `${rental.meter.hoursUsed.toLocaleString("pt-BR")} h` : "Aguardando devolução" },
+              {
+                label: "Média por diária",
+                value: rental.meter.hoursUsed !== null && analytics.totalDays
+                  ? `${(rental.meter.hoursUsed / analytics.totalDays).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`
+                  : "—",
+                detail: rental.meter.referenceHours ? `Referência: ${HORAS_POR_DIARIA} h por diária (${rental.meter.referenceHours} h no período)` : undefined,
+              },
+            ].map((item) => (
+              <div key={item.label}>
+                <dt className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{item.label}</dt>
+                <dd className="mt-1 text-lg font-black text-on-surface">{item.value}</dd>
+                {item.detail ? <dd className="text-xs text-on-surface-variant">{item.detail}</dd> : null}
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="mt-4 text-sm text-on-surface-variant">O locador ainda não registrou leituras do horímetro nesta locação.</p>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-secondary-container/40 bg-secondary-fixed/20 p-6"><h2 className="font-headline text-xl font-bold text-on-surface">Próximos passos</h2><p className="mt-1 text-sm text-on-surface-variant">Você pode consultar disponibilidade para uma nova reserva deste equipamento. Uma nova reserva não altera o contrato atual.</p><div className="mt-5 flex flex-col gap-3 sm:flex-row"><Link to={`/reservar/${rental.postingId}?inicio=${extensionStart}&extensao=1`} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-on-primary"><MaterialIcon icon="event_repeat" size={18} /> Reservar próximo período</Link><Link to={`/reservar/${rental.postingId}`} className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-bold text-primary"><MaterialIcon icon="replay" size={18} /> Alugar novamente</Link><button type="button" onClick={abrirConversa} disabled={abrindoChat || !rental.lessorId} className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-5 py-3 text-sm font-bold text-primary disabled:opacity-60"><MaterialIcon icon="chat" size={18} /> {abrindoChat ? "Abrindo..." : "Mensagens da locação"}</button></div></section>
     </div>

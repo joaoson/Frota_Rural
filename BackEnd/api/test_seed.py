@@ -38,6 +38,7 @@ class DevelopmentSeedTests(TestCase):
             self.assertRegex(machine.renagro_number, r'^BR\d{10}$')
         for rental in Rentals.objects.select_related('postings'):
             self.assertEqual(rental.total_price, calcular_total(rental))
+            self.assertEqual(rental.hourly_rate_snapshot, rental.postings.hourly_rate)
             self.assertLess(rental.start_date, rental.end_date)
             self.assertGreaterEqual(rental.start_date, rental.postings.availability_start)
             self.assertLessEqual(rental.end_date, rental.postings.availability_end)

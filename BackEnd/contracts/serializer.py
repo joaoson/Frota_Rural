@@ -16,6 +16,11 @@ class ContractOtpRequestInputSerializer(serializers.Serializer[Any]):
     role = serializers.ChoiceField(
         choices=SignatureRole.choices, help_text="Parte que vai assinar."
     )
+    revision_id = serializers.UUIDField(
+        required=False,
+        allow_null=True,
+        help_text="`revisao.id` do documento que a parte leu. Obrigatório quando há revisão congelada; o código só vale para essa revisão. Ausência ou divergência retorna stale_revision (409).",
+    )
 
 
 class ContractSignInputSerializer(serializers.Serializer[Any]):
@@ -38,6 +43,14 @@ class ContractSignInputSerializer(serializers.Serializer[Any]):
         help_text=(
             "Código de 6 dígitos enviado por e-mail. Obrigatório quando "
             "`CONTRACT_SIGNATURE_REQUIRE_OTP` está ligado."
+        ),
+    )
+    revision_id = serializers.UUIDField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "`revisao.id` do documento que a parte leu. Obrigatório quando o contrato tem "
+            "revisão congelada; se ela mudou, o aceite é recusado com `stale_revision`."
         ),
     )
 
@@ -72,6 +85,7 @@ class ContractSignatureOutputSerializer(serializers.ModelSerializer[ContractSign
             "id",
             "contract",
             "role",
+            "revision",
             "signer",
             "signer_name",
             "signer_email",
@@ -128,12 +142,18 @@ class _ContractTermsSerializer(serializers.Serializer[Any]):
     data_inicio = serializers.CharField()
     data_fim = serializers.CharField()
     prazo_dias = serializers.IntegerField()
-    valor_unitario = serializers.CharField()
-    estimativa_horas = serializers.IntegerField()
+    valor_unitario = serializers.CharField(help_text="Tarifa por hora congelada na reserva.")
     valor_locacao = serializers.CharField()
     valor_taxa_plataforma = serializers.CharField()
     percentual_taxa_plataforma = serializers.CharField()
-    valor_total_estimado = serializers.CharField()
+    # Documento 2.0.0: preço por diária fixa (ADR 0002).
+    horas_por_diaria = serializers.IntegerField(required=False)
+    valor_diaria = serializers.CharField(required=False)
+    diarias = serializers.IntegerField(required=False)
+    valor_total = serializers.CharField(required=False)
+    # Documento legado 1.0.0.
+    estimativa_horas = serializers.IntegerField(required=False)
+    valor_total_estimado = serializers.CharField(required=False)
 
 
 class _ContractOperationSerializer(serializers.Serializer[Any]):
@@ -194,21 +214,45 @@ class _SignatureSummarySerializer(serializers.Serializer[Any]):
     hash_registro = serializers.CharField()
 
 
+class _RevisionSummarySerializer(serializers.Serializer[Any]):
+    id = serializers.UUIDField(help_text="Informe em `revision_id` ao pedir o código e ao assinar.")
+    numero = serializers.IntegerField()
+    hash = serializers.CharField()
+    criada_em_utc = serializers.CharField()
+
+
 class _DocumentEvidenceSerializer(serializers.Serializer[Any]):
     hash_documento_atual = serializers.CharField()
     algoritmo_hash = serializers.CharField()
     assinaturas = _SignatureSummarySerializer(many=True)
 
 
+class _ContractManagementSerializer(serializers.Serializer[Any]):
+    allowed_actions = serializers.ListField(child=serializers.CharField())
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField()
+
+
 class ContractDocumentOutputSerializer(serializers.Serializer[Any]):
     """Payload agregado e já formatado para renderizar o PDF do contrato."""
 
+    titulo = serializers.CharField(required=False)
     contrato = _ContractTermsSerializer()
     operacao = _ContractOperationSerializer()
     locador = _ContractLessorSerializer()
     locatario = _ContractLesseeSerializer()
     equipamento = _ContractEquipmentSerializer()
     anuncio = _ContractPostingSerializer()
+    preambulo = serializers.CharField(required=False)
+    clausulas = serializers.JSONField(
+        required=False, help_text="Texto completo das cláusulas (documento 2.0.0), coberto pelo hash."
+    )
+    declaracao_assinatura = serializers.CharField(required=False)
+    revisao = _RevisionSummarySerializer(allow_null=True)
+    prazo_assinatura = serializers.DateTimeField(allow_null=True)
+    gestao = _ContractManagementSerializer()
+    legado = serializers.BooleanField(help_text="Aceite gravado antes das revisões (documento 1.0.0).")
+    previa = serializers.BooleanField(help_text="Contrato ainda não pago: o texto congela no pagamento.")
     assinatura = _ContractSignatureDatesSerializer()
     evidencia = _DocumentEvidenceSerializer()
 
@@ -217,6 +261,7 @@ class _EvidenceDocumentSerializer(serializers.Serializer[Any]):
     versao = serializers.CharField()
     hash = serializers.CharField()
     algoritmo = serializers.CharField()
+    revisao = serializers.IntegerField(allow_null=True)
 
 
 class ContractEvidenceOutputSerializer(serializers.Serializer[Any]):

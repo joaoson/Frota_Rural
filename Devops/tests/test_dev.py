@@ -66,6 +66,20 @@ class DevelopmentCommandsTests(DevelopmentFixture):
         _, second, _ = dev.configuration(self.arguments("local", "config", "--project", "farm_dev"), self.root, {})
         self.assertNotEqual(first["FROTA_COOKIE_PREFIX"], second["FROTA_COOKIE_PREFIX"])
 
+    def test_monitoring_is_explicit_local_and_shares_port_offset(self):
+        args = self.arguments("local", "up", "--observability", "--port-offset", "2")
+        command, env, _ = dev.configuration(args, self.root, {})
+        self.assertIn(str(self.root / "compose.observability.yaml"), command)
+        self.assertEqual(env["GRAFANA_PORT"], "3002")
+        self.assertEqual(env["PROMETHEUS_PORT"], "9092")
+        self.assertEqual(env["ALERTMANAGER_PORT"], "9095")
+        for service in ("prometheus", "grafana", "alertmanager"):
+            self.assertIn(service, dev.action_arguments(args))
+
+    def test_monitoring_cannot_be_added_to_hosted_database_mode(self):
+        with self.assertRaises(ValueError):
+            dev.configuration(self.arguments("supabase", "up", "--observability"), self.root, {})
+
     def test_invalid_ports_project_and_missing_file_fail_before_execution(self):
         for options in [("--port-offset", "-1"), ("--port-offset", "60000"),
                         ("--project", "../wrong"), ("--env-file", "missing.env")]:

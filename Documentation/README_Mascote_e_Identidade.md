@@ -248,6 +248,98 @@ da folha de poses estão em `FrontEnd/public/mascot/README.md`.
 - Alugar, anunciar e conhecer o fluxo alteram pose, orientação e destino.
 - Foco visível, estado selecionado e regiões de anúncio acessíveis são mantidos.
 - Movimento reduzido desativa inclinação e deslocamento, mantendo as poses.
-- Não há animação contínua, som, chatbot ou chamada de API em execução.
+- O guia ilustrado não tem animação contínua ou som. A busca conversacional no canto da página está descrita abaixo.
 
 É uma ilustração 3D renderizada com interações CSS, não uma malha 3D articulada.
+
+
+## Busca guiada com a capivara
+
+A página inicial também oferece um botão flutuante com a capivara que abre uma
+conversa no canto da tela. São cinco perguntas: atividade, tipo de solo,
+região do Brasil, estado e período. A região limita o dropdown aos estados
+correspondentes (incluindo o Distrito Federal); mudar de região limpa o estado
+anterior. As datas podem ser deixadas em aberto. Não há pergunta nem filtro de
+preço no chat. Fechar e reabrir preserva as respostas enquanto a
+página estiver montada; voltar e recomeçar permitem corrigir a busca.
+
+É um fluxo guiado, com busca literal primeiro e IA apenas quando ela não encontra
+nenhuma máquina. O componente
+`features/home/components/MachineFinderChat.tsx` usa `useMachineFinder` →
+`PostingStore` → `PostingRepository` → cliente HTTP injetado. O repositório
+valida o retorno com Zod e converte anúncios para os tipos de domínio existentes.
+
+`POST /api/postings/recommendations` é uma consulta pública e sem gravação.
+A view delega ao serviço `PostingRecommendationService`, com validação pelos
+serializers de anúncios. O resultado contém até três máquinas distintas,
+o total encontrado, os anúncios e os motivos da seleção; os links usam o ID
+real em `/anuncio/:id`. Não há anúncios inventados ou ampliação silenciosa dos
+filtros quando nenhum resultado é encontrado. `match_type` distingue `exact`,
+`similar` e `none`; `ai_unavailable` informa indisponibilidade temporária da IA.
+
+A atividade é comparada à finalidade declarada, com descrição/especificações
+como alternativa quando ela não foi preenchida. O estado selecionado é enviado
+como UF e validado pela API. Como os anúncios ainda armazenam endereço livre,
+a consulta reconhece a sigla ou nome completo do estado no fim do endereço,
+sem diferenciar acentos e aceitando país/CEP no final. Endereços sem estado
+identificável não são incluídos por suposição. Menções ao tipo de solo ajudam a ordenar,
+mas não comprovam adequação técnica nem presença de implementos. Isso é
+explicitado na conversa. Preço crescente desempata os resultados.
+
+Só anúncios e máquinas ativos, com disponibilidade não vencida, são retornados.
+Quando datas são informadas, o período inteiro deve caber na disponibilidade
+e no limite de duração. A consulta reutiliza as regras de reservas do módulo
+`payments.availability`, incluindo outras ofertas da mesma máquina, reservas
+provisórias não expiradas e o intervalo de um dia entre locações. Sem datas,
+a conversa pede que a disponibilidade seja conferida no anúncio. A seleção
+não cria uma reserva; disponibilidade e preço são confirmados ao reservar.
+
+Quando não há correspondência literal, o adaptador
+`postings/recommendation_ai.py` consulta o Groq com o mesmo modelo de extração
+estruturada do preço sugerido (`openai/gpt-oss-120b`). O transporte e a constante
+do modelo ficam em `common/groq.py`, compartilhados com `pricing/groq.py`.
+Reutiliza `GROQ_API_KEY`; não exige outra chave nem faz pesquisa na web.
+
+A IA recebe até 20 máquinas distintas, limitadas a 16 mil caracteres de catálogo,
+que já passaram pelos filtros de estado, datas e disponibilidade. Recebe apenas
+ID do anúncio, marca/modelo, finalidade, descrição e especificações públicas,
+com limites de tamanho por campo. A resposta deve selecionar IDs desse conjunto
+e citar um trecho literal que sustente cada alternativa; o servidor valida o
+JSON, os IDs e os trechos antes de consultar novamente a disponibilidade e os
+dados atuais dos anúncios. Alterações durante a chamada descartam a sugestão.
+As alternativas aparecem identificadas como IA e pedem confirmação ao locador.
+
+Cada chamada tem timeout de 15 segundos, sem repetição automática. A seleção é
+armazenada por cinco minutos, vinculada aos filtros semânticos e ao conteúdo do
+catálogo; falhas ficam em cache por 30 segundos. Um bloqueio evita chamadas
+simultâneas idênticas e o orçamento é de seis chamadas por minuto no cache Django.
+Com o cache local padrão, o orçamento é por processo; um cache compartilhado o
+torna comum aos workers. A disponibilidade é revalidada mesmo com resposta em cache.
+Resultados exatos não usam esse orçamento nem dependem do Groq.
+
+Sem alternativa útil, o chat e a página de máquinas usam o mesmo componente
+`PostingSearchEmptyState`, com opção de limpar filtros. Falha, timeout, limite
+ou ausência de chave mantêm a busca utilizável, com aviso de indisponibilidade
+das alternativas e opção de tentar novamente ou explorar todos os anúncios.
+
+O painel adapta sua largura e altura à tela, tem rolagem interna, fecha com
+Escape e restaura o foco no botão. A busca inclui estados de carregamento,
+erro com nova tentativa e ausência de resultados.
+
+### Retrato e movimento do chat
+
+O botão e o cabeçalho usam o retrato frontal local
+`public/mascot/capivara-profile.jpg`, gerado via Higgsfield a partir da capivara
+existente (origem e briefing em `public/mascot/README.md`). Ao abrir, o botão
+inteiro — retrato, selo e chamada — fica invisível e sai da navegação por
+teclado e da árvore acessível. O painel ocupa esse canto, respeitando as áreas
+seguras da tela; fechar recupera o botão e o foco.
+
+A transição segue os princípios de brevidade, continuidade, reversibilidade e
+movimento opcional das [diretrizes de movimento da Apple](https://developer.apple.com/design/human-interface-guidelines/motion).
+São escolhas da implementação web: entrada de 280 ms e saída de 180 ms, com
+opacidade e leve escala/deslocamento a partir do canto inferior direito, sem
+rebote. `AnimatePresence` mantém o conteúdo apenas durante a saída; nesse
+intervalo ele fica `inert` e oculto para leitores de tela. Reabrir interrompe
+a saída e preserva a conversa. Ativação por teclado é imediata; a preferência
+`prefers-reduced-motion` troca o movimento por um fade de 120 ms.

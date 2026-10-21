@@ -23,6 +23,7 @@ export interface UserRepository {
   findById(id: string): Promise<User>;
   create(payload: CreateUserPayload): Promise<User>;
   updateProfile(id: string, input: UpdateProfileInput): Promise<User>;
+  uploadPhoto(id: string, file: File): Promise<User>;
   changePassword(id: string, currentPassword: string, newPassword: string): Promise<void>;
 }
 
@@ -57,6 +58,19 @@ export class HttpUserRepository implements UserRepository {
       method: "PATCH",
       path: `users/${id}`,
       body: input,
+    });
+    return toDomain(userApiSchema.parse(response.data));
+  }
+
+  async uploadPhoto(id: string, file: File): Promise<User> {
+    const form = new FormData();
+    form.append("image", file);
+    const response = await this.http.send<unknown>({
+      method: "POST",
+      path: `users/${id}/photo`,
+      body: form,
+      // O cliente HTTP calcula o boundary, como no upload de fotos dos anúncios.
+      headers: { "Content-Type": undefined },
     });
     return toDomain(userApiSchema.parse(response.data));
   }

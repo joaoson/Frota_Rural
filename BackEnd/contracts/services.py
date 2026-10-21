@@ -15,16 +15,20 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from authentication.emailing.email import send_contract_signature_otp_email
 from common.exceptions import BadGateway, Conflict
 from contracts import signature_evidence
-from contracts.contract_document import build_contract_document
+from contracts.contract_document import build_contract_document, build_legacy_document
 from contracts.enums import ContractStatus, SignatureRole
-from contracts.models import Contracts, ContractSignatureOtps, ContractSignatures
+from contracts.models import Contracts, ContractRevisions, ContractSignatureOtps, ContractSignatures
+from contracts.revisions import ensure_current_revision
 from contracts.serializer import ContractOtpRequestInputSerializer, ContractSignInputSerializer
+from rentals import lifecycle
 from rentals.enums import RentalStatus
 from rentals.models import Rentals
 from users.models import Users
 from postings.models import Postings
 from payments.availability import tem_conflito
 from notifications.events import notify_rental_event
+
+STALE_REVISION_MESSAGE = "O contrato foi atualizado. Revise o documento antes de assinar."
 
 LEGAL_BASIS = (
     "Assinatura eletrônica simples, com validade entre as partes nos termos "
@@ -85,15 +89,48 @@ class ContractService:
         return contract.rental.postings.machinery.owner
 
     @staticmethod
+    def document_for(contract: Contracts, revision: ContractRevisions | None) -> tuple[dict[str, Any], str]:
+        """Documento a exibir e conferir, e de onde ele vem.
+
+        `revisao`: congelado, é o que se assina. `legado`: aceite gravado antes das
+        revisões, conferido contra o documento 1.0.0 reconstruído. `previa`:
+        contrato ainda não pago; o texto só congela no pagamento.
+        """
+        if revision is not None:
+            return revision.document, "revisao"
+        if contract.signatures.exists():
+            return build_legacy_document(contract), "legado"
+        return build_contract_document(contract), "previa"
+
+    @staticmethod
+    def _revision_summary(revision: ContractRevisions | None) -> dict[str, Any] | None:
+        if revision is None:
+            return None
+        return {
+            "id": revision.id,
+            "numero": revision.number,
+            "hash": revision.document_hash,
+            "criada_em_utc": revision.created_at.isoformat(),
+        }
+
+    @staticmethod
     def get_document(contract_id: UUID, *, actor: Users) -> dict[str, Any]:
         contract = ContractService.get(contract_id, actor=actor)
-        document = build_contract_document(contract)
-        signatures = [*contract.signatures.all()]
+        revision = ensure_current_revision(contract)
+        document, origin = ContractService.document_for(contract, revision)
+        signatures = [s for s in contract.signatures.all() if s.revision_id == (revision.pk if revision else None)]
 
-        # O hash é do documento (os termos). O bloco de assinatura é anexado só
-        # depois, porque ele muda a cada aceite e não faz parte do que se aceita.
+        from rentals.lifecycle import allowed_actions
+
+        # O hash é do documento (termos e cláusulas). O bloco de assinatura é
+        # anexado só depois, porque muda a cada aceite e não faz parte do que se aceita.
         return {
             **document,
+            "revisao": ContractService._revision_summary(revision),
+            "gestao": {"allowed_actions": allowed_actions(contract.rental, actor), "start_date": contract.rental.start_date.isoformat(), "end_date": contract.rental.end_date.isoformat()},
+            "prazo_assinatura": contract.signature_deadline.isoformat() if contract.signature_deadline else None,
+            "legado": origin == "legado",
+            "previa": origin == "previa",
             "assinatura": ContractService._signature_dates(signatures),
             "evidencia": {
                 "hash_documento_atual": signature_evidence.document_hash(document),
@@ -111,7 +148,8 @@ class ContractService:
         conferência do encadeamento que atesta que nada foi alterado depois.
         """
         contract = ContractService.get(contract_id, actor=actor)
-        document = build_contract_document(contract)
+        revision = contract.current_revision
+        document, _ = ContractService.document_for(contract, revision)
         intact, problems = signature_evidence.verify_chain(contract, document)
         return {
             "contrato_id": contract.id,
@@ -121,6 +159,7 @@ class ContractService:
                 "versao": document["contrato"]["versao_documento"],
                 "hash": signature_evidence.document_hash(document),
                 "algoritmo": signature_evidence.HASH_ALGORITHM,
+                "revisao": revision.number if revision else None,
             },
             "cadeia_integra": intact,
             "inconsistencias": problems,
@@ -199,6 +238,14 @@ class ContractSignatureService:
         # como só o código mais recente vale, cada pedido invalidaria o anterior
         # e travaria a assinatura de quem é de direito.
         ContractSignatureService._ensure_requester_is_party(requester, party)
+        # Sem código para contrato fechado, já assinado por essa parte ou não pago.
+        ContractSignatureService._ensure_deadline(contract)
+        ContractSignatureService._ensure_not_signed(contract, role)
+        ContractSignatureService._ensure_payable(contract.rental)
+        revision = ensure_current_revision(contract)
+        ContractSignatureService._ensure_deadline(contract)
+        if serializer.validated_data.get("revision_id") != (revision.pk if revision else None):
+            raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
 
         if not party.email:
             raise ValidationError("A parte não possui e-mail cadastrado para receber o código.")
@@ -209,6 +256,8 @@ class ContractSignatureService:
             id=uuid.uuid4(),
             contract=contract,
             role=role,
+            signer=party,
+            revision=revision,
             email=party.email,
             code_hash=signature_evidence.hash_otp_code(code, contract.id),
             expires_at=now + timedelta(seconds=signature_evidence.OTP_TTL_SECONDS),
@@ -254,6 +303,7 @@ class ContractSignatureService:
         validated: dict[str, Any] = serializer.validated_data
         role: str = validated["role"]
 
+        ContractSignatureService._ensure_deadline(contract)
         ContractSignatureService._ensure_not_signed(contract, role)
         ContractSignatureService._ensure_payable(contract.rental)
 
@@ -263,14 +313,23 @@ class ContractSignatureService:
         ContractSignatureService._ensure_requester_is_party(requester, party)
         signer = requester or party
 
+        # Antes do OTP: um código não pode ser gasto aceitando um texto que a
+        # parte não viu. Repetido sob lock em `_record_acceptance`.
+        revision = ensure_current_revision(contract)
+        ContractSignatureService._ensure_deadline(contract)
+        revision_id = revision.pk if revision else None
+        if validated.get("revision_id") != revision_id:
+            raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
+
         otp: str | None = validated.get("otp")
         otp_verified = False
         if settings.CONTRACT_SIGNATURE_REQUIRE_OTP or otp:
-            ContractSignatureService._consume_otp(contract, role, otp)
+            ContractSignatureService._consume_otp(contract, role, otp, signer=signer, revision_id=revision_id)
             otp_verified = True
 
         return ContractSignatureService._record_acceptance(
             contract,
+            revision_id=revision_id,
             role=role,
             signer=signer,
             signer_name=validated["name"].strip(),
@@ -284,6 +343,7 @@ class ContractSignatureService:
     def _record_acceptance(
         contract: Contracts,
         *,
+        revision_id: UUID | None,
         role: str,
         signer: Users,
         signer_name: str,
@@ -299,16 +359,21 @@ class ContractSignatureService:
         rental.postings = posting
         locked = Contracts.objects.select_for_update().get(pk=contract.pk)
         locked.rental = rental
+        if locked.current_revision_id != revision_id:
+            raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
+        ContractSignatureService._ensure_deadline(locked)
         ContractSignatureService._ensure_not_signed(locked, role)
         ContractSignatureService._ensure_payable(rental)
 
-        # O hash é calculado sobre o documento exatamente como ele é servido em
-        # contracts/<id> — é esse conteúdo que a parte leu e aceitou.
-        document = build_contract_document(locked)
+        # O hash é do documento exatamente como ele é servido em contracts/<id>:
+        # a revisão congelada, ou o documento 1.0.0 de um contrato legado.
+        revision = locked.current_revision
+        document, _ = ContractService.document_for(locked, revision)
         try:
             signature = signature_evidence.record_signature(
                 contract=locked,
                 document=document,
+                revision=revision,
                 role=role,
                 signer=signer,
                 signer_name=signer_name,
@@ -323,7 +388,12 @@ class ContractSignatureService:
                 code="signature_conflict",
             ) from exc
 
-        if role == SignatureRole.LESSEE:
+        if revision is not None:
+            # Assinado só quando os dois papéis aceitaram a mesma revisão.
+            roles = set(ContractSignatures.objects.filter(revision=revision).values_list("role", flat=True))
+            locked.accepted_by_lessee = SignatureRole.LESSEE in roles
+            locked.accepted_by_lessor = SignatureRole.LESSOR in roles
+        elif role == SignatureRole.LESSEE:
             locked.accepted_by_lessee = True
         else:
             locked.accepted_by_lessor = True
@@ -339,15 +409,23 @@ class ContractSignatureService:
         rental.save(update_fields=["status"])
         locked.save(update_fields=["accepted_by_lessor", "accepted_by_lessee", "status"])
         notify_rental_event(rental, f"contract_signed_{role}",
-                            event_key=f"contract:{locked.pk}:signed:{role}", contract=locked)
+                            event_key=f"contract:{locked.pk}:revision:{revision_id}:signed:{role}", contract=locked)
         if locked.status == ContractStatus.SIGNED:
             notify_rental_event(rental, "contract_completed",
-                                event_key=f"contract:{locked.pk}:completed", contract=locked)
+                                event_key=f"contract:{locked.pk}:revision:{revision_id}:completed", contract=locked)
         return SignatureResult(contract=locked, signature=signature)
 
     @staticmethod
-    def _consume_otp(contract: Contracts, role: str, code: str | None) -> None:
-        """Valida e consome o código informado; `ValidationError` se não servir."""
+    def _consume_otp(
+        contract: Contracts, role: str, code: str | None, *, signer: Users, revision_id: UUID | None,
+    ) -> None:
+        """Valida e consome o código informado; `ValidationError` se não servir.
+
+        O aceite grava `signer.email` como endereço confirmado. Por isso o código só
+        vale se foi enviado a esse mesmo endereço, para essa parte e para a revisão
+        que ela está assinando: trocar o e-mail do cadastro depois do envio não pode
+        transformar o endereço novo, que nunca recebeu o código, em "verificado".
+        """
         if not code:
             raise ValidationError("Informe o código enviado para o seu e-mail.")
 
@@ -361,6 +439,10 @@ class ContractSignatureService:
             )
             if otp is None:
                 error = "Nenhum código pendente. Solicite um novo código."
+            elif otp.email.casefold() != (signer.email or "").casefold():
+                error = "Seu e-mail mudou depois do envio do código. Solicite um novo código."
+            elif (otp.signer_id not in (None, signer.pk)) or otp.revision_id != revision_id:
+                error = "Este código foi emitido para outra versão do contrato. Solicite um novo código."
             elif otp.is_expired:
                 error = "O código expirou. Solicite um novo código."
             elif otp.attempts >= signature_evidence.OTP_MAX_ATTEMPTS:
@@ -380,8 +462,15 @@ class ContractSignatureService:
             raise ValidationError(error)
 
     @staticmethod
+    def _ensure_deadline(contract):
+        if contract.status == "cancelled":
+            raise Conflict("Este contrato está cancelado.")
+        if contract.signature_deadline and timezone.now() >= contract.signature_deadline:
+            raise Conflict("O prazo de assinatura terminou. A reserva será cancelada com estorno integral.", code="signature_deadline")
+
+    @staticmethod
     def _ensure_payable(rental: Rentals) -> None:
-        if rental.status not in (RentalStatus.ACTIVE, RentalStatus.SIGNED) or not rental.payments.filter(status="approved").exists():
+        if rental.status not in lifecycle.PAID or not rental.payments.filter(status="approved").exists():
             raise Conflict("Confirme o pagamento desta reserva antes de assinar o contrato.")
         if tem_conflito(rental.postings_id, rental.start_date, rental.end_date, ignorar=rental.pk):
             raise Conflict("As datas desta reserva não estão mais disponíveis.")

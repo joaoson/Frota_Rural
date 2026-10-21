@@ -38,7 +38,8 @@ O listener usa `--events-from @self`, dispositivo `frota-rural-local`, telemetri
 desativada e encaminha para `http://127.0.0.1:8000/api/payments/webhook` dentro
 da rede do backend. Recebe `checkout.session.completed`,
 `checkout.session.async_payment_succeeded`, `checkout.session.expired` e
-`checkout.session.async_payment_failed`. O helper grava somente
+`checkout.session.async_payment_failed`, `refund.updated`, `refund.failed` e
+`charge.refunded`. O helper grava somente
 `STRIPE_WEBHOOK_SECRET` em `BackEnd/.env`, com permissão `600`, reinicia backend
 e listener e verifica que o segredo efetivo coincide com o listener atual.
 
@@ -81,7 +82,7 @@ docker stop frota_rural_retrofit-stripe-listener
 O SDK Stripe retorna `StripeObject`, que não oferece `dict.get()`. Esse uso
 causava HTTP 500 no evento e na sessão, mesmo com assinatura válida. O serviço
 usa acesso por chave e checagem de presença. Os testes usam o parser real do
-SDK com payloads assinados e não acessam banco nem rede:
+SDK com payloads assinados e não acessam a rede:
 
 ```bash
 docker exec NOME_DO_BACKEND_LOCAL python manage.py test payments.test_webhook
@@ -94,3 +95,77 @@ pertence ao Compose legado que carrega `BackEnd/.env`; não a execute contra um
 backend com `STRIPE_WEBHOOK_SECRET` fornecido pelo ambiente. Nesse caso,
 configure a chave e o segredo do listener no arquivo selecionado e recrie o
 backend com o mesmo modo/offset antes de encaminhar os eventos.
+
+## Tentativas duráveis e conciliação
+
+Cada checkout grava antes uma tentativa em `payments` (status `creating`) com a
+chave de idempotência `checkout:<locação>:<n>` e os parâmetros exatos da sessão. O
+Stripe é chamado fora dos locks da reserva; se a resposta se perder, uma nova
+tentativa do locatário repete a mesma chave e recebe a mesma sessão, sem criar
+outra. A sessão leva `payment_id` em `metadata`, então o webhook liga a sessão à
+tentativa mesmo quando a gravação local falhou. Cada evento recebido fica em
+`payment_events` e é aplicado uma única vez.
+
+O que a resposta síncrona e o webhook não fecharam é resolvido por:
+
+```bash
+docker exec NOME_DO_BACKEND_LOCAL python manage.py reconcile_payments
+```
+
+O comando repete tentativas incertas com a mesma chave, expira no Stripe sessões
+de reservas já canceladas, aplica pagamentos ou expirações cujo webhook não
+chegou e lista os pagamentos em revisão. Ele é idempotente; em produção, rode-o
+periodicamente (cron ou job agendado), já que o projeto não tem agendador próprio.
+
+## Cancelamento, estorno e prazo de assinatura (H)
+
+A prévia `GET /api/rentals/<id>/cancellation` informa a regra congelada na reserva:
+sem pagamento, sem custo; pelo locatário com pelo menos 7 dias, 100%; com menos
+antecedência, 90%; pelo locador, 100%. Após o início, somente a administração.
+`POST /api/rentals/<id>/cancel` recebe `reason` e libera as datas antes de chamar
+o provedor. Não use PATCH de status para cancelar ou concluir.
+
+`refunds` guarda a obrigação de estorno e `refund_attempts` cada tentativa remota.
+Timeouts repetem a mesma chave; uma nova chave só nasce após falha terminal
+confirmada pelo Stripe. Depois de 23 horas, uma tentativa sem resposta é procurada
+por metadata no provedor; se não houver evidência, exige revisão manual, sem
+reenviar uma chave que o Stripe possa ter esquecido. `reconcile_payments` também
+recupera estornos pendentes/falhos. Nunca altere o status da reserva para tentar
+recuperar um estorno. Webhooks necessários: `refund.updated`, `refund.failed` e
+`charge.refunded`, além dos eventos de checkout já configurados.
+
+Novas revisões recebem `signature_deadline = start_date - 24 horas`. Assinaturas
+e pedidos de OTP vencidos retornam 409. O comando `expire_unsigned_contracts`
+cancela contratos vencidos sem as duas assinaturas e solicita estorno integral.
+Contratos legados sem prazo não recebem uma data retroativa. O lembrete antecipado
+continua na Fase 5.
+
+O repositório não instala um agendador no servidor. Após o deploy e as migrations,
+configure o job abaixo (exemplo a cada cinco minutos, com caminhos absolutos e o
+nome real do container); também é possível executá-lo manualmente:
+
+```sh
+/opt/frota/Devops/reconcile-contracts.sh NOME_DO_BACKEND
+# crontab do operador do deploy:
+*/5 * * * * /opt/frota/Devops/reconcile-contracts.sh NOME_DO_BACKEND >> /var/log/frota-contracts.log 2>&1
+```
+
+Os dois comandos são idempotentes. A frequência do job determina o atraso entre
+o vencimento e a liberação das datas; a recusa de assinatura vale imediatamente.
+Monitore os registros `refunds.status=failed`, `last_error` e pagamentos em revisão.
+Uma falha de estorno não reabre a reserva cancelada.
+
+## Troca de datas (I)
+
+Ambas as partes podem propor pelo cartão da locação ou pela página do contrato.
+A outra parte aceita ou recusa; quem propôs pode retirar. O período original vale
+até o aceite. A aceitação verifica novamente os conflitos e a antecedência mínima,
+preserva a quantidade de diárias e o valor pago, e cria nova revisão para as duas
+assinaturas. Não cria pagamento adicional. O histórico e as evidências anteriores
+permanecem; o documento atual mostra somente as assinaturas da revisão vigente.
+
+Para demonstrar: entre como locatário e solicite novas datas; em outra sessão,
+entre como locador, abra o contrato e aceite. Confira a revisão incrementada, as
+duas assinaturas pendentes e o preço inalterado. Os testes de navegador em
+`FrontEnd/tests/contract-management.spec.ts` exercitam esse fluxo e um cancelamento
+pago com falha recuperável de estorno, sem movimentar dinheiro no Stripe.

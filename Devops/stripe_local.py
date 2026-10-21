@@ -20,6 +20,7 @@ DEVICE = "frota-rural-local"
 EVENTS = ",".join((
     "checkout.session.completed", "checkout.session.async_payment_succeeded",
     "checkout.session.expired", "checkout.session.async_payment_failed",
+    "refund.updated", "refund.failed", "charge.refunded",
 ))
 COMMAND = ["listen", "--events-from", "@self", "--skip-update",
            "--events", EVENTS, "--forward-to", FORWARD_URL]

@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { AuthContext } from "@/contexts/authContextValue";
+import { resetDashboardPreferences } from "../hooks/useDashboardPreference";
+import { useContext, useState } from "react";
 import { Link } from "react-router";
 
 import MaterialIcon from "@/components/MaterialIcon";
 import NotificationPopover from "@/components/NotificationPopover";
 import ThemeToggle from "@/components/ThemeToggle";
+import { UserAvatar } from "@/shared/components/UserAvatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +32,7 @@ interface DashboardShellProps<Tab extends string> {
   onLogout: () => void;
   logoutTab: Tab;
   initials: string;
+  profilePhotoUrl?: string | null;
   accountName: React.ReactNode;
   accountRole: React.ReactNode;
   avatarClassName?: string;
@@ -42,11 +46,13 @@ export function DashboardShell<Tab extends string>({
   onLogout,
   logoutTab,
   initials,
+  profilePhotoUrl,
   accountName,
   accountRole,
   avatarClassName = "bg-primary-container text-on-primary",
   children,
 }: DashboardShellProps<Tab>) {
+  const userId = useContext(AuthContext)?.userId;
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
@@ -72,7 +78,7 @@ export function DashboardShell<Tab extends string>({
           </Link>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 space-y-1">
           {items.map((item) => {
             const buttonEl = (
               <button
@@ -123,11 +129,11 @@ export function DashboardShell<Tab extends string>({
 
         <div className="p-4 border-t border-outline-variant/30">
           <div className="flex items-center gap-3">
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-headline font-bold text-sm ${avatarClassName}`}
-            >
-              {initials}
-            </div>
+            <UserAvatar
+              photoUrl={profilePhotoUrl}
+              initials={initials}
+              className={`w-10 h-10 text-sm ${avatarClassName}`}
+            />
             <div>
               <div className="font-bold text-sm text-on-surface">{accountName}</div>
               <div className="text-[11px] text-on-surface-variant">{accountRole}</div>
@@ -149,12 +155,17 @@ export function DashboardShell<Tab extends string>({
             </button>
           </div>
           <div className="flex items-center gap-2">
+            {userId && <button type="button" onClick={() => resetDashboardPreferences(userId)}
+              title="Limpar filtros e restaurar a visualização salva neste navegador"
+              className="min-h-11 rounded-lg px-2 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high">
+              Restaurar painel
+            </button>}
             <ThemeToggle />
             <NotificationPopover />
           </div>
         </header>
 
-        <div className="p-8 max-w-[1200px]">{children}</div>
+        <div className="max-w-[1200px] p-4 sm:p-6 xl:p-8">{children}</div>
       </main>
     </div>
   );

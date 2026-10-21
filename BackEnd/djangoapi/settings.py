@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
+from common.api_documentation import API_DESCRIPTION
 from .database import database_config, load_environment
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "common.observability.ObservabilityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # Add this at the VERY TOP
     "django.middleware.common.CommonMiddleware",  # Must be after CorsMiddleware
     "django.middleware.security.SecurityMiddleware",
@@ -171,28 +173,22 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Frota Rural API",
-    "DESCRIPTION": (
-        "Documentação completa e interativa da API do Frota Rural. Uma plataforma focada na "
-        "conexão entre Locadores de Maquinário Agrícola e Locatários (Produtores Rurais).\n\n"
-        "## Autenticação\n\n"
-        "A API usa **JWT (Bearer token)**. Para testar os endpoints protegidos por aqui:\n\n"
-        "1. Chame `POST /api/login` com e-mail e senha.\n"
-        "2. Copie o valor de `access` da resposta.\n"
-        "3. Clique em **Authorize** (canto superior direito) e cole o token.\n\n"
-        "O token de acesso expira em 15 minutos; use `POST /api/login/refresh` para renová-lo."
-    ),
+    "DESCRIPTION": API_DESCRIPTION,
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "CONTACT": {"name": "Equipe Frota Rural", "url": "https://github.com/joaoson/Frota_Rural"},
     "SERVERS": [
-        {"url": "http://127.0.0.1:8000", "description": "Ambiente local de desenvolvimento"},
+        {"url": "/", "description": "Mesmo endereço e porta desta documentação"},
     ],
     "SORT_OPERATIONS": False,
+    "PREPROCESSING_HOOKS": ["common.schema.canonical_endpoints"],
     # Vários campos se chamam `status` (ou `role`) com conjuntos de opções
     # diferentes. Sem os nomes explícitos o drf-spectacular gera componentes com
     # sufixo aleatório (StatusDe3Enum). Cada entrada aponta para o TextChoices.
     "ENUM_NAME_OVERRIDES": {
+        "MeterReadingKindEnum": "rentals.enums.MeterReadingKind",
+        "NotificationKindEnum": ["rental", "payment", "contract"],
         "ValidationStatusEnum": "document_validation.enums.ValidationStatus",
         "ReviewDecisionEnum": "document_validation.enums.ReviewDecision",
         "LicenseCategoryEnum": "document_validation.enums.LicenseCategory",
@@ -215,6 +211,7 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,
         "displayRequestDuration": True,
+        "withCredentials": True,
         "docExpansion": "none",
         "filter": True,
     },
@@ -224,10 +221,15 @@ SPECTACULAR_SETTINGS = {
     "TAGS": [
         {"name": "Autenticação", "description": "Login, refresh, logout e recuperação de senha."},
         {"name": "Usuários", "description": "Cadastro, consulta e manutenção de contas."},
+        {"name": "Operadores", "description": "Vínculos dos operadores com a equipe do locatário."},
         {"name": "Maquinário", "description": "Equipamentos cadastrados pelos locadores."},
+        {"name": "Máquinas", "description": "Métricas de utilização do maquinário pelo locador."},
         {"name": "Anúncios", "description": "Publicação de maquinário disponível para locação."},
         {"name": "Locações", "description": "Reservas e ciclo de vida das locações."},
         {"name": "Contratos", "description": "Geração e assinatura dos contratos de locação."},
+        {"name": "Pagamentos", "description": "Cotação, checkout, confirmação de pagamentos e webhook Stripe."},
+        {"name": "Precificação", "description": "Simulação do preço por diária e consulta da ocupação do anúncio."},
+        {"name": "Notificações", "description": "Avisos privados de reservas, pagamentos e contratos para o destinatário."},
         {"name": "Avaliações", "description": "Reputação de locadores e locatários."},
         {"name": "Mensagens", "description": "Chat entre locadores, locatários e operadores."},
         {
@@ -327,6 +329,12 @@ CONTRACT_SIGNATURE_REQUIRE_OTP = (
 )
 CONTRACT_OTP_TTL_SECONDS = int(os.getenv("CONTRACT_OTP_TTL_SECONDS", "600"))
 CONTRACT_OTP_MAX_ATTEMPTS = int(os.getenv("CONTRACT_OTP_MAX_ATTEMPTS", "5"))
+# Proxies reversos cujo X-Forwarded-For é confiável para o IP da evidência de
+# assinatura (IPs ou redes, separados por vírgula, ex. "10.0.0.0/8,127.0.0.1").
+# Vazio: o IP gravado é sempre o da conexão (REMOTE_ADDR).
+CONTRACT_TRUSTED_PROXIES = [
+    value.strip() for value in os.getenv("CONTRACT_TRUSTED_PROXIES", "").split(",") if value.strip()
+]
 
 # Firebase Storage (fotos de anúncios e demais mídias enviadas por usuários)
 # FIREBASE_STORAGE_BUCKET: ex. "frota-rural.firebasestorage.app"
@@ -349,3 +357,15 @@ CHAT_BANNED_WORDS = [
 CHAT_MAX_MESSAGE_LENGTH = int(os.getenv("CHAT_MAX_MESSAGE_LENGTH", "4000"))
 CHAT_RATE_LIMIT_MESSAGES = int(os.getenv("CHAT_RATE_LIMIT_MESSAGES", "20"))
 CHAT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "10"))
+
+# Telemetry remains private unless an explicit scrape credential is configured.
+METRICS_TOKEN = os.getenv("METRICS_TOKEN", "")
+METRICS_TOKEN_FILE = os.getenv("METRICS_TOKEN_FILE", "")
+CORS_EXPOSE_HEADERS = ["X-Request-ID"]
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"request_json": {"()": "common.observability.RequestLogFormatter"}},
+    "handlers": {"request_console": {"class": "logging.StreamHandler", "formatter": "request_json"}},
+    "loggers": {"frota.requests": {"handlers": ["request_console"], "level": "INFO", "propagate": False}},
+}

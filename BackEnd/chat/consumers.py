@@ -34,7 +34,8 @@ SERVIDOR -> CLIENTE
     {"type":"typing","thread_id":"...","user_id":"...","is_typing":true}
     {"type":"unread.updated","unread_total":N,"unread_threads":N}
     {"type":"thread.updated","thread":{...}}
-    {"type":"error","code":"...","message":"..."}
+    {"type":"message.ack","thread_id":"...","client_id":"...","message":{...},"created":true}
+    {"type":"error","code":"...","message":"...","thread_id":"...","client_id":"..."}
     {"type":"pong","server_time":"...Z"}
 
 Falha por thread devolve `error` e MANTÉM o socket aberto; só falha de conexão
@@ -131,12 +132,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def _on_send(self, data: Event) -> None:
         thread_id = str(data.get("thread_id") or "")
+        # Errors name the send they refuse, so the client fails that bubble at once
+        # with the reason instead of waiting for an echo that will never come.
+        refused = {"thread_id": thread_id, "client_id": str(data.get("client_id") or "") or None}
         if thread_id not in self.subscribed:
-            await self._error("not_subscribed", "Assine a conversa antes de enviar.")
+            await self._error("not_subscribed", "Assine a conversa antes de enviar.", **refused)
             return
-        receiver_id, created = await self._persist(
-            thread_id, data.get("content"), data.get("client_id")
-        )
+        try:
+            message, receiver_id, created = await self._persist(
+                thread_id, data.get("content"), data.get("client_id")
+            )
+        except ThreadError as exc:
+            await self._error(exc.code, exc.message, **refused)
+            return
+        except ValidationError as exc:
+            await self._error("invalid_payload", validation_message(exc), **refused)
+            return
+        # Sender-only confirmation, also for an idempotent replay: when the first
+        # echo was lost, the retry is acknowledged instead of failing again.
+        await self._send({
+            "type": "message.ack", "thread_id": message["thread_id"],
+            "client_id": message["client_id"], "message": message, "created": created,
+        })
         if created:
             await database_sync_to_async(ChatService.push_unread)(receiver_id)
 
@@ -167,7 +184,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return ThreadService.get(self.user, thread_id)
 
     @database_sync_to_async
-    def _persist(self, thread_id: str, content: object, client_id: object) -> tuple[UUID, bool]:
+    def _persist(self, thread_id: str, content: object, client_id: object) -> tuple[Event, UUID, bool]:
         # Revalida a escrita a cada envio: o socket vive mais que o token, e a
         # regra (locação cancelada, anúncio pausado) pode ter mudado no meio.
         access = ThreadService.authorize(self.user, thread_id, write=True)
@@ -178,7 +195,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             raise ThreadError("client_id inválido.") from exc
 
         receiver_id = access.peer_of(self.user.id)
-        _, created = ChatService.create_message(
+        message, created = ChatService.create_message(
             sender=self.user,
             receiver_id=receiver_id,
             scope=access.scope,
@@ -187,7 +204,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             client_id=client_uuid,
             thread_id=thread_id,
         )
-        return receiver_id, created
+        return message, receiver_id, created
 
     @database_sync_to_async
     def _mark_read(self, thread_id: str, up_to: object) -> None:
@@ -245,5 +262,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def _send(self, payload: Event) -> None:
         await self.send(text_data=json.dumps(payload))
 
-    async def _error(self, code: str, message: str) -> None:
-        await self._send({"type": "error", "code": code, "message": message})
+    async def _error(self, code: str, message: str, **context: str | None) -> None:
+        extra = {key: value for key, value in context.items() if value}
+        await self._send({"type": "error", "code": code, "message": message, **extra})

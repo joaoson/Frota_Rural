@@ -16,8 +16,6 @@ export function rentalStatusBadge(status: string | null): BadgeConfig {
       return { icon: "check_circle", variant: "success", label: "Concluída" };
     case "cancelled":
       return { icon: "warning", variant: "error", label: "Locação Cancelada" };
-    case "validating":
-      return { icon: "hourglass_bottom", variant: "neutral", label: "Aguardando Validação" };
     default:
       return { icon: "", variant: "muted", label: "" };
   }

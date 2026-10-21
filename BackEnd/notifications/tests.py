@@ -193,15 +193,16 @@ class RentalNotificationTests(NotificationFixtures, TestCase):
         self.assertEqual(Notification.objects.filter(title='Locação atualizada').count(), 2)
         self.assertEqual(self.client.patch(url, data, format='json').status_code, 200)
         self.assertEqual(Notification.objects.filter(title='Locação atualizada').count(), 2)
-        self.assertEqual(self.client.patch(url, {'status': 'cancelled'}, format='json').status_code, 200)
-        self.assertEqual(self.client.patch(url, {'status': 'cancelled'}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(url + "/cancel", {}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(url + "/cancel", {}, format='json').status_code, 200)
         self.assertEqual(Notification.objects.filter(title='Reserva cancelada').count(), 2)
 
     def test_lessor_completion_notifies_both_parties(self):
-        self.source.status = 'active'
+        # Completion requires both signatures (ADR 0002); the fixture contract is signed.
+        self.source.status = 'signed'
         self.source.save(update_fields=['status'])
         self.client.force_authenticate(self.owner)
-        response = self.client.patch(f'/api/rentals/{self.source.pk}', {'status': 'completed'}, format='json')
+        response = self.client.post(f'/api/rentals/{self.source.pk}/complete', {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(title='Locação concluída').count(), 2)
 
@@ -267,11 +268,13 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
         payment = self.payment()
         PaymentService._approve(payment.session_id)
         url = f'/api/contracts/{self.rental.pk}/sign'
-        response = self.client.post(url, {'role': 'locatario'}, format='json')
+        # Payment approval froze the revision both parties accept.
+        revision_id = str(self.rental.contracts.revisions.get().pk)
+        response = self.client.post(url, {'role': 'locatario', 'revision_id': revision_id}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(kind='contract').count(), 2)
         self.client.force_authenticate(self.owner)
-        response = self.client.post(url, {'role': 'locador'}, format='json')
+        response = self.client.post(url, {'role': 'locador', 'revision_id': revision_id}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(kind='contract').count(), 6)
         self.assertEqual(Notification.objects.filter(title='Contrato assinado pelas duas partes').count(), 2)

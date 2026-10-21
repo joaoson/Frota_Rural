@@ -1,13 +1,17 @@
+import logging
 from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
+from django.core.files.uploadedfile import UploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from common.db import enforce_constraints_now
-from common.exceptions import Conflict
+from common.exceptions import BadGateway, Conflict, ServiceUnavailable
+from common.images import validate_image_upload
+from djangoapi import firebase_storage
 from users.enums import UserRole, UserStatus
 from users.models import Users
 from users.serializer import (
@@ -116,6 +120,56 @@ class UserService:
     @staticmethod
     def list() -> QuerySet[Users]:
         return Users.objects.order_by("name")
+
+
+class UserPhotoService:
+    @staticmethod
+    def upload(
+        user_id: UUID,
+        image: UploadedFile | None,
+        *,
+        content_type: str,
+        actor: Users,
+    ) -> Users:
+        # Assim como a troca de senha, este fluxo pertence ao titular da conta.
+        if user_id != actor.pk:
+            raise NotFound("Usuário não encontrado.")
+        UserService.get(user_id, actor=actor)
+        image = validate_image_upload(image, content_type)
+
+        # Nenhuma transação fica aberta durante o upload de rede.
+        try:
+            path = firebase_storage.upload_image(image, folder=f"profiles/{user_id}")
+        except firebase_storage.FirebaseStorageNotConfigured as exc:
+            raise ServiceUnavailable(str(exc)) from exc
+        except Exception as exc:
+            raise BadGateway("Erro ao enviar a imagem para o Firebase.") from exc
+
+        try:
+            return UserPhotoService._save_photo(user_id, path)
+        except Exception:
+            UserPhotoService._delete_photo(path)
+            raise
+
+    @staticmethod
+    @transaction.atomic
+    def _save_photo(user_id: UUID, path: str) -> Users:
+        # Serializa substituições concorrentes e lê o caminho realmente atual.
+        user = Users.objects.select_for_update().get(pk=user_id)
+        previous = user.profile_photo
+        user.profile_photo = path
+        user.save(update_fields=["profile_photo", "updated_at"])
+        if previous:
+            transaction.on_commit(lambda: UserPhotoService._delete_photo(previous))
+        return user
+
+    @staticmethod
+    def _delete_photo(path: str) -> None:
+        try:
+            firebase_storage.delete_image(path)
+        except Exception:
+            # Uma falha de limpeza não desfaz uma foto já salva.
+            logging.getLogger(__name__).exception("Erro ao remover a foto de perfil %s", path)
 
 
 class OperatorService:

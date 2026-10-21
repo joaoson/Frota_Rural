@@ -1,5 +1,10 @@
+import { useDashboardPreference, searchPreference, yearPreference, contractPreference } from "@/features/dashboard/hooks/useDashboardPreference";
+import { contractStore } from "@/app/container";
+import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
+import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
+import { canDo, isConfirmedRental, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
 import { useAuth } from "@/contexts/useAuth";
 import { AccountSection } from "@/features/dashboard/components/AccountSection";
@@ -69,15 +74,18 @@ const DashboardLocatario = () => {
   const visibleItems = isOperator ? sidebarItems.filter(item => ["chat", "notificacoes", "conta", "sair"].includes(item.tab)) : sidebarItems;
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hash } = useLocation();
+  const focusedRentalId = hash.startsWith("#locacao-") ? hash.slice("#locacao-".length) : undefined;
   const requestedTab = searchParams.get("tab");
   const tab: Tab = visibleItems.find((item) => item.tab === requestedTab)?.tab ?? (isOperator ? "conta" : "dashboard");
   const setTab = (next: Tab) => setSearchParams({ tab: next });
-  const [rentalSearch, setRentalSearch] = useState("");
-  const [rentalYear, setRentalYear] = useState("Todos");
-  const [contractSearch, setContractSearch] = useState("");
-  const [contractYear, setContractYear] = useState("Todos");
-  const [contractFilter, setContractFilter] = useState("Todos");
+  const [rentalSearch, setRentalSearch] = useDashboardPreference<string>(userId, "tenant:rentalSearch", searchPreference, "");
+  const [rentalYear, setRentalYear] = useDashboardPreference<string>(userId, "tenant:rentalYear", yearPreference, "Todos");
+  const [contractSearch, setContractSearch] = useDashboardPreference<string>(userId, "tenant:contractSearch", searchPreference, "");
+  const [contractYear, setContractYear] = useDashboardPreference<string>(userId, "tenant:contractYear", yearPreference, "Todos");
+  const [contractFilter, setContractFilter] = useDashboardPreference<string>(userId, "tenant:contractFilter", contractPreference, "Todos");
   const [signingRental, setSigningRental] = useState<string | null>(null);
+  const [amendmentRentalId, setAmendmentRentalId] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [recurrenceSource, setRecurrenceSource] = useState<Rental | null>(null);
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
@@ -107,6 +115,12 @@ const DashboardLocatario = () => {
             ? `${rental.startDate.toLocaleDateString("pt-BR")} a ${rental.endDate.toLocaleDateString("pt-BR")}`
             : "",
         status: rental.status,
+        phase: rental.phase,
+        allowedActions: rental.allowedActions,
+        notes: rental.notes,
+        meter: rental.meter,
+        refunds: rental.refunds,
+        signatureDeadline: rental.signatureDeadline,
         total: (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
           style: "currency",
           currency: "BRL",
@@ -129,10 +143,10 @@ const DashboardLocatario = () => {
     (year === "Todos" || String(r.source.startDate?.getFullYear()) === year);
   const years = ["Todos", ...Array.from(new Set(rentals.flatMap(r => r.source.startDate ? [String(r.source.startDate.getFullYear())] : []))).sort().reverse()];
   const allContracts = rentals.filter(r => r.hasContract);
-  const contracts = allContracts.filter(r => matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
-  const filteredRentals = rentals.filter(r => matches(r, rentalSearch, rentalYear));
-  const activeRentals = filteredRentals.filter(r => ["pending", "awaiting_payment", "active", "signed", "validating"].includes(r.status ?? ""));
-  const pastRentals = filteredRentals.filter(r => ["completed", "cancelled", "closed"].includes(r.status ?? ""));
+  const contracts = allContracts.filter(r => r.id === focusedRentalId || matches(r, contractSearch, contractYear) && (contractFilter === "Todos" || situacaoAssinatura(r).grupo === contractFilter));
+  const filteredRentals = rentals.filter(r => r.id === focusedRentalId || matches(r, rentalSearch, rentalYear));
+  const activeRentals = filteredRentals.filter(isOpenRental);
+  const pastRentals = filteredRentals.filter(r => !isOpenRental(r));
   const today = new Date();
   const spendData = Array.from({ length: 6 }, (_, index) => {
     const month = new Date(today.getFullYear(), today.getMonth() - 5 + index, 1);
@@ -144,9 +158,9 @@ const DashboardLocatario = () => {
     return { month: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), rating: averageRating(receivedReviews.filter(r => r.createdAt?.getFullYear() === month.getFullYear() && r.createdAt?.getMonth() === month.getMonth())) };
   });
   const ratingAverage = averageRating(receivedReviews);
-  const cancel = async (id: string) => {
+  const cancel = async (id: string, reason: string) => {
     try {
-      await cancelRental.mutateAsync(id);
+      await cancelRental.mutateAsync({ id, reason });
       toast.success("Reserva cancelada. As datas foram liberadas.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível cancelar a reserva."); }
   };
@@ -181,13 +195,14 @@ const DashboardLocatario = () => {
     }
   };
 
-  const renderRentalCard = (r: (typeof rentals)[number]) => (
+  const renderRentalCard = (r: (typeof rentals)[number], view: DashboardView) => (
     <RentalCard
       key={r.id}
       rental={r}
+      view={view}
       recurrenceIndex={r.recurrenceIndex}
       onScheduleRecurrence={() => { setRecurrenceSource(r.source); setRecurrenceOpen(true); }}
-      paymentAction={(r.status === "pending" || r.status === "awaiting_payment") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
+      paymentAction={canDo(r, "pay") ? <RentalPaymentButton rentalId={r.id} /> : undefined}
       counterparty={{
         label: "Locador",
         name: r.owner,
@@ -196,8 +211,10 @@ const DashboardLocatario = () => {
       }}
       detailsOpen={showDetalhes === r.id}
       onToggleDetails={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)}
-      onCancel={() => void cancel(r.id)}
-      cancelling={cancelRental.isPending && cancelRental.variables === r.id}
+      onCancel={(reason) => void cancel(r.id, reason)}
+      onPreviewCancellation={() => contractStore.previewCancellation(r.id)}
+      onAmend={() => setAmendmentRentalId(r.id)}
+      cancelling={cancelRental.isPending && cancelRental.variables?.id === r.id}
       cancelLabel="Cancelar reserva"
       analysisHref={`/dashboard-locatario/locacoes/${r.id}`}
       review={{
@@ -225,6 +242,7 @@ const DashboardLocatario = () => {
       onLogout={logout}
       logoutTab="sair"
       initials={user ? getInitials(user.name) : "…"}
+      profilePhotoUrl={user?.profilePhotoUrl}
       accountName={user ? `${user.name.split(" ")[0]} ${user.name.split(" ").slice(-1)[0]}` : "…"}
       accountRole={isOperator ? "Operador" : "Locatário"}
       avatarClassName="bg-tertiary-container text-on-tertiary"
@@ -240,9 +258,9 @@ const DashboardLocatario = () => {
             <p className="text-on-surface-variant text-sm mt-3">Veja o resumo das suas locações</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
-              { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(r => r.status === "active").length), sub: "em andamento", icon: "event_available" },
+              { label: "LOCAÇÕES ATIVAS", value: String(rentals.filter(isConfirmedRental).length), sub: "pagas e em andamento", icon: "event_available" },
               { label: "CONTRATOS", value: String(allContracts.filter(r => r.acceptedByLessor && r.acceptedByLessee).length), sub: "assinados por ambas as partes", icon: "description" },
               { label: "LOCAÇÕES TOTAIS", value: String(rentals.length), sub: "reservas registradas", icon: "inventory_2" },
               { label: "VALOR CONTRATADO NO MÊS", value: formatCurrency(spendData[5].value), sub: today.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }), icon: "payments" },
@@ -325,13 +343,13 @@ const DashboardLocatario = () => {
                 Ver todas <MaterialIcon icon="arrow_forward" size={14} />
               </button>
             </div>
-            <div className="space-y-3">
-              {rentals.map((r) => {
+            <DashboardCollection label="Minhas locações" items={rentals} defaultView="list"
+              renderItem={(r, view) => {
                 const badge = rentalStatusBadge(r.status);
                 return (
-                  <Link key={r.id} to={`/dashboard-locatario?tab=locacoes#locacao-${r.id}`} className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-5 flex items-center justify-between hover:shadow-md transition-shadow">
+                  <Link key={r.id} to={`/dashboard-locatario?tab=locacoes#locacao-${r.id}`} className={`bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-4 sm:p-5 flex flex-col gap-4 ${view === "list" ? "@xl/collection:flex-row @xl/collection:items-center" : ""} justify-between hover:shadow-md transition-shadow`}>
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-surface-container-high">
+                      <div className="w-12 h-12 shrink-0 rounded-xl overflow-hidden bg-surface-container-high">
                         <MaterialIcon icon="agriculture" className="text-primary p-2" size={32} />
                       </div>
                       <div>
@@ -345,8 +363,8 @@ const DashboardLocatario = () => {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
+              }}
+            />
           </div>
         </div>
       )}
@@ -373,27 +391,14 @@ const DashboardLocatario = () => {
           />
 
           {!rentalsQuery.isLoading && !rentalsQuery.isError && filteredRentals.length === 0 && <p role="status">Nenhuma locação encontrada.</p>}
-          {activeRentals.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon icon="play_circle" size={20} className="text-primary" /> Locações em Andamento
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {activeRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          )}
-
-          {pastRentals.length > 0 && (
-            <div className="space-y-4 mt-8">
-              <h2 className="font-headline text-lg font-bold text-on-surface flex items-center gap-2">
-                <MaterialIcon icon="history" size={20} className="text-on-surface-variant" /> Locações Passadas
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {pastRentals.map(renderRentalCard)}
-              </div>
-            </div>
-          )}
+          <DashboardCollection
+            label="Locações"
+            items={[...activeRentals, ...pastRentals]}
+            resetKey={JSON.stringify([rentalSearch, rentalYear])}
+            focusItemId={focusedRentalId}
+            getGroup={(rental) => isOpenRental(rental) ? "Locações em Andamento" : "Locações Passadas"}
+            renderItem={renderRentalCard}
+          />
         </div>
       )}
 
@@ -413,7 +418,7 @@ const DashboardLocatario = () => {
             years={years}
             searchPlaceholder="Buscar por contrato, locador ou maquinário..."
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {["Todos", "Pendentes", "Assinados", "Encerrados"].map((f) => (
               <button key={f} type="button" onClick={() => setContractFilter(f)} aria-pressed={contractFilter === f} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${f === contractFilter ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"}`}>
                 {f}
@@ -421,11 +426,12 @@ const DashboardLocatario = () => {
             ))}
           </div>
           {contracts.length === 0 && <p role="status" className="text-sm text-on-surface-variant">Nenhum contrato disponível.</p>}
-          {contracts.map((c) => (
-            <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
-              <div className="flex items-start justify-between mb-4">
+          <DashboardCollection label="Contratos" items={contracts} defaultView="list" resetKey={JSON.stringify([contractSearch, contractYear, contractFilter])}
+            renderItem={(c, view) => (
+            <div key={c.id} className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 shrink-0 bg-surface-container-high rounded-xl flex items-center justify-center">
                     <MaterialIcon icon="description" className="text-primary" size={24} />
                   </div>
                   <div>
@@ -437,7 +443,7 @@ const DashboardLocatario = () => {
                   {situacaoAssinatura(c).encerrado ? "Encerrado" : situacaoAssinatura(c).completo ? "Assinado" : "Assinatura Pendente"}
                 </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
+              <div className={`grid grid-cols-1 @sm/collection:grid-cols-2 ${view === "list" ? "@3xl/collection:grid-cols-4" : ""} gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4`}>
                 <div>
                   <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">Locador</div>
                   <div className="font-bold text-tertiary text-sm">{c.owner}</div>
@@ -455,18 +461,19 @@ const DashboardLocatario = () => {
                   <div className="font-bold text-on-surface text-sm">{c.machine}</div>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Link to={`/contrato/${c.id}`} className="bg-gradient-to-r from-primary to-primary-container text-on-primary px-5 py-2.5 rounded-lg font-bold text-sm hover:shadow-lg transition-all flex items-center gap-2 text-center decoration-transparent">
                   <MaterialIcon icon="visibility" size={16} /> Visualizar Contrato
                 </Link>
-                {(c.status === "pending" || c.status === "awaiting_payment") && <RentalPaymentButton rentalId={c.id} />}
+                {canDo(c, "pay") && <RentalPaymentButton rentalId={c.id} />}
                 {situacaoAssinatura(c).podeAssinarComoLocatario && <button type="button" onClick={() => setSigningRental(c.id)} className="bg-primary/10 text-primary px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2"><MaterialIcon icon="draw" size={16} /> Assinar Contrato</button>}
                 <Link to={`/contrato/${c.id}?print=1`} className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-lg font-bold text-sm hover:bg-outline-variant/30 transition-colors flex items-center gap-2">
                   <MaterialIcon icon="download" size={16} /> Imprimir / Salvar PDF
                 </Link>
               </div>
             </div>
-          ))}
+          )}
+          />
         </div>
       )}
 
@@ -494,6 +501,7 @@ const DashboardLocatario = () => {
       )}
       <AssinaturaContratoModal open={signingRental !== null} onOpenChange={(open) => { if (!open) setSigningRental(null); }} contratoId={signingRental ?? ""} papel="locatario" onAssinado={() => { void rentalsQuery.refetch(); }} />
       {recurrenceSource && <RentalRecurrenceDialog key={recurrenceSource.id} source={recurrenceSource} open={recurrenceOpen} onOpenChange={(open) => { setRecurrenceOpen(open); if (!open) setTab("locacoes"); }} />}
+      {amendmentRentalId && <ContractAmendmentsDialog contractId={amendmentRentalId} actorId={userId} onClose={() => setAmendmentRentalId(null)} />}
     </DashboardShell>
   );
 };

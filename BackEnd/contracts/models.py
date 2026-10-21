@@ -3,7 +3,7 @@ from typing import Any, NoReturn
 from django.db import models
 from django.utils import timezone
 
-from contracts.enums import ContractStatus, SignatureRole
+from contracts.enums import AmendmentStatus, ContractStatus, RevisionReason, SignatureRole
 
 
 class Contracts(models.Model):
@@ -14,6 +14,13 @@ class Contracts(models.Model):
     accepted_by_lessee = models.BooleanField(blank=True, null=True)
     status = models.TextField(choices=ContractStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
+    signature_deadline = models.DateTimeField(blank=True, null=True)
+    # Versão congelada que as duas partes assinam. Nula em contratos ainda não
+    # pagos (o documento é só uma prévia) e nos legados, assinados antes das
+    # revisões existirem.
+    current_revision = models.ForeignKey(
+        "ContractRevisions", models.DO_NOTHING, related_name="+", blank=True, null=True,
+    )
 
     class Meta:
         db_table = "contracts"
@@ -24,6 +31,43 @@ class Contracts(models.Model):
 
 class ImmutableRecordError(Exception):
     """Levantada ao tentar alterar ou remover uma evidência já gravada."""
+
+
+class ContractRevisions(models.Model):
+    """Documento completo do contrato, congelado. É exatamente o que se assina.
+
+    Append-only como as assinaturas: `save`/`delete` recusam alterações e a
+    migração 0004 deste app bloqueia UPDATE/DELETE no banco. Mudanças de cadastro,
+    anúncio ou modelo de cláusulas depois do congelamento não alteram o que foi
+    aceito; um aditivo cria uma nova revisão.
+    """
+
+    id = models.UUIDField(primary_key=True)
+    contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="revisions")
+    number = models.PositiveIntegerField()
+    document = models.JSONField()
+    document_hash = models.CharField(max_length=64)
+    document_version = models.CharField(max_length=20)
+    reason = models.CharField(max_length=20, choices=RevisionReason.choices)
+    created_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "contract_revisions"
+        ordering = ["contract", "number"]
+        constraints = [
+            models.UniqueConstraint(fields=["contract", "number"], name="unique_contract_revision_number"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Revisão {self.number} ({self.document_hash[:12]})"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self._state.adding:
+            raise ImmutableRecordError("Revisões de contrato são append-only e não podem ser alteradas.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> NoReturn:
+        raise ImmutableRecordError("Revisões de contrato são append-only e não podem ser removidas.")
 
 
 class ContractSignatures(models.Model):
@@ -38,6 +82,10 @@ class ContractSignatures(models.Model):
 
     id = models.UUIDField(primary_key=True)
     contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="signatures")
+    # Revisão aceita. Nula só nas assinaturas legadas, anteriores às revisões.
+    revision = models.ForeignKey(
+        ContractRevisions, models.DO_NOTHING, related_name="signatures", blank=True, null=True,
+    )
 
     # Quem aceitou. Guardamos nome e e-mail no próprio registro além da FK:
     # se o cadastro mudar depois, a evidência preserva o que valia no aceite.
@@ -69,6 +117,10 @@ class ContractSignatures(models.Model):
         indexes = [
             models.Index(fields=["contract", "signed_at"]),
         ]
+        constraints = [
+            # Cada papel aceita uma revisão uma única vez.
+            models.UniqueConstraint(fields=["revision", "role"], name="unique_signature_per_revision_role"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.role} @ {self.signed_at.isoformat()} ({self.document_hash[:12]})"
@@ -96,6 +148,12 @@ class ContractSignatureOtps(models.Model):
     id = models.UUIDField(primary_key=True)
     contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="signature_otps")
     role = models.CharField(max_length=20, choices=SignatureRole.choices)
+    # O código só vale para quem o pediu, para a revisão que essa parte leu e
+    # para o endereço que o recebeu. Nulos só em códigos anteriores a isso.
+    signer = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+", blank=True, null=True)
+    revision = models.ForeignKey(
+        ContractRevisions, models.DO_NOTHING, related_name="signature_otps", blank=True, null=True,
+    )
     email = models.CharField(max_length=255)
     code_hash = models.CharField(max_length=64)
     attempts = models.IntegerField(default=0)
@@ -120,3 +178,29 @@ class ContractSignatureOtps(models.Model):
     @property
     def is_usable(self) -> bool:
         return self.consumed_at is None and not self.is_expired
+
+
+class ContractAmendments(models.Model):
+    """Proposta de troca de datas; só o aceite da contraparte modifica a reserva."""
+
+    id = models.UUIDField(primary_key=True)
+    contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="amendments")
+    proposer = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+")
+    base_revision = models.ForeignKey(ContractRevisions, models.DO_NOTHING, related_name="+")
+    original_start = models.DateTimeField()
+    original_end = models.DateTimeField()
+    proposed_start = models.DateTimeField()
+    proposed_end = models.DateTimeField()
+    reason = models.CharField(max_length=1000)
+    status = models.CharField(max_length=20, choices=AmendmentStatus.choices, default=AmendmentStatus.PENDING)
+    decided_by = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+", null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "contract_amendments"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["contract"], condition=models.Q(status="pending"), name="one_pending_contract_amendment"),
+        ]

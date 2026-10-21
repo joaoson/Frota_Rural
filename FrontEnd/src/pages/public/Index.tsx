@@ -4,6 +4,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import MascotCompanion from "@/features/home/components/MascotCompanion";
+import MachineFinderChat from "@/features/home/components/MachineFinderChat";
 import heroBg from "@/assets/hero-bg.jpg";
 import machine1 from "@/assets/machine-1.jpg";
 import machine2 from "@/assets/machine-2.jpg";
@@ -274,6 +275,7 @@ const Index = () => {
       </main>
 
       <Footer />
+      <MachineFinderChat />
     </div>
   );
 };

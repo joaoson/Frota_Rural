@@ -47,6 +47,15 @@ export interface ChangePasswordVariables {
   newPassword: string;
 }
 
+export function useUploadProfilePhoto() {
+  return useMutation<User, Error, { id: string; file: File }>({
+    mutationFn: ({ id, file }) => userStore.uploadPhoto(id, file),
+    onSuccess: () => {
+      void userStore.invalidateLists();
+    },
+  });
+}
+
 export function useChangePassword() {
   return useMutation<void, Error, ChangePasswordVariables>({
     mutationFn: ({ id, currentPassword, newPassword }) =>

@@ -36,12 +36,12 @@ def parser():
     result.add_argument("--env-file", type=Path, help="Explicit credentials/config file; never merged with other .env files")
     result.add_argument("--project", help="Override the isolated Compose project name")
     result.add_argument("--port-offset", type=int, help="Offset all host ports; default local=0, supabase=1")
+    result.add_argument("--observability", action="store_true", help="Add local Prometheus, Grafana and Alertmanager (run observability/setup.py first)")
     result.add_argument("--allow-remote", action="store_true", help="Explicitly allow Supabase migrate or seed writes")
     return result
 
 
 def current_branch(root):
-    # Resolve this checkout, even when invoked from a Git hook or another repo.
     git_env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         result = subprocess.run(["git", "-C", str(root), "symbolic-ref", "--quiet", "--short", "HEAD"],
@@ -54,7 +54,6 @@ def current_branch(root):
 
 
 def resolve_arguments(args, root=ROOT):
-    """Select a mode once, before constructing any Docker or database command."""
     args.branch = None
     if args.command in MODES:
         if args.legacy_action is None:
@@ -106,6 +105,11 @@ def configuration(args, root=ROOT, environ=None):
     if args.mode == "supabase":
         command += ["-f", str(root / "compose.supabase.yaml")]
     command += ["-f", str(root / "compose.development.yaml")]
+    if getattr(args, "observability", False):
+        if args.mode != "local":
+            raise ValueError("The observability overlay is local only; remote operations require dedicated configuration.")
+        command += ["-f", str(root / "compose.observability.yaml")]
+        env.update(PROMETHEUS_PORT=str(9090 + offset), ALERTMANAGER_PORT=str(9093 + offset), GRAFANA_PORT=str(3000 + offset))
     return command, env, project
 
 
@@ -116,6 +120,8 @@ def action_arguments(args):
         raise ValueError("Review check-db and plan-migrations/seed-preview, then explicitly add --allow-remote.")
     if args.action == "up":
         services = ["redis", "backend", "frontend"]
+        if getattr(args, "observability", False):
+            services += ["prometheus", "alertmanager", "grafana"]
         return ["up", "--build", "-d", *(["db"] if args.mode == "local" else []), *services]
     simple = {"down": ["down"], "status": ["ps"], "logs": ["logs", "--follow", "--tail", "100"],
               "config": ["config", "--quiet"]}

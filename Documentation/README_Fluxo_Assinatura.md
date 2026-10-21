@@ -8,6 +8,10 @@ O **porquê** de cada decisão (base legal, canonicalização, encadeamento, imu
 está na Parte 2 de [`README_Arquitetura_Fotos_e_Assinatura.md`](README_Arquitetura_Fotos_e_Assinatura.md).
 Aqui o foco é o mapa de chamadas.
 
+> **Atualização (2026-10-21) — revisões congeladas.** Os passos 1.2, 1.3 e 1.5 do
+> [plano de implementação](IMPLEMENTATION_PLAN_T01_T07.md) mudaram o que se assina; a
+> seção 12 resume o comportamento atual e prevalece sobre trechos antigos abaixo.
+
 ---
 
 ## 1. Peças envolvidas
@@ -435,8 +439,40 @@ parte assinaria um hash diferente do mesmo contrato.
   que **qualquer** uma das partes assina.
 - **`GET /contracts/<id>/evidence`** existe no backend e em `getContractEvidence`, mas
   nenhuma tela o consome ainda.
-- **`ContractService.signContract` faz uma segunda chamada** (`getRentalById`) logo após
-  o aceite, para devolver o aluguel já atualizado junto do recibo.
+- **O aluguel atualizado vem na própria resposta do aceite** (`rental_details`); não há
+  mais uma segunda leitura que, se falhasse, faria um aceite gravado parecer recusado.
 - **Pagamento é simulado** (`setTimeout` de 1,2 s em `Reservar.tsx`); o contrato é criado
   automaticamente no `POST /rentals/`, independentemente disso.
 - **Sem carimbo de tempo de terceiro.** O `signed_at` é do relógio do servidor.
+
+---
+
+## 12. Revisões congeladas, OTP e IP (2026-10-21)
+
+- **O documento assinado é uma revisão imutável.** `contracts.revisions.freeze_revision`
+  grava em `contract_revisions` o documento 2.0.0 completo — termos **e o texto das
+  cláusulas** (`contracts/contract_template.py`) — com o hash dele. A revisão 1 nasce
+  em `PaymentService._approve`; contratos pagos antes desta versão ganham a sua na
+  primeira leitura ou assinatura (`ensure_current_revision`). A tabela é append-only no
+  model e no banco (migração `contracts.0004`).
+- **`GET /contracts/<id>`** serve a revisão congelada e devolve `revisao` (`id`,
+  `numero`, `hash`), `previa` (contrato não pago: o texto ainda não congelou) e `legado`
+  (aceite gravado antes das revisões, conferido contra o documento 1.0.0 reconstruído).
+  Editar cadastro, anúncio ou o modelo de cláusulas não muda uma revisão existente.
+- **Leitura desatualizada é recusada.** `POST /otp` e `POST /sign` exigem `revision_id`
+  igual à revisão vigente; senão **409 `stale_revision`**, conferido antes de consumir o
+  OTP e de novo sob lock. As telas recarregam o documento e pedem nova leitura.
+- **Assinado só com as duas partes na mesma revisão.** `contract_signatures.revision`
+  liga cada aceite à revisão (único por revisão + papel); `accepted_by_*` refletem os
+  aceites da revisão vigente. Uma nova revisão (aditivo) exige as duas assinaturas de novo.
+- **O OTP vale só para quem o pediu, para a revisão lida e para o e-mail que o recebeu.**
+  `contract_signature_otps` guarda `signer` e `revision`; trocar o e-mail do cadastro
+  depois do envio faz o código ser recusado ("Seu e-mail mudou..."). Pedir código exige
+  contrato pago e papel ainda não assinado.
+- **IP da evidência.** `X-Forwarded-For` só é lido quando a conexão vem de um proxy em
+  `CONTRACT_TRUSTED_PROXIES` (IPs ou redes); o IP gravado é o primeiro salto, de trás para
+  frente, que não é um desses proxies. Vazio (padrão): sempre `REMOTE_ADDR`.
+
+| Variável | Padrão | Efeito |
+| --- | --- | --- |
+| `CONTRACT_TRUSTED_PROXIES` | vazio | Proxies cujo `X-Forwarded-For` é confiável |

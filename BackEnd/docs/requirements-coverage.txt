@@ -1,0 +1,2 @@
+# Reporting only; install in the disposable test container.
+coverage==7.16.2

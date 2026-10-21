@@ -29,7 +29,7 @@ from document_validation.models import Certification
 from machines.models import Machines
 from notifications.events import notify_rental_event
 from notifications.models import Notification
-from payments.pricing import calcular_total
+from payments.pricing import cotar
 from postings.models import Postings
 from users.models import Users
 
@@ -129,12 +129,11 @@ def build_plan(now=None):
         offset = -45 + i * 5 if historical or cancelled else 14 + (i - 4) * 7
         start = day + timedelta(days=offset)
         end = start + timedelta(days=1, hours=9)
-        price = calcular_total(Rentals(start_date=start, end_date=end,
-            postings=Postings(hourly_rate=Decimal(150 + i * 25))))
+        quote = cotar(Postings(hourly_rate=Decimal(150 + i * 25)), start, end)
         renter_id = seed_id('user', 1 if i % 2 == 0 else 4)
         rental_id = add(Rentals, 'rental', i, postings_id=seed_id('posting', i), lessee_id=renter_id,
             operator_id=seed_id('user', 2 if i % 2 == 0 else 5), start_date=start, end_date=end,
-            total_price=price, initial_hour_meter=1000 + i * 50 if historical else None,
+            **quote.snapshot(), initial_hour_meter=1000 + i * 50 if historical else None,
             final_hour_meter=1016 + i * 50 if historical else None, status=rental_status,
             reservation_expires_at=now + timedelta(minutes=30) if rental_status == 'pending' else None,
             created_at=start - timedelta(days=3) if historical or cancelled else now, updated_at=now)

@@ -99,6 +99,7 @@ export const userApiSchema = z.object({
   document: z.string(),
   email: z.string(),
   phone: z.string().nullish(),
+  profile_photo_url: z.string().nullish(),
   role: z.string(),
   address: z.string(),
   city: z.string().nullish(),

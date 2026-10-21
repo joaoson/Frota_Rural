@@ -4,6 +4,7 @@ interface DashboardPaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  label?: string;
 }
 
 /**
@@ -28,7 +29,7 @@ function buildPageItems(currentPage: number, totalPages: number): (number | "...
   return items;
 }
 
-const DashboardPagination = ({ currentPage, totalPages, onPageChange }: DashboardPaginationProps) => {
+const DashboardPagination = ({ currentPage, totalPages, onPageChange, label = "Paginação" }: DashboardPaginationProps) => {
   if (totalPages <= 1) return null;
 
   const page = Math.min(Math.max(currentPage, 1), totalPages);
@@ -38,7 +39,7 @@ const DashboardPagination = ({ currentPage, totalPages, onPageChange }: Dashboar
   };
 
   return (
-    <nav aria-label="Paginação" className="flex items-center justify-center gap-2 pt-4">
+    <nav aria-label={label} className="flex flex-wrap items-center justify-center gap-1 pt-4">
       <button
         type="button"
         onClick={() => goTo(page - 1)}
@@ -48,6 +49,8 @@ const DashboardPagination = ({ currentPage, totalPages, onPageChange }: Dashboar
       >
         <MaterialIcon icon="chevron_left" size={20} />
       </button>
+      <span className="text-sm text-on-surface-variant sm:hidden" aria-live="polite">Página {page} de {totalPages}</span>
+      <div className="hidden flex-wrap items-center justify-center gap-1 sm:flex">
       {buildPageItems(page, totalPages).map((item, i) =>
         item === "..." ? (
           <span
@@ -72,6 +75,7 @@ const DashboardPagination = ({ currentPage, totalPages, onPageChange }: Dashboar
           </button>
         ),
       )}
+      </div>
       <button
         type="button"
         onClick={() => goTo(page + 1)}

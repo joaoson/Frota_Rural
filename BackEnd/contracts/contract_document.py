@@ -3,17 +3,19 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
+from contracts import contract_template
 from contracts.models import Contracts
+from payments.pricing import HORAS_POR_DIARIA
 from users.models import Users
 
-DOCUMENT_VERSION = "1.0.0"
+# Documento das revisões congeladas: termos + texto completo das cláusulas.
+DOCUMENT_VERSION = contract_template.TEMPLATE_VERSION
+# Contratos assinados antes das revisões: só os termos, sem as cláusulas. Esta
+# versão nunca muda, senão os hashes já aceitos deixariam de conferir.
+LEGACY_DOCUMENT_VERSION = "1.0.0"
 
 # Rótulo fixo do tipo de operação intermediada pela plataforma.
 TIPO_SERVICO = "Locação de Maquinário"
-
-# Jornada diária usada para estimar as horas contratadas. Fonte única da regra:
-# o frontend exibe a mesma estimativa a partir do documento devolvido pela API.
-HORAS_ESTIMADAS_POR_DIA = 8
 
 CPF_DIGITS = 11
 CNPJ_DIGITS = 14
@@ -152,36 +154,40 @@ def _parte(user: Users) -> dict[str, str]:
     }
 
 
-def build_contract_document(contract: Contracts) -> dict[str, Any]:
-    """Termos do contrato, já formatados. É sobre este dict que o hash do aceite é calculado."""
+def _valores(rental) -> tuple[Decimal, int, int, str, str, str]:
+    """Tarifa, diárias, horas e composição, da cotação congelada na reserva (ADR 0002).
+
+    Locações sem cotação gravada usam o cálculo antigo, a partir do anúncio.
+    """
+    tarifa = rental.hourly_rate_snapshot
+    if tarifa is None:
+        tarifa = rental.postings.hourly_rate
+    dias = rental.billable_days or _prazo_em_dias(rental.start_date, rental.end_date)
+    horas = HORAS_POR_DIARIA * dias
+    valor_locacao, valor_taxa, percentual_taxa = _composicao_valores(rental.total_price, tarifa, horas)
+    return tarifa, dias, horas, valor_locacao, valor_taxa, percentual_taxa
+
+
+def _identificacao(contract: Contracts, versao: str, dias: int) -> dict[str, Any]:
+    rental = contract.rental
+    return {
+        "numero": f"#CTR-{str(rental.id)[:4].upper()}",
+        "versao_documento": versao,
+        "data_geracao": contract.created_at.strftime("%d/%m/%Y") if contract.created_at else "",
+        "data_inicio": rental.start_date.strftime("%Y-%m-%d") if rental.start_date else "",
+        "data_fim": rental.end_date.strftime("%Y-%m-%d") if rental.end_date else "",
+        "prazo_dias": dias,
+    }
+
+
+def _partes_e_objeto(contract: Contracts) -> dict[str, Any]:
     rental = contract.rental
     posting = rental.postings
     machine = posting.machinery
     lessor = machine.owner
     lessee = rental.lessee
-
-    dias = _prazo_em_dias(rental.start_date, rental.end_date)
-    horas = HORAS_ESTIMADAS_POR_DIA * dias
-    valor_locacao, valor_taxa, percentual_taxa = _composicao_valores(
-        rental.total_price, posting.hourly_rate, horas
-    )
     municipio, uf = _municipio_uf(lessee)
-
     return {
-        "contrato": {
-            "numero": f"#CTR-{str(rental.id)[:4].upper()}",
-            "versao_documento": DOCUMENT_VERSION,
-            "data_geracao": contract.created_at.strftime("%d/%m/%Y") if contract.created_at else "",
-            "data_inicio": rental.start_date.strftime("%Y-%m-%d") if rental.start_date else "",
-            "data_fim": rental.end_date.strftime("%Y-%m-%d") if rental.end_date else "",
-            "prazo_dias": dias,
-            "valor_unitario": _format_brl(posting.hourly_rate),
-            "estimativa_horas": horas,
-            "valor_locacao": valor_locacao,
-            "valor_taxa_plataforma": valor_taxa,
-            "percentual_taxa_plataforma": percentual_taxa,
-            "valor_total_estimado": _format_brl(rental.total_price),
-        },
         "operacao": {
             "codigo": f"OP-{str(rental.id)[4:9].upper()}",
         },
@@ -210,4 +216,51 @@ def build_contract_document(contract: Contracts) -> dict[str, Any]:
             "tipo_servico": TIPO_SERVICO,
             "finalidade_uso": machine.usage_purpose or "",
         },
+    }
+
+
+def build_contract_document(contract: Contracts) -> dict[str, Any]:
+    """Documento completo, com o texto das cláusulas. É o que uma revisão congela e o hash cobre."""
+    rental = contract.rental
+    tarifa, dias, horas, valor_locacao, valor_taxa, percentual_taxa = _valores(rental)
+    diaria = rental.daily_rate if rental.daily_rate is not None else Decimal(tarifa) * HORAS_POR_DIARIA
+    document: dict[str, Any] = {
+        "titulo": contract_template.TITULO,
+        "contrato": {
+            **_identificacao(contract, DOCUMENT_VERSION, dias),
+            "valor_unitario": _format_brl(tarifa),
+            "horas_por_diaria": HORAS_POR_DIARIA,
+            "valor_diaria": _format_brl(diaria),
+            "diarias": dias,
+            "valor_locacao": valor_locacao,
+            "valor_taxa_plataforma": valor_taxa,
+            "percentual_taxa_plataforma": percentual_taxa,
+            "valor_total": _format_brl(rental.total_price),
+        },
+        **_partes_e_objeto(contract),
+        "preambulo": contract_template.PREAMBULO,
+        "declaracao_assinatura": contract_template.DECLARACAO_ASSINATURA,
+    }
+    document["clausulas"] = contract_template.render_clausulas(document)
+    return document
+
+
+def build_legacy_document(contract: Contracts) -> dict[str, Any]:
+    """Termos no formato 1.0.0, para conferir aceites gravados antes das revisões.
+
+    As chaves e a formatação não podem mudar: o hash destes aceites é recalculado
+    a partir deste dict. As cláusulas dessa época não fazem parte do documento.
+    """
+    tarifa, dias, horas, valor_locacao, valor_taxa, percentual_taxa = _valores(contract.rental)
+    return {
+        "contrato": {
+            **_identificacao(contract, LEGACY_DOCUMENT_VERSION, dias),
+            "valor_unitario": _format_brl(tarifa),
+            "estimativa_horas": horas,
+            "valor_locacao": valor_locacao,
+            "valor_taxa_plataforma": valor_taxa,
+            "percentual_taxa_plataforma": percentual_taxa,
+            "valor_total_estimado": _format_brl(contract.rental.total_price),
+        },
+        **_partes_e_objeto(contract),
     }

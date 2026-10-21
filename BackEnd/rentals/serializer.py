@@ -1,3 +1,5 @@
+from datetime import datetime
+from drf_spectacular.utils import extend_schema_field
 from typing import Any
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -5,7 +7,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from contracts.models import Contracts
-from rentals.models import Rentals
+from rentals import lifecycle
+from rentals.meter import usage_summary
+from rentals.models import RentalMeterReadings, Rentals
 from users.enums import UserRole
 from users.models import Users
 
@@ -39,6 +43,7 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
 
     Aqui fica só a validação que depende do próprio payload. A checagem de
     conflito com outras reservas consulta o banco e mora no `RentalService`.
+    O valor não é gravável: a cotação é calculada e congelada pelo servidor.
     """
 
     class Meta:
@@ -49,11 +54,19 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             "operator",
             "start_date",
             "end_date",
-            "total_price",
-            "initial_hour_meter",
-            "final_hour_meter",
+            "notes",
             "status",
         ]
+        extra_kwargs = {"notes": {"max_length": 1000, "allow_blank": True, "required": False}}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance is not None:
+            # Os vínculos não mudam após a criação (o RentalService recusa um valor
+            # diferente). Repetir o mesmo valor não pode valer como pedido de
+            # alteração, nem disparar novo cálculo de preço.
+            for field in ("postings", "lessee"):
+                self.fields.pop(field)
 
     def validate(self, attrs):
         """Keep a day free before and after each rental for machine turnaround."""
@@ -66,9 +79,9 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
         if end_date < start_date:
             raise serializers.ValidationError({"end_date": "A data de fim deve ser posterior à data de início."})
 
-        if self.instance and not any(field in attrs for field in ('start_date', 'end_date', 'postings')):
-            # Cancellation and meter updates must still work if an expired hold
-            # has since been taken by another renter.
+        if self.instance and not any(field in attrs for field in ('start_date', 'end_date')):
+            # Cancellation and notes must still work if an expired hold has
+            # since been taken by another renter.
             return attrs
         if not self.instance or any(field in attrs for field in ('start_date', 'end_date')):
             if posting.status != 'active' or posting.machinery.status != 'active':
@@ -109,9 +122,20 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     # assinar. `rentals.status` sozinho não distingue "o locador assinou" de
     # "o locatário assinou": ambos deixam o aluguel em `active`.
     contract_id = serializers.SerializerMethodField()
+    signature_deadline = serializers.SerializerMethodField()
+    refunds = serializers.SerializerMethodField()
     contract_status = serializers.SerializerMethodField()
     accepted_by_lessor = serializers.SerializerMethodField()
     accepted_by_lessee = serializers.SerializerMethodField()
+    # Leitura única do ciclo de vida (rentals.lifecycle): as telas não decidem por status.
+    phase = serializers.SerializerMethodField()
+    phase_label = serializers.SerializerMethodField()
+    allowed_actions = serializers.SerializerMethodField(
+        help_text="Ações que o usuário autenticado pode executar agora (vazio sem usuário no contexto)."
+    )
+    meter = serializers.SerializerMethodField(
+        help_text="Leituras vigentes do horímetro e horas usadas. Informativo: não altera o valor."
+    )
 
     class Meta:
         model = Rentals
@@ -123,9 +147,20 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "start_date",
             "end_date",
             "total_price",
+            "hourly_rate_snapshot",
+            "daily_rate",
+            "billable_days",
+            "subtotal",
+            "platform_fee_rate",
+            "platform_fee",
             "initial_hour_meter",
             "final_hour_meter",
+            "meter",
             "status",
+            "phase",
+            "phase_label",
+            "allowed_actions",
+            "notes",
             "created_at",
             "updated_at",
             "lessee_name",
@@ -138,6 +173,11 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "machine_model",
             "contract_number",
             "contract_id",
+            "signature_deadline",
+            "refunds",
+            "cancellation_policy_version",
+            "cancelled_at",
+            "cancellation_reason",
             "contract_status",
             "accepted_by_lessor",
             "accepted_by_lessee",
@@ -151,6 +191,16 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             return obj.contracts
         except ObjectDoesNotExist:
             return None
+
+    def get_signature_deadline(self, obj) -> datetime | None:
+        contract = self._contract(obj)
+        return contract.signature_deadline if contract else None
+
+    @extend_schema_field({"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string", "format": "uuid"}, "amount": {"type": "string"}, "status": {"type": "string"}}}})
+    def get_refunds(self, obj):
+        from payments.models import Refunds
+        return [{"id": str(refund.pk), "amount": str(refund.amount), "status": refund.status}
+                for refund in Refunds.objects.filter(payment__rental=obj).order_by("created_at")]
 
     def get_contract_number(self, obj: Rentals) -> str:
         """Número legível do contrato, ex.: #CTR-08E8."""
@@ -171,3 +221,22 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     def get_accepted_by_lessee(self, obj: Rentals) -> bool:
         contract = self._contract(obj)
         return bool(contract.accepted_by_lessee) if contract else False
+
+    def get_phase(self, obj: Rentals) -> str:
+        return lifecycle.phase(obj).value
+
+    def get_phase_label(self, obj: Rentals) -> str:
+        return lifecycle.phase(obj).label
+
+    def get_meter(self, obj: Rentals) -> dict[str, Any]:
+        return usage_summary(obj)
+
+    def get_allowed_actions(self, obj: Rentals) -> list[str]:
+        return lifecycle.allowed_actions(obj, self.context.get("user"))
+
+
+class RentalMeterReadingOutputSerializer(serializers.ModelSerializer[RentalMeterReadings]):
+    class Meta:
+        model = RentalMeterReadings
+        fields = ["id", "rental", "kind", "value", "note", "recorded_by", "recorded_at", "supersedes"]
+        read_only_fields = fields

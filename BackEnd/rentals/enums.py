@@ -9,3 +9,8 @@ class RentalStatus(models.TextChoices):
     COMPLETED = "completed", "Concluída"
     CLOSED = "closed", "Encerrada"
     CANCELLED = "cancelled", "Cancelada"
+
+
+class MeterReadingKind(models.TextChoices):
+    CHECK_IN = "check_in", "Retirada"
+    CHECK_OUT = "check_out", "Devolução"

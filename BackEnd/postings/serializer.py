@@ -4,9 +4,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from drf_spectacular.utils import extend_schema_field
+from django.utils import timezone
 from rest_framework import serializers
 
 from djangoapi import firebase_storage
+from common.geography import BRAZILIAN_STATES
 from postings.enums import PostingStatus
 from postings.models import Postings, PostingsPhotos
 from machines.models import Machines
@@ -264,3 +266,40 @@ class PostingPhotoUploadOutputSerializer(serializers.ModelSerializer[PostingsPho
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_url(self, obj: PostingsPhotos) -> str | None:
         return firebase_storage.public_url(obj.image_url)
+
+
+class RecommendationInputSerializer(serializers.Serializer[Any]):
+    application = serializers.ChoiceField(choices=["soil_preparation", "planting", "spraying", "harvesting"])
+    soil = serializers.ChoiceField(choices=["clay", "sand", "mixed", "unknown"], default="unknown")
+    location = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    state = serializers.ChoiceField(choices=list(BRAZILIAN_STATES), required=False, allow_blank=True, default="")
+    start_date = serializers.DateField(required=False, allow_null=True, default=None)
+    end_date = serializers.DateField(required=False, allow_null=True, default=None)
+    max_hourly_rate = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"),
+        required=False, allow_null=True, default=None,
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        start, end = attrs["start_date"], attrs["end_date"]
+        if bool(start) != bool(end):
+            raise serializers.ValidationError({"end_date": "Informe as duas datas ou deixe o período em aberto."})
+        if start and start <= timezone.localdate():
+            raise serializers.ValidationError({"start_date": "Escolha uma data a partir de amanhã."})
+        if start and end < start:
+            raise serializers.ValidationError({"end_date": "A data final não pode ser anterior à inicial."})
+        return attrs
+
+
+class RecommendationItemSerializer(serializers.Serializer[Any]):
+    posting = PostingListOutputSerializer()
+    reasons = serializers.ListField(child=serializers.CharField())
+    soil_mentioned = serializers.BooleanField()
+
+
+class RecommendationOutputSerializer(serializers.Serializer[Any]):
+    results = RecommendationItemSerializer(many=True)
+    total = serializers.IntegerField()
+    dates_checked = serializers.BooleanField()
+    match_type = serializers.ChoiceField(choices=["exact", "similar", "none"])
+    ai_unavailable = serializers.BooleanField()

@@ -1,4 +1,5 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
+import { machineRecommendationsApiSchema, type MachineNeeds, type MachineRecommendations } from "../types/recommendation";
 
 import type {
   PostingDetail,
@@ -26,6 +27,7 @@ export interface PostingFilter {
 }
 
 export interface PostingRepository {
+  recommend(needs: MachineNeeds): Promise<MachineRecommendations>;
   list(filter?: PostingFilter): Promise<PostingListItem[]>;
   findById(id: string): Promise<PostingDetail>;
   create(payload: PostingWritePayload): Promise<string>;
@@ -39,6 +41,28 @@ export class HttpPostingRepository implements PostingRepository {
 
   constructor(http: HttpClient) {
     this.http = http;
+  }
+
+  async recommend(needs: MachineNeeds): Promise<MachineRecommendations> {
+    const response = await this.http.send<unknown>({
+      method: "POST",
+      path: `${COLLECTION_PATH}/recommendations`,
+      body: {
+        application: needs.application,
+        soil: needs.soil,
+        state: needs.state,
+        start_date: needs.startDate,
+        end_date: needs.endDate,
+      },
+    });
+    const dto = machineRecommendationsApiSchema.parse(response.data);
+    return {
+      results: dto.results.map((item) => ({ posting: listItemToDomain(item.posting), reasons: item.reasons, soilMentioned: item.soil_mentioned })),
+      total: dto.total,
+      datesChecked: dto.dates_checked,
+      matchType: dto.match_type,
+      aiUnavailable: dto.ai_unavailable,
+    };
   }
 
   async list(filter: PostingFilter = {}): Promise<PostingListItem[]> {

@@ -7,13 +7,13 @@ import { test as base, expect, type BrowserContext, type Page } from '@playwrigh
 export type Account = { id: string; email: string; password: string; expiredAccess: string };
 export type Seed = {
   owner: Account; renter: Account; machines: [string, string]; posting: string; threadId: string;
-  sourceRental: string;
+  sourceRental: string; runId: string;
 };
 export const apiURL = process.env.E2E_API_URL ?? 'http://localhost:8001/api/';
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const seedScript = readFileSync(new URL('./seed_django.py', import.meta.url), 'utf8');
 
-function seed(action: 'create' | 'delete', id: string): Promise<string> {
+function seed(action: 'create' | 'delete' | 'management', id: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const container = process.env.E2E_BACKEND_CONTAINER;
     const command = container
@@ -76,4 +76,8 @@ export async function openPostingForm(page: Page, account: Account) {
   await page.goto('/dashboard/novo-anuncio');
   await expect(page.getByRole('heading', { name: 'Novo Anúncio' })).toBeVisible();
   await expect(page.getByRole('combobox')).toBeEnabled();
+}
+
+export async function prepareContractManagement(data: Seed): Promise<{ rental: string; contract: string; start: string; end: string }> {
+  return JSON.parse(await seed('management', data.runId));
 }

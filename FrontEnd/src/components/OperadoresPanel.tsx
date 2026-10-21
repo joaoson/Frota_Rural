@@ -1,3 +1,4 @@
+import { DashboardCollection } from "@/features/dashboard/components/DashboardCollection";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { HttpError } from "@/shared/http/errors";
 import { toast } from "sonner";
@@ -586,13 +587,13 @@ const OperadoresPanel = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filtered.map((operator) => (
+        <DashboardCollection label="Operadores" items={filtered} resetKey={search}
+          renderItem={(operator) => (
             <div
               key={operator.id}
-              className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
+              className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 shadow-sm"
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-12 h-12 shrink-0 bg-tertiary-container text-on-tertiary rounded-full flex items-center justify-center font-headline font-bold text-sm">
                     {getInitials(operator.name)}
@@ -621,7 +622,7 @@ const OperadoresPanel = () => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
+              <div className="grid grid-cols-1 @sm/collection:grid-cols-2 gap-4 bg-surface-container-low p-4 rounded-xl border border-outline-variant/20 mb-4">
                 <div>
                   <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                     Documento
@@ -638,7 +639,7 @@ const OperadoresPanel = () => {
                     {maskPhone(operator.phone?.replace(/^\+55/, "") ?? "") || "—"}
                   </div>
                 </div>
-                <div className="col-span-2">
+                <div className="@sm/collection:col-span-2">
                   <div className="text-[10px] font-bold text-outline uppercase tracking-wider mb-1">
                     Localidade
                   </div>
@@ -650,7 +651,7 @@ const OperadoresPanel = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => openEdit(operator)}
                   disabled={saving || unlinking}
@@ -683,8 +684,8 @@ const OperadoresPanel = () => {
                 </AlertDialog>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
     </div>
   );

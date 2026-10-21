@@ -3,6 +3,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { contractStore } from "@/app/container";
 
 import type {
+  MeterReadingKind,
+  MeterRecordResult,
   Rental,
   SignatureOtp,
   SignatureReceipt,
@@ -45,11 +47,13 @@ export interface SignContractInput {
   name: string;
   /** Só quando o contrato exige confirmação por código. */
   otp?: string;
+  /** `revisao.id` do documento que a parte leu. */
+  revisionId?: string | null;
 }
 
 export function useSignContract() {
   return useMutation<SignatureReceipt, Error, SignContractInput>({
-    mutationFn: ({ id, role, name, otp }) => contractStore.sign(id, role, name, otp),
+    mutationFn: ({ id, role, name, otp, revisionId }) => contractStore.sign(id, role, name, otp, revisionId),
     onSuccess: () => {
       void contractStore.invalidateRentals();
     },
@@ -57,8 +61,8 @@ export function useSignContract() {
 }
 
 export function useRequestSignatureOtp() {
-  return useMutation<SignatureOtp, Error, { id: string; role: SignatureRole }>({
-    mutationFn: ({ id, role }) => contractStore.requestSignatureOtp(id, role),
+  return useMutation<SignatureOtp, Error, { id: string; role: SignatureRole; revisionId?: string | null }>({
+    mutationFn: ({ id, role, revisionId }) => contractStore.requestSignatureOtp(id, role, revisionId),
   });
 }
 
@@ -67,5 +71,22 @@ export function useContractEvidence(id: string | null) {
 }
 
 export function useCancelRental() {
-  return useMutation<Rental, Error, string>({ mutationFn: (id) => contractStore.cancelRental(id) });
+  return useMutation<Rental, Error, { id: string; reason?: string }>({ mutationFn: ({ id, reason }) => contractStore.cancelRental(id, reason) });
+}
+
+export function useRecordMeterReading() {
+  return useMutation<MeterRecordResult, Error, { id: string; kind: MeterReadingKind; value: number; note?: string }>({
+    mutationFn: ({ id, kind, value, note }) => contractStore.recordMeterReading(id, kind, value, note),
+  });
+}
+
+export function useCompleteRental() {
+  return useMutation<Rental, Error, { id: string; finalHourMeter?: number }>({
+    mutationFn: ({ id, finalHourMeter }) => contractStore.completeRental(id, finalHourMeter),
+  });
+}
+
+/** Uso registrado pelo horímetro nas locações concluídas da máquina (só o dono). */
+export function useMachineUsage(machineId: string | null) {
+  return useQuery({ ...contractStore.machineUsageOptions(machineId ?? ""), enabled: Boolean(machineId) });
 }

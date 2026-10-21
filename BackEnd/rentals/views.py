@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from rentals.cancellation import CancellationInputSerializer, CancellationQuoteSerializer
+
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -8,17 +10,35 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.schemas import error_response, error_responses
+from rentals.meter import MeterReadingInputSerializer, MeterService
+from rentals.schema import (
+    BookingPolicyOutputSerializer, MachineUsageOutputSerializer, MeterRecordOutputSerializer,
+    RentalCompleteInputSerializer, RentalCreateInputSerializer, RentalUpdateInputSerializer,
+)
 from rentals.serializer import (
     RentalFilterSerializer,
-    RentalInputSerializer,
+    RentalMeterReadingOutputSerializer,
     RentalOutputSerializer,
 )
+from rentals import policy
 from rentals.services import RentalService
 
 TAGS = ["Locações"]
+
+
+def _context(request: Request) -> dict[str, object]:
+    """`allowed_actions` depende de quem pergunta."""
+    return {"user": request.user}
 RENTAL_NOT_FOUND = error_response(404, "Locação não encontrada.")
 INVALID_RENTAL = error_response(
     400, "Dados inválidos, período acima do limite do anúncio ou em conflito com outra reserva."
+)
+UPDATE_DESCRIPTION = (
+    "O locatário pode editar observações. Datas e operador só mudam enquanto a reserva está "
+    "`pending` e não há pagamento aberto; novas datas revalidam a agenda e recalculam a cotação. "
+    "O operador deve estar ativo e vinculado à equipe do locatário. `postings` e `lessee` são "
+    "imutáveis; `total_price` não é gravável. Enviar `status` retorna 409 (`use_rental_action`): "
+    "use `/cancel` ou `/complete`. Para datas de uma locação paga, use aditivos do contrato."
 )
 
 
@@ -34,27 +54,37 @@ class RentalListView(APIView):
     )
     def get(self, request: Request) -> Response:
         rentals = RentalService.list(request.query_params, user=request.user)
-        return Response(RentalOutputSerializer(rentals, many=True).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rentals, many=True, context=_context(request)).data,
+                        status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
         summary="Criar locação (reserva)",
         description=(
             "Cria a reserva de um anúncio e, na mesma transação, o contrato correspondente com "
-            "status `pending_signatures`. Não é necessário criar o contrato em uma chamada separada."
+            "status `pending_signatures`. A locação começa `pending`, com bloqueio temporário de "
+            "30 minutos em `reservation_expires_at`.\n\n"
+            "Use um anúncio e uma máquina ativos, de outro usuário, e `lessee` igual ao usuário "
+            "autenticado. Consulte `/api/rentals/policy` e a disponibilidade do anúncio antes de "
+            "escolher datas. O operador é opcional; se informado, deve estar ativo na equipe do "
+            "locatário. Não envie `total_price`: o servidor calcula e preserva a cotação.\n\n"
+            "No exemplo, substitua os UUIDs e escolha três dias disponíveis após a data mínima. "
+            "Com tarifa de R$ 100/h, três diárias de 8 h e taxa de 5%, o total é R$ 2.520,00. "
+            "Use `id` para checkout e `contract_id` para consultar o contrato."
         ),
-        request=RentalInputSerializer,
-        responses={201: RentalOutputSerializer, 400: INVALID_RENTAL},
+        request=RentalCreateInputSerializer,
+        responses={201: RentalOutputSerializer, 400: INVALID_RENTAL, **error_responses(401, 403)},
         examples=[
             OpenApiExample(
                 "Nova Reserva de Trator",
-                summary="Exemplo de criação de uma locação",
+                summary="Reserva de três diárias; preço calculado pelo servidor",
+                description="Substitua os UUIDs por anúncio ativo e usuário autenticado; ajuste as datas à política e agenda.",
                 value={
                     "postings": "f5e1c4a0-56d1-4b7c-9a1b-c1d4e6f8a9b2",
                     "lessee": "e6a2b8e5-3d71-4a9f-b98a-f4c78d0671f2",
-                    "start_date": "2026-09-10T08:00:00Z",
-                    "end_date": "2026-09-15T18:00:00Z",
-                    "total_price": "8500.00",
+                    "start_date": "2030-05-10T08:00:00-03:00",
+                    "end_date": "2030-05-12T18:00:00-03:00",
+                    "notes": "Retirada pela manhã; combinar entrega pelo chat.",
                 },
                 request_only=True,
             )
@@ -62,7 +92,7 @@ class RentalListView(APIView):
     )
     def post(self, request: Request) -> Response:
         rental = RentalService.create(request.data, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_201_CREATED)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_201_CREATED)
 
 
 class RentalDetailView(APIView):
@@ -71,38 +101,42 @@ class RentalDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Consultar locação",
+        description="Consulta uma reserva visível para o participante ou administrador, com preço acordado, contrato, leituras e ações permitidas.",
         responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND},
     )
     def get(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.get(pk, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
         summary="Substituir locação",
-        request=RentalInputSerializer,
-        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
+        description=UPDATE_DESCRIPTION + " PUT exige início e fim; use PATCH para enviar somente os campos alterados.",
+        request=RentalUpdateInputSerializer,
+        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND, **error_responses(401, 403, 409)},
     )
     def put(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.update(pk, request.data, user=request.user)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
         summary="Atualizar locação parcialmente",
-        description="Usado principalmente para avançar o status da locação (ex.: `active`, `completed`, `cancelled`).",
-        request=RentalInputSerializer,
-        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND},
+        description=UPDATE_DESCRIPTION,
+        request=RentalUpdateInputSerializer,
+        responses={200: RentalOutputSerializer, 400: INVALID_RENTAL, 404: RENTAL_NOT_FOUND, **error_responses(401, 403, 409)},
+        examples=[OpenApiExample("Atualizar observação", value={"notes": "Combinar retirada às 8h pelo chat."}, request_only=True)],
     )
     def patch(self, request: Request, pk: UUID) -> Response:
         rental = RentalService.update(pk, request.data, user=request.user, partial=True)
-        return Response(RentalOutputSerializer(rental).data, status=status.HTTP_200_OK)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=TAGS,
-        summary="Excluir locação",
+        summary="Exclusão bloqueada para preservar o histórico",
+        description="Rota de compatibilidade: uma locação visível retorna 409 (`has_dependents`) para preservar seu histórico. Para cancelar e solicitar estorno, use POST /api/rentals/{id}/cancel.",
         responses={
-            204: None,
+            401: error_response(401),
             404: RENTAL_NOT_FOUND,
             409: error_response(409, "Existem registros dependentes (ex.: contrato)."),
         },
@@ -110,3 +144,127 @@ class RentalDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         RentalService.delete(pk, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class BookingPolicyView(APIView):
+    @extend_schema(
+        tags=TAGS,
+        summary="Regras de reserva",
+        description=(
+            "Antecedência mínima aplicada pelo servidor à reserva avulsa, à troca de datas e à "
+            "recorrência. A tela de reserva usa estes valores em vez de repetir a regra."
+        ),
+        responses={200: BookingPolicyOutputSerializer},
+    )
+    def get(self, request: Request) -> Response:
+        return Response({
+            "antecedencia_minima_dias": policy.ANTECEDENCIA_MINIMA_DIAS,
+            "data_minima_inicio": policy.earliest_start_date().isoformat(),
+        }, status=status.HTTP_200_OK)
+
+
+class RentalMeterReadingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Leituras do horímetro da locação",
+        description="Histórico das leituras de retirada e devolução, inclusive as corrigidas.",
+        responses={200: RentalMeterReadingOutputSerializer(many=True), 404: RENTAL_NOT_FOUND},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        readings = MeterService.readings(pk, user=request.user)
+        return Response(RentalMeterReadingOutputSerializer(readings, many=True).data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Registrar leitura do horímetro",
+        description=(
+            "O locador registra a leitura de retirada (`check_in`) e a de devolução (`check_out`) de uma "
+            "locação assinada, a partir do primeiro dia. Uma nova leitura do mesmo tipo corrige a anterior. "
+            "As leituras são só métricas de uso: não alteram o valor, o pagamento nem a conclusão."
+        ),
+        request=MeterReadingInputSerializer,
+        responses={
+            201: MeterRecordOutputSerializer,
+            400: error_response(400, "Leitura negativa, acima de 60.000 h ou de devolução menor que a de retirada."),
+            403: error_response(403, "Somente o locador registra as leituras."),
+            404: RENTAL_NOT_FOUND,
+            409: error_response(409, "Locação ainda não assinada, já concluída ou antes do primeiro dia."),
+        },
+        examples=[OpenApiExample("Retirada", value={"kind": "check_in", "value": 1250, "note": "Leitura conferida no painel."}, request_only=True)],
+    )
+    def post(self, request: Request, pk: UUID) -> Response:
+        result = MeterService.record(pk, request.data, user=request.user)
+        rental = RentalService.get(pk, user=request.user)
+        return Response({
+            "reading": RentalMeterReadingOutputSerializer(result.reading).data,
+            "warnings": list(result.warnings),
+            "rental": RentalOutputSerializer(rental, context=_context(request)).data,
+        }, status=status.HTTP_201_CREATED)
+
+
+class RentalCompleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Concluir locação",
+        description=(
+            "O locador conclui uma locação assinada pelas duas partes depois da data de fim. A leitura de "
+            "devolução (`final_hour_meter`) é opcional e só informativa."
+        ),
+        request=RentalCompleteInputSerializer,
+        examples=[
+            OpenApiExample("Concluir sem leitura", value={}, request_only=True),
+            OpenApiExample("Concluir com leitura de devolução", value={"final_hour_meter": 1274, "note": "Devolução conferida."}, request_only=True),
+        ],
+        responses={200: RentalOutputSerializer, 404: RENTAL_NOT_FOUND, **error_responses(400, 401, 403),
+                   409: error_response(409, "Contrato sem as duas assinaturas ou período ainda em andamento.")},
+    )
+    def post(self, request: Request, pk: UUID) -> Response:
+        rental = RentalService.complete(pk, request.data, user=request.user)
+        rental = RentalService.get(rental.pk, user=request.user)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data, status=status.HTTP_200_OK)
+
+
+class MachineUsageView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Máquinas"],
+        summary="Uso registrado da máquina",
+        description=(
+            "Locações concluídas, diárias e horas registradas pelo horímetro, com a média por diária ao lado "
+            "da referência de 8 h. Só o dono da máquina consulta. Informativo: não altera preços."
+        ),
+        responses={200: MachineUsageOutputSerializer, 404: error_response(404, "Máquina não encontrada.")},
+    )
+    def get(self, request: Request, pk: UUID) -> Response:
+        return Response(MeterService.machine_usage(pk, user=request.user), status=status.HTTP_200_OK)
+
+
+class RentalCancellationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=TAGS, summary="Simular cancelamento e estorno",
+                   description="Calcula a elegibilidade, valor a devolver e retenção conforme a política preservada na reserva. Não cancela nem solicita estorno.",
+                   responses={200: CancellationQuoteSerializer, 401: error_response(401), 404: error_response(404)})
+    def get(self, request, pk):
+        from rentals.cancellation import CancellationService
+        rental = CancellationService.get(pk, user=request.user)
+        return Response(policy.cancellation_quote(rental, request.user))
+
+
+class RentalCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=TAGS, summary="Cancelar locação e solicitar estorno",
+                   description="Cancela e libera as datas; registra uma obrigação durável de estorno. O campo refunds distingue solicitação de devolução confirmada. Repetir não duplica a obrigação.",
+                   request=CancellationInputSerializer,
+                   examples=[OpenApiExample("Cancelamento pelo participante", value={"reason": "Alteração do planejamento de uso."}, request_only=True)],
+                   responses={200: RentalOutputSerializer, 400: error_response(400), 401: error_response(401), 404: error_response(404), 409: error_response(409)})
+    def post(self, request, pk):
+        from rentals.cancellation import CancellationService
+        rental = CancellationService.cancel(pk, request.data, user=request.user)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data)

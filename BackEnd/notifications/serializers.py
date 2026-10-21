@@ -11,7 +11,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         fields = ['id', 'kind', 'title', 'message', 'rental', 'posting', 'contract',
                   'created_at', 'read_at', 'is_read']
 
-    def get_is_read(self, notification):
+    def get_is_read(self, notification) -> bool:
         return notification.read_at is not None
 
 

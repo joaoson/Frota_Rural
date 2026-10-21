@@ -6,9 +6,9 @@ import os
 from urllib.parse import urlsplit
 
 import httpx
-from jsonschema import validate
 
-ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
+from common.groq import ENDPOINT, RESEARCH_MODEL, complete_json
+
 MAX_EVIDENCE_CHARS = 8000
 MAX_SOURCE_CHARS = 1800
 
@@ -84,7 +84,7 @@ def research_with_groq(prompt, extraction_prompt, schema):
         # token use. Search and extraction stay separate because browser search
         # does not support strict structured output in the same request.
         message = _message(http.post(ENDPOINT, headers=headers, json={
-            "model": "openai/gpt-oss-20b",
+            "model": RESEARCH_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "tools": [{"type": "browser_search"}],
             "tool_choice": "required",
@@ -97,22 +97,15 @@ def research_with_groq(prompt, extraction_prompt, schema):
         if not evidence:
             return None
 
-        extracted = _message(http.post(ENDPOINT, headers=headers, json={
-            "model": "openai/gpt-oss-120b",
-            "messages": [{"role": "user", "content": (
+        data = complete_json(
+            http, api_key=os.environ["GROQ_API_KEY"],
+            messages=[{"role": "user", "content": (
                 EXTRACTION_RULES + "\nPEDIDO ORIGINAL:\n" + prompt + "\n" +
                 extraction_prompt.format(research=json.dumps(evidence, ensure_ascii=False))
-            )}],
-            "temperature": 0,
-            "max_completion_tokens": 2000,
-            "response_format": {"type": "json_schema", "json_schema": {
-                "name": "machine_valuation", "strict": True, "schema": schema,
-            }},
-        }))
-        if extracted is None:
+            )}], schema=schema, schema_name="machine_valuation",
+        )
+        if data is None:
             return None
-        data = json.loads(extracted["content"])
-        validate(instance=data, schema=schema)
         selected_urls = {source["url"] for source in data["sources"]}
         data["sources"] = [
             {"url": item["url"], "title": item["title"]}

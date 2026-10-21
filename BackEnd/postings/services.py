@@ -7,12 +7,12 @@ from django.core.files.uploadedfile import UploadedFile
 from django.db import IntegrityError, transaction
 from django.db.models import Q, QuerySet
 from django.utils import timezone
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 
 from common.db import enforce_constraints_now
 from common.exceptions import BadGateway, Conflict, ServiceUnavailable
+from common.images import validate_image_upload
 from djangoapi import firebase_storage
-from users.models import Users
 from postings.enums import PostingStatus
 from postings.models import Postings, PostingsPhotos
 from postings.serializer import (
@@ -20,9 +20,7 @@ from postings.serializer import (
     PostingInputSerializer,
     PostingPhotoUploadInputSerializer,
 )
-
-MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
-ALLOWED_PHOTO_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
+from users.models import Users
 
 
 def _link_pricing_suggestion(suggestion_id: UUID, posting: Postings) -> None:
@@ -160,8 +158,7 @@ class PostingPhotoService:
         serializer.is_valid(raise_exception=True)
         is_primary: bool = serializer.validated_data["is_primary"]
 
-        PostingPhotoService._validate_image(image, content_type)
-        assert image is not None  # garantido por _validate_image
+        image = validate_image_upload(image, content_type)
 
         try:
             image_path = firebase_storage.upload_image(image, folder=f"postings/{posting.id}")
@@ -171,30 +168,6 @@ class PostingPhotoService:
             raise BadGateway("Erro ao enviar a imagem para o Firebase.") from exc
 
         return PostingPhotoService._save_photo(posting, image_path, is_primary=is_primary)
-
-    @staticmethod
-    def _validate_image(image: UploadedFile | None, content_type: str) -> None:
-        if image is None:
-            # Sem corpo multipart o Django nem chega a popular request.FILES. Vale
-            # distinguir os dois casos: o cliente que erra o Content-Type recebe
-            # uma mensagem que aponta a causa, em vez de "nenhum arquivo".
-            media_type = (content_type or "").split(";")[0].strip()
-            if media_type != "multipart/form-data":
-                raise ValidationError(
-                    "A requisição precisa ser multipart/form-data; foi recebido "
-                    f"'{media_type or 'nenhum Content-Type'}'."
-                )
-            raise ValidationError("Nenhum arquivo enviado.")
-
-        if image.content_type not in ALLOWED_PHOTO_TYPES:
-            raise ValidationError(
-                "Tipo de arquivo não suportado. Envie JPG, PNG ou WEBP "
-                f"(recebido: '{image.content_type}')."
-            )
-
-        if (image.size or 0) > MAX_PHOTO_BYTES:
-            megabytes = (image.size or 0) / (1024 * 1024)
-            raise ValidationError(f"'{image.name}' tem {megabytes:.1f}MB e excede o máximo de 5MB.")
 
     @staticmethod
     @transaction.atomic

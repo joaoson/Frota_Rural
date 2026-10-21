@@ -10,6 +10,7 @@ export function toDomain(dto: UserApi): User {
     document: dto.document,
     email: dto.email,
     phone: dto.phone ?? null,
+    profilePhotoUrl: dto.profile_photo_url ?? null,
     role: dto.role,
     address: dto.address,
     city: dto.city ?? null,

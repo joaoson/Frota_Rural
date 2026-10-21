@@ -6,9 +6,13 @@ import { useUnreadCount } from "@/features/chat/hooks/useChat";
 import NotificationPopover from "@/components/NotificationPopover";
 import ThemeToggle from "@/components/ThemeToggle";
 import { homeRouteForRole } from "@/shared/utils/homeRoute";
+import { useUser } from "@/features/users/hooks/useUsers";
+import { UserAvatar } from "@/shared/components/UserAvatar";
+import { getInitials } from "@/shared/utils/getInitials";
 
 const Navbar = () => {
-  const { isAuthenticated, isLoading, userRole, logout } = useAuth();
+  const { isAuthenticated, isLoading, userId, userRole, logout } = useAuth();
+  const { data: user } = useUser(isAuthenticated && !isLoading ? userId : null);
   const unreadTotal = useUnreadCount().data?.unreadTotal ?? 0;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -73,9 +77,15 @@ const Navbar = () => {
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}
+                aria-label="Menu da conta"
+                aria-expanded={dropdownOpen}
                 className="w-10 h-10 rounded-full bg-primary/10 text-primary dark:text-primary-bright flex items-center justify-center hover:bg-primary/20 transition-colors"
               >
-                <MaterialIcon icon="person" size={24} />
+                <UserAvatar
+                  photoUrl={user?.profilePhotoUrl}
+                  initials={user ? getInitials(user.name) : "…"}
+                  className="w-10 h-10 text-sm"
+                />
               </button>
               
               {dropdownOpen && (

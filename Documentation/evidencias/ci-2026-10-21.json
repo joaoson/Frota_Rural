@@ -1,0 +1,70 @@
+{
+  "commit": "8943e1a22d5b982554976281305a9deebe908abb",
+  "run_id": 39612427515,
+  "run_url": "https://github.com/joaoson/Frota_Rural/actions/runs/39612427515",
+  "conclusion": "success",
+  "artifacts": [
+    "frontend-coverage",
+    "backend-coverage-and-openapi",
+    "playwright-report"
+  ],
+  "frontend": {
+    "lines": {
+      "total": 4569,
+      "covered": 2385,
+      "skipped": 0,
+      "pct": 52.19
+    },
+    "statements": {
+      "total": 5183,
+      "covered": 2638,
+      "skipped": 0,
+      "pct": 50.89
+    },
+    "functions": {
+      "total": 1811,
+      "covered": 732,
+      "skipped": 0,
+      "pct": 40.41
+    },
+    "branches": {
+      "total": 4407,
+      "covered": 2119,
+      "skipped": 0,
+      "pct": 48.08
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend": {
+    "covered_lines": 6745,
+    "num_statements": 7233,
+    "percent_covered": 91.55243116578794,
+    "percent_covered_display": "91.55",
+    "missing_lines": 488,
+    "excluded_lines": 28,
+    "percent_statements_covered": 93.25314530623531,
+    "percent_statements_covered_display": "93.25",
+    "num_branches": 1302,
+    "num_partial_branches": 171,
+    "covered_branches": 1069,
+    "missing_branches": 233,
+    "percent_branches_covered": 82.10445468509985,
+    "percent_branches_covered_display": "82.10"
+  },
+  "tests": {
+    "vitest": 167,
+    "vitest_files": 29,
+    "django": 514,
+    "playwright_executions": 126,
+    "devops_helper": 21
+  },
+  "openapi": {
+    "paths": 72,
+    "operations": 106
+  }
+}

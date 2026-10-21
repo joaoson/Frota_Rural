@@ -34,6 +34,8 @@ export function ChatSocketProvider({ children }: { children: React.ReactNode }) 
   const dispatcher = useMemo<ChatSocketHandlers>(
     () => ({
       onMessage: (tid, message) => each((l) => l.onMessage?.(tid, message)),
+      onAck: (tid, clientId, message) => each((l) => l.onAck?.(tid, clientId, message)),
+      onError: (error) => each((l) => l.onError?.(error)),
       onRead: (tid, readerId, ids, upTo) => each((l) => l.onRead?.(tid, readerId, ids, upTo)),
       onHidden: (tid, messageId) => each((l) => l.onHidden?.(tid, messageId)),
       onTyping: (tid, userId, isTyping) => each((l) => l.onTyping?.(tid, userId, isTyping)),

@@ -9,7 +9,7 @@ import type { PostingDetail } from "@/features/postings/types/posting";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
-import type { RentalOccupancy, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { BookingPolicy, RentalOccupancy, RentalQuote, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 import { HttpError } from "@/shared/http/errors";
 
@@ -384,6 +384,8 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [cotacao, setCotacao] = useState<RentalQuote | null>(null);
+  const [politica, setPolitica] = useState<BookingPolicy | null>(null);
 
   useEffect(() => {
     const requestedStart = searchParams.get("inicio");
@@ -391,11 +393,20 @@ const Reservar = () => {
     if (searchParams.get("extensao") === "1") setObservacoes("Solicitação de extensão da locação anterior.");
   }, [searchParams]);
 
+  // A antecedência mínima é do servidor; a conta local só vale até ela chegar.
+  useEffect(() => {
+    let ignored = false;
+    contractStore.bookingPolicy()
+      .then((value) => { if (!ignored) setPolitica(value); })
+      .catch(() => {});
+    return () => { ignored = true; };
+  }, []);
   const minStartDate = useMemo(() => {
+    if (politica) return politica.earliestStartDate;
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return d.toISOString().split("T")[0];
-  }, []);
+  }, [politica]);
 
   // Etapa 3 — assinatura
   const [aceitouTermos, setAceitouTermos] = useState(false);
@@ -461,6 +472,19 @@ const Reservar = () => {
       })
       .finally(() => setCarregandoDisponibilidade(false));
   }, [id]);
+
+  // O valor exibido é o do servidor: o mesmo cálculo que a reserva congela.
+  useEffect(() => {
+    setCotacao(null);
+    if (!id || !dataInicio || !dataFim || dataFim < dataInicio) return;
+    let ignored = false;
+    contractStore
+      .quotePosting(id, toRentalDateTime(dataInicio, "start"), toRentalDateTime(dataFim, "end"))
+      .then((value) => { if (!ignored) setCotacao(value); })
+      // Sem a cotação, a prévia local continua visível; o servidor fixa o valor ao reservar.
+      .catch((erro: unknown) => console.error("Erro ao calcular o valor:", erro));
+    return () => { ignored = true; };
+  }, [id, dataInicio, dataFim]);
 
   useEffect(() => {
     const { locacaoId, resultado } = retornoStripe;
@@ -545,10 +569,10 @@ const Reservar = () => {
           setPagamentoEmRevisao(true);
           return;
         }
-        if (status === "expired") {
+        if (status === "expired" || status === "refunded" || status === "partially_refunded") {
           clearPaymentReturn();
           setConfirmandoPagamento(false);
-          toast.error("O pagamento expirou. Confira suas reservas em Minhas Locações.");
+          toast.info(status === "expired" ? "O pagamento expirou. Confira suas reservas em Minhas Locações." : "O pagamento foi estornado. Confira o cancelamento em Minhas Locações.");
           return;
         }
         if (status === "approved") {
@@ -572,16 +596,27 @@ const Reservar = () => {
   }, [retornoStripe, id]);
 
   const titulo = [anuncio?.machineBrand, anuncio?.machineModel].filter(Boolean).join(" ") || "Maquinário";
-  const valorDiaria = anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0;
+  const valorDiaria = createdRental?.dailyRate ?? cotacao?.dailyRate
+    ?? (anuncio ? anuncio.hourlyRate * HORAS_POR_DIARIA : 0);
   const maxReservationDays = anuncio?.maxReservationDays ?? null;
 
   const { diarias, subtotal, taxa, total } = useMemo(() => {
+    // Uma reserva criada tem a cotação congelada; antes dela vale a do servidor.
+    if (createdRental?.totalPrice != null && createdRental.subtotal != null && createdRental.platformFee != null) {
+      return {
+        diarias: createdRental.billableDays ?? calcularDiarias(dataInicio, dataFim),
+        subtotal: createdRental.subtotal, taxa: createdRental.platformFee, total: createdRental.totalPrice,
+      };
+    }
+    if (cotacao && !createdRental) {
+      return { diarias: cotacao.days, subtotal: cotacao.subtotal, taxa: cotacao.fee, total: cotacao.total };
+    }
     const dias = calcularDiarias(dataInicio, dataFim);
     const computedTotal = dias * valorDiaria * (1 + TAXA_PLATAFORMA);
     const reservationTotal = createdRental?.totalPrice ?? computedTotal;
     const sub = reservationTotal / (1 + TAXA_PLATAFORMA);
     return { diarias: dias, subtotal: sub, taxa: reservationTotal - sub, total: reservationTotal };
-  }, [dataInicio, dataFim, valorDiaria, createdRental]);
+  }, [dataInicio, dataFim, valorDiaria, createdRental, cotacao]);
 
   const datasBloqueadas = useMemo(() => {
     const bloqueadas = new Set<string>();
@@ -630,7 +665,7 @@ const Reservar = () => {
       return;
     }
     if (dataInicio < minStartDate) {
-      toast.error("A data de início deve ser a partir de uma semana após o dia de hoje.");
+      toast.error(`A locação precisa começar a partir de ${formatarData(minStartDate)}.`);
       return;
     }
     if (diarias <= 0) {
@@ -662,6 +697,7 @@ const Reservar = () => {
           start_date: toRentalDateTime(dataInicio, "start"),
           end_date: toRentalDateTime(dataFim, "end"),
           total_price: total, status: "pending",
+          ...(observacoes.trim() ? { notes: observacoes.trim() } : {}),
         });
         // Keep the server-issued reservation before contacting the provider:
         // retrying or refreshing must never create another rental for these dates.
@@ -683,14 +719,28 @@ const Reservar = () => {
     }
   };
 
+  /** O contrato mudou desde a leitura: recarrega e exige nova leitura e novo código. */
+  const tratarRevisaoDesatualizada = async (error: unknown) => {
+    if (!(error instanceof HttpError) || error.apiCode !== "stale_revision" || !createdRental) return false;
+    toast.error("O contrato foi atualizado. Revise o documento antes de assinar.");
+    setAceitouTermos(false);
+    setCodigoOtp("");
+    setOtpEnviadoPara(null);
+    setContratoPreview(await contractStore.findContractDocument(createdRental.id).catch(() => null));
+    return true;
+  };
+
   const solicitarCodigo = async () => {
     if (!createdRental || enviandoOtp) return;
     setEnviandoOtp(true);
     try {
-      const { sentTo } = await contractStore.requestSignatureOtp(createdRental.id, "locatario");
+      const { sentTo } = await contractStore.requestSignatureOtp(
+        createdRental.id, "locatario", contratoPreview?.revisao?.id,
+      );
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (error) {
+      if (await tratarRevisaoDesatualizada(error)) return;
       toast.error(error instanceof HttpError ? error.message : "Não foi possível enviar o código por e-mail.");
     } finally {
       setEnviandoOtp(false);
@@ -723,6 +773,7 @@ const Reservar = () => {
         "locatario",
         nomeAssinatura,
         codigoOtp.trim(),
+        contratoPreview?.revisao?.id,
       );
       // Mostramos o recibo antes de sair da página: é a prova do que foi
       // assinado, e ela fica guardada no contrato para consulta posterior.
@@ -730,8 +781,9 @@ const Reservar = () => {
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
       window.scrollTo(0, 0);
     } catch (err) {
-      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
       setAssinando(false);
+      if (await tratarRevisaoDesatualizada(err)) return;
+      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
     }
   };
 
@@ -951,6 +1003,7 @@ const Reservar = () => {
                       Observações (opcional)
                     </label>
                     <textarea id="observacoes-opcional"
+                      maxLength={1000}
                       rows={4}
                       value={observacoes}
                       onChange={(e) => setObservacoes(e.target.value)}

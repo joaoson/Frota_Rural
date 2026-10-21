@@ -5,14 +5,15 @@ import json
 import time
 from unittest.mock import patch
 
-from django.test import SimpleTestCase, override_settings
+from django.test import TestCase, override_settings
 
 
 @override_settings(STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='whsec_regression_test')
-class StripeWebhookParsingTests(SimpleTestCase):
+class StripeWebhookParsingTests(TestCase):
     def deliver(self, kind, fields, *, valid_signature=True):
+        self.sequence = getattr(self, 'sequence', 0) + 1  # Stripe event ids are unique per event
         body = json.dumps({
-            'id': 'evt_regression_test', 'object': 'event', 'livemode': False,
+            'id': f'evt_regression_test_{self.sequence}', 'object': 'event', 'livemode': False,
             'type': kind,
             'data': {'object': {'id': 'cs_regression_test', 'object': 'checkout.session', **fields}},
         }).encode()
@@ -33,7 +34,7 @@ class StripeWebhookParsingTests(SimpleTestCase):
             with self.subTest(kind=kind):
                 approve.reset_mock()
                 self.assertEqual(self.deliver(kind, {'payment_status': 'paid'}).status_code, 200)
-                approve.assert_called_once_with('cs_regression_test')
+                approve.assert_called_once_with('cs_regression_test', payment_id=None, payment_intent=None)
 
     @patch('payments.services.PaymentService._approve')
     def test_unpaid_or_missing_payment_status_does_not_approve(self, approve):
@@ -45,7 +46,7 @@ class StripeWebhookParsingTests(SimpleTestCase):
     @patch('payments.services.PaymentService._expire')
     def test_expiration_does_not_require_payment_status(self, expire):
         self.assertEqual(self.deliver('checkout.session.expired', {}).status_code, 200)
-        expire.assert_called_once_with('cs_regression_test')
+        expire.assert_called_once_with('cs_regression_test', payment_id=None)
 
     @patch('payments.services.PaymentService._approve')
     def test_invalid_signature_cannot_approve_payment(self, approve):

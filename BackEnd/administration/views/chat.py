@@ -48,6 +48,7 @@ class ChatModerationResolveView(ChatModerationView):
     @extend_schema(
         tags=TAGS,
         summary="Decide sobre uma mensagem denunciada",
+        description="Permite à administração decidir sobre a denúncia de uma mensagem e aplicar a moderação correspondente.",
         request=MessageModerationDecisionInputSerializer,
         responses={
             200: MessageResponseSerializer,

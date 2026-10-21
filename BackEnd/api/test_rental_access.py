@@ -96,14 +96,14 @@ class RentalAccessTests(RecurrenceFixtures, TestCase):
         self.rental.created_at = timezone.now() - timedelta(hours=1)
         self.rental.save()
         self.conflict(day=self.rental.start_date.date())
-        response = self.client.patch(self.url, {'status': 'cancelled'}, format='json')
+        response = self.client.post(self.url + "/cancel", {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
 
     def test_owner_can_complete_past_confirmed_rental_and_history_cannot_be_deleted(self):
         self.source.status = 'signed'
         self.source.save()
         self.client.force_authenticate(self.owner)
-        response = self.client.patch(f'/api/rentals/{self.source.pk}', {'status': 'completed'}, format='json')
+        response = self.client.post(f'/api/rentals/{self.source.pk}/complete', {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(self.client.delete(self.url).status_code, 409)
 
