@@ -41,7 +41,6 @@ def parser():
 
 
 def current_branch(root):
-    # Resolve this checkout, even when invoked from a Git hook or another repo.
     git_env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     try:
         result = subprocess.run(["git", "-C", str(root), "symbolic-ref", "--quiet", "--short", "HEAD"],
@@ -54,7 +53,6 @@ def current_branch(root):
 
 
 def resolve_arguments(args, root=ROOT):
-    """Select a mode once, before constructing any Docker or database command."""
     args.branch = None
     if args.command in MODES:
         if args.legacy_action is None:
