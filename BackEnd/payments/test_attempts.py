@@ -90,7 +90,7 @@ class PaymentAttemptTests(PaymentTestCase):
     def test_a_failed_attempt_does_not_block_cancelling_the_booking(self):
         with patch(CREATE_SESSION, side_effect=stripe.APIConnectionError("timeout")):
             self.checkout()
-        response = self.client.patch(f"/api/rentals/{self.rental.id}", {"status": "cancelled"}, format="json")
+        response = self.client.post(f"/api/rentals/{self.rental.id}/cancel", {}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
 
     def test_reconcile_attaches_a_session_created_remotely_and_closes_abandoned_ones(self):
@@ -112,7 +112,7 @@ class PaymentAttemptTests(PaymentTestCase):
         other.status = "cancelled"
         other.save(update_fields=["status"])
         self.age()
-        with patch(CREATE_SESSION, return_value=session("cs_orphan")), patch(EXPIRE_SESSION) as expire, \
+        with patch(CREATE_SESSION, return_value=session("cs_orphan")), patch(EXPIRE_SESSION, return_value={"status": "expired"}) as expire, \
                 patch(RETRIEVE_SESSION, return_value={"status": "open"}):
             report = reconcile_payments()
         expire.assert_called_once_with("cs_orphan")

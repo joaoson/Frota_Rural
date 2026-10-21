@@ -1,3 +1,5 @@
+import { useAuth } from "@/contexts/useAuth";
+import { ContractAmendmentsPanel } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router";
 import "./Contrato.css";
@@ -59,6 +61,7 @@ function BlocoEvidencia({ evidencia }: { evidencia: AssinaturaEvidencia }) {
 }
 
 export default function Contrato() {
+  const { userId } = useAuth();
   const { id } = useParams<{ id: string }>();
   const documentQuery = useContractDocument(id ?? null);
   const data = documentQuery.data ?? null;
@@ -101,6 +104,7 @@ export default function Contrato() {
 
   return (
     <div className="contrato-root">
+      {id && data.revisao && data.gestao && <div className="no-print mx-auto my-5 max-w-4xl"><ContractAmendmentsPanel contractId={id} actorId={userId} document={data} /></div>}
       <div className="print-btn-wrap no-print">
         <ThemeToggle />
         <button className="print-btn" onClick={() => window.print()}>

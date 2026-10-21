@@ -95,18 +95,8 @@ class RentalService:
                 raise ValidationError({field: "Este vínculo não pode ser alterado após a criação."})
         if "total_price" in data:
             raise ValidationError({"total_price": "O valor é calculado pelo servidor."})
-        next_status = data.get("status", rental.status)
-        if next_status != rental.status:
-            cancellable = (rental.status == RentalStatus.PENDING
-                           and not rental.payments.filter(status__in=OPEN_PAYMENT_STATUSES).exists())
-            is_owner = user.pk == posting.machinery.owner_id
-            if next_status == RentalStatus.COMPLETED and is_owner and rental.status == RentalStatus.ACTIVE:
-                raise Conflict("A locação só pode ser concluída depois que as duas partes assinarem o contrato.")
-            # Readings are usage metrics only: completion never depends on them.
-            completable = is_owner and rental.status == RentalStatus.SIGNED and rental.end_date <= timezone.now()
-            if not ((next_status == RentalStatus.CANCELLED and cancellable)
-                    or (next_status == RentalStatus.COMPLETED and completable)):
-                raise Conflict("Esta alteração exige o fluxo de pagamento ou assinatura correspondente.")
+        if "status" in data:
+            raise Conflict("Use /api/rentals/<id>/cancel para cancelar ou /complete para concluir.", code="use_rental_action")
         if any(field in data for field in ("start_date", "end_date", "operator")):
             if user.pk != rental.lessee_id:
                 raise PermissionDenied("Somente o locatário pode alterar os dados de uma reserva pendente.")
@@ -129,10 +119,8 @@ class RentalService:
             validated["operator"] = validate_operator_assignment(
                 validated.get("operator", rental.operator), rental.lessee, lock=True,
             )
-        previous_status = rental.status
         changed = any(getattr(rental, field) != value for field, value in validated.items())
         save_fields = {"updated_at": timezone.now()}
-        # A status/meter-only change remains possible after an unpaid hold expires.
         if any(field in validated for field in ("start_date", "end_date")):
             start = validated.get("start_date", rental.start_date)
             end = validated.get("end_date", rental.end_date)
@@ -145,28 +133,34 @@ class RentalService:
                 save_fields.update(quote.snapshot())
                 changed = changed or rental.total_price != quote.total
         rental = serializer.save(**save_fields)
-        if previous_status != rental.status and rental.status == RentalStatus.CANCELLED:
-            Contracts.objects.filter(rental=rental).update(status="cancelled")
-            rental._state.fields_cache.pop("contracts", None)
         if changed:
-            event = "rental_updated"
-            if rental.status != previous_status and rental.status in (RentalStatus.CANCELLED, RentalStatus.COMPLETED):
-                event = f"rental_{rental.status}"
-            event_key = f"rental:{rental.pk}:{event}"
-            if event == "rental_updated":
-                event_key += f":{uuid4()}"
-            notify_rental_event(rental, event, event_key=event_key)
+            notify_rental_event(rental, "rental_updated", event_key=f"rental:{rental.pk}:rental_updated:{uuid4()}")
         return rental
 
     @staticmethod
     @transaction.atomic
     def complete(rental_id: UUID, data: Mapping[str, Any], *, user) -> Rentals:
-        """Conclusão pelo locador; a leitura de devolução é opcional e só informativa."""
+        reference = RentalService.get(rental_id, user=user)
+        posting = Postings.objects.select_related("machinery").select_for_update(of=("self", "machinery")).get(pk=reference.postings_id)
+        rental = Rentals.objects.select_for_update().get(pk=rental_id)
+        rental.postings = posting
+        contract = Contracts.objects.select_for_update().filter(rental=rental).first()
+        if user.pk != posting.machinery.owner_id:
+            raise PermissionDenied("Somente o locador pode concluir a locação.")
+        if rental.status == RentalStatus.COMPLETED:
+            return rental
+        if rental.status != RentalStatus.SIGNED or not contract or contract.status != "signed" or not (contract.accepted_by_lessor and contract.accepted_by_lessee) or rental.end_date > timezone.now():
+            raise Conflict("A conclusão exige as duas assinaturas e o fim do período contratado.")
         if data.get("final_hour_meter") not in (None, ""):
             MeterService.record(rental_id, {
                 "kind": MeterReadingKind.CHECK_OUT, "value": data["final_hour_meter"], "note": data.get("note", ""),
             }, user=user)
-        return RentalService.update(rental_id, {"status": RentalStatus.COMPLETED}, user=user, partial=True)
+            rental.refresh_from_db()
+        rental.status = RentalStatus.COMPLETED
+        rental.updated_at = timezone.now()
+        rental.save(update_fields=["status", "updated_at"])
+        notify_rental_event(rental, "rental_completed", event_key=f"rental:{rental.pk}:rental_completed")
+        return rental
 
     @staticmethod
     def delete(rental_id: UUID, *, user) -> None:

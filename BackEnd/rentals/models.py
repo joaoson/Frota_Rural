@@ -28,6 +28,10 @@ class Rentals(models.Model):
     priced_at = models.DateTimeField(blank=True, null=True)
     # Observações do locatário para a retirada/serviço. Operacionais: não entram no contrato.
     notes = models.TextField(blank=True, default="")
+    cancellation_policy_version = models.CharField(max_length=32, default="2026-10-21")
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+", null=True, blank=True)
+    cancellation_reason = models.CharField(max_length=1000, blank=True, default="")
     # Leituras de horímetro: só métricas de uso, nunca entram no preço.
     initial_hour_meter = models.IntegerField(blank=True, null=True)
     final_hour_meter = models.IntegerField(blank=True, null=True)

@@ -3,7 +3,7 @@ from typing import Any, NoReturn
 from django.db import models
 from django.utils import timezone
 
-from contracts.enums import ContractStatus, RevisionReason, SignatureRole
+from contracts.enums import AmendmentStatus, ContractStatus, RevisionReason, SignatureRole
 
 
 class Contracts(models.Model):
@@ -14,6 +14,7 @@ class Contracts(models.Model):
     accepted_by_lessee = models.BooleanField(blank=True, null=True)
     status = models.TextField(choices=ContractStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
+    signature_deadline = models.DateTimeField(blank=True, null=True)
     # Versão congelada que as duas partes assinam. Nula em contratos ainda não
     # pagos (o documento é só uma prévia) e nos legados, assinados antes das
     # revisões existirem.
@@ -177,3 +178,29 @@ class ContractSignatureOtps(models.Model):
     @property
     def is_usable(self) -> bool:
         return self.consumed_at is None and not self.is_expired
+
+
+class ContractAmendments(models.Model):
+    """Proposta de troca de datas; só o aceite da contraparte modifica a reserva."""
+
+    id = models.UUIDField(primary_key=True)
+    contract = models.ForeignKey(Contracts, models.DO_NOTHING, related_name="amendments")
+    proposer = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+")
+    base_revision = models.ForeignKey(ContractRevisions, models.DO_NOTHING, related_name="+")
+    original_start = models.DateTimeField()
+    original_end = models.DateTimeField()
+    proposed_start = models.DateTimeField()
+    proposed_end = models.DateTimeField()
+    reason = models.CharField(max_length=1000)
+    status = models.CharField(max_length=20, choices=AmendmentStatus.choices, default=AmendmentStatus.PENDING)
+    decided_by = models.ForeignKey("users.Users", models.DO_NOTHING, related_name="+", null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "contract_amendments"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["contract"], condition=models.Q(status="pending"), name="one_pending_contract_amendment"),
+        ]

@@ -31,7 +31,8 @@ CHECKOUT_COMPLETED = "checkout.session.completed"
 CHECKOUT_EXPIRED = "checkout.session.expired"
 CHECKOUT_SUCCEEDED = "checkout.session.async_payment_succeeded"
 CHECKOUT_FAILED = "checkout.session.async_payment_failed"
-HANDLED_EVENTS = (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED, CHECKOUT_EXPIRED, CHECKOUT_FAILED)
+REFUND_EVENTS = ("refund.created", "refund.updated", "refund.failed", "charge.refunded")
+HANDLED_EVENTS = (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED, CHECKOUT_EXPIRED, CHECKOUT_FAILED, *REFUND_EVENTS)
 # Stripe requires a session to stay open at least 30 minutes after it is created.
 MIN_SESSION_LIFETIME = timedelta(minutes=MINUTOS_DE_RESERVA, seconds=30)
 # 4xx answers: Stripe received the request and refused it, so no session exists.
@@ -211,14 +212,48 @@ class PaymentService:
         logger.warning("Tentativa de pagamento %s sem sessão confirmada: %s", payment_id, exc)
 
     @staticmethod
-    @transaction.atomic
     def _attach_session(payment_id: UUID, session) -> CheckoutSession:
+        result = PaymentService._attach_session_locked(payment_id, session)
+        if result is None:
+            PaymentService.close_cancelled_checkout(payment_id, session.id)
+            raise Conflict("Esta reserva foi cancelada durante a criação do pagamento.")
+        return result
+
+    @staticmethod
+    def close_cancelled_checkout(payment_id, session_id) -> str:
+        """Fecha uma sessão tardia fora dos locks; pagamento confirmado gera estorno."""
+        try:
+            provider = _stripe()
+            session = provider.checkout.Session.retrieve(session_id)
+            if _get(session, "status") == "open":
+                try:
+                    session = provider.checkout.Session.expire(session_id)
+                except stripe.StripeError:
+                    session = provider.checkout.Session.retrieve(session_id)
+            if _get(session, "status") == "complete" and _get(session, "payment_status") == "paid":
+                PaymentService._approve(session_id, payment_id=str(payment_id), payment_intent=_get(session, "payment_intent"))
+                return "approved"
+            if _get(session, "status") == "expired":
+                PaymentService._expire(session_id, payment_id=str(payment_id))
+                return "expired"
+        except stripe.StripeError as exc:
+            logger.warning("Sessão tardia %s aguardando conciliação: %s", session_id, exc)
+        return "uncertain"
+
+    @staticmethod
+    @transaction.atomic
+    def _attach_session_locked(payment_id: UUID, session) -> CheckoutSession | None:
         payment = Payments.objects.select_related("rental").get(pk=payment_id)
         Postings.objects.select_for_update().get(pk=payment.rental.postings_id)
         rental = Rentals.objects.select_for_update().get(pk=payment.rental_id)
         payment = Payments.objects.select_for_update().get(pk=payment_id)
         if payment.session_id is None:
             payment.session_id = session.id
+        if rental.status == "cancelled":
+            if payment.status == PaymentStatus.CREATING:
+                payment.status = PaymentStatus.PENDING
+            payment.save(update_fields=["session_id", "status", "updated_at"])
+            return None
         if payment.status == PaymentStatus.CREATING:
             payment.status = PaymentStatus.PENDING
             payment.last_error = ""
@@ -282,7 +317,10 @@ class PaymentService:
                 return  # Stripe redelivers events; each one is applied once.
         payment_id = _get(_get(session, "metadata") or {}, "payment_id")
         try:
-            if event_type in (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED):
+            if event_type in REFUND_EVENTS:
+                from payments.refunds import RefundService
+                RefundService.handle_event(event_type, session)
+            elif event_type in (CHECKOUT_COMPLETED, CHECKOUT_SUCCEEDED):
                 if _get(session, "payment_status") == "paid":
                     PaymentService._approve(session_id, payment_id=payment_id,
                                             payment_intent=_get(session, "payment_intent"))
@@ -318,12 +356,21 @@ class PaymentService:
             return
         Postings.objects.select_for_update().select_related("machinery").get(pk=payment.rental.postings_id)
         rental = Rentals.objects.select_for_update().get(pk=payment.rental_id)
+        contract = Contracts.objects.select_for_update().filter(rental=rental).first()
         payment = Payments.objects.select_for_update().get(pk=payment.pk)
         if payment.session_id is None:
             payment.session_id = session_id
         if payment_intent and not payment.payment_intent_id:
             payment.payment_intent_id = str(payment_intent)  # needed to refund later
-        if payment.status in ("approved", "requires_review"):
+        if rental.status == "cancelled":
+            from payments.refunds import RefundService
+            if payment.status not in ("refunded", "partially_refunded"):
+                payment.status = "approved"
+            payment.save(update_fields=["session_id", "payment_intent_id", "status", "updated_at"])
+            refund = RefundService.request(payment, payment.amount, reason="Pagamento recebido após o cancelamento.")
+            transaction.on_commit(lambda: RefundService.process(refund.pk))
+            return
+        if payment.status in ("approved", "requires_review", "refunded", "partially_refunded"):
             payment.save(update_fields=["session_id", "payment_intent_id", "updated_at"])
             return
         if rental.status not in ("pending", "awaiting_payment") or tem_conflito(
@@ -341,7 +388,6 @@ class PaymentService:
         rental.save(update_fields=["status", "updated_at"])
         # Paid terms are frozen now: later profile/listing/template edits cannot
         # change what the two parties sign.
-        contract = Contracts.objects.select_for_update().filter(rental=rental).first()
         if contract is not None:
             contract.rental = rental
             freeze_initial_revision(contract)

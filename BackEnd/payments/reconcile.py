@@ -26,6 +26,7 @@ class ReconcileReport:
     uncertain: int = 0
     expired: int = 0
     approved: int = 0
+    refunds_checked: int = 0
     requires_review: list[str] = field(default_factory=list)
 
 
@@ -47,19 +48,22 @@ def reconcile_payments(*, grace: timedelta = timedelta(minutes=2)) -> ReconcileR
             report.uncertain += 1
             continue
         if attempt.rental.status in lifecycle.PROVISIONAL:
-            PaymentService._attach_session(attempt.pk, session)
-            report.attached += 1
-        else:
-            # The booking ended (e.g. cancelled) meanwhile: close the session no one was shown.
+            from common.exceptions import Conflict
             try:
-                provider.checkout.Session.expire(session.id)
-            except stripe.StripeError as exc:
-                logger.warning("Sessão %s não pôde ser expirada: %s", session.id, exc)
-            PaymentService._expire(session.id, payment_id=str(attempt.pk))
-            report.expired += 1
+                PaymentService._attach_session(attempt.pk, session)
+                report.attached += 1
+            except Conflict:
+                report.uncertain += 1
+        else:
+            outcome = PaymentService.close_cancelled_checkout(attempt.pk, session.id)
+            setattr(report, outcome, getattr(report, outcome) + 1)
 
     # 2. Open sessions whose webhook never arrived.
     for payment in Payments.objects.filter(status=PaymentStatus.PENDING, updated_at__lt=cutoff).exclude(session_id=None):
+        if payment.rental.status == "cancelled":
+            outcome = PaymentService.close_cancelled_checkout(payment.pk, payment.session_id)
+            setattr(report, outcome, getattr(report, outcome) + 1)
+            continue
         try:
             session = provider.checkout.Session.retrieve(payment.session_id)
         except stripe.StripeError as exc:
@@ -72,6 +76,9 @@ def reconcile_payments(*, grace: timedelta = timedelta(minutes=2)) -> ReconcileR
         elif _get(session, "status") == "expired":
             PaymentService._expire(payment.session_id)
             report.expired += 1
+
+    from payments.refunds import reconcile_refunds
+    report.refunds_checked = reconcile_refunds()
 
     # 3. Paid but unavailable bookings stay for a person to resolve.
     report.requires_review = [

@@ -1,3 +1,4 @@
+import type { AmendmentInput, AmendmentDecision, CancellationQuote } from "../types/management";
 import { notificationKeys } from "@/features/notifications/api/NotificationStore";
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
@@ -100,12 +101,34 @@ export class ContractStore {
     return this.repository.findContractDocument(id);
   }
 
-  async cancelRental(id: string): Promise<Rental> {
-    const rental = await this.repository.cancelRental(id);
+  async cancelRental(id: string, reason = ""): Promise<Rental> {
+    const rental = await this.repository.cancelRental(id, reason);
     await this.invalidateRentals();
     void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
-    void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.all });
     return rental;
+  }
+
+  previewCancellation(id: string): Promise<CancellationQuote> {
+    return this.repository.previewCancellation(id);
+  }
+
+  amendmentsOptions(id: string) {
+    return { queryKey: [...contractKeys.all, "amendments", id], queryFn: () => this.repository.listAmendments(id) };
+  }
+
+  async proposeAmendment(id: string, input: AmendmentInput) {
+    const result = await this.repository.proposeAmendment(id, input);
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.all });
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return result;
+  }
+
+  async decideAmendment(id: string, amendmentId: string, decision: AmendmentDecision) {
+    const result = await this.repository.decideAmendment(id, amendmentId, decision);
+    void this.queryClient.invalidateQueries({ queryKey: contractKeys.all });
+    void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    return result;
   }
 
   async createRental(payload: CreateRentalPayload): Promise<Rental> {

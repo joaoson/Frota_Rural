@@ -1,3 +1,4 @@
+vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "tenant" }) }));
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";

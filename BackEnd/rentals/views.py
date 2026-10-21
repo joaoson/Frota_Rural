@@ -212,3 +212,23 @@ class MachineUsageView(APIView):
     )
     def get(self, request: Request, pk: UUID) -> Response:
         return Response(MeterService.machine_usage(pk, user=request.user), status=status.HTTP_200_OK)
+
+
+class RentalCancellationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=TAGS, summary="Simular cancelamento e estorno")
+    def get(self, request, pk):
+        from rentals.cancellation import CancellationService
+        rental = CancellationService.get(pk, user=request.user)
+        return Response(policy.cancellation_quote(rental, request.user))
+
+
+class RentalCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=TAGS, summary="Cancelar locação e solicitar estorno", responses={200: RentalOutputSerializer})
+    def post(self, request, pk):
+        from rentals.cancellation import CancellationService
+        rental = CancellationService.cancel(pk, request.data, user=request.user)
+        return Response(RentalOutputSerializer(rental, context=_context(request)).data)

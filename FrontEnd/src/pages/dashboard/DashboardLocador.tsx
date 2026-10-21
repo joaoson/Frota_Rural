@@ -1,3 +1,4 @@
+import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { isAwaitingPayment, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
@@ -19,7 +20,7 @@ import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import AssinaturaContratoModal, {
   type PapelAssinatura,
 } from "@/components/AssinaturaContratoModal";
-import { documentStore } from "@/app/container";
+import { contractStore, documentStore } from "@/app/container";
 import { useCertifications, useOperatorLicenses } from "@/features/documents/hooks/useDocuments";
 import type { Certification, OperatorLicense } from "@/features/documents/types/document";
 import { useMachines } from "@/features/machines/hooks/useMachines";
@@ -91,6 +92,7 @@ const DashboardLocador = () => {
   const requestedTab = searchParams.get("tab");
   const tab: Tab = sidebarItems.find((item) => item.tab === requestedTab)?.tab ?? "dashboard";
   const setTab = (next: Tab) => setSearchParams({ tab: next });
+  const [amendmentRentalId, setAmendmentRentalId] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [showAvaliar, setShowAvaliar] = useState<string | null>(null);
 
@@ -170,6 +172,8 @@ const DashboardLocador = () => {
         allowedActions: r.allowedActions,
         notes: r.notes,
         meter: r.meter,
+        refunds: r.refunds,
+        signatureDeadline: r.signatureDeadline,
         source: r,
         total: (r.totalPrice ?? 0).toLocaleString("pt-BR", {
           style: "currency",
@@ -272,8 +276,11 @@ const DashboardLocador = () => {
         className: "text-tertiary",
       }}
       analysisHref={r.hasContract ? `/contrato/${r.id}` : undefined}
-      onCancel={async () => {
-        try { await cancelRental.mutateAsync(r.id); toast.success("Reserva recusada."); }
+      onPreviewCancellation={() => contractStore.previewCancellation(r.id)}
+      onAmend={() => setAmendmentRentalId(r.id)}
+      cancelLabel="Cancelar reserva"
+      onCancel={async (reason) => {
+        try { await cancelRental.mutateAsync({ id: r.id, reason }); toast.success("Reserva cancelada. As datas foram liberadas."); }
         catch (error) { toast.error(error instanceof HttpError ? error.message : "Não foi possível recusar a reserva."); }
       }}
       cancelling={cancelRental.isPending}
@@ -1267,6 +1274,7 @@ const DashboardLocador = () => {
           void rentalsQuery.refetch();
         }}
       />
+      {amendmentRentalId && <ContractAmendmentsDialog contractId={amendmentRentalId} actorId={userId} onClose={() => setAmendmentRentalId(null)} />}
     </DashboardShell>
   );
 };

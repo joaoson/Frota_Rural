@@ -34,3 +34,25 @@ it("paginates received and given reviews independently", () => {
   expect(screen.getByText("Autor 6")).toBeTruthy();
   expect(screen.queryByText("Autor 0")).toBeNull();
 });
+
+it("requires a valid refund preview, displays retained value, and submits the reason", async () => {
+  const cancel = vi.fn();
+  const preview = vi.fn().mockRejectedValueOnce(new Error("Pagamento em confirmação")).mockResolvedValue({ allowed: true, refundAmount: 90, retainedAmount: 10, policyText: "Estorno de 90%", policyVersion: "2026-10-21", reasonCode: "late_tenant_cancellation" });
+  render(<MemoryRouter><RentalCard rental={{ ...rental, status: "active", allowedActions: ["cancel"] }} counterparty={counterparty} review={review} detailsOpen={false} onToggleDetails={vi.fn()} onCancel={cancel} onPreviewCancellation={preview} cancelLabel="Cancelar reserva" /></MemoryRouter>);
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar reserva" }));
+  expect((screen.getByRole("button", { name: "Confirmar cancelamento" }) as HTMLButtonElement).disabled).toBe(true);
+  await screen.findByText("Pagamento em confirmação");
+  expect(cancel).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  await screen.findByText("Estorno de 90%");
+  expect(screen.getByText(/Valor retido:/).textContent).toMatch(/10,00/);
+  fireEvent.change(screen.getByLabelText("Motivo do cancelamento (opcional)"), { target: { value: "Chuva forte" } });
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar cancelamento" }));
+  expect(cancel).toHaveBeenCalledWith("Chuva forte");
+});
+
+it("keeps the refund outcome visible after cancellation", () => {
+  render(<MemoryRouter><RentalCard rental={{ ...rental, status: "cancelled", refunds: [{ id: "refund", amount: 100, status: "failed" }] }} counterparty={counterparty} review={review} detailsOpen={false} onToggleDetails={vi.fn()} /></MemoryRouter>);
+  expect(screen.getByRole("status").textContent).toContain("Estorno falhou");
+  expect(screen.getByRole("status").textContent).toContain("datas já foram liberadas");
+});

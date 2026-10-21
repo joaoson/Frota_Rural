@@ -10,7 +10,11 @@ from rentals.views import (
     RentalMeterReadingsView,
 )
 
+from rentals.views import RentalCancellationView, RentalCancelView
+
 urlpatterns = [
+    path("rentals/<uuid:pk>/cancellation", RentalCancellationView.as_view(), name="rental_cancellation"),
+    path("rentals/<uuid:pk>/cancel", RentalCancelView.as_view(), name="rental_cancel"),
     path("rentals/", RentalListView.as_view()),
     path("rentals/policy", BookingPolicyView.as_view(), name="rental_booking_policy"),
     path("rentals/<uuid:pk>/recurrence/preview", recurrence_preview, name="rental_recurrence_preview"),

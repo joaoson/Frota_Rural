@@ -71,7 +71,7 @@ export function useContractEvidence(id: string | null) {
 }
 
 export function useCancelRental() {
-  return useMutation<Rental, Error, string>({ mutationFn: (id) => contractStore.cancelRental(id) });
+  return useMutation<Rental, Error, { id: string; reason?: string }>({ mutationFn: ({ id, reason }) => contractStore.cancelRental(id, reason) });
 }
 
 export function useRecordMeterReading() {

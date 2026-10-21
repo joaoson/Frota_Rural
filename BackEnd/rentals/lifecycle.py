@@ -78,15 +78,24 @@ def allowed_actions(rental, user, now: datetime | None = None) -> list[str]:
         if is_lessee and rental.start_date > now and not {"approved", "requires_review"} & set(payments):
             actions.append("pay")
         if rental.status == RentalStatus.PENDING and not open_payment:
-            if is_lessee or is_owner:
-                actions.append("cancel")
             if is_lessee:
                 actions.append("edit_dates")
 
+    from rentals.policy import cancellation_quote
+    if cancellation_quote(rental, user, now)["allowed"]:
+        actions.append("cancel")
+
     contract = _contract(rental)
-    if rental.status in PAID and contract is not None and contract.status == "pending_signatures":
+    if (rental.status in PAID and contract is not None and contract.status == "pending_signatures"
+            and (contract.signature_deadline is None or contract.signature_deadline > now)):
         if (is_lessee and not contract.accepted_by_lessee) or (is_owner and not contract.accepted_by_lessor):
             actions.append("sign")
+
+    if (rental.status in PAID and contract is not None and contract.current_revision_id
+            and rental.start_date > now and rental.initial_hour_meter is None
+            and (is_lessee or is_owner) and "approved" in payments
+            and (contract.status == "signed" or contract.signature_deadline is None or contract.signature_deadline > now)):
+        actions.append("amend")
 
     if rental.status == RentalStatus.SIGNED and is_owner:
         if now.date() >= rental.start_date.date():

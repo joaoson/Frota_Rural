@@ -120,6 +120,8 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     # assinar. `rentals.status` sozinho não distingue "o locador assinou" de
     # "o locatário assinou": ambos deixam o aluguel em `active`.
     contract_id = serializers.SerializerMethodField()
+    signature_deadline = serializers.SerializerMethodField()
+    refunds = serializers.SerializerMethodField()
     contract_status = serializers.SerializerMethodField()
     accepted_by_lessor = serializers.SerializerMethodField()
     accepted_by_lessee = serializers.SerializerMethodField()
@@ -169,6 +171,11 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "machine_model",
             "contract_number",
             "contract_id",
+            "signature_deadline",
+            "refunds",
+            "cancellation_policy_version",
+            "cancelled_at",
+            "cancellation_reason",
             "contract_status",
             "accepted_by_lessor",
             "accepted_by_lessee",
@@ -182,6 +189,15 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             return obj.contracts
         except ObjectDoesNotExist:
             return None
+
+    def get_signature_deadline(self, obj):
+        contract = self._contract(obj)
+        return contract.signature_deadline if contract else None
+
+    def get_refunds(self, obj):
+        from payments.models import Refunds
+        return [{"id": str(refund.pk), "amount": str(refund.amount), "status": refund.status}
+                for refund in Refunds.objects.filter(payment__rental=obj).order_by("created_at")]
 
     def get_contract_number(self, obj: Rentals) -> str:
         """Número legível do contrato, ex.: #CTR-08E8."""

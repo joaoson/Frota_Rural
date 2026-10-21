@@ -19,6 +19,7 @@ export type RentalPhase =
 export type RentalAction =
   | "pay"
   | "cancel"
+  | "amend"
   | "edit_dates"
   | "sign"
   | "record_check_in"

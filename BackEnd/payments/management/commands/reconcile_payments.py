@@ -24,7 +24,7 @@ class Command(BaseCommand):
             raise CommandError(str(exc.detail)) from exc
         self.stdout.write(
             f"Sessões ligadas: {report.attached} · tentativas recusadas: {report.failed} · "
-            f"ainda incertas: {report.uncertain} · expiradas: {report.expired} · aprovadas: {report.approved}"
+            f"ainda incertas: {report.uncertain} · expiradas: {report.expired} · aprovadas: {report.approved} · estornos verificados: {report.refunds_checked}"
         )
         for payment_id in report.requires_review:
             self.stdout.write(f"Em revisão (resolver com o suporte): {payment_id}")

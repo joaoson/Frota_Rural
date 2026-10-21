@@ -17,3 +17,11 @@ class SignatureRole(models.TextChoices):
 class RevisionReason(models.TextChoices):
     INITIAL = "initial", "Versão inicial, congelada no pagamento"
     AMENDMENT = "amendment", "Aditivo aceito pelas partes"
+
+
+class AmendmentStatus(models.TextChoices):
+    PENDING = "pending", "Aguardando resposta"
+    ACCEPTED = "accepted", "Aceito"
+    REJECTED = "rejected", "Recusado"
+    WITHDRAWN = "withdrawn", "Retirado"
+    EXPIRED = "expired", "Expirado"

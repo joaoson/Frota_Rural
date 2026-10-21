@@ -62,6 +62,8 @@ export function valorTotalContrato(contrato: ContratoData["contrato"]): string {
 }
 
 export interface ContratoData {
+  prazo_assinatura?: string | null;
+  gestao?: { allowed_actions: string[]; start_date: string; end_date: string };
   /** Documento 2.0.0; ausente nos contratos legados (1.0.0). */
   titulo?: string;
   contrato: {

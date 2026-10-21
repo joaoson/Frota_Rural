@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { refundSchema } from "./management";
 
 const meterReadingApiSchema = z.object({
   id: z.string(), value: z.number(), note: z.string().nullish(), recorded_at: z.string(), recorded_by: z.string().nullish(),
@@ -39,6 +40,8 @@ export const rentalApiSchema = z.object({
   accepted_by_lessee: z.boolean().nullish(),
   contract_status: z.string().nullish(),
   contract_id: z.string().nullish(),
+  signature_deadline: z.string().nullish(),
+  refunds: z.array(refundSchema).optional(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
   lessee_name: z.string().nullish(),

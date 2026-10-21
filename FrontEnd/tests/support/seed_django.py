@@ -11,14 +11,17 @@ import django
 django.setup()
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.db import transaction
+from django.db import transaction, connection
 from django.db.models import Q
 from django.utils import timezone
 from rentals.models import Rentals
 from api.models import RentalRecurrence
 from chat.models import Messages
 from chat.threads import format_thread_id
-from contracts.models import Contracts
+from contracts.models import Contracts, ContractAmendments, ContractSignatureOtps
+from contracts.revisions import freeze_revision
+from payments.models import Payments, Refunds, RefundAttempts
+from payments.pricing import cotar
 from machines.models import Machines
 from postings.models import Postings, PostingsPhotos
 from pricing.models import PricingSuggestions
@@ -51,7 +54,22 @@ with transaction.atomic():
         # generated series protect each other until the occurrence link is cleared.
         Rentals.objects.filter(lessee_id=renter_id).update(recurrence=None)
         RentalRecurrence.objects.filter(lessee_id=renter_id).delete()
-        Contracts.objects.filter(rental__lessee_id=renter_id).delete()
+        contracts = Contracts.objects.filter(rental__lessee_id=renter_id)
+        contract_ids = list(contracts.values_list("id", flat=True))
+        ContractAmendments.objects.filter(contract_id__in=contract_ids).delete()
+        ContractSignatureOtps.objects.filter(contract_id__in=contract_ids).delete()
+        contracts.update(current_revision=None)
+        # Apenas evidências desta fixture local. O modo replica é restrito à
+        # transação de limpeza; a aplicação continua com os triggers append-only.
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL session_replication_role = replica")
+            cursor.execute("DELETE FROM contract_signatures WHERE contract_id = ANY(%s)", [contract_ids])
+            cursor.execute("DELETE FROM contract_revisions WHERE contract_id = ANY(%s)", [contract_ids])
+            cursor.execute("SET LOCAL session_replication_role = origin")
+        RefundAttempts.objects.filter(refund__payment__rental__lessee_id=renter_id).delete()
+        Refunds.objects.filter(payment__rental__lessee_id=renter_id).delete()
+        Payments.objects.filter(rental__lessee_id=renter_id).delete()
+        contracts.delete()
         Rentals.objects.filter(lessee_id=renter_id).delete()
         PricingSuggestions.objects.filter(machinery__owner_id=owner_id).delete()
         PostingsPhotos.objects.filter(postings__machinery__owner_id=owner_id).delete()
@@ -108,6 +126,19 @@ with transaction.atomic():
         )
         print(json.dumps({**accounts, "machines": machines, "posting": str(posting.id),
                           "threadId": format_thread_id("posting", posting.id, owner_id, renter_id),
-                          "sourceRental": str(source.id)}))
+                          "sourceRental": str(source.id), "runId": run_id}))
+    elif action == "management":
+        posting = Postings.objects.get(pk=identity("posting"), machinery__owner_id=owner_id)
+        start = (timezone.now() + timedelta(days=20)).replace(hour=12, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=2)
+        rental = Rentals.objects.create(id=identity("management-rental"), postings=posting, lessee_id=renter_id,
+            start_date=start, end_date=end, status="active", created_at=timezone.now(), **cotar(posting, start, end).snapshot())
+        contract = Contracts.objects.create(id=identity("management-contract"), rental=rental,
+            status="pending_signatures", created_at=timezone.now())
+        # Sem IDs do provedor: o teste de cancelamento produz falha local de
+        # conciliação recuperável, sem chamar a API Stripe ou movimentar dinheiro.
+        Payments.objects.create(rental=rental, amount=rental.total_price, status="approved")
+        freeze_revision(contract)
+        print(json.dumps({"rental": str(rental.pk), "contract": str(contract.pk), "start": start.isoformat(), "end": end.isoformat()}))
     else:
-        raise ValueError("Expected create or delete")
+        raise ValueError("Expected create, management or delete")

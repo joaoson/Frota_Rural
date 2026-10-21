@@ -193,8 +193,8 @@ class RentalNotificationTests(NotificationFixtures, TestCase):
         self.assertEqual(Notification.objects.filter(title='Locação atualizada').count(), 2)
         self.assertEqual(self.client.patch(url, data, format='json').status_code, 200)
         self.assertEqual(Notification.objects.filter(title='Locação atualizada').count(), 2)
-        self.assertEqual(self.client.patch(url, {'status': 'cancelled'}, format='json').status_code, 200)
-        self.assertEqual(self.client.patch(url, {'status': 'cancelled'}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(url + "/cancel", {}, format='json').status_code, 200)
+        self.assertEqual(self.client.post(url + "/cancel", {}, format='json').status_code, 200)
         self.assertEqual(Notification.objects.filter(title='Reserva cancelada').count(), 2)
 
     def test_lessor_completion_notifies_both_parties(self):
@@ -202,7 +202,7 @@ class RentalNotificationTests(NotificationFixtures, TestCase):
         self.source.status = 'signed'
         self.source.save(update_fields=['status'])
         self.client.force_authenticate(self.owner)
-        response = self.client.patch(f'/api/rentals/{self.source.pk}', {'status': 'completed'}, format='json')
+        response = self.client.post(f'/api/rentals/{self.source.pk}/complete', {}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(title='Locação concluída').count(), 2)
 

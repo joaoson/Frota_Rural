@@ -130,9 +130,9 @@ class CompletionTests(MeterFixtures, TestCase):
         unsigned = self.started("active", ended=True)
         response = self.complete(unsigned)
         self.assertEqual(response.status_code, 409)
-        self.assertIn("assinarem", str(response.data))
+        self.assertIn("duas assinaturas", str(response.data))
         self.assertEqual(self.complete(self.started(offset=7)).status_code, 409)  # period still running
-        self.assertEqual(self.complete(self.started(ended=True, offset=14), user=self.tenant).status_code, 409)
+        self.assertEqual(self.complete(self.started(ended=True, offset=14), user=self.tenant).status_code, 403)
         self.assertFalse(Rentals.objects.filter(status="completed").exclude(pk=self.source.pk).exists())
 
 

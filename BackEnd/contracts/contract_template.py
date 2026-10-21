@@ -1,4 +1,4 @@
-"""Cláusulas do contrato de locação, versão 2.0.0 do modelo.
+"""Cláusulas do contrato de locação, versão 2.1.0 do modelo.
 
 O texto mora no servidor para entrar no hash do aceite: o que a parte lê é o
 mesmo que fica congelado na revisão (ADR 0002 e passo 1.2 do plano). O front só
@@ -20,7 +20,7 @@ por parte) e "lado_a_lado" (duas colunas). `pagina` reproduz a paginação impre
 
 from typing import Any
 
-TEMPLATE_VERSION = "2.0.0"
+TEMPLATE_VERSION = "2.1.0"
 
 TITULO = "Contrato de Locação de Maquinário Agrícola com Prestação de Serviços"
 
@@ -94,9 +94,11 @@ def _prazo(doc: dict[str, Any]) -> dict[str, Any]:
                     "contrato."),
             ("2.3", "Paralisações por condições climáticas adversas comprovadas suspendem o prazo sem custo "
                     "adicional ao Locatário, salvo acordo em contrário registrado na plataforma."),
-            ("2.4", "Depois de confirmado o pagamento, as datas e a duração desta locação não são alteradas "
-                    "por este contrato. Uma mudança de período depende de acordo entre as partes e de nova "
-                    "reserva na plataforma, observada a Cláusula 9."),
+            ("2.4", "Antes do início, uma parte pode solicitar uma troca de datas com a mesma quantidade de "
+                    "diárias, sem alterar o preço ou gerar novo pagamento. O aceite da outra parte depende de "
+                    "disponibilidade e de pelo menos 7 dias de antecedência do novo início. Até esse aceite, "
+                    "o período anterior continua valendo. Ao aceitar, uma nova revisão é emitida e ambas as "
+                    "partes precisam assiná-la. A redução do período não é suportada; prorrogações exigem nova reserva."),
             ("2.5", "O Locatário pode programar a recorrência desta locação com frequência semanal, "
                     "quinzenal ou mensal. Para cada período, a plataforma gera uma nova reserva e um novo "
                     "contrato com as mesmas condições, cada um sujeito a pagamento próprio e ao aceite das "
@@ -236,19 +238,18 @@ def _cancelamento() -> dict[str, Any]:
     return _clausula(
         9, "Cancelamento e Rescisão", 3,
         _itens(
-            ("9.1", "Antes da confirmação do pagamento, a reserva pode ser cancelada pela plataforma, sem custo. "
-                    "Depois do pagamento, o cancelamento e o eventual estorno são tratados com o suporte da "
-                    "plataforma, conforme a política de cancelamento vigente na data da operação."),
-        ),
-        {"tipo": "multas", "itens": [
-            {"rotulo": "Rescisão por culpa do Locatário", "tom": "ok",
-             "texto": "Multa de **10%** sobre o valor total, acrescida de indenização por danos ao equipamento."},
-            {"rotulo": "Rescisão por culpa do Locador", "tom": "aviso",
-             "texto": "Multa de **10%** sobre o valor total e restituição integral dos valores pagos."},
-        ]},
-        _itens(
-            ("9.2", "Não há penalidade em caso de rescisão por caso fortuito ou força maior (art. 393 do Código "
-                    "Civil), nem em caso de alteração de prazo acordada entre as partes."),
+            ("9.1", "A reserva é paga integralmente na confirmação; não existe caução reembolsável separada. "
+                    "Antes do pagamento, o cancelamento é gratuito. O locatário recebe estorno de 100% se "
+                    "cancelar com pelo menos 7 dias de antecedência do início, ou de 90% se cancelar com "
+                    "menos de 7 dias, com retenção de 10%. O cancelamento pelo locador gera estorno integral "
+                    "ao locatário. Após o início, o cancelamento deve ser tratado pela administração."),
+            ("9.2", "As duas assinaturas devem ser concluídas até **24 horas antes do início**. A falta de "
+                    "qualquer assinatura até esse prazo determina o cancelamento automático da reserva, "
+                    "com estorno integral. Uma alteração de datas aceita inicia novo prazo para ambas as assinaturas."),
+            ("9.3", "O cancelamento libera as datas imediatamente. O estorno é acompanhado separadamente na "
+                    "plataforma; seu processamento ou eventual falha não reabre a reserva. O prazo para "
+                    "o crédito depende do provedor e do meio de pagamento. Pagamento confirmado após um "
+                    "cancelamento gera estorno integral, sem reativar a locação."),
         ),
     )
 

@@ -18,7 +18,7 @@ it("cancels through the server and refreshes rentals and notifications", async (
   const cache = new QueryClient(); const invalidate = vi.spyOn(cache, "invalidateQueries");
   const store = new ContractStore(new HttpContractRepository({ send } as HttpClient), cache);
   expect(await store.cancelRental("rental-a")).toMatchObject({ status: "cancelled" });
-  expect(send).toHaveBeenCalledWith({ method: "PATCH", path: "rentals/rental-a", body: { status: "cancelled" } });
+  expect(send).toHaveBeenCalledWith({ method: "POST", path: "rentals/rental-a/cancel", body: { reason: "" } });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["contracts", "rentals"] });
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["notifications"] });
 });

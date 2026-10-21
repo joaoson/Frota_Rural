@@ -1,3 +1,5 @@
+import { contractStore } from "@/app/container";
+import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { canDo, isConfirmedRental, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useMemo, useState } from "react";
@@ -82,6 +84,7 @@ const DashboardLocatario = () => {
   const [contractYear, setContractYear] = useState("Todos");
   const [contractFilter, setContractFilter] = useState("Todos");
   const [signingRental, setSigningRental] = useState<string | null>(null);
+  const [amendmentRentalId, setAmendmentRentalId] = useState<string | null>(null);
   const [showDetalhes, setShowDetalhes] = useState<string | null>(null);
   const [recurrenceSource, setRecurrenceSource] = useState<Rental | null>(null);
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
@@ -115,6 +118,8 @@ const DashboardLocatario = () => {
         allowedActions: rental.allowedActions,
         notes: rental.notes,
         meter: rental.meter,
+        refunds: rental.refunds,
+        signatureDeadline: rental.signatureDeadline,
         total: (rental.totalPrice ?? 0).toLocaleString("pt-BR", {
           style: "currency",
           currency: "BRL",
@@ -152,9 +157,9 @@ const DashboardLocatario = () => {
     return { month: month.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), rating: averageRating(receivedReviews.filter(r => r.createdAt?.getFullYear() === month.getFullYear() && r.createdAt?.getMonth() === month.getMonth())) };
   });
   const ratingAverage = averageRating(receivedReviews);
-  const cancel = async (id: string) => {
+  const cancel = async (id: string, reason: string) => {
     try {
-      await cancelRental.mutateAsync(id);
+      await cancelRental.mutateAsync({ id, reason });
       toast.success("Reserva cancelada. As datas foram liberadas.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível cancelar a reserva."); }
   };
@@ -205,8 +210,10 @@ const DashboardLocatario = () => {
       }}
       detailsOpen={showDetalhes === r.id}
       onToggleDetails={() => setShowDetalhes(showDetalhes === r.id ? null : r.id)}
-      onCancel={() => void cancel(r.id)}
-      cancelling={cancelRental.isPending && cancelRental.variables === r.id}
+      onCancel={(reason) => void cancel(r.id, reason)}
+      onPreviewCancellation={() => contractStore.previewCancellation(r.id)}
+      onAmend={() => setAmendmentRentalId(r.id)}
+      cancelling={cancelRental.isPending && cancelRental.variables?.id === r.id}
       cancelLabel="Cancelar reserva"
       analysisHref={`/dashboard-locatario/locacoes/${r.id}`}
       review={{
@@ -493,6 +500,7 @@ const DashboardLocatario = () => {
       )}
       <AssinaturaContratoModal open={signingRental !== null} onOpenChange={(open) => { if (!open) setSigningRental(null); }} contratoId={signingRental ?? ""} papel="locatario" onAssinado={() => { void rentalsQuery.refetch(); }} />
       {recurrenceSource && <RentalRecurrenceDialog key={recurrenceSource.id} source={recurrenceSource} open={recurrenceOpen} onOpenChange={(open) => { setRecurrenceOpen(open); if (!open) setTab("locacoes"); }} />}
+      {amendmentRentalId && <ContractAmendmentsDialog contractId={amendmentRentalId} actorId={userId} onClose={() => setAmendmentRentalId(null)} />}
     </DashboardShell>
   );
 };

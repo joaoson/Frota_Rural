@@ -118,13 +118,17 @@ class ContractService:
         contract = ContractService.get(contract_id, actor=actor)
         revision = ensure_current_revision(contract)
         document, origin = ContractService.document_for(contract, revision)
-        signatures = [*contract.signatures.all()]
+        signatures = [s for s in contract.signatures.all() if s.revision_id == (revision.pk if revision else None)]
+
+        from rentals.lifecycle import allowed_actions
 
         # O hash é do documento (termos e cláusulas). O bloco de assinatura é
         # anexado só depois, porque muda a cada aceite e não faz parte do que se aceita.
         return {
             **document,
             "revisao": ContractService._revision_summary(revision),
+            "gestao": {"allowed_actions": allowed_actions(contract.rental, actor), "start_date": contract.rental.start_date.isoformat(), "end_date": contract.rental.end_date.isoformat()},
+            "prazo_assinatura": contract.signature_deadline.isoformat() if contract.signature_deadline else None,
             "legado": origin == "legado",
             "previa": origin == "previa",
             "assinatura": ContractService._signature_dates(signatures),
@@ -235,9 +239,11 @@ class ContractSignatureService:
         # e travaria a assinatura de quem é de direito.
         ContractSignatureService._ensure_requester_is_party(requester, party)
         # Sem código para contrato fechado, já assinado por essa parte ou não pago.
+        ContractSignatureService._ensure_deadline(contract)
         ContractSignatureService._ensure_not_signed(contract, role)
         ContractSignatureService._ensure_payable(contract.rental)
         revision = ensure_current_revision(contract)
+        ContractSignatureService._ensure_deadline(contract)
         if serializer.validated_data.get("revision_id") != (revision.pk if revision else None):
             raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
 
@@ -297,6 +303,7 @@ class ContractSignatureService:
         validated: dict[str, Any] = serializer.validated_data
         role: str = validated["role"]
 
+        ContractSignatureService._ensure_deadline(contract)
         ContractSignatureService._ensure_not_signed(contract, role)
         ContractSignatureService._ensure_payable(contract.rental)
 
@@ -309,6 +316,7 @@ class ContractSignatureService:
         # Antes do OTP: um código não pode ser gasto aceitando um texto que a
         # parte não viu. Repetido sob lock em `_record_acceptance`.
         revision = ensure_current_revision(contract)
+        ContractSignatureService._ensure_deadline(contract)
         revision_id = revision.pk if revision else None
         if validated.get("revision_id") != revision_id:
             raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
@@ -353,6 +361,7 @@ class ContractSignatureService:
         locked.rental = rental
         if locked.current_revision_id != revision_id:
             raise Conflict(STALE_REVISION_MESSAGE, code="stale_revision")
+        ContractSignatureService._ensure_deadline(locked)
         ContractSignatureService._ensure_not_signed(locked, role)
         ContractSignatureService._ensure_payable(rental)
 
@@ -400,10 +409,10 @@ class ContractSignatureService:
         rental.save(update_fields=["status"])
         locked.save(update_fields=["accepted_by_lessor", "accepted_by_lessee", "status"])
         notify_rental_event(rental, f"contract_signed_{role}",
-                            event_key=f"contract:{locked.pk}:signed:{role}", contract=locked)
+                            event_key=f"contract:{locked.pk}:revision:{revision_id}:signed:{role}", contract=locked)
         if locked.status == ContractStatus.SIGNED:
             notify_rental_event(rental, "contract_completed",
-                                event_key=f"contract:{locked.pk}:completed", contract=locked)
+                                event_key=f"contract:{locked.pk}:revision:{revision_id}:completed", contract=locked)
         return SignatureResult(contract=locked, signature=signature)
 
     @staticmethod
@@ -451,6 +460,13 @@ class ContractSignatureService:
         # Levantado só depois do bloco atômico: a tentativa errada já foi gravada.
         if error is not None:
             raise ValidationError(error)
+
+    @staticmethod
+    def _ensure_deadline(contract):
+        if contract.status == "cancelled":
+            raise Conflict("Este contrato está cancelado.")
+        if contract.signature_deadline and timezone.now() >= contract.signature_deadline:
+            raise Conflict("O prazo de assinatura terminou. A reserva será cancelada com estorno integral.", code="signature_deadline")
 
     @staticmethod
     def _ensure_payable(rental: Rentals) -> None:

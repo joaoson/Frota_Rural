@@ -64,7 +64,7 @@ class ContractRevisionTests(ContractTestCase):
     def test_clause_text_is_part_of_the_frozen_hash(self):
         document = self.document()
         revision = self.contract_revision()
-        self.assertEqual(document["contrato"]["versao_documento"], "2.0.0")
+        self.assertEqual(document["contrato"]["versao_documento"], "2.1.0")
         self.assertEqual(revision.document["clausulas"], document["clausulas"])
         self.assertEqual(signature_evidence.document_hash(revision.document), revision.document_hash)
         # A later template change affects new documents only, never a frozen revision.
@@ -130,7 +130,7 @@ class ContractRevisionTests(ContractTestCase):
         document = self.document()
         self.assertTrue(document["previa"])
         self.assertIsNone(document["revisao"])
-        self.assertEqual(document["contrato"]["versao_documento"], "2.0.0")
+        self.assertEqual(document["contrato"]["versao_documento"], "2.1.0")
         self.assertFalse(ContractRevisions.objects.exists())
 
     def test_legacy_contract_keeps_its_1_0_0_document_and_two_boolean_flow(self):

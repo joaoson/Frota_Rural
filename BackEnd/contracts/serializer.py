@@ -227,6 +227,12 @@ class _DocumentEvidenceSerializer(serializers.Serializer[Any]):
     assinaturas = _SignatureSummarySerializer(many=True)
 
 
+class _ContractManagementSerializer(serializers.Serializer[Any]):
+    allowed_actions = serializers.ListField(child=serializers.CharField())
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField()
+
+
 class ContractDocumentOutputSerializer(serializers.Serializer[Any]):
     """Payload agregado e já formatado para renderizar o PDF do contrato."""
 
@@ -243,6 +249,8 @@ class ContractDocumentOutputSerializer(serializers.Serializer[Any]):
     )
     declaracao_assinatura = serializers.CharField(required=False)
     revisao = _RevisionSummarySerializer(allow_null=True)
+    prazo_assinatura = serializers.DateTimeField(allow_null=True)
+    gestao = _ContractManagementSerializer()
     legado = serializers.BooleanField(help_text="Aceite gravado antes das revisões (documento 1.0.0).")
     previa = serializers.BooleanField(help_text="Contrato ainda não pago: o texto congela no pagamento.")
     assinatura = _ContractSignatureDatesSerializer()

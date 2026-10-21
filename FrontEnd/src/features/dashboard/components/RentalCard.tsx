@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
+import { REFUND_LABELS, type CancellationQuote, type RentalRefund } from "@/features/contracts/types/management";
 import MaterialIcon from "@/components/MaterialIcon";
 import type { MeterReadingKind, RentalMeter } from "@/features/contracts/types/rental";
 import { canDo, isOpenRental, rentalPhaseBadge } from "@/features/contracts/types/rentalLifecycle";
@@ -16,6 +17,8 @@ export interface RentalCardData {
   allowedActions?: string[];
   notes?: string;
   meter?: RentalMeter | null;
+  refunds?: RentalRefund[];
+  signatureDeadline?: Date | null;
   contract: string | null;
   machine: string;
   period: string;
@@ -51,7 +54,9 @@ interface RentalCardProps {
   review: ReviewPanel;
   detailsOpen: boolean;
   onToggleDetails: () => void;
-  onCancel?: () => void;
+  onCancel?: (reason: string) => void;
+  onPreviewCancellation?: () => Promise<CancellationQuote>;
+  onAmend?: () => void;
   cancelling?: boolean;
   cancelLabel?: string;
   onScheduleRecurrence?: () => void;
@@ -107,6 +112,8 @@ export function RentalCard({
   detailsOpen,
   onToggleDetails,
   onCancel,
+  onPreviewCancellation,
+  onAmend,
   cancelling = false,
   cancelLabel = "Recusar",
   analysisHref,
@@ -118,6 +125,19 @@ export function RentalCard({
   meterBusy = false,
 }: RentalCardProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [quote, setQuote] = useState<CancellationQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const previewCancellation = async () => {
+    setConfirmCancel(true);
+    setQuote(null);
+    setQuoteError(null);
+    setQuoteLoading(true);
+    try { if (onPreviewCancellation) setQuote(await onPreviewCancellation()); }
+    catch (error) { setQuoteError(error instanceof Error ? error.message : "Não foi possível consultar o estorno."); }
+    finally { setQuoteLoading(false); }
+  };
   const [meterForm, setMeterForm] = useState<MeterReadingKind | "complete" | null>(null);
   const [meterValue, setMeterValue] = useState("");
   const [meterNote, setMeterNote] = useState("");
@@ -185,10 +205,13 @@ export function RentalCard({
           </Field>
         </div>
 
+        {rental.signatureDeadline && rental.phase === "aguardando_assinaturas" && <p className="mb-3 text-sm text-on-surface-variant">Assine até {rental.signatureDeadline.toLocaleString("pt-BR")}. Sem as duas assinaturas, a reserva será cancelada com estorno integral.</p>}
+        {rental.refunds?.map(refund => <p key={refund.id} role="status" className="mb-3 rounded-lg bg-secondary-container/20 p-3 text-sm">{REFUND_LABELS[refund.status]}: {refund.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{refund.status === "failed" && ". O estorno continuará em acompanhamento; as datas já foram liberadas."}</p>)}
         {recurrenceIndex != null && <p className="mb-3 text-xs font-bold text-primary">Reserva recorrente · Ocorrência {recurrenceIndex}</p>}
         <div className="flex flex-wrap gap-2">
           {onScheduleRecurrence && <button type="button" onClick={onScheduleRecurrence} className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/20"><MaterialIcon icon="event_repeat" size={14} /> Programar recorrência</button>}
           {paymentAction}
+          {onAmend && canDo(rental, "amend") && <button type="button" onClick={onAmend} className="rounded-lg border border-primary/30 px-4 py-2 text-xs font-bold text-primary">Alterar datas</button>}
           {onRecordReading && canDo(rental, "record_check_in") && (
             <button type="button" onClick={() => openMeterForm("check_in")} className="flex items-center gap-1 rounded-lg border border-primary/30 px-4 py-2 text-xs font-bold text-primary hover:bg-primary/10">
               <MaterialIcon icon="speed" size={14} /> {meter?.checkIn ? "Corrigir leitura de retirada" : "Registrar retirada"}
@@ -205,7 +228,7 @@ export function RentalCard({
             </button>
           )}
           {canCancel && onCancel && (
-            <button type="button" onClick={() => setConfirmCancel(true)} disabled={cancelling} className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50">
+            <button type="button" onClick={() => void previewCancellation()} disabled={cancelling} className="px-4 border-2 border-error/50 text-error hover:bg-error-container/20 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50">
               {cancelLabel}
             </button>
           )}
@@ -327,8 +350,12 @@ export function RentalCard({
         {confirmCancel && canCancel && onCancel && (
           <div role="group" aria-label="Confirmar cancelamento da reserva" className="mt-4 rounded-xl border border-error/30 p-4 space-y-3">
             <p className="text-sm">Cancelar esta reserva? As datas serão liberadas para novas locações.</p>
+            {quoteLoading && <p role="status">Consultando política e estorno...</p>}
+            {quoteError && <div role="alert"><p className="text-error">{quoteError}</p><button type="button" onClick={() => void previewCancellation()}>Tentar novamente</button></div>}
+            {quote && <div className="space-y-2 text-sm"><p>{quote.policyText}</p><p>Estorno previsto: <strong>{quote.refundAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></p><p>Valor retido: {quote.retainedAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>{!quote.allowed && <p role="alert">O cancelamento não está disponível neste momento.</p>}</div>}
+            <label className="block text-sm">Motivo do cancelamento (opcional)<textarea maxLength={1000} value={cancelReason} onChange={event => setCancelReason(event.target.value)} className={`${PANEL_INPUT} mt-1`} /></label>
             <div className="flex flex-wrap gap-3">
-              <button type="button" disabled={cancelling} onClick={onCancel} className="rounded-lg bg-error text-white px-4 py-2 text-sm disabled:opacity-50">{cancelling ? "Cancelando..." : "Confirmar cancelamento"}</button>
+              <button type="button" disabled={cancelling || quoteLoading || Boolean(onPreviewCancellation && !quote?.allowed)} onClick={() => onCancel(cancelReason.trim())} className="rounded-lg bg-error text-white px-4 py-2 text-sm disabled:opacity-50">{cancelling ? "Cancelando..." : "Confirmar cancelamento"}</button>
               <button type="button" disabled={cancelling} onClick={() => setConfirmCancel(false)} className="rounded-lg border px-4 py-2 text-sm">Manter reserva</button>
             </div>
           </div>

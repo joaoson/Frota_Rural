@@ -569,10 +569,10 @@ const Reservar = () => {
           setPagamentoEmRevisao(true);
           return;
         }
-        if (status === "expired") {
+        if (status === "expired" || status === "refunded" || status === "partially_refunded") {
           clearPaymentReturn();
           setConfirmandoPagamento(false);
-          toast.error("O pagamento expirou. Confira suas reservas em Minhas Locações.");
+          toast.info(status === "expired" ? "O pagamento expirou. Confira suas reservas em Minhas Locações." : "O pagamento foi estornado. Confira o cancelamento em Minhas Locações.");
           return;
         }
         if (status === "approved") {

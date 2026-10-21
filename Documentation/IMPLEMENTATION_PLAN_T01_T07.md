@@ -260,8 +260,8 @@ When a rental completes with a check-out reading above `machines.hour_meter`, up
 | E | Lifecycle module + booking policy + notes (**implemented 2026-10-21**: policy exposed at `GET /api/rentals/policy`) | 4.2, 4.3 | A |
 | F | Meter readings, completion, usage metrics (**implemented 2026-10-21**: 3.4 left off, so readings never touch the machine meter or price suggestions) | 3.x | A, E |
 | G | Payment attempts + reconciliation (**implemented 2026-10-21**: attempts without a session never block cancellation) | 2.1 | A |
-| H | Cancellation/refund + signature deadline + clause 9 text | 2.2, 2.3 | B, G |
-| I | Date-change amendments + clause 2 text | 2.4 | B, E |
+| H | Cancellation/refund + signature deadline + clause 9 text (**implemented 2026-10-21**: durable refund attempts, late-payment recovery, template 2.1.0; deadline reminders stay in Phase 5) | 2.2, 2.3 | B, G |
+| I | Date-change amendments + clause 2 text (**implemented 2026-10-21**: same-day-count proposals, atomic acceptance, new immutable revision and re-signing; original party/equipment/price data preserved) | 2.4 | B, E |
 | — | Phase 5 items | 5 | as needed |
 
 ## 5. Acceptance gates

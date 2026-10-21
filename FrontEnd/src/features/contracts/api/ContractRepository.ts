@@ -1,3 +1,4 @@
+import { cancellationSchema, amendmentSchema, type CancellationQuote, type ContractAmendment, type AmendmentInput, type AmendmentDecision } from "../types/management";
 import type { HttpClient } from "@/shared/http/HttpClient";
 
 import type { ContratoData } from "../types/contractDocument";
@@ -48,7 +49,11 @@ export interface RentalFilter {
 export interface ContractRepository {
   listRentals(filter: RentalFilter): Promise<Rental[]>;
   findRentalById(id: string): Promise<Rental>;
-  cancelRental(id: string): Promise<Rental>;
+  cancelRental(id: string, reason?: string): Promise<Rental>;
+  previewCancellation(id: string): Promise<CancellationQuote>;
+  listAmendments(id: string): Promise<ContractAmendment[]>;
+  proposeAmendment(id: string, input: AmendmentInput): Promise<ContractAmendment>;
+  decideAmendment(id: string, amendmentId: string, decision: AmendmentDecision): Promise<ContractAmendment>;
   listByPosting(postingId: string): Promise<Rental[]>;
   listOccupancyByPosting(postingId: string): Promise<RentalOccupancy[]>;
   quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote>;
@@ -154,11 +159,33 @@ export class HttpContractRepository implements ContractRepository {
     return rentalToDomain(rentalApiSchema.parse(response.data));
   }
 
-  async cancelRental(id: string): Promise<Rental> {
+  async cancelRental(id: string, reason = ""): Promise<Rental> {
     const response = await this.http.send<unknown>({
-      method: "PATCH", path: `rentals/${id}`, body: { status: "cancelled" },
+      method: "POST", path: `rentals/${id}/cancel`, body: { reason },
     });
     return rentalToDomain(rentalApiSchema.parse(response.data));
+  }
+
+  async previewCancellation(id: string): Promise<CancellationQuote> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `rentals/${id}/cancellation` });
+    return cancellationSchema.parse(response.data);
+  }
+
+  async listAmendments(id: string): Promise<ContractAmendment[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `contracts/${id}/amendments` });
+    return amendmentSchema.array().parse(response.data);
+  }
+
+  async proposeAmendment(id: string, input: AmendmentInput): Promise<ContractAmendment> {
+    const response = await this.http.send<unknown>({ method: "POST", path: `contracts/${id}/amendments`, body: {
+      base_revision: input.baseRevision, proposed_start: input.proposedStart, proposed_end: input.proposedEnd, reason: input.reason,
+    } });
+    return amendmentSchema.parse(response.data);
+  }
+
+  async decideAmendment(id: string, amendmentId: string, decision: AmendmentDecision): Promise<ContractAmendment> {
+    const response = await this.http.send<unknown>({ method: "POST", path: `contracts/${id}/amendments/${amendmentId}/${decision}`, body: {} });
+    return amendmentSchema.parse(response.data);
   }
 
   async createRental(payload: CreateRentalPayload): Promise<Rental> {

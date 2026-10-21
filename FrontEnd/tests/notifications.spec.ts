@@ -72,8 +72,8 @@ test('refreshes new rental updates automatically and links to the affected renta
   await page.goto('/dashboard-locatario?tab=notificacoes');
   const panel = page.getByRole('region', { name: 'Notificações', exact: true });
   await expect(panel.getByRole('heading', { name: 'Reserva criada', exact: true })).toBeVisible();
-  const cancel = await page.request.patch(`${apiURL}rentals/${rental}`, {
-    headers: { Authorization: `Bearer ${token}` }, data: { status: 'cancelled' },
+  const cancel = await page.request.post(`${apiURL}rentals/${rental}/cancel`, {
+    headers: { Authorization: `Bearer ${token}` }, data: { reason: 'Mudança de planos' },
   });
   expect(cancel.status()).toBe(200);
   await page.clock.fastForward(31_000);

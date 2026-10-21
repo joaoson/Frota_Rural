@@ -1,3 +1,4 @@
+import type { RentalRefund } from "./management";
 import type { SignatureRole } from "./rentalSchemas";
 
 export interface Rental {
@@ -16,6 +17,8 @@ export interface Rental {
   machineModel: string | null;
   contractNumber: string | null;
   contractId?: string | null;
+  signatureDeadline?: Date | null;
+  refunds?: RentalRefund[];
   startDate: Date | null;
   endDate: Date | null;
   totalPrice: number | null;
@@ -112,17 +115,19 @@ export function situacaoAssinatura(rental: {
   status: string | null;
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
+  signatureDeadline?: Date | null;
 }) {
   const encerrado = ENCERRADOS.includes(rental.status ?? "");
   const completo = rental.acceptedByLessor && rental.acceptedByLessee;
+  const prazoAberto = !rental.signatureDeadline || rental.signatureDeadline.getTime() > Date.now();
   const pagamentoConfirmado = rental.status === "active" || rental.status === "signed";
   return {
     encerrado,
     assinadoPeloLocador: rental.acceptedByLessor,
     assinadoPeloLocatario: rental.acceptedByLessee,
     completo,
-    podeAssinarComoLocador: pagamentoConfirmado && !encerrado && !rental.acceptedByLessor,
-    podeAssinarComoLocatario: pagamentoConfirmado && !encerrado && !rental.acceptedByLessee,
+    podeAssinarComoLocador: pagamentoConfirmado && prazoAberto && !encerrado && !rental.acceptedByLessor,
+    podeAssinarComoLocatario: pagamentoConfirmado && prazoAberto && !encerrado && !rental.acceptedByLessee,
     grupo: encerrado ? "Encerrados" : completo ? "Assinados" : "Pendentes",
   };
 }

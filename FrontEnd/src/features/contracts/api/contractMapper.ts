@@ -49,6 +49,8 @@ export function rentalToDomain(dto: RentalApi): Rental {
     machineModel: dto.machine_model ?? null,
     contractNumber: dto.contract_number ?? null,
     contractId: dto.contract_id ?? null,
+    signatureDeadline: toDate(dto.signature_deadline),
+    refunds: dto.refunds ?? [],
     startDate: toDate(dto.start_date),
     endDate: toDate(dto.end_date),
     totalPrice: toNumber(dto.total_price),

@@ -108,9 +108,9 @@ class LifecycleTests(RecurrenceFixtures, TestCase):
     def test_each_stored_status_has_one_meaning_and_its_actions(self):
         cases = [
             (self.rental("pending"), "reserva", {"pay", "cancel", "edit_dates"}, {"cancel"}),
-            (self.rental("awaiting_payment", payment="pending"), "aguardando_pagamento", {"pay"}, set()),
-            (self.rental("active", payment="approved"), "aguardando_assinaturas", {"sign"}, {"sign"}),
-            (self.rental("signed", signed=True, payment="approved"), "pronta_para_entrega", set(), set()),
+            (self.rental("awaiting_payment", payment="pending"), "aguardando_pagamento", {"pay", "cancel"}, {"cancel"}),
+            (self.rental("active", payment="approved"), "aguardando_assinaturas", {"sign", "cancel"}, {"sign", "cancel"}),
+            (self.rental("signed", signed=True, payment="approved"), "pronta_para_entrega", {"cancel"}, {"cancel"}),
             (self.rental("signed", start_in_days=-1, signed=True, payment="approved"), "em_uso", set(),
              {"record_check_in"}),
             (self.rental("signed", start_in_days=-1, signed=True, initial_hour_meter=10), "em_uso", set(),
@@ -133,6 +133,6 @@ class LifecycleTests(RecurrenceFixtures, TestCase):
         self.client.force_authenticate(self.owner)
         data = self.client.get(f"/api/rentals/{rental.pk}").data
         self.assertEqual((data["phase"], data["phase_label"]), ("aguardando_assinaturas", "Aguardando assinaturas"))
-        self.assertEqual(data["allowed_actions"], ["sign"])
+        self.assertEqual(data["allowed_actions"], ["cancel", "sign"])
         listed = next(row for row in self.client.get("/api/rentals/").data if row["id"] == str(rental.pk))
-        self.assertEqual(listed["allowed_actions"], ["sign"])
+        self.assertEqual(listed["allowed_actions"], ["cancel", "sign"])
