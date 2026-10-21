@@ -3,5 +3,17 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  test: { include: ["src/**/*.test.{ts,tsx}"], environment: "jsdom", restoreMocks: true },
+  test: {
+    include: ["src/**/*.test.{ts,tsx}"],
+    environment: "jsdom",
+    restoreMocks: true,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/**/tests/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "html", "json", "json-summary", "lcov"],
+      reportsDirectory: "../test-reports/frontend",
+      reportOnFailure: true,
+    },
+  },
 });

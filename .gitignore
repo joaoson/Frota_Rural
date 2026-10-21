@@ -4,6 +4,8 @@ videos/
 .env
 .env.supabase
 .env.local
+test-reports/
+BackEnd/coverage-report/
 Devops/__pycache__/
 Devops/tests/__pycache__/
 
