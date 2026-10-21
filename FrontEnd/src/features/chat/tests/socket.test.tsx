@@ -69,3 +69,22 @@ it("logs out after a second rejected token even when both handshakes were accept
   expect(state.refresh).toHaveBeenCalledTimes(1);
   expect(state.logout).toHaveBeenCalledTimes(1);
 });
+
+it("delivers sender acknowledgments and refusals tied to the refused send", async () => {
+  const onAck = vi.fn();
+  const onError = vi.fn();
+  renderHook(() => useChatSocket({ onAck, onError }));
+  await waitFor(() => expect(TestSocket.instances).toHaveLength(1));
+  const socket = TestSocket.instances[0];
+  const message = {
+    id: "m1", thread_id: "t1", sender_id: "me", receiver_id: "peer", content: "oi",
+    sent_at: "2026-10-01T00:00:00Z", read_at: null, flagged_for_moderation: false, hidden: false, client_id: "c1",
+  };
+  act(() => {
+    socket.onopen?.();
+    socket.onmessage?.({ data: JSON.stringify({ type: "message.ack", thread_id: "t1", client_id: "c1", message, created: false }) });
+    socket.onmessage?.({ data: JSON.stringify({ type: "error", code: "rate_limited", message: "Aguarde.", thread_id: "t1", client_id: "c2" }) });
+  });
+  expect(onAck).toHaveBeenCalledWith("t1", "c1", expect.objectContaining({ id: "m1", clientId: "c1" }));
+  expect(onError).toHaveBeenCalledWith({ code: "rate_limited", message: "Aguarde.", threadId: "t1", clientId: "c2" });
+});

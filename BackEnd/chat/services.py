@@ -127,7 +127,8 @@ class ChatService:
         if client_id:
             existing = Messages.objects.filter(sender=sender, client_id=client_id).first()
             if existing is not None:
-                return serialize_message(existing, thread_id=thread_id), False
+                return ChatService._replay(existing, receiver_id=receiver_id, scope=scope,
+                                           scope_id=scope_id, content=content), False
 
         try:
             with transaction.atomic():
@@ -147,11 +148,28 @@ class ChatService:
             existing = Messages.objects.filter(sender=sender, client_id=client_id).first()
             if existing is None:
                 raise
-            return serialize_message(existing, thread_id=thread_id), False
+            return ChatService._replay(existing, receiver_id=receiver_id, scope=scope,
+                                       scope_id=scope_id, content=content), False
 
         payload = serialize_message(message, thread_id=thread_id)
         ChatService.fan_out_message(thread_id, payload, [str(sender.id), str(receiver_id)])
         return payload, True
+
+    @staticmethod
+    def _replay(
+        existing: Messages, *, receiver_id: UUID, scope: str, scope_id: UUID, content: str,
+    ) -> dict[str, Any]:
+        """O mesmo `client_id` identifica o mesmo envio, que já foi gravado.
+
+        Reusar o identificador em outra conversa ou com outro texto é erro do
+        cliente, não reenvio: devolver a mensagem antiga sob outra thread faria a
+        tela mostrar como enviado algo que nunca foi.
+        """
+        existing_scope_id = existing.rental_id if scope == SCOPE_RENTAL else existing.posting_id
+        if (str(existing_scope_id) != str(scope_id) or str(existing.receiver_id) != str(receiver_id)
+                or existing.content != content):
+            raise ThreadError("Este identificador de envio já foi usado em outra mensagem.", status=409)
+        return serialize_message(existing)
 
     @staticmethod
     def fan_out_message(

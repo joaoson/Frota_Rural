@@ -90,6 +90,8 @@ export function useChatActions() {
       resolveThread: (scope: ChatScope, scopeId: string, peerId?: string) =>
         chatStore.resolveThread(scope, scopeId, peerId),
       setUnread: (counts: UnreadCounts) => chatStore.setUnread(counts),
+      /** Relê o contador do servidor (inclusive o número de conversas não lidas). */
+      refreshUnread: () => chatStore.invalidateUnread(),
     }),
     [],
   );

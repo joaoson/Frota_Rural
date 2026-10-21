@@ -254,9 +254,9 @@ When a rental completes with a check-out reading above `machines.hour_meter`, up
 | # | PR | Steps | Depends on |
 | --- | --- | --- | --- |
 | A | ADR + price snapshot + meter validation (**implemented 2026-10-21**: readings stay writable by the owner through PATCH, now validated, until Phase 3; contract document keys keep their names until PR B so existing signature hashes still verify) | 0, 1.1, 1.4 | — |
-| B | Contract revisions + backend clause template + honest text | 1.2, 1.5 | A |
-| C | OTP binding + trusted proxy IP | 1.3 | B (revision FK) |
-| D | Chat reliability | 4.1 | — (parallel) |
+| B | Contract revisions + backend clause template + honest text (**implemented 2026-10-21**: legacy 1.0.0 contracts keep their old wording and two-flag flow; the operator clauses 1.2/5.2 were left as they were) | 1.2, 1.5 | A |
+| C | OTP binding + trusted proxy IP (**implemented 2026-10-21**: setting named `CONTRACT_TRUSTED_PROXIES`; a changed email is rejected at signing instead of invalidating codes in the profile update) | 1.3 | B (revision FK) |
+| D | Chat reliability (**implemented 2026-10-21**) | 4.1 | — (parallel) |
 | E | Lifecycle module + booking policy + notes | 4.2, 4.3 | A |
 | F | Meter readings, completion, usage metrics | 3.x | A, E |
 | G | Payment attempts + reconciliation | 2.1 | A |

@@ -14,8 +14,19 @@ import {
 
 export type SocketStatus = "connecting" | "open" | "closed";
 
+/** Recusa do servidor. Com `clientId`, ela se refere àquele envio. */
+export interface ChatSocketError {
+  code: string;
+  message: string;
+  threadId?: string;
+  clientId?: string;
+}
+
 export interface ChatSocketHandlers {
   onMessage?: (threadId: string, message: ChatMessage) => void;
+  /** Confirmação só para quem enviou, inclusive de um reenvio já gravado. */
+  onAck?: (threadId: string, clientId: string, message: ChatMessage) => void;
+  onError?: (error: ChatSocketError) => void;
   onRead?: (threadId: string, readerId: string, messageIds: string[], upTo: string) => void;
   onHidden?: (threadId: string, messageId: string) => void;
   onTyping?: (threadId: string, userId: string, isTyping: boolean) => void;
@@ -134,6 +145,23 @@ export function useChatSocket(handlers: ChatSocketHandlers) {
             data.thread_id as string,
             toChatMessage(chatMessageApiSchema.parse(data.message)),
           );
+          break;
+        case "message.ack":
+          if (typeof data.client_id === "string") {
+            h.onAck?.(
+              data.thread_id as string,
+              data.client_id,
+              toChatMessage(chatMessageApiSchema.parse(data.message)),
+            );
+          }
+          break;
+        case "error":
+          h.onError?.({
+            code: String(data.code ?? ""),
+            message: String(data.message ?? "A mensagem não pôde ser enviada."),
+            ...(typeof data.thread_id === "string" ? { threadId: data.thread_id } : {}),
+            ...(typeof data.client_id === "string" ? { clientId: data.client_id } : {}),
+          });
           break;
         case "message.read":
           h.onRead?.(

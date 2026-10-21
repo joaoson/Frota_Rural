@@ -1,40 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import MaterialIcon from "@/components/MaterialIcon";
 
-import type { ChatThread } from "@/features/chat/types/chat";
-import { useChatActions } from "@/features/chat/hooks/useChat";
+import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 
 /**
  * Inbox real, compartilhado pelos dois dashboards.
  *
  * Substitui os mocks que existiam duplicados em DashboardLocador e
  * DashboardLocatario. A conversa em si mora em /mensagens/:threadId — manter
- * uma única implementação da thread evita que as duas cópias divirjam.
+ * uma única implementação da thread evita que as duas cópias divirjam. A lista
+ * vem de `useChatThreads`, o mesmo inbox vivo e paginado de /mensagens.
  */
 export default function ChatInboxPanel({ subtitle }: { subtitle: string }) {
-  const chat = useChatActions();
   const navigate = useNavigate();
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const { threads, loading, error: erro, refresh, hasMore, loadMore, loadingMore } = useChatThreads();
   const [busca, setBusca] = useState("");
-
-  const carregar = useCallback(async () => {
-    try {
-      const page = await chat.listThreads({ limit: 50 });
-      setThreads(page.results);
-      setErro(null);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar as conversas.");
-    } finally {
-      setLoading(false);
-    }
-  }, [chat]);
-
-  useEffect(() => {
-    void carregar();
-  }, [carregar]);
 
   const filtradas = threads.filter((t) => {
     const alvo = `${t.peer?.name ?? ""} ${t.scopeLabel}`.toLowerCase();
@@ -76,7 +57,7 @@ export default function ChatInboxPanel({ subtitle }: { subtitle: string }) {
             <p className="text-sm text-error">{erro}</p>
             <button
               type="button"
-              onClick={() => void carregar()}
+              onClick={() => void refresh()}
               className="mt-2 text-sm font-bold text-primary hover:underline"
             >
               Tentar novamente
@@ -130,6 +111,16 @@ export default function ChatInboxPanel({ subtitle }: { subtitle: string }) {
                 ) : null}
               </button>
             ))}
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="w-full p-3 text-sm font-bold text-primary hover:bg-surface-container-high disabled:opacity-60"
+              >
+                {loadingMore ? "Carregando..." : "Carregar mais conversas"}
+              </button>
+            ) : null}
           </div>
         )}
       </div>

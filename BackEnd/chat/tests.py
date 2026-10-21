@@ -2,6 +2,7 @@ import json
 import uuid
 from datetime import date, timedelta
 
+from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, TransactionTestCase, override_settings
@@ -223,6 +224,18 @@ class ChatApiTests(TestCase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(first.json()["id"], second.json()["id"])
         self.assertEqual(Messages.objects.filter(client_id=cid).count(), 1)
+
+    def test_reused_client_id_with_other_content_is_not_treated_as_a_retry(self):
+        w = self.w
+        tid = format_thread_id("rental", w["rental"].id, w["lessee"].id, w["owner"].id)
+        cid = str(uuid.uuid4())
+        url = f"/api/chat/threads/{tid}/messages"
+        self.client.post(url, {"content": "primeira", "client_id": cid},
+                         content_type="application/json", **self.auth(w["lessee"]))
+        response = self.client.post(url, {"content": "outra", "client_id": cid},
+                                    content_type="application/json", **self.auth(w["lessee"]))
+        self.assertEqual(response.status_code, 409, response.content)
+        self.assertEqual(Messages.objects.get(client_id=cid).content, "primeira")
 
     def test_authz_matrix(self):
         w = self.w
@@ -540,3 +553,63 @@ class ChatConsumerTests(TransactionTestCase):
         finally:
             await a.disconnect()
             await b.disconnect()
+
+    async def until(self, comm, event_type):
+        """Next frame of `event_type`; group fan-out and the ack may arrive in either order."""
+        for _ in range(5):
+            frame = await comm.receive_json_from(timeout=2)
+            if frame["type"] == event_type:
+                return frame
+        self.fail(f"{event_type} not received")
+
+    async def subscribed(self, *comms):
+        w = self.w
+        tid = format_thread_id("rental", w["rental"].id, w["lessee"].id, w["owner"].id)
+        for comm in comms:
+            await comm.connect()
+            await comm.send_json_to({"type": "thread.subscribe", "thread_id": tid})
+            self.assertEqual((await comm.receive_json_from())["type"], "thread.subscribed")
+        return tid
+
+    async def test_retry_after_a_lost_echo_is_acknowledged_once_stored(self):
+        cid = str(uuid.uuid4())
+        a, b = self.connect(self.w["lessee"]), self.connect(self.w["owner"])
+        try:
+            tid = await self.subscribed(a, b)
+            send = {"type": "message.send", "thread_id": tid, "content": "chegou?", "client_id": cid}
+            await a.send_json_to(send)
+            first = await self.until(a, "message.ack")
+            self.assertTrue(first["created"])
+            self.assertEqual((await self.until(b, "message.new"))["message"]["id"], first["message"]["id"])
+            while not await b.receive_nothing(timeout=0.3):  # thread/unread updates of the first send
+                await b.receive_json_from()
+
+            await a.send_json_to(send)  # e.g. the echo was lost and the user pressed Reenviar
+            replay = await self.until(a, "message.ack")
+            self.assertFalse(replay["created"])
+            self.assertEqual(replay["client_id"], cid)
+            self.assertEqual(replay["message"]["id"], first["message"]["id"])
+            self.assertTrue(await b.receive_nothing(timeout=0.3))
+            count = await database_sync_to_async(Messages.objects.filter(client_id=cid).count)()
+            self.assertEqual(count, 1)
+        finally:
+            await a.disconnect()
+            await b.disconnect()
+
+    async def test_refused_send_names_the_client_id_and_thread(self):
+        cid = str(uuid.uuid4())
+        a = self.connect(self.w["lessee"])
+        try:
+            tid = await self.subscribed(a)
+            await a.send_json_to({"type": "message.send", "thread_id": tid, "content": "um", "client_id": cid})
+            await self.until(a, "message.ack")
+            await a.send_json_to({"type": "message.send", "thread_id": tid, "content": "dois", "client_id": cid})
+            error = await self.until(a, "error")
+            self.assertEqual(error["code"], "conflict")
+            self.assertEqual((error["client_id"], error["thread_id"]), (cid, tid))
+            other = str(uuid.uuid4())
+            await a.send_json_to({"type": "message.send", "thread_id": tid, "content": "   ", "client_id": other})
+            error = await self.until(a, "error")
+            self.assertEqual(error["client_id"], other)
+        finally:
+            await a.disconnect()
