@@ -2,6 +2,8 @@
 
 Branch: `develop_joaofre_locacoes_integradas`. Base Git: `3eed0a2`; resultados medidos no working tree com as alterações desta entrega. Esta é uma atualização do diagnóstico de 14/10, não uma certificação de nota. Os limiares de cobertura da rubrica e o calendário oficial das sprints não foram fornecidos.
 
+**Atualização posterior no mesmo dia:** a [CI do commit `8943e1a`](https://github.com/joaoson/Frota_Rural/actions/runs/39612427515) passou e publicou os artefatos. Seus resultados são 52,19% de linhas no frontend e 91,55% combinado no backend. O CSV original da rubrica foi localizado novamente; os limiares estão na [nova comparação](COMPARACAO_RUBRICA_2026_10_21.md). As tabelas abaixo preservam a medição local inicial. Consulte também o [roteiro de apresentação](ROTEIRO_DEMONSTRACAO_RUBRICA.md).
+
 ## Resultado por requisito
 
 | Requisito | Entrega e evidência | Limite para avaliação |
@@ -86,6 +88,8 @@ Atualizações registradas em 21/10/2026, preservando datas e autoria anteriores
 - [8209 — Filtros de Frota](https://dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_workitems/edit/8209): encerrado após validação, com referência ao [PR 44](https://github.com/joaoson/Frota_Rural/pull/44) e testes; responsável João preservado.
 - [8251 — Pipeline](https://dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_workitems/edit/8251): revisão atribuída a Carlos; aberto até coleta da execução remota.
 - [8242 — Documentação DevOps](https://dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_workitems/edit/8242): revisão atribuída a Tiago; aberto até revisão e conciliação com o calendário das sprints.
-- [8005 — Feedback de pagamento malsucedido](https://dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_workitems/edit/8005): revisão atribuída a Amanda, com referência ao PR 44 e ao teste de retomada de checkout; aberto até conciliar o critério de aceite com a reserva provisória e demonstrar cartão recusado em sandbox.
+- [8005 — Feedback de pagamento malsucedido](https://dev.azure.com/pucpr-estudantes/BSI_2026_1SEM_7U_EQ10/_workitems/edit/8005): revisão atribuída a Amanda; posteriormente encerrado pela entrega de feedback/retry sem duplicação, com a diferença de escopo registrada: a reserva provisória continua recuperável. Isso não comprova pagamento externo nem emissão de comprovante, ainda tratados no PBI 8004.
+
+A [revisão completa dos 75 PBIs](RASTREABILIDADE_ADO_2026_10_21.md) registra 19 novos fechamentos, 71 Done e quatro New, todos com commits relacionados. Os níveis da rubrica e o escopo aceito não são determinados apenas pelos estados dos cards.
 
 Esses registros comprovam a organização atual e os vínculos com entregas reais. Não comprovam por si só que o processo foi praticado em todas as sprints.

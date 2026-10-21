@@ -10,6 +10,8 @@ Este documento reúne o estado das funcionalidades, os problemas que afetam os u
 
 > **Atualização de 21/10/2026:** as seis frentes de cobertura frontend/backend, responsividade/customização, observabilidade, documentação dos serviços e migrações receberam implementação, medições e documentação na branch atual. Consulte [Evidências de qualidade](EVIDENCIAS_QUALIDADE.md). O diagnóstico e a pontuação abaixo permanecem como registro de 14/10; não representam uma nova avaliação do working tree. Os resultados medidos não foram convertidos em nota sem os limiares e o calendário oficial da rubrica.
 
+> **Nova comparação:** o CSV original foi localizado novamente e os limiares de cobertura foram confirmados. A [comparação de 21/10](COMPARACAO_RUBRICA_2026_10_21.md) usa a CI aprovada do commit `8943e1a`, atualiza os níveis defendíveis e aponta as pendências. O [roteiro de demonstração](ROTEIRO_DEMONSTRACAO_RUBRICA.md) indica onde mostrar cada evidência e como explicá-la. O calendário de sprints continua pendente de conciliação.
+
 ## 1. Estado das funcionalidades T01–T07
 
 ### Visão geral
