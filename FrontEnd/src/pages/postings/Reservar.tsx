@@ -708,14 +708,28 @@ const Reservar = () => {
     }
   };
 
+  /** O contrato mudou desde a leitura: recarrega e exige nova leitura e novo código. */
+  const tratarRevisaoDesatualizada = async (error: unknown) => {
+    if (!(error instanceof HttpError) || error.apiCode !== "stale_revision" || !createdRental) return false;
+    toast.error("O contrato foi atualizado. Revise o documento antes de assinar.");
+    setAceitouTermos(false);
+    setCodigoOtp("");
+    setOtpEnviadoPara(null);
+    setContratoPreview(await contractStore.findContractDocument(createdRental.id).catch(() => null));
+    return true;
+  };
+
   const solicitarCodigo = async () => {
     if (!createdRental || enviandoOtp) return;
     setEnviandoOtp(true);
     try {
-      const { sentTo } = await contractStore.requestSignatureOtp(createdRental.id, "locatario");
+      const { sentTo } = await contractStore.requestSignatureOtp(
+        createdRental.id, "locatario", contratoPreview?.revisao?.id,
+      );
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (error) {
+      if (await tratarRevisaoDesatualizada(error)) return;
       toast.error(error instanceof HttpError ? error.message : "Não foi possível enviar o código por e-mail.");
     } finally {
       setEnviandoOtp(false);
@@ -748,6 +762,7 @@ const Reservar = () => {
         "locatario",
         nomeAssinatura,
         codigoOtp.trim(),
+        contratoPreview?.revisao?.id,
       );
       // Mostramos o recibo antes de sair da página: é a prova do que foi
       // assinado, e ela fica guardada no contrato para consulta posterior.
@@ -755,8 +770,9 @@ const Reservar = () => {
       toast.success("Contrato assinado! Reserva efetivada com sucesso.");
       window.scrollTo(0, 0);
     } catch (err) {
-      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
       setAssinando(false);
+      if (await tratarRevisaoDesatualizada(err)) return;
+      toast.error(err instanceof HttpError ? err.message : "Erro ao assinar contrato.");
     }
   };
 

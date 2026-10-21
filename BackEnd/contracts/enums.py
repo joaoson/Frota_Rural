@@ -12,3 +12,8 @@ class SignatureRole(models.TextChoices):
 
     LESSOR = "locador", "Locador (dono do maquinário)"
     LESSEE = "locatario", "Locatário (produtor que aluga)"
+
+
+class RevisionReason(models.TextChoices):
+    INITIAL = "initial", "Versão inicial, congelada no pagamento"
+    AMENDMENT = "amendment", "Aditivo aceito pelas partes"

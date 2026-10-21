@@ -12,6 +12,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from common.exceptions import BadGateway, Conflict, ServiceUnavailable
 from contracts.models import Contracts
+from contracts.revisions import freeze_initial_revision
 from notifications.events import notify_rental_event
 from payments.availability import MINUTOS_DE_RESERVA, periodos_ocupados, reserva_retida, tem_conflito
 from payments.models import Payments
@@ -198,6 +199,12 @@ class PaymentService:
         rental.status = "active"
         rental.updated_at = timezone.now()
         rental.save(update_fields=["status", "updated_at"])
+        # Paid terms are frozen now: later profile/listing/template edits cannot
+        # change what the two parties sign.
+        contract = Contracts.objects.select_for_update().filter(rental=rental).first()
+        if contract is not None:
+            contract.rental = rental
+            freeze_initial_revision(contract)
         notify_rental_event(rental, "payment_approved", event_key=f"payment:{payment.pk}:approved")
 
     @staticmethod

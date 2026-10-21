@@ -268,11 +268,13 @@ class PaymentAndContractNotificationTests(NotificationFixtures, TestCase):
         payment = self.payment()
         PaymentService._approve(payment.session_id)
         url = f'/api/contracts/{self.rental.pk}/sign'
-        response = self.client.post(url, {'role': 'locatario'}, format='json')
+        # Payment approval froze the revision both parties accept.
+        revision_id = str(self.rental.contracts.revisions.get().pk)
+        response = self.client.post(url, {'role': 'locatario', 'revision_id': revision_id}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(kind='contract').count(), 2)
         self.client.force_authenticate(self.owner)
-        response = self.client.post(url, {'role': 'locador'}, format='json')
+        response = self.client.post(url, {'role': 'locador', 'revision_id': revision_id}, format='json')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(Notification.objects.filter(kind='contract').count(), 6)
         self.assertEqual(Notification.objects.filter(title='Contrato assinado pelas duas partes').count(), 2)

@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import ipaddress
 import json
 import secrets
 import uuid
@@ -13,7 +14,7 @@ from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
 
-from contracts.models import Contracts, ContractSignatures
+from contracts.models import Contracts, ContractRevisions, ContractSignatures
 from users.models import Users
 
 HASH_ALGORITHM = "sha256"
@@ -44,13 +45,37 @@ def document_hash(document: Mapping[str, Any]) -> str:
 # --- Metadados da requisição ---
 
 
+def _is_trusted_proxy(address: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    for network in settings.CONTRACT_TRUSTED_PROXIES:
+        try:
+            if ip in ipaddress.ip_network(network, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def client_ip(request: HttpRequest) -> str:
-    """IP de origem, respeitando o proxy reverso à frente da aplicação."""
-    forwarded = str(request.META.get("HTTP_X_FORWARDED_FOR", ""))
-    if forwarded:
-        # O primeiro endereço da lista é o cliente original.
-        return forwarded.split(",", maxsplit=1)[0].strip()
-    return str(request.META.get("REMOTE_ADDR") or "")
+    """IP de origem gravado na evidência.
+
+    `X-Forwarded-For` é texto que qualquer cliente pode enviar. Ele só vale quando
+    a conexão vem de um proxy configurado em `CONTRACT_TRUSTED_PROXIES`, que
+    acrescenta o IP de quem o chamou ao fim da lista. Lendo de trás para frente, o
+    primeiro endereço que não é um desses proxies é o cliente; o que vier antes
+    pode ter sido forjado e é ignorado.
+    """
+    remote = str(request.META.get("REMOTE_ADDR") or "")
+    if not _is_trusted_proxy(remote):
+        return remote
+    hops = [hop.strip() for hop in str(request.META.get("HTTP_X_FORWARDED_FOR", "")).split(",") if hop.strip()]
+    for hop in reversed(hops):
+        if not _is_trusted_proxy(hop):
+            return hop
+    return hops[0] if hops else remote
 
 
 def client_user_agent(request: HttpRequest) -> str:
@@ -107,6 +132,7 @@ def record_signature(
     contract: Contracts,
     document: Mapping[str, Any],
     role: str,
+    revision: ContractRevisions | None = None,
     signer: Users | None = None,
     signer_name: str = "",
     signer_email: str = "",
@@ -134,6 +160,7 @@ def record_signature(
     return ContractSignatures.objects.create(
         id=uuid.uuid4(),
         contract=contract,
+        revision=revision,
         signer=signer,
         signer_name=signer_name,
         signer_email=signer_email,
@@ -166,12 +193,21 @@ def record_signature(
 def verify_chain(
     contract: Contracts, document: Mapping[str, Any] | None = None
 ) -> tuple[bool, list[str]]:
-    """Confere o encadeamento e, se `document` vier, que ele é o que foi assinado."""
+    """Confere o encadeamento e que cada aceite corresponde ao documento assinado.
+
+    Um aceite com revisão é conferido contra a própria revisão congelada. Um
+    aceite legado, anterior às revisões, contra `document` (o documento 1.0.0
+    reconstruído), se ele vier.
+    """
     problems: list[str] = []
     expected_previous = GENESIS_HASH
     current_hash = document_hash(document) if document is not None else None
 
-    signatures = ContractSignatures.objects.filter(contract=contract).order_by("signed_at", "id")
+    signatures = (
+        ContractSignatures.objects.filter(contract=contract)
+        .select_related("revision")
+        .order_by("signed_at", "id")
+    )
     for signature in signatures:
         if signature.previous_hash != expected_previous:
             problems.append(
@@ -196,7 +232,15 @@ def verify_chain(
         if not hmac.compare_digest(recomputed, signature.record_hash):
             problems.append(f"Registro {signature.id}: conteúdo alterado após a gravação.")
 
-        if current_hash and signature.document_hash != current_hash:
+        revision = signature.revision
+        if revision is not None:
+            if document_hash(revision.document) != revision.document_hash:
+                problems.append(f"Revisão {revision.number}: documento alterado após o congelamento.")
+            if signature.document_hash != revision.document_hash:
+                problems.append(
+                    f"Registro {signature.id}: o hash aceito não corresponde à revisão {revision.number}."
+                )
+        elif current_hash and signature.document_hash != current_hash:
             problems.append(
                 f"Registro {signature.id}: o documento atual não corresponde ao que foi assinado."
             )

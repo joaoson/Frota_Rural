@@ -327,6 +327,12 @@ CONTRACT_SIGNATURE_REQUIRE_OTP = (
 )
 CONTRACT_OTP_TTL_SECONDS = int(os.getenv("CONTRACT_OTP_TTL_SECONDS", "600"))
 CONTRACT_OTP_MAX_ATTEMPTS = int(os.getenv("CONTRACT_OTP_MAX_ATTEMPTS", "5"))
+# Proxies reversos cujo X-Forwarded-For é confiável para o IP da evidência de
+# assinatura (IPs ou redes, separados por vírgula, ex. "10.0.0.0/8,127.0.0.1").
+# Vazio: o IP gravado é sempre o da conexão (REMOTE_ADDR).
+CONTRACT_TRUSTED_PROXIES = [
+    value.strip() for value in os.getenv("CONTRACT_TRUSTED_PROXIES", "").split(",") if value.strip()
+]
 
 # Firebase Storage (fotos de anúncios e demais mídias enviadas por usuários)
 # FIREBASE_STORAGE_BUCKET: ex. "frota-rural.firebasestorage.app"

@@ -97,8 +97,10 @@ export class ContractStore {
     return result;
   }
 
-  async sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt> {
-    const receipt = await this.repository.sign(id, role, name, otp);
+  async sign(
+    id: string, role: SignatureRole, name: string, otp?: string, revisionId?: string | null,
+  ): Promise<SignatureReceipt> {
+    const receipt = await this.repository.sign(id, role, name, otp, revisionId);
     void this.queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     void this.invalidateRentals();
     void this.queryClient.invalidateQueries({ queryKey: contractKeys.document(id) });
@@ -106,8 +108,8 @@ export class ContractStore {
     return receipt;
   }
 
-  requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp> {
-    return this.repository.requestSignatureOtp(id, role);
+  requestSignatureOtp(id: string, role: SignatureRole, revisionId?: string | null): Promise<SignatureOtp> {
+    return this.repository.requestSignatureOtp(id, role, revisionId);
   }
 
   evidenceOptions(

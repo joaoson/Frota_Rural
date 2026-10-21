@@ -45,11 +45,13 @@ export interface SignContractInput {
   name: string;
   /** Só quando o contrato exige confirmação por código. */
   otp?: string;
+  /** `revisao.id` do documento que a parte leu. */
+  revisionId?: string | null;
 }
 
 export function useSignContract() {
   return useMutation<SignatureReceipt, Error, SignContractInput>({
-    mutationFn: ({ id, role, name, otp }) => contractStore.sign(id, role, name, otp),
+    mutationFn: ({ id, role, name, otp, revisionId }) => contractStore.sign(id, role, name, otp, revisionId),
     onSuccess: () => {
       void contractStore.invalidateRentals();
     },
@@ -57,8 +59,8 @@ export function useSignContract() {
 }
 
 export function useRequestSignatureOtp() {
-  return useMutation<SignatureOtp, Error, { id: string; role: SignatureRole }>({
-    mutationFn: ({ id, role }) => contractStore.requestSignatureOtp(id, role),
+  return useMutation<SignatureOtp, Error, { id: string; role: SignatureRole; revisionId?: string | null }>({
+    mutationFn: ({ id, role, revisionId }) => contractStore.requestSignatureOtp(id, role, revisionId),
   });
 }
 

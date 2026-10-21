@@ -23,6 +23,11 @@ class SignatureFixtures(RecurrenceFixtures):
         self.rental.save()
         return Payments.objects.create(rental=self.rental, session_id='cs_signature', status='approved', amount=self.rental.total_price)
 
+    def accept(self, client, role):
+        """Sign the revision the party just read, as the contract screens do."""
+        revision = client.get(f'/api/contracts/{self.rental.pk}').data['revisao']
+        return client.post(self.url, {'role': role, 'revision_id': str(revision['id'])}, format='json')
+
 
 @override_settings(CONTRACT_SIGNATURE_REQUIRE_OTP=False)
 class SignatureAccessTests(SignatureFixtures, TestCase):
@@ -58,10 +63,10 @@ class SignatureAccessTests(SignatureFixtures, TestCase):
 
     def test_approved_payment_allows_both_parties_to_sign_with_fresh_evidence(self):
         self.paid()
-        response = self.client.post(self.url, {'role': 'locatario'}, format='json')
+        response = self.accept(self.client, 'locatario')
         self.assertEqual(response.status_code, 200, response.data)
         self.client.force_authenticate(self.owner)
-        response = self.client.post(self.url, {'role': 'locador'}, format='json')
+        response = self.accept(self.client, 'locador')
         self.assertEqual(response.status_code, 200, response.data)
         self.rental.refresh_from_db()
         self.assertEqual(self.rental.status, 'signed')
@@ -83,6 +88,8 @@ class SignatureAccessTests(SignatureFixtures, TestCase):
 class SignatureConcurrencyTests(SignatureFixtures, TransactionTestCase):
     def test_simultaneous_signatures_preserve_both_acceptances_and_evidence_chain(self):
         self.paid()
+        # Reading the document freezes the revision both parties then accept.
+        revision_id = str(self.client.get(f'/api/contracts/{self.rental.pk}').data['revisao']['id'])
         barrier = Barrier(2)
 
         def sign(pair):
@@ -92,7 +99,7 @@ class SignatureConcurrencyTests(SignatureFixtures, TransactionTestCase):
                 client = APIClient()
                 client.force_authenticate(user)
                 barrier.wait(timeout=10)
-                return client.post(self.url, {'role': role}, format='json').status_code
+                return client.post(self.url, {'role': role, 'revision_id': revision_id}, format='json').status_code
             finally:
                 close_old_connections()
 

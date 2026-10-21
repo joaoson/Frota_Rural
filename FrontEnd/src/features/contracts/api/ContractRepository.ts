@@ -53,8 +53,8 @@ export interface ContractRepository {
   createRecurrence(id: string, payload: CreateRecurrenceInput): Promise<RecurrenceCreated>;
   listContracts(): Promise<Contract[]>;
   findContractDocument(id: string): Promise<ContratoData>;
-  sign(id: string, role: SignatureRole, name: string, otp?: string): Promise<SignatureReceipt>;
-  requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp>;
+  sign(id: string, role: SignatureRole, name: string, otp?: string, revisionId?: string | null): Promise<SignatureReceipt>;
+  requestSignatureOtp(id: string, role: SignatureRole, revisionId?: string | null): Promise<SignatureOtp>;
   findEvidence(id: string): Promise<ContractEvidence>;
 }
 
@@ -153,31 +153,36 @@ export class HttpContractRepository implements ContractRepository {
   /**
    * Registra o aceite. A evidência (hash do documento, timestamp UTC, IP e
    * User-Agent) é gravada pelo servidor em log imutável — nada disso sobe do
-   * cliente, justamente para ter valor probatório.
+   * cliente, justamente para ter valor probatório. `revisionId` é a revisão que
+   * a parte leu: se ela mudou, o servidor recusa com `stale_revision`.
    */
   async sign(
     id: string,
     role: SignatureRole,
     name: string,
     otp?: string,
+    revisionId?: string | null,
   ): Promise<SignatureReceipt> {
-    const response = await this.http.send<{ signature_evidence?: unknown }>({
+    const response = await this.http.send<{ signature_evidence?: unknown; rental_details?: unknown }>({
       method: "POST",
       path: `contracts/${id}/sign`,
-      body: { role, name, ...(otp ? { otp } : {}) },
+      body: { role, name, revision_id: revisionId ?? null, ...(otp ? { otp } : {}) },
     });
     const raw = response.data?.signature_evidence;
+    // A locação já vem na resposta: uma segunda leitura que falhasse faria um
+    // aceite gravado parecer recusado.
+    const rental = rentalApiSchema.safeParse(response.data?.rental_details);
     return {
-      rental: await this.findRentalById((response.data as { rental?: string }).rental ?? id),
+      rental: rental.success ? rentalToDomain(rental.data) : null,
       evidence: raw ? toSignatureEvidence(signatureEvidenceApiSchema.parse(raw)) : null,
     };
   }
 
-  async requestSignatureOtp(id: string, role: SignatureRole): Promise<SignatureOtp> {
+  async requestSignatureOtp(id: string, role: SignatureRole, revisionId?: string | null): Promise<SignatureOtp> {
     const response = await this.http.send<unknown>({
       method: "POST",
       path: `contracts/${id}/otp`,
-      body: { role },
+      body: { role, revision_id: revisionId ?? null },
     });
     return toSignatureOtp(signatureOtpApiSchema.parse(response.data));
   }

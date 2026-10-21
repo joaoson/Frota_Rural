@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { contractStore } from "@/app/container";
 import type { SignatureEvidence } from "@/features/contracts/types/rental";
-import type { ContratoData } from "@/features/contracts/types/contractDocument";
+import { valorTotalContrato, type ContratoData } from "@/features/contracts/types/contractDocument";
 import { HttpError } from "@/shared/http/errors";
 import { formatarUtcCompleto } from "@/shared/utils/formatarUtc";
 
@@ -59,6 +59,9 @@ export default function AssinaturaContratoModal({
   const [enviandoOtp, setEnviandoOtp] = useState(false);
   const [assinando, setAssinando] = useState(false);
   const [recibo, setRecibo] = useState<SignatureEvidence | null>(null);
+  // Incrementado quando o servidor avisa que o documento mudou: recarrega e
+  // exige nova leitura, novo aceite dos termos e novo código.
+  const [recarga, setRecarga] = useState(0);
 
   // Cada abertura recomeça do zero: o modal serve a vários contratos da lista.
   useEffect(() => {
@@ -95,7 +98,15 @@ export default function AssinaturaContratoModal({
     return () => {
       cancelado = true;
     };
-  }, [open, contratoId, papel]);
+  }, [open, contratoId, papel, recarga]);
+
+  /** O contrato mudou desde a leitura: nada é assinado sem rever o texto novo. */
+  const tratarRevisaoDesatualizada = (e: unknown) => {
+    if (!(e instanceof HttpError) || e.apiCode !== "stale_revision") return false;
+    toast.error("O contrato foi atualizado. Revise o documento antes de assinar.");
+    setRecarga((n) => n + 1);
+    return true;
+  };
 
   const jaAssinadoPorMim = contrato?.evidencia?.assinaturas.some((a) => a.papel === papel) ?? false;
 
@@ -103,10 +114,11 @@ export default function AssinaturaContratoModal({
     if (enviandoOtp) return;
     setEnviandoOtp(true);
     try {
-      const { sentTo } = await contractStore.requestSignatureOtp(contratoId, papel);
+      const { sentTo } = await contractStore.requestSignatureOtp(contratoId, papel, contrato?.revisao?.id);
       setOtpEnviadoPara(sentTo);
       toast.success(`Código enviado para ${sentTo}.`);
     } catch (e) {
+      if (tratarRevisaoDesatualizada(e)) return;
       toast.error(e instanceof HttpError ? e.message : "Não foi possível enviar o código por e-mail.");
     } finally {
       setEnviandoOtp(false);
@@ -135,11 +147,13 @@ export default function AssinaturaContratoModal({
         papel,
         nomeAssinatura,
         codigoOtp.trim(),
+        contrato?.revisao?.id,
       );
       setRecibo(evidence);
       toast.success("Contrato assinado! A evidência do aceite foi registrada.");
       onAssinado?.(evidence);
     } catch (e) {
+      if (tratarRevisaoDesatualizada(e)) return;
       toast.error(e instanceof HttpError ? e.message : "Erro ao assinar o contrato.");
     } finally {
       setAssinando(false);
@@ -304,7 +318,7 @@ export default function AssinaturaContratoModal({
                 </p>
                 <p>
                   <strong className="text-tertiary">Valor:</strong> R${" "}
-                  {contrato.contrato.valor_total_estimado}, incluindo locação (R${" "}
+                  {valorTotalContrato(contrato.contrato)}, incluindo locação (R${" "}
                   {contrato.contrato.valor_locacao}) e taxa da plataforma (R${" "}
                   {contrato.contrato.valor_taxa_plataforma}).
                 </p>

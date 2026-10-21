@@ -60,13 +60,20 @@ class ContractTestCase(TestCase):
         self.contract = ContractService.create_for_rental(self.rental)
         self.client.defaults.update(auth(self.lessee))
 
+    def revision_id(self, as_user=None):
+        """`revisao.id` do documento como a parte o lê antes de assinar."""
+        response = self.client.get(f"/api/contracts/{self.contract.id}", **auth(as_user or self.lessee))
+        revision = response.json().get("revisao") if response.status_code == 200 else None
+        return revision["id"] if revision else None
+
     def sign(self, role, as_user=None, **body):
-        headers = auth(as_user or (self.owner if role == "locador" else self.lessee))
+        signer = as_user or (self.owner if role == "locador" else self.lessee)
+        body.setdefault("revision_id", self.revision_id(signer))
         return self.client.post(
             f"/api/contracts/{self.contract.id}/sign",
             {"role": role, "name": "Fulano de Tal", **body},
             content_type="application/json",
-            **headers,
+            **auth(signer),
         )
 
 
@@ -153,11 +160,12 @@ class ContractSignatureTests(ContractTestCase):
 @override_settings(CONTRACT_SIGNATURE_REQUIRE_OTP=True)
 class ContractOtpTests(ContractTestCase):
     def request_otp(self, role="locatario", as_user=None, **patch_kwargs):
-        headers = auth(as_user or (self.owner if role == "locador" else self.lessee))
+        user = as_user or (self.owner if role == "locador" else self.lessee)
+        headers = auth(user)
         with patch("contracts.services.send_contract_signature_otp_email", **patch_kwargs) as send:
             response = self.client.post(
                 f"/api/contracts/{self.contract.id}/otp",
-                {"role": role},
+                {"role": role, "revision_id": self.revision_id(user)},
                 content_type="application/json",
                 **headers,
             )

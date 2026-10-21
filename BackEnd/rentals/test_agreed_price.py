@@ -119,7 +119,8 @@ class AgreedPriceTests(AgreedPriceFixtures, TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["contrato"]["valor_unitario"], "180,00")
         self.assertEqual(response.data["contrato"]["valor_locacao"], "2.880,00")
-        self.assertEqual(response.data["contrato"]["valor_total_estimado"], "3.024,00")
+        self.assertEqual(response.data["contrato"]["valor_diaria"], "1.440,00")
+        self.assertEqual(response.data["contrato"]["valor_total"], "3.024,00")
 
     def test_recurrence_occurrences_keep_their_own_quote(self):
         response = self.create()
