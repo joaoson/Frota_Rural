@@ -23,6 +23,36 @@ CNH: roda o OCR do `cnh_image` no arquivo salvo e entrega o resultado ao `cnh_da
 comparar a foto com o que foi digitado (índice de veracidade, [ADR 0004](../../Documentation/adr/0004-indice-de-veracidade-dados-x-ocr.md)).
 Sem foto ou sem OCR, o `cnh_data` avalia só a plausibilidade dos dados.
 
+## A pipeline inteira em um olhar
+
+```
+ANEXAR A FOTO                                   SALVAR A CNH
+─────────────                                   ────────────
+foto/PDF ──► cnh_image ──► formulário           formulário + foto salva
+             rede neural                         ──► OCR de novo no servidor
+             + OCR (detector, 4 votos             ──► cnh_data
+             em nome/RG/categoria)                    regras duras + ML (plausibilidade)
+                          │                           + comparação com a foto
+                  usuário confere e edita             ──► índice 0–100 + decisão
+                  e salva                                 ──► rejected (enforce) + motivos p/ o admin
+```
+
+1. **`cnh_image`** dá a nota de ser CNH e lê os campos. CPF, datas, nº de registro e UF saem de uma
+   leitura validada; nome, RG e categoria saem por votação de 4 leituras (0 ou 1 voto: não sai; 2:
+   sai incerto; a partir do limite confiável: sai normal). Tudo que sai vai ao formulário, e os
+   incertos ganham "confira antes de enviar". Cada documento processado substitui o formulário inteiro.
+2. **`cnh_data`** (ao salvar) recebe o formulário e o OCR refeito no servidor. Aplica as regras
+   duras, calcula a plausibilidade `P` (ML) e compara os campos com a foto; o índice mistura os dois
+   com um peso que cresce com a quantidade de campos fortes lidos. Recusa por regra dura, por
+   divergência dura com a foto (CPF ou dois campos fortes) ou por nota ≥ 0,60.
+3. **O que cada pessoa vê:** o dono, uma mensagem curta sem campos nem regras; o admin, o índice
+   (baixa até 40, média até 70, alta acima), o aviso de recusa automática e os motivos específicos.
+
+Se qualquer modelo falhar, ninguém é recusado por isso. Detalhes: [`cnh_image`](cnh_image/README.md),
+[`cnh_data`](cnh_data/README.md) e os ADRs
+[0003](../../Documentation/adr/0003-ocr-da-cnh-no-modelo-de-imagem.md) e
+[0004](../../Documentation/adr/0004-indice-de-veracidade-dados-x-ocr.md).
+
 ## Estrutura
 
 ```

@@ -52,6 +52,30 @@ cnh_image/
 Adaptador no Django: `document_validation/ml_adapters/cnh_image.py` (`CnhClassifier`).
 Endpoint: `POST /api/operator-licenses/validate-document` (multipart, campo `file`).
 
+## As peças de ML (e quem fez cada uma)
+
+| Peça | Papel | Quem fez |
+|---|---|---|
+| Rede neural (MobileNetV2) | nota de o arquivo ser uma CNH | **nós** (`train.py`, com o dataset BID e imagens que não são CNH) |
+| Detector de texto (RapidOCR / PP-OCR) | desenha caixas em volta de cada trecho de texto da foto | pronto, de terceiros (embutido no pacote) |
+| Reconhecedor de texto (RapidOCR / PP-OCR) | lê o texto de cada caixa (ou de um recorte) | pronto, de terceiros |
+| `models/layout_antiga.json` | posição esperada dos rótulos e dos campos da CNH antiga | **nós**, aprendido do ground truth (`scripts/learn_layout.py`) |
+
+Não treinamos nenhum OCR: o dataset serve para **aprender onde cada campo fica** e para **medir** o
+leitor. As máscaras `*_gt_segmentation.jpg` do dataset **não são usadas** em lugar nenhum (nem no
+treino da rede: `train.py` as ignora de propósito, porque não são CNHs).
+
+### O detector e as janelas dos campos
+
+1. O **detector** do RapidOCR olha a foto inteira e devolve linhas: texto, 4 cantos da caixa e uma
+   nota. Ele só diz "há texto neste retângulo"; não sabe qual campo é qual.
+2. O sistema acha entre as linhas os **rótulos** conhecidos (NOME, CPF, VALIDADE...) e usa-os como
+   âncoras para **endireitar a foto** (rotação, escala, deslocamento).
+3. Com a foto endireitada, as **janelas** do `layout_antiga.json` dizem onde procurar cada campo em
+   relação ao seu rótulo. As janelas **não vêm do detector**: foram aprendidas uma vez do
+   `*_gt_ocr.txt` (posição e texto verdadeiros de cada campo), só com os documentos de treino.
+4. O texto que o detector achou dentro da janela é o **voto 1** do campo (ver "Votação").
+
 ## Como o OCR funciona
 
 ```
@@ -81,13 +105,58 @@ mais próxima abaixo do rótulo. O PDF tem os dados em imagens embutidas, não e
 corrige o espaçamento do nome e as datas, e o que bate com os dígitos verificadores ganha
 prioridade. A digital traz a **naturalidade** (cidade e UF), que a antiga não tem.
 
+### Votação (nome, RG e categoria da CNH antiga)
+
+Nome, RG e categoria erram mais que os outros campos (foto ruidosa; a categoria é uma letra só, que o
+detector muitas vezes nem enxerga). Para cada um, o sistema lê o campo de **4 maneiras** e cada
+leitura **válida** é **1 voto** para o valor que ela produziu. A estrutura é a mesma nos três:
+
+| Voto | De onde vem |
+|---|---|
+| 1. detector | texto que o detector achou na janela do campo (o nome junta os pedaços da mesma linha) |
+| 2. recorte −3 px | a região do campo, deslocada 3 px para cima, lida direto pelo reconhecedor |
+| 3. recorte 0 px | a mesma região, sem deslocamento |
+| 4. recorte +3 px | a mesma região, deslocada 3 px para baixo |
+
+Os recortes não passam pelo detector e são endireitados pela mesma transformação da foto. O
+deslocamento (`REGION_SHIFTS`) cobre o erro de posicionamento: um recorte alguns pixels acima ou
+abaixo ainda pega o texto.
+
+**Um voto só existe se** o texto passa na validação do campo e, nos recortes, o reconhecedor deu nota
+≥ 0,30 (`REGION_MIN_SCORE`). Por isso o voto 1 pode faltar (o detector não achou nada na janela) e o
+máximo é 4.
+
+| | Nome | RG | Categoria |
+|---|---|---|---|
+| validação do texto | nome limpo e plausível | só o número (5 a 14 dígitos, sem o órgão emissor; mantém `X` final) | categoria válida; `8`→`B` e `0`→`D` |
+| votos para o campo sair | 2 | 2 | 2 |
+| votos para sair sem `uncertain` | 3 | 4 | 3 |
+
+**Contagem:** os textos válidos são comparados sem espaço, acento nem caixa; cada valor distinto soma
+os seus votos e vence o mais votado. O número de votos do vencedor decide: abaixo do mínimo o campo
+**não sai**; entre o mínimo e o confiável ele sai **marcado como incerto**; a partir do confiável
+sai normal.
+
+**Exemplo (categoria):** detector sem leitura; recortes `B`, `8` (corrigido para `B`) e `D`. O valor
+`B` tem 2 votos e `D` tem 1; vence `B` com 2 votos, abaixo dos 3 confiáveis, então a categoria sai
+como **B, incerta**.
+
+CPF, datas, nº de registro e UF **não votam** (têm validação forte), nem a CNH digital (o nome vem da
+MRZ, que tem dígitos verificadores), nem a filiação e as observações.
+
 ### Princípios
 
 - **Precisão acima de cobertura.** Um campo só é devolvido se passar na validação (CPF com dígitos
   verificadores, datas reais, UF existente, categoria no conjunto válido...). Dado errado no
   formulário é pior do que campo vazio.
 - **Incerteza explícita.** Nome, RG e categoria que não tiveram votos suficientes voltam em
-  `uncertain_fields`, e o front avisa "confira antes de enviar".
+  `uncertain_fields`, e o front avisa "confira antes de enviar" (ver "Votação" acima: abaixo do
+  mínimo o campo não sai; entre o mínimo e o confiável sai e é preenchido, marcado como incerto).
+  Precisão medida no BID com o mínimo → com os confiáveis: nome 76% → 90%, RG 92% → 94%, categoria
+  97% → 100% (`MIN_VOTES` e `TRUST_VOTES` em `lib/parse_antiga.py`).
+- **O RG não tem formato único.** Cada Secretaria de Segurança Pública define o seu: 7 a 9
+  caracteres, com ou sem dígito verificador, que pode ser `X` (`0.000.000-0`, `00.000.000-0`,
+  `00.000.000-X`). O parser devolve o número sem pontuação e mantém o `X` final.
 - **O OCR nunca derruba a validação.** Se o RapidOCR faltar, estourar o tempo ou der erro, volta
   o resultado da rede neural com `fields: null`.
 - **Nada de valores em log.** Só o tipo da exceção vai para o stderr.
@@ -117,9 +186,19 @@ prioridade. A digital traz a **naturalidade** (cidade e UF), que a antiga não t
   0,15 o OCR é pulado.
 
 O Django repassa `document_type`, `fields` e `uncertain_fields` em `CnhValidationOutputSerializer`.
-O front (`CNHUpload.tsx`) preenche os campos com máscara, aceita edição e mostra "CNH {antiga|digital}
-reconhecida. Preenchemos N campos...". Ao trocar de arquivo, os campos preenchidos antes pelo OCR
-são limpos.
+
+### O que o front faz com o resultado (`CNHUpload.tsx`)
+
+- **Vão para o formulário todos os campos devolvidos**, inclusive os de `uncertain_fields` (esses
+  ganham a dica "Lido do documento com pouca certeza: confira antes de enviar"). Campos não
+  devolvidos ficam vazios; nacionalidade ("Brasileiro(a)") e pontos (0) mantêm o valor de fábrica.
+- **Cada documento processado substitui o formulário inteiro**: tudo é apagado, inclusive o
+  cadastro salvo no modo de edição, e só entra o que a análise do novo documento leu. Vale mesmo se
+  o resultado vier sem campos (CNH física nova, arquivo que não é CNH). Se a chamada falhar (erro de
+  rede), nada é apagado. Só vale o resultado do último arquivo anexado.
+- A mensagem é genérica: "CNH reconhecida. Preenchemos alguns campos automaticamente, por favor
+  confira antes de enviar." (sem número de campos nem tipo da CNH). Nada é enviado sozinho.
+- RG: máscara e validação aceitam 7 a 9 caracteres (`maskRG.ts`, `validateRG.ts`).
 
 ## Qualidade (CNH antiga, dataset BID, validação por documento)
 

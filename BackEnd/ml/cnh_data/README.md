@@ -21,6 +21,34 @@ O código continua independente do modelo que olha a foto ([`cnh_image`](../cnh_
 este modelo só **recebe** o resultado do OCR como dado (o Django faz a ponte); a comparação dos dois
 está em [`../README.md`](../README.md).
 
+## O que é ML aqui e o que não é
+
+| Peça | É ML? | Papel |
+|---|---|---|
+| Regras duras (`rules.py`) | não | erros impossíveis (CPF inválido, nome "teste", validade de 30 anos...) |
+| Classificador (`HistGradientBoosting`) | **sim** | chance de os dados serem falsos (`P`) |
+| Detector de estranheza (`IsolationForest`) | **sim** | "isso foge do normal", mesmo de um jeito que nenhum exemplo falso previu |
+| Comparação com o OCR (`consistency.py`) | não | conta simples, campo a campo |
+| Índice de veracidade (`veracity.py`) | não | média ponderada de `P` e da comparação |
+
+Os dois modelos de ML foram treinados com **44 mil cadastros inventados por nós** (24 mil normais e
+20 mil falsos; não existe base pública de fraude de CNH). O classificador nunca vê o texto cru:
+recebe só números calculados do cadastro (tamanho e vogais do nome, se o 1º nome existe no IBGE, se a
+cidade existe na UF, idade na habilitação, dígitos distintos dos números...).
+
+**Em ordem:** (1) regras duras, que recusam na hora; (2) `P`, sempre calculada; (3) comparação com a
+foto, onde o OCR leu; (4) mistura de `P` e da comparação num índice de 0 a 100. O **peso do OCR cresce
+com a quantidade de campos fortes lidos** e o da plausibilidade cai na mesma proporção:
+
+| O OCR leu | `w` | Quem decide a nota |
+|---|---|---|
+| nada, ou menos de 1 campo forte | 0 | só a plausibilidade `P` (**o fallback**) |
+| 1 ou 2 campos fortes | 0,33 a 0,67 | mistura dos dois |
+| 3 campos fortes ou mais | 1 | só a comparação com a foto (`P` sai da nota) |
+
+Portanto a plausibilidade **não** é um plano B que só liga quando o OCR falha: ela perde peso aos
+poucos. As **regras duras** valem sempre, por cima de tudo (um fato não vira probabilidade).
+
 ## Fluxo
 
 ```
@@ -130,7 +158,7 @@ valida isso**: quem chama a API direto, sem o formulário, também passa por aqu
 | | `name_equals_mother`, `parents_equal` | nome igual ao da mãe; mãe igual ao pai |
 | números | `cnh_number_length` | CNH sem 11 dígitos |
 | | `cpf_invalid` | CPF sem 11 dígitos, repetido ou com dígito verificador errado |
-| | `rg_too_short` | RG com menos de 5 dígitos |
+| | `rg_too_short` | RG com menos de 5 dígitos (RGs de 7 a 9 caracteres, com ou sem `X` no fim, passam: o RG não tem tamanho único) |
 | | `number_low_variety` | CNH/CPF/RG com 2 dígitos distintos ou menos |
 | | `number_sequential` | 7+ dígitos consecutivos (`1234567`, `9876543`), mesmo com CPF válido |
 | datas | `invalid_date` | data que não é `AAAA-MM-DD` |
@@ -189,7 +217,7 @@ precisão medida do OCR (veja `cnh_image/README.md`):
 | Peso | Campos | Como compara |
 |---|---|---|
 | 1,0 (fortes) | `cpf`, `cnh_number`, `birth_date`, `first_license_date`, `issue_date`, `expiration_date` | igualdade (dígitos / data ISO); o OCR acerta 99–100% |
-| 0,5 | `issuing_state`, e `category`, `rg`, `name` **só se o OCR não os marcou como incertos** | igualdade; nome por similaridade ≥ 0,85 (tolera uma letra errada e acento) |
+| 0,5 | `issuing_state`, e `category`, `rg`, `name` **só se o OCR não os marcou como incertos** | igualdade; nome por similaridade ≥ 0,85 (tolera uma letra errada e acento); o RG compara também o dígito verificador `X` e aceita qualquer tamanho (7 a 9 caracteres) |
 | 0,25 | `mother_name`, `father_name`, `birth_place` | filiação vale se bater com a mãe **ou** o pai digitados (a ordem do OCR é heurística); local compara UF e similaridade da cidade |
 
 `evidência` é a soma dos pesos dos campos comparados e `concordância`, a fração ponderada que
@@ -219,6 +247,15 @@ Uma divergência isolada em um campo forte (um dia de emissão trocado) **não**
 a foto que contradiz o digitado, a mensagem ao dono é curta e não cita campos: "Os dados informados não coincidem com o documento
 enviado. Corrija e reenvie, ou aguarde a análise manual." Os campos que divergem só aparecem para o
 administrador (`details`), sem valores nem pesos.
+
+### O que o administrador vê (`/admin/documentos`)
+
+- **Índice de veracidade** (0 a 100, com barra): **baixa** até 40 (vermelho, a faixa em que o modelo
+  recusa), **média** de 41 a 70 (âmbar, "confira com o documento anexado") e **alta** a partir de 71
+  (verde). Sem índice (modelo desligado, indisponível ou cadastro anterior a ele), a tela diz que a CNH
+  não foi avaliada. As faixas estão em `FrontEnd/src/features/documents/types/documentBadges.ts`.
+- Se a CNH foi recusada pelo modelo, o aviso "Recusada automaticamente pelo modelo. Sua decisão a
+  substitui." e a lista de **motivos específicos** (`details`). Certificações não mostram o painel.
 
 **O que isto não prova**: consistência não é autenticidade. Quem sobe a foto de uma CNH alheia e
 digita os dados dessa mesma foto passa. O cruzamento pega dados digitados que **não** correspondem
