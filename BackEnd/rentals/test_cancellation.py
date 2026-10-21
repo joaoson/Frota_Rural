@@ -1,4 +1,5 @@
 """PR H: políticas, repetição, pagamentos tardios e estornos sem reabrir datas."""
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
@@ -11,6 +12,7 @@ from django.utils import timezone
 
 from contracts.models import ContractSignatureOtps
 from contracts.revisions import freeze_initial_revision
+from contracts.services import ContractService
 from contracts.tests import ContractTestCase, auth, make_user
 from notifications.models import Notification
 from payments.availability import tem_conflito
@@ -186,6 +188,28 @@ class CancellationTests(ContractTestCase):
         call_command("expire_unsigned_contracts", stdout=StringIO())
         self.assertEqual(Refunds.objects.get().amount, Decimal("2520.00"))
         self.provider.Refund.create.assert_called_once()
+
+    def test_deadline_job_skips_a_blocked_contract_and_cancels_the_rest(self):
+        # A second paid contract past its deadline, whose payment is in review.
+        blocked = Rentals.objects.create(
+            id=uuid.uuid4(), postings=self.rental.postings, lessee=self.lessee,
+            start_date=self.rental.start_date + timedelta(days=30), end_date=self.rental.end_date + timedelta(days=30),
+            total_price="2520.00", status="active", created_at=timezone.now(),
+        )
+        Payments.objects.create(rental=blocked, session_id="cs_review", status="requires_review", amount="2520.00")
+        Payments.objects.create(rental=blocked, session_id="cs_paid_blocked", status="approved", amount="2520.00")
+        blocked_contract = ContractService.create_for_rental(blocked)
+        for contract in (blocked_contract, self.contract):
+            freeze_initial_revision(contract)
+            contract.signature_deadline = timezone.now() - timedelta(seconds=1)
+            contract.save(update_fields=["signature_deadline"])
+        out = StringIO()
+        call_command("expire_unsigned_contracts", stdout=out)
+        self.assertIn(str(blocked_contract.pk), out.getvalue())
+        self.rental.refresh_from_db()
+        blocked.refresh_from_db()
+        self.assertEqual((self.rental.status, blocked.status), ("cancelled", "active"))
+        self.assertEqual(Refunds.objects.get().payment, self.payment)
 
     def test_checkout_response_after_cancel_is_closed_without_returning_payment_link(self):
         from types import SimpleNamespace
