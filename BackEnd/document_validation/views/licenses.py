@@ -42,8 +42,10 @@ class OperatorLicenseListView(APIView):
         tags=TAGS,
         summary="Cadastrar CNH",
         description=(
-            "Cadastra a CNH de um operador. O documento sempre entra com `validation_status` "
-            "igual a `pending` até a análise de um administrador."
+            "Cadastra a CNH de um operador. O documento entra com `validation_status` igual a "
+            "`pending` até a análise de um administrador. O envio nunca é bloqueado, mas se o "
+            "modelo de plausibilidade considerar os dados falsos o documento já é gravado como "
+            "`rejected`, com o motivo em `review_note` e `auto_rejected` verdadeiro."
         ),
         request=OperatorLicenseInputSerializer,
         responses={201: OperatorLicenseOutputSerializer, **error_responses(400, 409)},
@@ -71,7 +73,11 @@ class OperatorLicenseDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Substituir CNH",
-        description="Atualiza todos os campos da CNH. A validação volta para `pending` e a nota de análise é limpa.",
+        description=(
+            "Atualiza todos os campos da CNH. A validação volta para `pending`, a nota de análise "
+            "é limpa e os dados são reavaliados pelo modelo de plausibilidade (que pode recusar "
+            "de novo, como no cadastro)."
+        ),
         request=OperatorLicenseInputSerializer,
         responses={
             200: OperatorLicenseOutputSerializer,
@@ -86,7 +92,10 @@ class OperatorLicenseDetailView(APIView):
     @extend_schema(
         tags=TAGS,
         summary="Atualizar CNH parcialmente",
-        description="Atualiza apenas os campos enviados. A validação volta para `pending`.",
+        description=(
+            "Atualiza apenas os campos enviados. A validação volta para `pending` e os dados "
+            "são reavaliados pelo modelo de plausibilidade (que pode recusar de novo)."
+        ),
         request=OperatorLicenseInputSerializer,
         responses={
             200: OperatorLicenseOutputSerializer,

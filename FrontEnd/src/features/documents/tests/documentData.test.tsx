@@ -70,11 +70,22 @@ it("uploads files as multipart and reports the CNH authenticity score", async ()
   const file = new File(["%PDF"], "cnh.pdf", { type: "application/pdf" });
   http.send.mockResolvedValueOnce(ok({ url: "documents/cnh.pdf" })).mockResolvedValueOnce(ok({ is_valid: false, confidence: "low", score: 0.2, error: "Documento ilegível" }));
   expect(await repository.uploadFile(file)).toBe("documents/cnh.pdf");
-  expect(await repository.validateCnhFile(file)).toEqual({ isValid: false, confidence: "low", score: 0.2, error: "Documento ilegível" });
+  expect(await repository.validateCnhFile(file)).toEqual({ isValid: false, confidence: "low", score: 0.2, error: "Documento ilegível",
+    documentType: "desconhecido", extractedFields: {}, uncertainFields: [] });
   const [upload, validation] = http.send.mock.calls.map(([request]) => request);
   expect(upload).toMatchObject({ method: "POST", path: "documents/upload", headers: { "Content-Type": "multipart/form-data" } });
   expect((upload.body as FormData).get("file")).toBe(file);
   expect(validation.path).toBe("operator-licenses/validate-document");
+});
+
+it("turns the OCR reading into form values and flags what the model was unsure about", async () => {
+  const http = fakeHttp(); const repository = new HttpDocumentRepository(http);
+  http.send.mockResolvedValue(ok({ is_valid: true, confidence: "high", score: 0.99, document_type: "cnh_antiga", uncertain_fields: ["name", "campo_desconhecido"],
+    fields: { name: "CARLOS LIMA", cpf: "52998224725", rg: "123456789", birth_place: "RIO VERDE – GO", ear: true, category: "AB", desconhecido: "x" } }));
+  const result = await repository.validateCnhFile(new File(["x"], "cnh.jpg"));
+  expect(result).toMatchObject({ isValid: true, documentType: "cnh_antiga", uncertainFields: ["name"] });
+  expect(result.extractedFields).toMatchObject({ name: "CARLOS LIMA", cpf: "529.982.247-25", rg: "12.345.678-9", birthCity: "RIO VERDE", birthState: "GO", ear: true, category: "AB" });
+  expect(result.extractedFields).not.toHaveProperty("desconhecido");
 });
 
 it("refreshes only the document group that changed and forgets everything on logout", async () => {
@@ -129,8 +140,10 @@ it.each([
   [{ birthDate: "2009-01-01" }, "O condutor deve ter pelo menos 18 anos."],
   [{ birthDate: "1899-01-01" }, "Data de nascimento inválida."],
   [{ cpf: "529.982.247-24" }, "CPF inválido. Verifique os dígitos informados."],
-  [{ rg: "123456789" }, "O RG deve seguir o formato XX.XXX.XXX-X."],
-  [{ rg: "11.111.111-1" }, "RG inválido. Verifique os dígitos informados."],
+  [{ rg: "123456789" }, null],
+  [{ rg: "12.345.678-X" }, null],
+  [{ rg: "123456" }, "RG inválido. Informe de 7 a 9 caracteres, como 0.000.000-0 ou 00.000.000-0."],
+  [{ rg: "11.111.111-1" }, "RG inválido. Informe de 7 a 9 caracteres, como 0.000.000-0 ou 00.000.000-0."],
   [{ cnhNumber: "123" }, "O número da CNH deve conter exatamente 11 dígitos."],
   [{ category: "Z" }, "Categoria inválida."],
   [{ firstLicenseDate: "2027-01-01" }, "A data da primeira habilitação não pode ser no futuro."],

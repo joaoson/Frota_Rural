@@ -23,3 +23,12 @@ export function homeRouteForRole(role: string | null | undefined): string {
       return "/";
   }
 }
+
+/**
+ * Aba "Documentos" do painel de cada papel. O operador vive no painel do
+ * locatário; os demais, no do locador. Mandar todos para `/dashboard` levava o
+ * operador a "Minha Conta", porque aquele painel não é dele.
+ */
+export function documentsRouteForRole(role: string | null | undefined): string {
+  return `${role === "operador" ? homeRouteForRole(role) : "/dashboard"}?tab=documentos`;
+}

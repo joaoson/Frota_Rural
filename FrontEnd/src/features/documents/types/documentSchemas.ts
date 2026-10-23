@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { validateCPF } from "@/shared/utils/validation/validateCPF";
+import { cleanRG } from "@/shared/utils/masks/maskRG";
 import { validateRG } from "@/shared/utils/validation/validateRG";
 
 export const ValidationStatus = {
@@ -47,6 +48,9 @@ export const operatorLicenseApiSchema = z.object({
   file_url: z.string().nullish(),
   validation_status: z.string(),
   review_note: z.string().nullish(),
+  auto_rejected: z.boolean().nullish(),
+  veracity_score: z.number().nullish(),
+  auto_rejection_reasons: z.array(z.string()).nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
 });
@@ -71,11 +75,19 @@ export const certificationApiSchema = z.object({
 export type CertificationApi = z.infer<typeof certificationApiSchema>;
 export const certificationListApiSchema = z.array(certificationApiSchema);
 
+export const CNH_DOCUMENT_TYPES = ["cnh_antiga", "cnh_digital", "desconhecido"] as const;
+
 export const cnhValidationApiSchema = z.object({
   is_valid: z.boolean(),
   confidence: z.enum(["high", "medium", "low"]),
   score: z.number(),
   error: z.string().optional(),
+  /** Layout que o OCR reconheceu. `desconhecido` = só vale `is_valid` da rede neural. */
+  document_type: z.enum(CNH_DOCUMENT_TYPES).optional(),
+  /** Campos lidos por OCR, com as chaves do payload de `POST operator-licenses`. */
+  fields: z.record(z.string(), z.union([z.string(), z.boolean()])).nullish(),
+  /** Campos de `fields` lidos com pouca certeza: o usuário deve conferi-los. */
+  uncertain_fields: z.array(z.string()).optional(),
 });
 export type CnhValidationApi = z.infer<typeof cnhValidationApiSchema>;
 
@@ -114,12 +126,8 @@ export const cnhFormSchema = z
       .trim()
       .min(1, "RG é obrigatório.")
       .refine(
-        (value) => validateRG(value.replace(/\D/g, "")),
-        "RG inválido. Verifique os dígitos informados.",
-      )
-      .refine(
-        (value) => /^\d{2}\.\d{3}\.\d{3}-[\dXx]$/.test(value),
-        "O RG deve seguir o formato XX.XXX.XXX-X.",
+        (value) => validateRG(cleanRG(value)),
+        "RG inválido. Informe de 7 a 9 caracteres, como 0.000.000-0 ou 00.000.000-0.",
       ),
     motherName: requiredText("Nome da mãe"),
     fatherName: z.string().trim(),

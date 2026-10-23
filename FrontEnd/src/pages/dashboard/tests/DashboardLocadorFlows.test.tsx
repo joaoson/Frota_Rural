@@ -133,8 +133,8 @@ it("lists only the owner's postings and filters them", async () => {
 it("shows document review results and removes a CNH or certification", async () => {
   api({ "DELETE operator-licenses/lic-1": () => null, "DELETE certifications/cert-1": () => { throw new ServerError(500); } });
   const { user } = open("documentos");
-  expect(await screen.findByText("Motivo: Foto ilegível")).toBeInTheDocument();
-  expect(screen.getByText("Motivo: Sem carimbo")).toBeInTheDocument();
+  expect(await screen.findByText("Foto ilegível")).toBeInTheDocument();
+  expect(screen.getByText("Sem carimbo")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /Editar CNH/ })).toHaveAttribute("href", "/document/cnh");
   await user.click(screen.getAllByRole("button", { name: "Remover" })[0]);
   await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remover" }));
@@ -156,7 +156,7 @@ it("invites the owner to add documents when there are none", async () => {
 it("reports a failed CNH removal and removes a certification", async () => {
   api({ "DELETE operator-licenses/lic-1": () => { throw new ServerError(500); }, "DELETE certifications/cert-1": () => null });
   const { user } = open("documentos");
-  await screen.findByText("Motivo: Foto ilegível");
+  await screen.findByText("Foto ilegível");
   await user.click(screen.getAllByRole("button", { name: "Remover" })[0]);
   await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remover" }));
   await vi.waitFor(() => expect(ui.toast.error).toHaveBeenCalledWith("Não foi possível remover a CNH."));
