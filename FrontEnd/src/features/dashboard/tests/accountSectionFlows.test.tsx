@@ -109,10 +109,10 @@ it.each([
   await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
 });
 
-it("links operators to their documents and handles accounts without optional data", () => {
+it("keeps documents out of the account page and handles accounts without optional data", () => {
   api();
   open(buildUser({ id: "user-a", role: "operador", document: "123", phone: null, city: null, state: null, cep: null }));
-  expect(screen.getByRole("link", { name: "Enviar ou atualizar CNH" })).toHaveAttribute("href", "/document/cnh");
+  expect(screen.queryByRole("link", { name: "Enviar ou atualizar CNH" })).not.toBeInTheDocument();
   expect(screen.getByLabelText("CPF / CNPJ")).toHaveValue("123");
   expect(screen.getByLabelText("Telefone")).toHaveValue("");
 });
