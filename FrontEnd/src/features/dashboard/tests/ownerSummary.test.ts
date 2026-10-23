@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { Rental } from "@/features/contracts/types/rental";
 import type { Review } from "@/features/reviews/types/review";
-import { ownerSummary } from "./ownerSummary";
+import { ownerSummary } from "../utils/ownerSummary";
 it("groups completed contractual values across a year boundary and excludes cancelled, pending and future records", () => {
   const now = new Date(2026, 1, 15);
   const summary = ownerSummary([
