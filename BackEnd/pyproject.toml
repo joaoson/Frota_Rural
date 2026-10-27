@@ -49,7 +49,7 @@ ignore = [
 "**/tests/**" = ["ANN", "PLR2004"]
 "seed.py" = ["T20", "E402", "B007", "PLR2004"]
 # Scripts de linha de comando do venv do TensorFlow (Python próprio, fora do Django).
-"ml/**" = ["T20", "PLR2004", "ANN"]
+"ml/**" = ["T20", "PLR2004", "ANN", "E402"]  # E402: scripts/ ajustam o sys.path antes de importar lib
 
 [tool.ruff.lint.flake8-annotations]
 # `*args: Any, **kwargs: Any` é o idioma dos overrides de save()/delete() do Django.

@@ -1,4 +1,4 @@
-import type { ValidationStatus } from "./documentSchemas";
+import type { CnhFormValues, ValidationStatus } from "./documentSchemas";
 
 export class BirthPlace {
   static readonly SEPARATOR = " – ";
@@ -53,6 +53,12 @@ export interface OperatorLicense extends ReviewableDocument {
   observations: string | null;
   points: number;
   fileUrl: string | null;
+  /** Recusada pelo modelo de ML, não por um administrador. */
+  autoRejected: boolean;
+  /** Índice de veracidade dos dados (0 a 100, maior = mais verdadeiro); `null` se não avaliado. */
+  veracityScore: number | null;
+  /** Motivos específicos da recusa automática, só para o administrador. */
+  autoRejectionReasons: string[];
 }
 
 export interface Certification extends ReviewableDocument {
@@ -65,11 +71,18 @@ export interface Certification extends ReviewableDocument {
   mediaUrl: string | null;
 }
 
+export type CnhDocumentType = "cnh_antiga" | "cnh_digital" | "desconhecido";
+
 export interface CnhValidationResult {
   isValid: boolean;
   confidence: "high" | "medium" | "low";
   score: number;
   error: string | null;
+  documentType: CnhDocumentType;
+  /** Campos do formulário lidos por OCR (vazio se o OCR não leu nada). */
+  extractedFields: Partial<CnhFormValues>;
+  /** Campos de `extractedFields` lidos com pouca certeza. */
+  uncertainFields: (keyof CnhFormValues)[];
 }
 
 export function isApproved(document: ReviewableDocument): boolean {

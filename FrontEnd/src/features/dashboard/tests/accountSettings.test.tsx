@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountSection } from '../components/AccountSection';
 import OperadoresPanel from '@/components/OperadoresPanel';
@@ -93,4 +94,10 @@ describe('account and operator actions', () => {
     fireEvent.submit(screen.getByRole('button', { name: /Salvar Alterações/ }).closest('form')!);
     await waitFor(() => expect(mocks.updateOperator).toHaveBeenCalledWith(user.id, expect.objectContaining({ document: 'DEMO-USER-05', name: 'Operador (demo)', phone: '+5511944443333' })));
   });
+});
+
+it("keeps documents out of the account page, which now has its own dashboard tab", () => {
+  render(<MemoryRouter><AccountSection userId={user.id} user={{ ...user, role: "operador" }} roleLabel="Operador" /></MemoryRouter>);
+  expect(screen.queryByText("Meus documentos")).toBeNull();
+  expect(screen.queryByRole("link", { name: "Enviar ou atualizar CNH" })).toBeNull();
 });

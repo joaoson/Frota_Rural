@@ -40,6 +40,19 @@ class OperatorLicense(models.Model):
         default=ValidationStatus.PENDING,
     )
     review_note = models.TextField(blank=True, null=True)
+    # True quando a recusa veio do modelo de plausibilidade, não de um administrador.
+    # Serve para não tratar a saída do próprio modelo como verdade em um retreino.
+    auto_rejected = models.BooleanField(default=False)
+    # Índice de veracidade do modelo `cnh_data` (0-100, maior = mais verdadeiro). Nulo quando o
+    # modelo está desligado ou indisponível.
+    veracity_score = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text="Índice de veracidade dos dados (0 a 100), calculado pelo modelo de ML.",
+    )
+    # Por que o modelo recusou (regras violadas, campos que não conferem com a foto...), para o
+    # administrador. A `review_note` que o dono vê continua genérica. Vazio se não foi recusada.
+    auto_rejection_reasons = models.JSONField(default=list, blank=True)
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
