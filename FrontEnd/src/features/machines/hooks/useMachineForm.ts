@@ -13,6 +13,7 @@ export const MACHINE_FORM_DEFAULTS: MachineFormValues = {
   hourMeter: "",
   usagePurpose: "Plantio",
   technicalSpecifications: "",
+  tipoPneu: "",
 };
 
 export function useMachineForm(): UseFormReturn<MachineFormValues> {

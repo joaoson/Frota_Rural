@@ -14,7 +14,8 @@ vi.mock("sonner", () => ({ toast: ui.toast }));
 vi.mock("@/components/Navbar", () => ({ default: () => null }));
 vi.mock("@/components/Footer", () => ({ default: () => null }));
 
-const api = (routes: Record<string, Route> = {}) => serve(net.http, { "POST machines": () => machineDto(), ...routes });
+const TIPOS_PNEU = [{ id: "pneu-radial", nome: "Radial" }, { id: "pneu-diagonal", nome: "Diagonal" }];
+const api = (routes: Record<string, Route> = {}) => serve(net.http, { "GET machines/tipos-pneu": () => TIPOS_PNEU, "POST machines": () => machineDto(), ...routes });
 const open = () => renderWithProviders(<NovoEquipamento />, { queryClient: net.queryClient });
 
 beforeEach(() => { net.http.send.mockReset(); net.queryClient.clear(); ui.userId = "owner-a"; ui.toast.success.mockReset(); ui.toast.error.mockReset(); });
@@ -28,11 +29,12 @@ it("registers a machine for the fleet and clears the form for the next one", asy
   await user.type(screen.getByLabelText("Potência (cv)"), "400");
   await user.type(screen.getByLabelText("Horímetro (horas)"), "1200");
   await user.type(screen.getByLabelText("Especificações Técnicas"), "Plataforma 35 pés");
+  await user.selectOptions(await screen.findByLabelText("Tipo de Pneu"), "Radial");
   await user.click(screen.getByRole("button", { name: /Cadastrar Equipamento/ }));
   await vi.waitFor(() => expect(ui.toast.success).toHaveBeenCalledWith("Equipamento cadastrado com sucesso."));
   expect(net.http.send).toHaveBeenCalledWith({ method: "POST", path: "machines", body: {
     owner: "owner-a", renagro_number: "BR1029304899", brand: "John Deere", model: "S790", year: 2022, power_cv: 400, hour_meter: 1200,
-    technical_specifications: "Plataforma 35 pés", usage_purpose: "Colheita",
+    technical_specifications: "Plataforma 35 pés", usage_purpose: "Colheita", tipo_pneu: "pneu-radial",
   } });
   expect(screen.getByLabelText("Modelo *")).toHaveValue("");
 });
@@ -59,7 +61,7 @@ it("shows registry and model rules before submitting", async () => {
   await user.click(screen.getByRole("button", { name: /Cadastrar Equipamento/ }));
   expect(await screen.findByText(/O registro Renagro deve conter BR/)).toBeInTheDocument();
   expect(screen.getByText("Modelo é obrigatório.")).toBeInTheDocument();
-  expect(net.http.send).not.toHaveBeenCalled();
+  expect(net.http.send).not.toHaveBeenCalledWith(expect.objectContaining({ method: "POST" }));
 });
 
 it.each([
@@ -84,5 +86,5 @@ it("requires a session to register machines", async () => {
   await user.type(screen.getByLabelText("Modelo *"), "S790");
   await user.click(screen.getByRole("button", { name: /Cadastrar Equipamento/ }));
   await vi.waitFor(() => expect(ui.toast.error).toHaveBeenCalledWith("Usuário não autenticado. Faça login para cadastrar o equipamento."));
-  expect(net.http.send).not.toHaveBeenCalled();
+  expect(net.http.send).not.toHaveBeenCalledWith(expect.objectContaining({ method: "POST" }));
 });

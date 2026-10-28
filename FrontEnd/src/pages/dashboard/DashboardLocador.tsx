@@ -4,6 +4,7 @@ import { ContractAmendmentsDialog } from "@/features/contracts/components/Contra
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { isAwaitingPayment, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
 import { useUpdateMachine } from "@/features/machines/hooks/useUpdateMachine";
+import { useTiposPneu } from "@/features/machines/hooks/useTiposPneu";
 import { useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { NotificationsPanel } from "@/features/notifications/components/NotificationsPanel";
@@ -107,6 +108,7 @@ const DashboardLocador = () => {
 
   const createReview = useCreateReview();
   const updateMachine = useUpdateMachine();
+  const tiposPneuQuery = useTiposPneu();
   const cancelRental = useCancelRental();
   const recordReading = useRecordMeterReading();
   const completeRental = useCompleteRental();
@@ -127,6 +129,8 @@ const DashboardLocador = () => {
         specifications: m.technicalSpecifications,
         status: m.status ?? "active",
         purpose: m.usagePurpose ?? "",
+        tipoPneu: m.tipoPneuNome,
+        tipoPneuId: m.tipoPneuId,
       })),
     [machinesQuery.data],
   );
@@ -192,6 +196,7 @@ const DashboardLocador = () => {
       horimetro: "",
       finalidade: "Plantio",
       especificacoes: "",
+      tipoPneuId: "",
     });
 
   const openEditModalForMachine = (m: (typeof machines)[number]) => {
@@ -205,6 +210,7 @@ const DashboardLocador = () => {
       horimetro: m.hourMeter != null ? String(m.hourMeter) : "",
       finalidade: m.purpose ?? "",
       especificacoes: m.specifications ?? "",
+      tipoPneuId: m.tipoPneuId ?? "",
     });
     setIsEditEquipamentoOpen(true);
   };
@@ -352,6 +358,7 @@ const DashboardLocador = () => {
         open={isEditEquipamentoOpen}
         onOpenChange={setIsEditEquipamentoOpen}
         equipamento={selectedEquipamento}
+        tiposPneu={tiposPneuQuery.data ?? []}
         onSave={async (data) => {
           await updateMachine.mutateAsync({ id: data.id, payload: {
             renagro_number: data.registroRenagro,
@@ -364,6 +371,7 @@ const DashboardLocador = () => {
             power_cv: data.potenciaCv ? Number(data.potenciaCv) : null,
             hour_meter: data.horimetro ? Number(data.horimetro) : null,
             technical_specifications: data.especificacoes.trim(),
+            tipo_pneu: data.tipoPneuId || null,
           } });
           setSelectedEquipamento(data);
           toast.success("Equipamento atualizado com sucesso!");
@@ -803,6 +811,9 @@ const DashboardLocador = () => {
                     </p>
                     <p className="text-xs text-outline font-medium tracking-wide uppercase mt-1">
                       Finalidade: {m.purpose || "Não informada"}
+                    </p>
+                    <p className="text-xs text-outline font-medium tracking-wide uppercase mt-1">
+                      Pneu: {m.tipoPneu ?? "Não informado"}
                     </p>
                     <MachineUsageLine machineId={m.id} />
                   </div>

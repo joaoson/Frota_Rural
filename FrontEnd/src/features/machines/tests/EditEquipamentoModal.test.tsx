@@ -9,6 +9,7 @@ afterEach(cleanup);
 const machine: EquipamentoData = {
   id: "machine-a", registroRenagro: "BR1234567890", marca: "John Deere", modelo: "5075E",
   anoFabricacao: "2022", potenciaCv: "75", horimetro: "1000", finalidade: "Plantio", especificacoes: "Cabine",
+  tipoPneuId: "",
 };
 
 function deferred() {

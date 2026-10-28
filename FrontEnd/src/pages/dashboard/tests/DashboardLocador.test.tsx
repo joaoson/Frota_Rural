@@ -10,6 +10,7 @@ vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "owner-a", logo
 vi.mock("@/features/users/hooks/useUsers", () => ({ useUser: () => ({ data: { id: "owner-a", name: "João", role: "locador" } }) }));
 vi.mock("@/features/machines/hooks/useMachines", () => ({ useMachines: () => ({ data: mocks.machines, isSuccess: true }) }));
 vi.mock("@/features/machines/hooks/useUpdateMachine", () => ({ useUpdateMachine: () => ({ mutateAsync: vi.fn() }) }));
+vi.mock("@/features/machines/hooks/useTiposPneu", () => ({ useTiposPneu: () => ({ data: [] }) }));
 vi.mock("@/features/postings/hooks/usePostings", () => ({ usePostings: (...args: unknown[]) => { mocks.postings(...args); return { data: mocks.postingsData }; } }));
 vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessor: () => ({ data: mocks.rentals }), useCancelRental: () => ({ mutateAsync: mocks.cancel }), useRecordMeterReading: () => ({ mutateAsync: mocks.record, isPending: false }), useCompleteRental: () => ({ mutateAsync: mocks.complete, isPending: false }), useMachineUsage: () => ({ data: undefined }) }));
 vi.mock("@/features/reviews/hooks/useReviews", () => ({ useCreateReview: () => ({ mutateAsync: mocks.review }), useReceivedReviews: () => ({ data: mocks.reviews }), useWrittenReviews: () => ({ data: mocks.given }) }));

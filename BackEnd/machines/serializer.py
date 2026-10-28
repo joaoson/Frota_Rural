@@ -5,7 +5,7 @@ from django.http import QueryDict
 from rest_framework import serializers
 
 from machines.enums import MachineStatus
-from machines.models import Machines
+from machines.models import Machines, TipoPneu
 from users.models import Users
 
 
@@ -30,6 +30,7 @@ class MachineInputSerializer(serializers.ModelSerializer[Machines]):
             "technical_specifications",
             "usage_purpose",
             "status",
+            "tipo_pneu",
         ]
 
     def validate_owner(self, value: Users) -> Users:
@@ -73,6 +74,8 @@ class MachineInputSerializer(serializers.ModelSerializer[Machines]):
 
 
 class MachineOutputSerializer(serializers.ModelSerializer[Machines]):
+    tipo_pneu_nome = serializers.CharField(source="tipo_pneu.nome", read_only=True, allow_null=True)
+
     class Meta:
         model = Machines
         fields = [
@@ -90,7 +93,16 @@ class MachineOutputSerializer(serializers.ModelSerializer[Machines]):
             "hour_meter_updated_at",
             "created_at",
             "updated_at",
+            "tipo_pneu",
+            "tipo_pneu_nome",
         ]
+        read_only_fields = fields
+
+
+class TipoPneuOutputSerializer(serializers.ModelSerializer[TipoPneu]):
+    class Meta:
+        model = TipoPneu
+        fields = ["id", "nome"]
         read_only_fields = fields
 
 

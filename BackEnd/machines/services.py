@@ -10,7 +10,7 @@ from rest_framework.exceptions import NotFound
 from common.db import enforce_constraints_now
 from common.exceptions import Conflict
 from machines.enums import MachineStatus
-from machines.models import Machines
+from machines.models import Machines, TipoPneu
 from users.models import Users
 from machines.serializer import MachineFilterSerializer, MachineInputSerializer
 
@@ -93,3 +93,9 @@ class MachineService:
                 "Não é possível excluir esta máquina: existem registros dependentes (ex.: anúncios).",
                 code="has_dependents",
             ) from exc
+
+
+class TipoPneuService:
+    @staticmethod
+    def list() -> QuerySet[TipoPneu]:
+        return TipoPneu.objects.order_by("nome")

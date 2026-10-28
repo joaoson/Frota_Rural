@@ -12,6 +12,13 @@ export interface Machine {
   status: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+  tipoPneuId: string | null;
+  tipoPneuNome: string | null;
+}
+
+export interface TipoPneu {
+  id: string;
+  nome: string;
 }
 
 export function machineDisplayName(machine: Machine): string {

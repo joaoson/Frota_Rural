@@ -27,6 +27,8 @@ export function toDomain(dto: MachineApi): Machine {
     status: dto.status ?? null,
     createdAt: toDate(dto.created_at),
     updatedAt: toDate(dto.updated_at),
+    tipoPneuId: dto.tipo_pneu ?? null,
+    tipoPneuNome: dto.tipo_pneu_nome ?? null,
   };
 }
 
@@ -47,5 +49,6 @@ export function toCreatePayload(
     hour_meter: values.hourMeter ? Number(values.hourMeter) : undefined,
     technical_specifications: values.technicalSpecifications,
     usage_purpose: values.usagePurpose,
+    tipo_pneu: values.tipoPneu || null,
   };
 }

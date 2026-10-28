@@ -32,11 +32,20 @@ export const machineApiSchema = z.object({
   status: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
+  tipo_pneu: z.string().nullish(),
+  tipo_pneu_nome: z.string().nullish(),
 });
 
 export type MachineApi = z.infer<typeof machineApiSchema>;
 
 export const machineListApiSchema = z.array(machineApiSchema);
+
+export const tipoPneuApiSchema = z.object({
+  id: z.string(),
+  nome: z.string(),
+});
+
+export const tipoPneuListApiSchema = z.array(tipoPneuApiSchema);
 
 export const machineFormSchema = z
   .object({
@@ -63,6 +72,7 @@ export const machineFormSchema = z
     hourMeter: hourMeterField,
     usagePurpose: z.string().trim().min(1, "Finalidade de uso é obrigatória."),
     technicalSpecifications: z.string().trim(),
+    tipoPneu: z.string(),
   })
   .superRefine((values, ctx) => {
     if (values.brandKey === OTHER_BRAND && values.otherBrand.length === 0) {
@@ -86,6 +96,7 @@ export interface CreateMachinePayload {
   hour_meter?: number | null;
   technical_specifications?: string;
   usage_purpose?: string;
+  tipo_pneu?: string | null;
 }
 
 export const machineEditFormSchema = z.object({

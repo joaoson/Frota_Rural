@@ -1,6 +1,20 @@
+import uuid
+
 from django.db import models
 
 from machines.enums import MachineStatus
+
+
+class TipoPneu(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "tipos_pneu"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
 
 
 class Machines(models.Model):
@@ -28,6 +42,7 @@ class Machines(models.Model):
     status = models.CharField(max_length=50, choices=MachineStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    tipo_pneu = models.ForeignKey(TipoPneu, models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = "machines"

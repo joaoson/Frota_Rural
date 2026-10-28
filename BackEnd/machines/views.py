@@ -13,8 +13,9 @@ from machines.serializer import (
     MachineFilterSerializer,
     MachineInputSerializer,
     MachineOutputSerializer,
+    TipoPneuOutputSerializer,
 )
-from machines.services import MachineService
+from machines.services import MachineService, TipoPneuService
 
 TAGS = ["Maquinário"]
 MACHINE_NOT_FOUND = error_response(404, "Máquina não encontrada.")
@@ -137,3 +138,17 @@ class MachineDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         MachineService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TipoPneuListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar tipos de pneu",
+        description="Opções da tabela `tipos_pneu` usadas no cadastro de máquinas.",
+        responses={200: TipoPneuOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        tipos = TipoPneuService.list()
+        return Response(TipoPneuOutputSerializer(tipos, many=True).data, status=status.HTTP_200_OK)

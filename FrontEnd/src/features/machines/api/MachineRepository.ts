@@ -1,10 +1,11 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
-import type { Machine } from "../types/machine";
+import type { Machine, TipoPneu } from "../types/machine";
 import {
   type CreateMachinePayload,
   machineApiSchema,
   machineListApiSchema,
+  tipoPneuListApiSchema,
 } from "../types/machineSchemas";
 import { toDomain } from "./machineMapper";
 
@@ -22,6 +23,7 @@ export interface MachineRepository {
   create(payload: CreateMachinePayload): Promise<Machine>;
   update(id: string, payload: Partial<CreateMachinePayload>): Promise<Machine>;
   remove(id: string): Promise<void>;
+  listTiposPneu(): Promise<TipoPneu[]>;
 }
 
 export class HttpMachineRepository implements MachineRepository {
@@ -68,5 +70,10 @@ export class HttpMachineRepository implements MachineRepository {
 
   async remove(id: string): Promise<void> {
     await this.http.send<unknown>({ method: "DELETE", path: `machines/${id}` });
+  }
+
+  async listTiposPneu(): Promise<TipoPneu[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: "machines/tipos-pneu" });
+    return tipoPneuListApiSchema.parse(response.data);
   }
 }

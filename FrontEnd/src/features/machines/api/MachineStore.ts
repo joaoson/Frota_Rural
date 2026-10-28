@@ -1,6 +1,6 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { Machine } from "../types/machine";
+import type { Machine, TipoPneu } from "../types/machine";
 import type { CreateMachinePayload } from "../types/machineSchemas";
 import type { MachineFilter, MachineRepository } from "./MachineRepository";
 
@@ -8,6 +8,7 @@ export const machineKeys = {
   all: ["machines"] as const,
   lists: () => [...machineKeys.all, "list"] as const,
   list: (filter: MachineFilter) => [...machineKeys.lists(), filter] as const,
+  tiposPneu: () => [...machineKeys.all, "tipos-pneu"] as const,
 };
 
 export class MachineStore {
@@ -25,6 +26,13 @@ export class MachineStore {
     return {
       queryKey: machineKeys.list(filter),
       queryFn: () => this.repository.list(filter),
+    };
+  }
+
+  tiposPneuOptions(): UseQueryOptions<TipoPneu[], Error, TipoPneu[], ReturnType<typeof machineKeys.tiposPneu>> {
+    return {
+      queryKey: machineKeys.tiposPneu(),
+      queryFn: () => this.repository.listTiposPneu(),
     };
   }
 

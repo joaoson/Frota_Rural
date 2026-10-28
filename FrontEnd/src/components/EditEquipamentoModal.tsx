@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
 import { HttpError } from "@/shared/http/errors";
+import type { TipoPneu } from "@/features/machines/types/machine";
 import { validateMachineEdit } from "@/features/machines/types/machineSchemas";
 
 /**
@@ -24,6 +25,7 @@ export interface EquipamentoData {
   horimetro: string;
   finalidade: string;
   especificacoes: string;
+  tipoPneuId: string;
 }
 
 interface EditEquipamentoModalProps {
@@ -31,6 +33,7 @@ interface EditEquipamentoModalProps {
   onOpenChange: (open: boolean) => void;
   equipamento: EquipamentoData;
   onSave: (data: EquipamentoData) => void | Promise<void>;
+  tiposPneu?: TipoPneu[];
 }
 
 const labelClass =
@@ -41,6 +44,7 @@ const EditEquipamentoModal = ({
   onOpenChange,
   equipamento,
   onSave,
+  tiposPneu = [],
 }: EditEquipamentoModalProps) => {
   const [form, setForm] = useState<EquipamentoData>(equipamento);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -192,6 +196,20 @@ const EditEquipamentoModal = ({
                   <option>Preparo de Solo</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="tipo-pneu" className={labelClass}>Tipo de Pneu</label>
+              <select id="tipo-pneu"
+                value={form.tipoPneuId}
+                onChange={(e) => handleChange("tipoPneuId", e.target.value)}
+                className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+              >
+                <option value="">Não informado</option>
+                {tiposPneu.map((tipo) => (
+                  <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                ))}
+              </select>
             </div>
 
             {/* Potência / Horímetro */}

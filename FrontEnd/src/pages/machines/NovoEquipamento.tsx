@@ -4,6 +4,7 @@ import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
 import { BrandSelect } from "@/features/machines/components/BrandSelect";
 import { useCreateMachine } from "@/features/machines/hooks/useCreateMachine";
+import { useTiposPneu } from "@/features/machines/hooks/useTiposPneu";
 import {
   MACHINE_FORM_DEFAULTS,
   useMachineForm,
@@ -27,12 +28,14 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof MachineFormValues>> = {
   hour_meter: "hourMeter",
   usage_purpose: "usagePurpose",
   technical_specifications: "technicalSpecifications",
+  tipo_pneu: "tipoPneu",
 };
 
 const NovoEquipamento = () => {
   const { userId } = useAuth();
   const form = useMachineForm();
   const createMachine = useCreateMachine();
+  const tiposPneu = useTiposPneu();
 
   const { errors } = form.formState;
   const brandKey = form.watch("brandKey");
@@ -136,6 +139,19 @@ const NovoEquipamento = () => {
             </select>
           </FormField>
         </div>
+
+        <FormField label="Tipo de Pneu" error={errors.tipoPneu?.message}>
+          <select
+            className={inputClass(Boolean(errors.tipoPneu))}
+            disabled={tiposPneu.isLoading}
+            {...form.register("tipoPneu")}
+          >
+            <option value="">Selecione o tipo de pneu</option>
+            {(tiposPneu.data ?? []).map((tipo) => (
+              <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+            ))}
+          </select>
+        </FormField>
 
         <div className="grid grid-cols-2 gap-5">
           <FormField label="Potência (cv)" error={errors.powerCv?.message} hint="Usada para sugerir o valor por hora do anúncio.">
