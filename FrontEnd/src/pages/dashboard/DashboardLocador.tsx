@@ -167,6 +167,7 @@ const DashboardLocador = () => {
         phase: r.phase,
         allowedActions: r.allowedActions,
         notes: r.notes,
+        tipoCultura: r.tipoCulturaNome,
         meter: r.meter,
         refunds: r.refunds,
         signatureDeadline: r.signatureDeadline,

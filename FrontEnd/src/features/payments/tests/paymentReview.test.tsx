@@ -7,10 +7,10 @@ import { ServerError } from "@/shared/http/errors";
 import { rentalToDomain } from "@/features/contracts/api/contractMapper";
 import { isPaid } from "../types/payment";
 
-const mocks = vi.hoisted(() => ({ createRental: vi.fn(), createCheckout: vi.fn(), getStatus: vi.fn(), findRentalById: vi.fn(), findContractDocument: vi.fn(), listByPosting: vi.fn(), listOccupancyByPosting: vi.fn(), quotePosting: vi.fn(), bookingPolicy: vi.fn(), findPosting: vi.fn() }));
+const mocks = vi.hoisted(() => ({ createRental: vi.fn(), createCheckout: vi.fn(), getStatus: vi.fn(), findRentalById: vi.fn(), findContractDocument: vi.fn(), listByPosting: vi.fn(), listOccupancyByPosting: vi.fn(), quotePosting: vi.fn(), bookingPolicy: vi.fn(), findPosting: vi.fn(), listTiposCultura: vi.fn() }));
 vi.mock("@/app/container", () => ({
   paymentStore: { getStatus: mocks.getStatus, createCheckout: mocks.createCheckout },
-  contractStore: { createRental: mocks.createRental, listByPosting: mocks.listByPosting, listOccupancyByPosting: mocks.listOccupancyByPosting, quotePosting: mocks.quotePosting, bookingPolicy: mocks.bookingPolicy, findRentalById: mocks.findRentalById, findContractDocument: mocks.findContractDocument },
+  contractStore: { createRental: mocks.createRental, listByPosting: mocks.listByPosting, listOccupancyByPosting: mocks.listOccupancyByPosting, quotePosting: mocks.quotePosting, bookingPolicy: mocks.bookingPolicy, listTiposCultura: mocks.listTiposCultura, findRentalById: mocks.findRentalById, findContractDocument: mocks.findContractDocument },
   postingStore: { findById: mocks.findPosting },
 }));
 vi.mock("@/components/Navbar", () => ({ default: () => null }));
@@ -20,6 +20,7 @@ vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "tenant-a" }) }
 beforeEach(() => {
   mocks.listOccupancyByPosting.mockResolvedValue([]);
   mocks.bookingPolicy.mockRejectedValue(new Error("offline")); // falls back to the local 7-day preview
+  mocks.listTiposCultura.mockResolvedValue([]);
   mocks.quotePosting.mockResolvedValue({ hourlyRate: 100, hoursPerDay: 8, dailyRate: 800, days: 1, subtotal: 800, feeRate: 0.05, fee: 40, total: 840 });
   mocks.findPosting.mockResolvedValue({ id: "posting-a", hourlyRate: 100, machineBrand: "John Deere", machineModel: "5075E" });
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});

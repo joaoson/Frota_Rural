@@ -34,6 +34,8 @@ export const rentalApiSchema = z.object({
   phase_label: z.string().nullish(),
   allowed_actions: z.array(z.string()).nullish(),
   notes: z.string().nullish(),
+  tipo_cultura: z.string().nullish(),
+  tipo_cultura_nome: z.string().nullish(),
   meter: rentalMeterApiSchema.nullish(),
   // Estado do aceite: `status` sozinho não distingue quem já assinou.
   accepted_by_lessor: z.boolean().nullish(),
@@ -91,7 +93,12 @@ export interface CreateRentalPayload {
   status: string;
   /** Observações para a retirada; vão ao locador, não ao contrato. */
   notes?: string;
+  tipo_cultura?: string | null;
 }
+
+export const tipoCulturaListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 
 export type SignatureRole = "locador" | "locatario";
 

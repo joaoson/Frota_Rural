@@ -15,6 +15,7 @@ import type {
   RentalQuote,
   SignatureOtp,
   SignatureReceipt,
+  TipoCultura,
 } from "../types/rental";
 import type { CreateRentalPayload, SignatureRole } from "../types/rentalSchemas";
 import type { ContractRepository, RentalFilter } from "./ContractRepository";
@@ -68,6 +69,10 @@ export class ContractStore {
   /** Valor do servidor para o período; é o mesmo que a reserva congela. */
   quotePosting(postingId: string, startDate: string, endDate: string): Promise<RentalQuote> {
     return this.repository.quotePosting(postingId, startDate, endDate);
+  }
+
+  listTiposCultura(): Promise<TipoCultura[]> {
+    return this.repository.listTiposCultura();
   }
 
   /** Antecedência mínima do servidor, a mesma para reserva, troca de datas e recorrência. */

@@ -21,9 +21,10 @@ from rentals.serializer import (
     RentalFilterSerializer,
     RentalMeterReadingOutputSerializer,
     RentalOutputSerializer,
+    TipoCulturaOutputSerializer,
 )
 from rentals import policy
-from rentals.services import RentalService
+from rentals.services import RentalService, TipoCulturaService
 
 TAGS = ["Locações"]
 
@@ -327,3 +328,17 @@ class RentalCancelView(APIView):
         from rentals.cancellation import CancellationService
         rental = CancellationService.cancel(pk, request.data, user=request.user)
         return Response(RentalOutputSerializer(rental, context=_context(request)).data)
+
+
+class TipoCulturaListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar tipos de cultura",
+        description="Opções da tabela `tipos_cultura` usadas na reserva.",
+        responses={200: TipoCulturaOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        tipos = TipoCulturaService.list()
+        return Response(TipoCulturaOutputSerializer(tipos, many=True).data, status=status.HTTP_200_OK)

@@ -9,7 +9,7 @@ import type { PostingDetail } from "@/features/postings/types/posting";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/useAuth";
-import type { BookingPolicy, RentalOccupancy, RentalQuote, Rental, SignatureEvidence } from "@/features/contracts/types/rental";
+import type { BookingPolicy, RentalOccupancy, RentalQuote, Rental, SignatureEvidence, TipoCultura } from "@/features/contracts/types/rental";
 import type { ContratoData } from "@/features/contracts/types/contractDocument";
 import { HttpError } from "@/shared/http/errors";
 
@@ -384,6 +384,8 @@ const Reservar = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [observacoes, setObservacoes] = useState("");
+  const [tipoCultura, setTipoCultura] = useState("");
+  const [tiposCultura, setTiposCultura] = useState<TipoCultura[]>([]);
   const [cotacao, setCotacao] = useState<RentalQuote | null>(null);
   const [politica, setPolitica] = useState<BookingPolicy | null>(null);
 
@@ -398,6 +400,13 @@ const Reservar = () => {
     let ignored = false;
     contractStore.bookingPolicy()
       .then((value) => { if (!ignored) setPolitica(value); })
+      .catch(() => {});
+    return () => { ignored = true; };
+  }, []);
+  useEffect(() => {
+    let ignored = false;
+    contractStore.listTiposCultura()
+      .then((value) => { if (!ignored) setTiposCultura(value); })
       .catch(() => {});
     return () => { ignored = true; };
   }, []);
@@ -698,6 +707,7 @@ const Reservar = () => {
           end_date: toRentalDateTime(dataFim, "end"),
           total_price: total, status: "pending",
           ...(observacoes.trim() ? { notes: observacoes.trim() } : {}),
+          tipo_cultura: tipoCultura || null,
         });
         // Keep the server-issued reservation before contacting the provider:
         // retrying or refreshing must never create another rental for these dates.
@@ -1010,6 +1020,22 @@ const Reservar = () => {
                       placeholder="Informe detalhes adicionais sobre a locação..."
                       className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition resize-none"
                     />
+                  </div>
+
+                  <div className="mb-7">
+                    <label htmlFor="tipo-cultura" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                      Tipo de Cultura
+                    </label>
+                    <select id="tipo-cultura"
+                      value={tipoCultura}
+                      onChange={(e) => setTipoCultura(e.target.value)}
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    >
+                      <option value="">Selecione o tipo de cultura</option>
+                      {tiposCultura.map((tipo) => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <button

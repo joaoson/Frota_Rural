@@ -16,6 +16,7 @@ export interface RentalCardData {
   phase?: string | null;
   allowedActions?: string[];
   notes?: string;
+  tipoCultura?: string | null;
   meter?: RentalMeter | null;
   refunds?: RentalRefund[];
   signatureDeadline?: Date | null;
@@ -202,6 +203,9 @@ export function RentalCard({
           </Field>
           <Field label="Valor">
             <div className="font-black text-primary text-lg">{rental.total}</div>
+          </Field>
+          <Field label="Cultura">
+            <div className="font-bold text-on-surface text-sm">{rental.tipoCultura ?? "Não informada"}</div>
           </Field>
         </div>
 

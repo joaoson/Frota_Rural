@@ -20,7 +20,7 @@ from postings.models import Postings
 from rentals import policy
 from rentals.enums import MeterReadingKind, RentalStatus
 from rentals.meter import MeterService
-from rentals.models import Rentals
+from rentals.models import Rentals, TipoCultura
 from rentals.serializer import RentalFilterSerializer, RentalInputSerializer, validate_operator_assignment
 
 PERIOD_CONFLICT_MESSAGE = (
@@ -185,3 +185,9 @@ class RentalService:
         if "lessor" in params:
             queryset = queryset.filter(postings__machinery__owner_id=params["lessor"])
         return queryset
+
+
+class TipoCulturaService:
+    @staticmethod
+    def list() -> QuerySet[TipoCultura]:
+        return TipoCultura.objects.order_by("nome")

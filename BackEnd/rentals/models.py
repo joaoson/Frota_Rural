@@ -1,6 +1,20 @@
+import uuid
+
 from django.db import models
 
 from rentals.enums import MeterReadingKind, RentalStatus
+
+
+class TipoCultura(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "tipos_cultura"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
 
 
 class Rentals(models.Model):
@@ -44,6 +58,7 @@ class Rentals(models.Model):
     )
     recurrence_index = models.PositiveSmallIntegerField(blank=True, null=True)
     reservation_expires_at = models.DateTimeField(blank=True, null=True)
+    tipo_cultura = models.ForeignKey(TipoCultura, models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = "rentals"

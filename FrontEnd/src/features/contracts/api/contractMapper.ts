@@ -65,6 +65,8 @@ export function rentalToDomain(dto: RentalApi): Rental {
     phaseLabel: dto.phase_label ?? null,
     ...(dto.allowed_actions ? { allowedActions: dto.allowed_actions } : {}),
     notes: dto.notes ?? "",
+    tipoCulturaId: dto.tipo_cultura ?? null,
+    tipoCulturaNome: dto.tipo_cultura_nome ?? null,
     meter: dto.meter
       ? {
           checkIn: dto.meter.check_in ? readingToDomain(dto.meter.check_in) : null,

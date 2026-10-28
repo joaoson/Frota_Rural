@@ -121,6 +121,7 @@ const DashboardLocatario = () => {
         phase: rental.phase,
         allowedActions: rental.allowedActions,
         notes: rental.notes,
+        tipoCultura: rental.tipoCulturaNome,
         meter: rental.meter,
         refunds: rental.refunds,
         signatureDeadline: rental.signatureDeadline,

@@ -14,6 +14,7 @@ import type {
   RentalQuote,
   SignatureOtp,
   SignatureReceipt,
+  TipoCultura,
 } from "../types/rental";
 import {
   contractApiSchema,
@@ -26,6 +27,7 @@ import {
   signatureEvidenceApiSchema,
   signatureOtpApiSchema,
   type SignatureRole,
+  tipoCulturaListApiSchema,
 } from "../types/rentalSchemas";
 import {
   contractToDomain,
@@ -69,6 +71,7 @@ export interface ContractRepository {
   sign(id: string, role: SignatureRole, name: string, otp?: string, revisionId?: string | null): Promise<SignatureReceipt>;
   requestSignatureOtp(id: string, role: SignatureRole, revisionId?: string | null): Promise<SignatureOtp>;
   findEvidence(id: string): Promise<ContractEvidence>;
+  listTiposCultura(): Promise<TipoCultura[]>;
 }
 
 export class HttpContractRepository implements ContractRepository {
@@ -269,5 +272,10 @@ export class HttpContractRepository implements ContractRepository {
       path: `contracts/${id}/evidence`,
     });
     return toContractEvidence(contractEvidenceApiSchema.parse(response.data));
+  }
+
+  async listTiposCultura(): Promise<TipoCultura[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: "rentals/tipos-cultura" });
+    return tipoCulturaListApiSchema.parse(response.data);
   }
 }

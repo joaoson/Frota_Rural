@@ -36,11 +36,18 @@ export interface Rental {
   /** O que o usuário autenticado pode fazer agora. */
   allowedActions?: string[];
   notes?: string;
+  tipoCulturaId?: string | null;
+  tipoCulturaNome?: string | null;
   /** Leituras do horímetro: só acompanhamento de uso, nunca alteram o valor. */
   meter?: RentalMeter | null;
   acceptedByLessor: boolean;
   acceptedByLessee: boolean;
   contractStatus: string | null;
+}
+
+export interface TipoCultura {
+  id: string;
+  nome: string;
 }
 
 /** Preço calculado no servidor: diária fixa (tarifa × 8 h) por dia de calendário. */

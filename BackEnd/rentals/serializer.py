@@ -9,7 +9,7 @@ from rest_framework import serializers
 from contracts.models import Contracts
 from rentals import lifecycle
 from rentals.meter import usage_summary
-from rentals.models import RentalMeterReadings, Rentals
+from rentals.models import RentalMeterReadings, Rentals, TipoCultura
 from users.enums import UserRole
 from users.models import Users
 
@@ -56,6 +56,7 @@ class RentalInputSerializer(serializers.ModelSerializer[Rentals]):
             "end_date",
             "notes",
             "status",
+            "tipo_cultura",
         ]
         extra_kwargs = {"notes": {"max_length": 1000, "allow_blank": True, "required": False}}
 
@@ -136,6 +137,7 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
     meter = serializers.SerializerMethodField(
         help_text="Leituras vigentes do horímetro e horas usadas. Informativo: não altera o valor."
     )
+    tipo_cultura_nome = serializers.CharField(source="tipo_cultura.nome", read_only=True, allow_null=True)
 
     class Meta:
         model = Rentals
@@ -181,6 +183,8 @@ class RentalOutputSerializer(serializers.ModelSerializer[Rentals]):
             "contract_status",
             "accepted_by_lessor",
             "accepted_by_lessee",
+            "tipo_cultura",
+            "tipo_cultura_nome",
         ]
         read_only_fields = fields
 
@@ -239,4 +243,11 @@ class RentalMeterReadingOutputSerializer(serializers.ModelSerializer[RentalMeter
     class Meta:
         model = RentalMeterReadings
         fields = ["id", "rental", "kind", "value", "note", "recorded_by", "recorded_at", "supersedes"]
+        read_only_fields = fields
+
+
+class TipoCulturaOutputSerializer(serializers.ModelSerializer[TipoCultura]):
+    class Meta:
+        model = TipoCultura
+        fields = ["id", "nome"]
         read_only_fields = fields
