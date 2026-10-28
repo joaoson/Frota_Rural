@@ -14,6 +14,7 @@ export const SIGNUP_FORM_DEFAULTS: SignupFormValues = {
   address: "",
   city: "",
   state: "",
+  portePropriedade: "",
   password: "",
 };
 

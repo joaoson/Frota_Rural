@@ -5,7 +5,7 @@ from rest_framework.validators import UniqueValidator
 
 from djangoapi import firebase_storage
 from users.enums import UserRole
-from users.models import Users
+from users.models import PortePropriedade, Users
 
 EMAIL_IN_USE_MESSAGE = "Este e-mail já está em uso."
 DOCUMENT_IN_USE_MESSAGE = "Este documento já está cadastrado."
@@ -53,7 +53,7 @@ class UserCreateInputSerializer(serializers.ModelSerializer[Users]):
 
     class Meta:
         model = Users
-        fields = [*PROFILE_FIELDS, "role", "password"]
+        fields = [*PROFILE_FIELDS, "porte_propriedade", "role", "password"]
         extra_kwargs = UNIQUE_FIELD_KWARGS
 
 
@@ -74,7 +74,7 @@ class UserUpdateInputSerializer(serializers.ModelSerializer[Users]):
 
     class Meta:
         model = Users
-        fields = PROFILE_FIELDS
+        fields = [*PROFILE_FIELDS, "porte_propriedade"]
         extra_kwargs = UNIQUE_FIELD_KWARGS
 
 
@@ -111,6 +111,7 @@ class OperatorUpdateInputSerializer(serializers.ModelSerializer[Users]):
 
 class UserOutputSerializer(serializers.ModelSerializer[Users]):
     profile_photo_url = serializers.SerializerMethodField()
+    porte_propriedade_nome = serializers.CharField(source="porte_propriedade.nome", read_only=True, allow_null=True)
 
     def get_profile_photo_url(self, obj: Users) -> str | None:
         return firebase_storage.public_url(obj.profile_photo)
@@ -135,6 +136,8 @@ class UserOutputSerializer(serializers.ModelSerializer[Users]):
             "last_login",
             "created_at",
             "updated_at",
+            "porte_propriedade",
+            "porte_propriedade_nome",
         ]
         read_only_fields = fields
 
@@ -145,4 +148,11 @@ class OperatorOutputSerializer(serializers.ModelSerializer[Users]):
     class Meta:
         model = Users
         fields = ["id", *PROFILE_FIELDS, "status", "created_at", "updated_at"]
+        read_only_fields = fields
+
+
+class PortePropriedadeOutputSerializer(serializers.ModelSerializer[PortePropriedade]):
+    class Meta:
+        model = PortePropriedade
+        fields = ["id", "nome"]
         read_only_fields = fields

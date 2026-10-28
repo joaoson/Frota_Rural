@@ -1,7 +1,7 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
-import type { User } from "../types/user";
-import { userApiSchema, userListApiSchema } from "../types/userSchemas";
+import type { PortePropriedade, User } from "../types/user";
+import { portePropriedadeListApiSchema, userApiSchema, userListApiSchema } from "../types/userSchemas";
 import { type CreateUserPayload, toDomain } from "./userMapper";
 
 const COLLECTION_PATH = "users";
@@ -16,6 +16,7 @@ export interface UpdateProfileInput {
   city?: string;
   state?: string;
   cep?: string;
+  porte_propriedade?: string | null;
 }
 
 export interface UserRepository {
@@ -25,6 +26,7 @@ export interface UserRepository {
   updateProfile(id: string, input: UpdateProfileInput): Promise<User>;
   uploadPhoto(id: string, file: File): Promise<User>;
   changePassword(id: string, currentPassword: string, newPassword: string): Promise<void>;
+  listPortesPropriedade(): Promise<PortePropriedade[]>;
 }
 
 export class HttpUserRepository implements UserRepository {
@@ -81,5 +83,10 @@ export class HttpUserRepository implements UserRepository {
       path: `users/${id}/change-password`,
       body: { current_password: currentPassword, new_password: newPassword },
     });
+  }
+
+  async listPortesPropriedade(): Promise<PortePropriedade[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: "users/portes-propriedade" });
+    return portePropriedadeListApiSchema.parse(response.data);
   }
 }

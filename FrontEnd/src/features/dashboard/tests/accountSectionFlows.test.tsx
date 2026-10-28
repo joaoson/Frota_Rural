@@ -8,6 +8,7 @@ import { serve, type Route } from "@/test/http";
 import { renderWithProviders } from "@/test/render";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/features/users/hooks/usePortesPropriedade", () => ({ usePortesPropriedade: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/app/container", () => import("@/test/container"));
 vi.mock("sonner", () => ({ toast }));
 
@@ -36,7 +37,7 @@ it("fills the form from the account and saves edits with the address from a new 
   await vi.waitFor(() => expect(toast.success).toHaveBeenCalledWith("Dados atualizados com sucesso."));
   expect(net.http.send).toHaveBeenCalledWith({ method: "PATCH", path: "users/user-a", body: {
     name: "Maria Silva", document: "52998224725", email: "maria@example.com", phone: "+5564999990000",
-    address: "Av. Brasil, Centro", city: "Cuiabá", state: "MT", cep: "78000000",
+    address: "Av. Brasil, Centro", city: "Cuiabá", state: "MT", cep: "78000000", porte_propriedade: null,
   } });
 });
 

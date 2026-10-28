@@ -24,6 +24,18 @@ class UsersManager(_UsersManagerBase):
         return user
 
 
+class PortePropriedade(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "portes_propriedade"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
 class Users(AbstractBaseUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
@@ -55,6 +67,7 @@ class Users(AbstractBaseUser):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    porte_propriedade = models.ForeignKey(PortePropriedade, models.PROTECT, blank=True, null=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["name", "document", "role", "address", "birth_date"]

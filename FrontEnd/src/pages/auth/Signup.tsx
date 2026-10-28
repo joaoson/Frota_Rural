@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { toCreatePayload } from "@/features/users/api/userMapper";
 import { useSignupForm } from "@/features/users/hooks/useSignupForm";
 import { useCreateUser } from "@/features/users/hooks/useUsers";
+import { usePortesPropriedade } from "@/features/users/hooks/usePortesPropriedade";
 import { maxBirthDate, UserRole } from "@/features/users/types/userSchemas";
 import type { SignupFormValues } from "@/features/users/types/userSchemas";
 import { FormField } from "@/shared/components/FormField";
@@ -31,6 +32,7 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof SignupFormValues>> = {
   birth_date: "birthDate",
   city: "city",
   state: "state",
+  porte_propriedade: "portePropriedade",
   password: "password",
   role: "role",
 };
@@ -46,6 +48,7 @@ const Signup = () => {
 
   const form = useSignupForm();
   const createUser = useCreateUser();
+  const portes = usePortesPropriedade();
   const { lookup } = useCepLookup();
   const { errors } = form.formState;
   const role = form.watch("role");
@@ -212,6 +215,19 @@ const Signup = () => {
                 </select>
               </FormField>
             </div>
+
+            <FormField label="Porte da Propriedade" error={errors.portePropriedade?.message}>
+              <select
+                className={inputClass(Boolean(errors.portePropriedade))}
+                disabled={portes.isLoading}
+                {...form.register("portePropriedade")}
+              >
+                <option value="">Selecione o porte da propriedade</option>
+                {(portes.data ?? []).map((porte) => (
+                  <option key={porte.id} value={porte.id}>{porte.nome}</option>
+                ))}
+              </select>
+            </FormField>
 
             <PasswordField
               label="Senha*"

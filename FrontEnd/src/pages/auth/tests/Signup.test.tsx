@@ -9,6 +9,7 @@ import { serve, type Route } from "@/test/http";
 import { renderWithProviders } from "@/test/render";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/features/users/hooks/usePortesPropriedade", () => ({ usePortesPropriedade: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/app/container", () => import("@/test/container"));
 vi.mock("sonner", () => ({ toast }));
 vi.mock("@/components/Navbar", () => ({ default: () => null }));

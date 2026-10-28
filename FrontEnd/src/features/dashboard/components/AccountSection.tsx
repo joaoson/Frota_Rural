@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { useChangePassword, useUpdateProfile } from "@/features/users/hooks/useUsers";
+import { usePortesPropriedade } from "@/features/users/hooks/usePortesPropriedade";
 import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
 import type { User } from "@/features/users/types/user";
 import { FormField } from "@/shared/components/FormField";
@@ -43,6 +44,7 @@ export function AccountSection({
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const { lookup } = useCepLookup();
+  const portes = usePortesPropriedade();
 
   const [formName, setFormName] = useState("");
   const [formDocument, setFormDocument] = useState("");
@@ -52,6 +54,7 @@ export function AccountSection({
   const [formCity, setFormCity] = useState("");
   const [formState, setFormState] = useState("");
   const [formCep, setFormCep] = useState("");
+  const [formPorte, setFormPorte] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -76,6 +79,7 @@ export function AccountSection({
     setFormCity(user.city ?? "");
     setFormState(user.state ?? "");
     setFormCep(maskCEP(user.cep ?? ""));
+    setFormPorte(user.portePropriedadeId ?? "");
   }
 
   const savedDocument = user ? (validateDocument(user.document) ? maskDocument(user.document) : user.document) : "";
@@ -139,6 +143,7 @@ export function AccountSection({
           city: formCity.trim(),
           state: formState.toUpperCase(),
           cep: clearSpecialChars(formCep),
+          porte_propriedade: formPorte || null,
         },
       });
       toast.success("Dados atualizados com sucesso.");
@@ -199,6 +204,7 @@ export function AccountSection({
             <div>
               <div className="font-bold text-on-surface">{user?.name ?? "…"}</div>
               <div className="text-sm text-on-surface-variant mb-2">{roleLabel}</div>
+              <div className="text-sm text-on-surface-variant mb-2">Porte: {user?.portePropriedadeNome ?? "Não informado"}</div>
               <ProfilePhotoUpload userId={user ? userId : null} />
             </div>
           </div>
@@ -298,6 +304,19 @@ export function AccountSection({
                 </select>
               </FormField>
             </div>
+
+            <FormField label="Porte da Propriedade" labelClassName={ACCOUNT_LABEL}>
+              <select
+                value={formPorte}
+                onChange={(event) => setFormPorte(event.target.value)}
+                className={ACCOUNT_INPUT}
+              >
+                <option value="">Não informado</option>
+                {(portes.data ?? []).map((porte) => (
+                  <option key={porte.id} value={porte.id}>{porte.nome}</option>
+                ))}
+              </select>
+            </FormField>
           </fieldset>
 
           <button

@@ -14,6 +14,13 @@ export interface User {
   birthDate: string;
   status: string | null;
   createdAt: Date | null;
+  portePropriedadeId: string | null;
+  portePropriedadeNome: string | null;
+}
+
+export interface PortePropriedade {
+  id: string;
+  nome: string;
 }
 
 export function isBlocked(user: User): boolean {

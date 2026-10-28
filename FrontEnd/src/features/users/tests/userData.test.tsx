@@ -14,14 +14,14 @@ import { renderHookWithQuery } from "@/test/render";
 vi.mock("@/app/container", () => import("@/test/container"));
 
 const signup = { role: "locador" as const, name: "Maria Silva", birthDate: "1990-05-10", document: "529.982.247-25", email: "maria@example.com",
-  phone: "(64) 99999-0000", cep: "75900-000", address: "Rua das Palmeiras, 100", city: "Rio Verde", state: "GO", password: "Senha1234" };
+  phone: "(64) 99999-0000", cep: "75900-000", address: "Rua das Palmeiras, 100", city: "Rio Verde", state: "GO", portePropriedade: "", password: "Senha1234" };
 
 beforeEach(() => { net.http.send.mockReset(); net.queryClient.clear(); });
 
 it("sends sign-up data unmasked, with a lower-case e-mail, international phone and the contract venue", () => {
   expect(toCreatePayload(signupFormSchema.parse({ ...signup, email: "Maria@Example.com" }))).toEqual({
     name: "Maria Silva", birth_date: "1990-05-10", document: "52998224725", email: "maria@example.com", phone: "+5564999990000",
-    role: "locador", address: "Rua das Palmeiras, 100", city: "Rio Verde", state: "GO", cep: "75900000", password: "Senha1234",
+    role: "locador", address: "Rua das Palmeiras, 100", city: "Rio Verde", state: "GO", cep: "75900000", password: "Senha1234", porte_propriedade: null,
   });
 });
 

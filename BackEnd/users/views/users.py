@@ -5,18 +5,19 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from administration.permissions import IsPlatformAdmin
 
 from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from users.serializer import (
     ChangePasswordInputSerializer,
+    PortePropriedadeOutputSerializer,
     UserCreateInputSerializer,
     UserOutputSerializer,
     UserUpdateInputSerializer,
 )
-from users.services import UserService
+from users.services import PortePropriedadeService, UserService
 
 TAGS = ["Usuários"]
 USER_NOT_FOUND = error_response(404, "Usuário não encontrado.")
@@ -167,3 +168,18 @@ class UserChangePasswordView(APIView):
     def post(self, request: Request, pk: UUID) -> Response:
         UserService.change_password(pk, request.data, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PortePropriedadeListView(APIView):
+    # Público: o cadastro (Signup) ainda não tem login.
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar portes de propriedade",
+        description="Opções da tabela `portes_propriedade` usadas no cadastro e em Minha Conta.",
+        responses={200: PortePropriedadeOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        portes = PortePropriedadeService.list()
+        return Response(PortePropriedadeOutputSerializer(portes, many=True).data, status=status.HTTP_200_OK)

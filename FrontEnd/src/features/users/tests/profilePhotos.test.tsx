@@ -16,6 +16,7 @@ import { useUser } from "../hooks/useUsers";
 import { userApiSchema } from "../types/userSchemas";
 
 const mocks = vi.hoisted(() => ({ send: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock("@/features/users/hooks/usePortesPropriedade", () => ({ usePortesPropriedade: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "user-1", isAuthenticated: true, isLoading: false, userRole: "locatario", logout: vi.fn() }) }));
 vi.mock("@/features/chat/hooks/useChat", () => ({ useUnreadCount: () => ({ data: { unreadTotal: 0 } }) }));
 vi.mock("@/components/NotificationPopover", () => ({ default: () => null }));

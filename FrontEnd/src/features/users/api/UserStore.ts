@@ -1,6 +1,6 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { User } from "../types/user";
+import type { PortePropriedade, User } from "../types/user";
 import type { CreateUserPayload } from "./userMapper";
 import type { UpdateProfileInput, UserRepository } from "./UserRepository";
 
@@ -8,6 +8,7 @@ export const userKeys = {
   all: ["users"] as const,
   lists: () => [...userKeys.all, "list"] as const,
   detail: (id: string) => [...userKeys.all, "detail", id] as const,
+  portesPropriedade: () => [...userKeys.all, "portes-propriedade"] as const,
 };
 
 export class UserStore {
@@ -27,6 +28,10 @@ export class UserStore {
     id: string,
   ): UseQueryOptions<User, Error, User, ReturnType<typeof userKeys.detail>> {
     return { queryKey: userKeys.detail(id), queryFn: () => this.repository.findById(id) };
+  }
+
+  portesPropriedadeOptions(): UseQueryOptions<PortePropriedade[], Error, PortePropriedade[], ReturnType<typeof userKeys.portesPropriedade>> {
+    return { queryKey: userKeys.portesPropriedade(), queryFn: () => this.repository.listPortesPropriedade() };
   }
 
   fetchById(id: string): Promise<User> {

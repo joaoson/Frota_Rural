@@ -13,7 +13,7 @@ from common.exceptions import BadGateway, Conflict, ServiceUnavailable
 from common.images import validate_image_upload
 from djangoapi import firebase_storage
 from users.enums import UserRole, UserStatus
-from users.models import Users
+from users.models import PortePropriedade, Users
 from users.serializer import (
     ChangePasswordInputSerializer,
     OperatorCreateInputSerializer,
@@ -225,3 +225,9 @@ class OperatorService:
     @staticmethod
     def list(employer: Users) -> QuerySet[Users]:
         return OperatorService._team(employer).order_by("name")
+
+
+class PortePropriedadeService:
+    @staticmethod
+    def list() -> QuerySet[PortePropriedade]:
+        return PortePropriedade.objects.order_by("nome")

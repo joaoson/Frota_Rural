@@ -19,6 +19,8 @@ export function toDomain(dto: UserApi): User {
     birthDate: dto.birth_date,
     status: dto.status ?? null,
     createdAt: dto.created_at ? new Date(dto.created_at) : null,
+    portePropriedadeId: dto.porte_propriedade ?? null,
+    portePropriedadeNome: dto.porte_propriedade_nome ?? null,
   };
 }
 
@@ -35,6 +37,7 @@ export interface CreateUserPayload {
   state: string;
   cep: string;
   password: string;
+  porte_propriedade?: string | null;
 }
 
 export function toCreatePayload(values: SignupFormValues): CreateUserPayload {
@@ -50,5 +53,6 @@ export function toCreatePayload(values: SignupFormValues): CreateUserPayload {
     state: values.state,
     cep: clearSpecialChars(values.cep),
     password: values.password,
+    porte_propriedade: values.portePropriedade || null,
   };
 }

@@ -89,6 +89,7 @@ export const signupFormSchema = z.object({
     .min(1, "Cidade é obrigatória.")
     .min(2, "Cidade deve ter pelo menos 2 caracteres."),
   state: z.string().min(1, "Selecione o estado."),
+  portePropriedade: z.string(),
   password: passwordSchema,
 });
 export type SignupFormValues = z.infer<typeof signupFormSchema>;
@@ -110,6 +111,12 @@ export const userApiSchema = z.object({
   last_login: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
+  porte_propriedade: z.string().nullish(),
+  porte_propriedade_nome: z.string().nullish(),
 });
 export type UserApi = z.infer<typeof userApiSchema>;
 export const userListApiSchema = z.array(userApiSchema);
+
+export const portePropriedadeListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);

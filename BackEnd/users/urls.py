@@ -3,6 +3,7 @@ from django.urls import path
 from users.views import (
     OperatorDetailView,
     OperatorListView,
+    PortePropriedadeListView,
     UserByEmailView,
     UserChangePasswordView,
     UserCreateView,
@@ -19,6 +20,7 @@ urlpatterns = [
     # "operators" nunca casa com o conversor uuid.
     path("users/operators", OperatorListView.as_view(), name="operators"),
     path("users/operators/<uuid:pk>", OperatorDetailView.as_view(), name="operator_detail"),
+    path("users/portes-propriedade", PortePropriedadeListView.as_view(), name="portes_propriedade"),
     path("users/<uuid:pk>", UserDetailView.as_view(), name="user_detail"),
     path("users/<uuid:pk>/photo", UserPhotoUploadView.as_view(), name="user_photo"),
     path(
