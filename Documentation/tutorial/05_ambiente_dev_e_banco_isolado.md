@@ -36,10 +36,10 @@ Mantenha esse terminal dentro de `BackEnd/` durante os comandos Django e curl do
 
 ## 2 Executar o exercício
 
-O app `autoria`, o modelo `Genero`, os três registros e a FK de `Users` já estão criados. Continuar nos guias 01, 02 e 04; não repetir `startapp`.
+O banco está só com o seed, sem tabela de exercício. Escolha a tela no [README](README.md#guias-por-tela) e siga o guia dela.
 
 ```bash
-python manage.py showmigrations autoria users
+python manage.py showmigrations <app>
 python manage.py makemigrations --check --dry-run
 python manage.py check
 # Depois de alterar outro model:

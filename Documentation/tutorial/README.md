@@ -70,7 +70,7 @@ Estes registros são criados pelo sistema (pagamento, assinatura, chat, moderaç
 | [02_exemplo_maquina_tipo_pneu.md](02_exemplo_maquina_tipo_pneu.md) | Exemplo completo, linha a linha |
 | [03_validacao_e_erros.md](03_validacao_e_erros.md) | Como comprovar cada requisito, erros comuns e testes |
 | [05_ambiente_dev_e_banco_isolado.md](05_ambiente_dev_e_banco_isolado.md) | Banco isolado e Django nativo para ensaiar |
-| [06_avaliacao_do_exercicio.md](06_avaliacao_do_exercicio.md) | Avaliação do seu ensaio (`autoria.Genero` em `Users`) |
+| [06_avaliacao_do_exercicio.md](06_avaliacao_do_exercicio.md) | Avaliação do ensaio antigo (`autoria.Genero` em `Users`), já removido do código e do banco |
 | [modelos/](modelos/) | Um guia por tela de cadastro |
 
 ## Sobre as linhas
@@ -78,7 +78,7 @@ Estes registros são criados pelo sistema (pagamento, assinatura, chat, moderaç
 - Os números se referem ao código **original** do commit `0ca8c7e` (branch `develop_joaofre_locacoes_integradas`, PR para `develop`).
 - Cada passo diz "depois da linha N" **e** mostra o texto daquela linha (a âncora). Se você já colou algo antes no mesmo arquivo, os números andam; procure a âncora com `Ctrl+F`.
 - "Trocar a linha N por" significa substituir a linha inteira. "Colar" significa inserir sem apagar nada.
-- Na sua cópia local, `BackEnd/users/models.py`, `djangoapi/settings.py` e `djangoapi/urls.py` têm as alterações do ensaio (app `autoria`). Nesses arquivos, os números locais são diferentes.
+- Gabarito: a branch `codex/tutorial-gabarito` tem os 8 exemplos aplicados sobre `0ca8c7e`, um commit por guia. Para ver um deles: `git show <commit>` (lista com `git log --oneline 0ca8c7e..origin/codex/tutorial-gabarito`).
 
 ## Ambiente
 

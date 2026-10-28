@@ -32,7 +32,7 @@ O professor vai pedir para você explicar esse caminho. Se o dado aparece depois
 
 **Onde fica a tabela nova:** no **mesmo app Django** do model que recebe a FK. Para máquina, `machines/models.py`. Assim você não precisa criar app, nem mexer em `INSTALLED_APPS` ou em `djangoapi/urls.py`.
 
-> Seu ensaio usou um app separado (`autoria`). Também funciona, mas exige `startapp`, registrar o app em `settings.py` e incluir as URLs dele em `djangoapi/urls.py`. Ou seja, mais três lugares para errar durante a defesa.
+> O ensaio antigo usou um app separado (`autoria`). Também funciona, mas exige `startapp`, registrar o app em `settings.py` e incluir as URLs dele em `djangoapi/urls.py`. Ou seja, mais três lugares para errar durante a defesa.
 
 ## 3. Os 11 passos
 

@@ -1,5 +1,7 @@
 # Avaliação do ensaio — 28/10/2026
 
+> **Arquivado.** O código deste ensaio foi removido da branch de prática e as migrations foram desfeitas no banco `frota_rural_autoria`, também em 28/10/2026. O código continua na branch `codex/autoria-genero-ensaio`. Esta página fica como registro dos erros encontrados.
+
 Branch `codex/autoria-pratica`; banco consultado: `frota_rural_autoria`. Avaliação do exercício atual, sem estimar nota da rubrica.
 
 | Requisito | Evidência | Situação |

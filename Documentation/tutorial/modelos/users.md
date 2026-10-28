@@ -11,7 +11,7 @@
 
 O raciocínio de cada passo está no [exemplo de máquina](../02_exemplo_maquina_tipo_pneu.md). As linhas são do arquivo **original** (commit `0ca8c7e`).
 
-> **Seu ensaio local:** a sua cópia já tem `categoria_autoria` em `users/models.py` e a migration `users/0007_users_categoria_autoria.py`. Com elas, as migrations deste guia saem como `0008`/`0009`, e as linhas de `models.py` andam alguns números. Use as âncoras. Para operadores (também `Users`), veja o [guia de operadores](operators.md).
+> Para operadores (também `Users`), veja o [guia de operadores](operators.md).
 
 ## Mapa
 
