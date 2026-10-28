@@ -11,4 +11,11 @@ export interface Operator {
   cep: string | null;
   birthDate: string;
   status: string | null;
+  funcaoOperadorId: string | null;
+  funcaoOperadorNome: string | null;
+}
+
+export interface FuncaoOperador {
+  id: string;
+  nome: string;
 }

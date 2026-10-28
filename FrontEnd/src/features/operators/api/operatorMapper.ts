@@ -16,6 +16,8 @@ export function toDomain(dto: OperatorApi): Operator {
     cep: dto.cep ?? null,
     birthDate: dto.birth_date,
     status: dto.status ?? null,
+    funcaoOperadorId: dto.funcao_operador ?? null,
+    funcaoOperadorNome: dto.funcao_operador_nome ?? null,
   };
 }
 
@@ -30,6 +32,7 @@ export interface OperatorPayload {
   state: string;
   cep: string;
   password?: string;
+  funcao_operador?: string | null;
 }
 
 // `role` e `employer` não vão no corpo: o servidor os fixa a partir do token.

@@ -15,7 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { operatorStore } from "@/app/container";
-import type { Operator } from "@/features/operators/types/operator";
+import type { FuncaoOperador, Operator } from "@/features/operators/types/operator";
 import { maskDocument } from "@/shared/utils/masks/maskDocument";
 import { maskPhone } from "@/shared/utils/masks/maskPhone";
 import { maskCEP } from "@/shared/utils/masks/maskCEP";
@@ -41,6 +41,7 @@ type FormState = {
   city: string;
   uf: string;
   password: string;
+  funcaoOperador: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -54,6 +55,7 @@ const EMPTY_FORM: FormState = {
   city: "",
   uf: "",
   password: "",
+  funcaoOperador: "",
 };
 
 /** Campos validados no cadastro. Na edição a senha sai da lista. */
@@ -101,6 +103,7 @@ function operatorToForm(operator: Operator): FormState {
     city: operator.city ?? "",
     uf: (operator.state ?? "").toUpperCase(),
     password: "",
+    funcaoOperador: operator.funcaoOperadorId ?? "",
   };
 }
 
@@ -130,6 +133,7 @@ const OperadoresPanel = () => {
   const [saving, setSaving] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [funcoes, setFuncoes] = useState<FuncaoOperador[]>([]);
   const cepRequest = useRef(0);
   const mutationPending = useRef(false);
   const formId = useId();
@@ -155,6 +159,14 @@ const OperadoresPanel = () => {
     void loadOperators();
     return () => { cepRequest.current += 1; };
   }, [loadOperators]);
+
+  useEffect(() => {
+    let ignored = false;
+    operatorStore.listFuncoes()
+      .then((value) => { if (!ignored) setFuncoes(value); })
+      .catch(() => {});
+    return () => { ignored = true; };
+  }, []);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -260,6 +272,7 @@ const OperadoresPanel = () => {
       city: form.city.trim(),
       state: form.uf,
       cep: clearSpecialChars(form.cep),
+      funcao_operador: form.funcaoOperador || null,
     };
 
     mutationPending.current = true;
@@ -482,6 +495,23 @@ const OperadoresPanel = () => {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label htmlFor={`${formId}-funcao`} className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                Função
+              </label>
+              <select
+                id={`${formId}-funcao`}
+                value={form.funcaoOperador}
+                onChange={(e) => setForm((prev) => ({ ...prev, funcaoOperador: e.target.value }))}
+                className={inputClass(false)}
+              >
+                <option value="">Não informada</option>
+                {funcoes.map((funcao) => (
+                  <option key={funcao.id} value={funcao.id}>{funcao.nome}</option>
+                ))}
+              </select>
+            </div>
+
             {!isEditing && (
               <div className="space-y-2">
                 <label htmlFor={`${formId}-password`} className="text-[10px] font-bold uppercase tracking-widest text-outline">
@@ -604,6 +634,9 @@ const OperadoresPanel = () => {
                     </h3>
                     <p className="text-sm text-on-surface-variant truncate">
                       {operator.email}
+                    </p>
+                    <p className="text-xs text-outline font-medium uppercase tracking-wide">
+                      Função: {operator.funcaoOperadorNome ?? "Não informada"}
                     </p>
                   </div>
                 </div>

@@ -17,8 +17,13 @@ export const operatorApiSchema = z.object({
   status: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
+  funcao_operador: z.string().nullish(),
+  funcao_operador_nome: z.string().nullish(),
 });
 export const operatorListApiSchema = z.array(operatorApiSchema);
+export const funcaoOperadorListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 export type OperatorApi = z.infer<typeof operatorApiSchema>;
 
 function maxBirthDate(): string {

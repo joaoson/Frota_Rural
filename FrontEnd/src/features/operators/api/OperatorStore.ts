@@ -1,6 +1,6 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { Operator } from "../types/operator";
+import type { FuncaoOperador, Operator } from "../types/operator";
 import type { OperatorPayload } from "./operatorMapper";
 import type { OperatorRepository } from "./OperatorRepository";
 
@@ -41,6 +41,10 @@ export class OperatorStore {
 
   unlink(id: string): Promise<void> {
     return this.repository.unlink(id);
+  }
+
+  listFuncoes(): Promise<FuncaoOperador[]> {
+    return this.repository.listFuncoes();
   }
 
   async invalidateLists(): Promise<void> {

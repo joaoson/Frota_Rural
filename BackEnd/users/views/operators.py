@@ -11,11 +11,12 @@ from rest_framework.views import APIView
 from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from users.serializer import (
+    FuncaoOperadorOutputSerializer,
     OperatorCreateInputSerializer,
     OperatorOutputSerializer,
     OperatorUpdateInputSerializer,
 )
-from users.services import OperatorService
+from users.services import FuncaoOperadorService, OperatorService
 
 TAGS = ["Operadores"]
 OPERATOR_NOT_FOUND = error_response(404, "Operador não encontrado na sua equipe.")
@@ -95,3 +96,17 @@ class OperatorDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         OperatorService.unlink(authenticated_user(request), pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FuncaoOperadorListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar funções de operador",
+        description="Opções da tabela `funcoes_operador` usadas no cadastro de operadores.",
+        responses={200: FuncaoOperadorOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        funcoes = FuncaoOperadorService.list()
+        return Response(FuncaoOperadorOutputSerializer(funcoes, many=True).data, status=status.HTTP_200_OK)

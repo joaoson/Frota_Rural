@@ -88,7 +88,7 @@ it("registers an operator with the address from the CEP and an initial password"
   await vi.waitFor(() => expect(toast.success).toHaveBeenCalledWith("Operador cadastrado. Repasse a senha inicial para que ele acesse a conta."));
   expect(net.http.send).toHaveBeenCalledWith({ method: "POST", path: "users/operators", body: {
     name: "Ana Reis", birth_date: "1995-05-05", document: "52998224725", email: "ana@example.com", phone: "+5564988887777",
-    address: "Rua das Palmeiras, Centro", city: "Rio Verde", state: "GO", cep: "75900000", password: "Senha1234",
+    address: "Rua das Palmeiras, Centro", city: "Rio Verde", state: "GO", cep: "75900000", password: "Senha1234", funcao_operador: null,
   } });
   expect(screen.getAllByRole("heading", { level: 3 }).map(h => h.textContent)).toEqual(["Ana Reis", "Bruno Dias", "Carlos Lima"]);
 });

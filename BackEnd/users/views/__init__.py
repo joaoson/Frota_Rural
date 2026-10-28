@@ -1,4 +1,4 @@
-from users.views.operators import OperatorDetailView, OperatorListView
+from users.views.operators import FuncaoOperadorListView, OperatorDetailView, OperatorListView
 from users.views.photos import UserPhotoUploadView
 from users.views.users import (
     PortePropriedadeListView,
@@ -10,6 +10,7 @@ from users.views.users import (
 )
 
 __all__ = [
+    "FuncaoOperadorListView",
     "OperatorDetailView",
     "OperatorListView",
     "PortePropriedadeListView",

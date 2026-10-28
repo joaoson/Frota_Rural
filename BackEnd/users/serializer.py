@@ -5,7 +5,7 @@ from rest_framework.validators import UniqueValidator
 
 from djangoapi import firebase_storage
 from users.enums import UserRole
-from users.models import PortePropriedade, Users
+from users.models import FuncaoOperador, PortePropriedade, Users
 
 EMAIL_IN_USE_MESSAGE = "Este e-mail já está em uso."
 DOCUMENT_IN_USE_MESSAGE = "Este documento já está cadastrado."
@@ -95,14 +95,14 @@ class OperatorCreateInputSerializer(serializers.ModelSerializer[Users]):
 
     class Meta:
         model = Users
-        fields = [*PROFILE_FIELDS, "password"]
+        fields = [*PROFILE_FIELDS, "funcao_operador", "password"]
         extra_kwargs = UNIQUE_FIELD_KWARGS
 
 
 class OperatorUpdateInputSerializer(serializers.ModelSerializer[Users]):
     class Meta:
         model = Users
-        fields = PROFILE_FIELDS
+        fields = [*PROFILE_FIELDS, "funcao_operador"]
         extra_kwargs = UNIQUE_FIELD_KWARGS
 
 
@@ -145,14 +145,23 @@ class UserOutputSerializer(serializers.ModelSerializer[Users]):
 class OperatorOutputSerializer(serializers.ModelSerializer[Users]):
     """Operador como o empregador que o cadastrou enxerga (sem `role` nem `employer`)."""
 
+    funcao_operador_nome = serializers.CharField(source="funcao_operador.nome", read_only=True, allow_null=True)
+
     class Meta:
         model = Users
-        fields = ["id", *PROFILE_FIELDS, "status", "created_at", "updated_at"]
+        fields = ["id", *PROFILE_FIELDS, "status", "created_at", "updated_at", "funcao_operador", "funcao_operador_nome"]
         read_only_fields = fields
 
 
 class PortePropriedadeOutputSerializer(serializers.ModelSerializer[PortePropriedade]):
     class Meta:
         model = PortePropriedade
+        fields = ["id", "nome"]
+        read_only_fields = fields
+
+
+class FuncaoOperadorOutputSerializer(serializers.ModelSerializer[FuncaoOperador]):
+    class Meta:
+        model = FuncaoOperador
         fields = ["id", "nome"]
         read_only_fields = fields
