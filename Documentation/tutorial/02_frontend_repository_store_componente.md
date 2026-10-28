@@ -2,6 +2,8 @@
 
 Arquivos completos. A base HTTP já contém `/api`; os paths abaixo começam em `autoria/`.
 
+Use `http://localhost:5183`, conectado à API `http://localhost:8010/api`. Os caminhos abaixo são relativos à raiz do repositório. Para reiniciar o Vite com essa conexão, consulte o [guia do ambiente](05_ambiente_dev_e_banco_isolado.md).
+
 ## Tipos e validação
 
 <!-- file: FrontEnd/src/features/autoria/types/autoria.ts -->
@@ -83,7 +85,7 @@ export class AutoriaStore {
 }
 ```
 
-## Registrar no container
+## Registrar no container de dependências do frontend
 
 `FrontEnd/src/app/container.ts` — acrescentar os imports:
 

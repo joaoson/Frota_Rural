@@ -2,6 +2,14 @@
 
 Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
 
+```bash
+# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural.
+```
+
 | Ponto | Arquivo ou valor |
 | --- | --- |
 | Modelo existente | `BackEnd/contracts/models.py` → `ContractSignatures` |
@@ -27,9 +35,9 @@ categoria_autoria = models.ForeignKey(
 
 ```bash
 # Rodar depois de autoria.0002_categorias_iniciais.
-docker exec "$AUTORIA_BACKEND" python manage.py makemigrations contracts
-docker exec "$AUTORIA_BACKEND" python manage.py migrate --plan
-docker exec "$AUTORIA_BACKEND" python manage.py migrate
+python manage.py makemigrations contracts
+python manage.py migrate --plan
+python manage.py migrate
 # A migration gerada deve ter AddField e dependência de autoria.
 ```
 
@@ -100,7 +108,7 @@ Não desativar triggers, não usar UPDATE direto e não recalcular evidências a
 ## 5 Identificar o registro e conferir a FK
 
 ```bash
-docker exec "$AUTORIA_BACKEND" python manage.py shell -c 'from contracts.models import ContractSignatures; print(list(ContractSignatures.objects.values_list("pk", flat=True)[:10]))'
+python manage.py shell -c 'from contracts.models import ContractSignatures; print(list(ContractSignatures.objects.values_list("pk", flat=True)[:10]))'
 # Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
 # Use um ID ao qual a conta autenticada tenha acesso.
 ```

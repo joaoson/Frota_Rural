@@ -4,9 +4,22 @@ Exercício: **nova tabela com três registros → seletor no frontend → FK em 
 
 São exemplos para implementar à mão. Nenhuma migration ou mudança de aplicação desta pasta é aplicada automaticamente.
 
+## Terminal de prática
+
+```bash
+# Em um terminal novo, na raiz do repositório:
+cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: Host: 127.0.0.1:5442 / Database: frota_rural.
+```
+
+Os comandos Django de todos os guias são executados dentro de `BackEnd/`, com esse ambiente ativo. Os caminhos dos arquivos para editar continuam relativos à raiz do repositório. Django e frontend já foram iniciados para o ensaio; para retomar após desligá-los, use o guia 05.
+
 ## Ordem de execução
 
-0. [Preparar banco de ensaio e escolher Django no Docker ou no terminal](05_ambiente_dev_e_banco_isolado.md).
+0. [Conferir ou retomar o banco isolado, Django nativo e frontend](05_ambiente_dev_e_banco_isolado.md).
 1. [Tabela e três registros](00_tabela_e_tres_registros.md)
 2. [API, serializers, services e rotas](01_api_services_e_rotas.md)
 3. [Repository, Store, componente e página](02_frontend_repository_store_componente.md)
@@ -22,8 +35,10 @@ F5              -> GET /api/autoria/<recurso>/<id>   -> JOIN    -> categoria_nom
 
 Criar: arquivos identificados como completos.
 Acrescentar: trechos dentro da classe/lista/função indicada; preservar o código atual.
-API base local: http://localhost:8002/api
-Frontend local: http://localhost:5175
+API base local: http://localhost:8010/api
+Frontend local: http://localhost:5183
+Swagger: http://localhost:8010/api/schema/swagger-ui
+PostgreSQL: 127.0.0.1:5442 / frota_rural
 ```
 
 ## Modelos

@@ -1,197 +1,159 @@
-# Django separado e banco para o ensaio
+# Ambiente de ensaio: banco isolado e Django nativo
 
-`Devops/dev.py` é opcional. Django pode rodar com `python manage.py runserver`; o PostgreSQL precisa estar ligado. `makemigrations`, `migrate`, `shell` e `seed.py` não precisam do servidor HTTP ligado.
+Django e Vite rodam no computador. Somente o PostgreSQL usa Docker, com volume exclusivo `frota-autoria_postgres_data`.
 
-Escolha **A ou B**. Ambos abaixo usam o banco do projeto Docker `frota-autoria`, com volume próprio. O nome lógico continua `frota_rural`, mas os dados são separados do ambiente atual.
+| Serviço | Endereço / configuração |
+| --- | --- |
+| Frontend | http://localhost:5183 |
+| API | http://localhost:8010/api |
+| Swagger | http://localhost:8010/api/schema/swagger-ui |
+| PostgreSQL | `127.0.0.1:5442` |
+| Banco | `frota_rural` |
+| Usuário / senha do banco local | `postgres` / `postgres` |
+| Container do banco | `frota-autoria-db-1` |
 
-| Ambiente | Frontend | API | PostgreSQL no computador |
-| --- | --- | --- | --- |
-| Atual | 5175 | 8002 | 5434 |
-| Ensaio de autoria | 5183 | 8010 | 5442 |
+## 1 Abrir o terminal para praticar
 
-Banco isolado não duplica o código: containers deste checkout carregam as mesmas edições. Durante o ensaio, use o frontend/API de autoria e deixe o ambiente antigo parado se for alterar models e migrations.
-
-## A — Tudo pelo script
-
-Na raiz do repositório, Docker Desktop ligado:
-
-```bash
-# Usar o exemplo explicitamente evita carregar integrações do .env.local privado.
-python3 Devops/dev.py up --mode local --project frota-autoria --port-offset 10 --env-file .env.local.example
-python3 Devops/dev.py check-db --mode local --project frota-autoria --port-offset 10 --env-file .env.local.example
-python3 Devops/dev.py seed --mode local --project frota-autoria --port-offset 10 --env-file .env.local.example
-
-# Manter estas variáveis no terminal em que seguir os demais tutoriais.
-export AUTORIA_BACKEND=frota-autoria-backend-1
-export AUTORIA_API=http://localhost:8010/api
-docker exec "$AUTORIA_BACKEND" python manage.py verify_database
-```
-
-```text
-Frontend: http://localhost:5183
-Swagger:  http://localhost:8010/api/schema/swagger-ui
-Login:    admin@example.test / Teste1234
-Locador:  joao.silva@example.test / Teste1234
-
-Nos exemplos dos demais guias, substituir o frontend :5175 por :5183.
-No Docker, verify_database mostra db:5432; no host, a conexão é 127.0.0.1:5442.
-```
-
-Depois de editar um model:
+O banco, o venv e o seed já foram preparados neste checkout. Em cada terminal novo, começar na raiz do repositório:
 
 ```bash
-docker exec "$AUTORIA_BACKEND" python manage.py makemigrations
-docker exec "$AUTORIA_BACKEND" python manage.py migrate
-```
-
-Parar preservando os dados; repetir `up` para voltar:
-
-```bash
-python3 Devops/dev.py down --mode local --project frota-autoria --port-offset 10 --env-file .env.local.example
-# Não acrescentar -v: o volume frota-autoria_postgres_data guarda o ensaio.
-```
-
-## B — PostgreSQL em Docker; Django e Vite no terminal
-
-Se já iniciou a opção A, execute o `down` acima antes. Os dados serão reutilizados.
-
-Atalho para uma nova sessão, depois da instalação inicial abaixo:
-
-```bash
-# Na raiz do repositório.
-docker start frota-autoria-db-1
 cd BackEnd
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Comandos do exercício, por exemplo:
+```
+
+```text
+Host: 127.0.0.1:5442
+Database: frota_rural
+Connection OK: database=frota_rural, schema=public, TLS=disabled.
+```
+
+Mantenha esse terminal dentro de `BackEnd/` durante os comandos Django e curl dos tutoriais. Os caminhos dos arquivos a editar são relativos à raiz do repositório.
+
+`Devops/autoria.env.sh` define a conexão isolada, `AUTORIA_API` e as URLs do Vite. Também desliga a leitura automática dos `.env` antigos. Use esse arquivo em todas as sessões de prática.
+
+## 2 Executar o exercício
+
+Continuar no terminal do passo 1:
+
+```bash
+# Apenas na primeira vez, se BackEnd/autoria ainda não existir:
+python manage.py startapp autoria
+# Agora seguir o guia 00: registrar o app e escrever CategoriaAutoria.
+python manage.py makemigrations autoria
+# Escrever a migration dos três registros e a FK conforme os guias.
 python manage.py makemigrations
+python manage.py migrate --plan
 python manage.py migrate
-# Apenas se a API ainda não estiver rodando na porta 8010:
+python manage.py check
+```
+
+```text
+makemigrations -> gera arquivos a partir dos models.
+migrate        -> aplica os arquivos ao PostgreSQL de ensaio.
+runserver      -> atende a API; não precisa estar ligado para os dois comandos acima.
+```
+
+## 3 Retomar os serviços depois de desligar
+
+### Banco
+
+Ligar Docker Desktop e executar:
+
+```bash
+docker start frota-autoria-db-1
+```
+
+### Django
+
+Em um terminal configurado pelo passo 1, executar apenas se a API ainda não estiver rodando:
+
+```bash
 python manage.py runserver 127.0.0.1:8010
 ```
 
-`Devops/autoria.env.sh` contém somente a configuração local de ensaio. Ele substitui os exports manuais do passo 3 e deve ser carregado em cada terminal usado para comandos Django. Não é necessário executar migrations antes de começar a editar; o exemplo acima mostra como aplicar suas próximas mudanças.
+Deixar esse terminal aberto. Para migrations, abrir outro terminal e repetir o passo 1. O servidor recarrega as alterações automaticamente; pare com Ctrl+C quando ele estiver em primeiro plano.
 
-### 1 Subir somente o banco
+### Frontend
 
-Na raiz do repositório:
+Em outro terminal, a partir da raiz:
+
+```bash
+cd FrontEnd
+source ../Devops/autoria.env.sh
+npm run dev -- --host localhost --port 5183 --strictPort
+```
+
+### Conferir os serviços
+
+```bash
+curl --fail-with-body http://localhost:8010/health/ready
+curl --fail --silent --output /dev/null --write-out '%{http_code}\n' http://localhost:5183/
+```
+
+Se a porta `8010` ou `5183` estiver ocupada e o respectivo endereço abrir, o serviço já está ativo. Os processos iniciados durante a preparação rodam em segundo plano e gravam logs em `BackEnd/.venv/autoria-django.log` e `BackEnd/.venv/autoria-vite.log`.
+
+## 4 Contas e dados do seed
+
+```text
+Administrador: admin@example.test
+Locador:       joao.silva@example.test
+Locatário:     maria.oliveira@example.test
+Senha inicial: Teste1234
+
+Inventário inicial: 7 usuários, 20 máquinas, 20 anúncios, 32 locações,
+37 fotos de anúncios, leituras de horímetro, contratos, avaliações e mensagens.
+```
+
+Para acrescentar registros de demonstração ausentes, no terminal do passo 1:
+
+```bash
+python seed.py --asset-base-url http://localhost:5183/demo
+```
+
+O seed preserva registros existentes. Não é necessário executá-lo em cada sessão.
+
+## 5 Instalação inicial em outro checkout
+
+Pular esta seção no ambiente já preparado. Em outro checkout, use projeto e portas livres se este ambiente estiver ligado.
+
+Na raiz, criar o PostgreSQL isolado:
 
 ```bash
 POSTGRES_DB=frota_rural POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres POSTGRES_PORT=127.0.0.1:5442 \
   docker compose --env-file .env.local.example --project-name frota-autoria -f compose.yaml up -d --wait db
 ```
 
-```text
-Configuração para DBeaver/pgAdmin ou Django no computador:
-Host:     127.0.0.1
-Porta:    5442
-Database: frota_rural
-Usuário:  postgres
-Senha:    postgres
-
-Credenciais apenas do banco local de ensaio.
-```
-
-### 2 Preparar Python uma vez
-
-Python 3.13, como na imagem Docker do projeto:
+Preparar Django com Python 3.13:
 
 ```bash
 cd BackEnd
 python3.13 -m venv .venv
 source .venv/bin/activate
+source ../Devops/autoria.env.sh
 python -m pip install -r docs/requirements.txt
-```
-
-### 3 Configurar a conexão em cada terminal do backend
-
-Continuar dentro de `BackEnd`, com o venv ativo:
-
-```bash
-# Impedir que BackEnd/.env ou .env da raiz selecionem outro banco.
-export DJANGO_LOAD_ENV_FILES=false
-export DATABASE_URL=''
-export DB_SCHEMA=''
-export DB_SSLROOTCERT=''
-export DB_SSLMODE=disable
-export DB_HOST=127.0.0.1
-export DB_PORT=5442
-export DB_NAME=frota_rural
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DJANGO_DEBUG=true
-export DJANGO_SECRET_KEY=django-insecure-autoria-local-only
-export DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
-export CHANNEL_LAYER_BACKEND=memory
-export FRONTEND_URL=http://localhost:5183
-export AUTH_REFRESH_COOKIE_NAME=frota-autoria_refresh
-export SESSION_COOKIE_NAME=frota-autoria_session
-export CSRF_COOKIE_NAME=frota-autoria_csrf
-export CONTRACT_SIGNATURE_REQUIRE_OTP=false
-export STRIPE_SECRET_KEY=''
-export STRIPE_WEBHOOK_SECRET=''
-export RESEND_API_KEY=''
-export FIREBASE_CREDENTIALS_FILE=''
-export FIREBASE_STORAGE_BUCKET=''
-export AUTORIA_API=http://localhost:8010/api
-
 python manage.py verify_database
-# Confirmar: Host: 127.0.0.1:5442 / Database: frota_rural.
 python manage.py migrate
 python seed.py --asset-base-url http://localhost:5183/demo
-python manage.py runserver 127.0.0.1:8010
 ```
 
-`CHANNEL_LAYER_BACKEND=memory` permite este ensaio com um processo Django sem Redis. Os fluxos de machine learning exigem o ambiente adicional descrito em `BackEnd/ml/README.md`; ele não é necessário para tabela/FK/formulário.
-
-### 4 Frontend em outro terminal
-
-Na raiz do repositório:
+Preparar o frontend em outro terminal, a partir da raiz:
 
 ```bash
 cd FrontEnd
 npm ci
-VITE_API_BASE_URL=http://localhost:8010/api VITE_WS_BASE_URL=ws://localhost:8010 \
-  npm run dev -- --host localhost --port 5183 --strictPort
 ```
 
-### 5 Aplicar os demais tutoriais sem Docker no Django
+Depois, iniciar os serviços pelo passo 3. Para exercícios de tabela/FK/formulário, o channel layer em memória já está configurado; os fluxos de machine learning têm dependências adicionais descritas em `BackEnd/ml/README.md`.
+
+## 6 Preservar o banco
 
 ```bash
-# Em BackEnd, venv ativo e exports do passo 3 carregados.
-# Trocar: docker exec "$AUTORIA_BACKEND" python manage.py ...
-# Por:    python manage.py ...
-
-python manage.py startapp autoria
-# Editar os arquivos indicados no guia 00 e no modelo escolhido.
-python manage.py makemigrations autoria
-python manage.py makemigrations
-python manage.py migrate --plan
-python manage.py migrate
-python manage.py shell
-```
-
-Para executar esses comandos, pode parar `runserver` com Ctrl+C e iniciá-lo novamente depois. Um terminal novo precisa ativar o venv e repetir os exports. Não é necessário recriar o venv nem executar o seed em cada início.
-
-```bash
-# Parar somente o banco; o volume e os dados permanecem.
+# Parar o banco mantendo o volume e todos os registros:
 docker stop frota-autoria-db-1
-# Próxima sessão:
+# Retomar:
 docker start frota-autoria-db-1
 ```
 
-## Qual opção usar na defesa?
-
-```text
-A: dependências prontas nos containers; editar no VS Code e rodar manage.py por docker exec.
-B: comandos Django diretamente no terminal; exige Python e dependências instaladas no computador.
-
-makemigrations: gera arquivo de migration a partir do model.
-migrate: aplica a migration ao banco da conexão atual.
-runserver: inicia a API; não substitui migrate.
-
-Trocar apenas DB_NAME em um .env não cria o banco.
-Trocar apenas a porta do frontend não muda o banco da API.
-No script, --project separa os volumes; --port-offset separa as portas.
-```
+O volume separa os dados do ensaio dos demais ambientes. O código continua no mesmo checkout: outras instâncias desse checkout também carregam as edições. Use os endereços deste guia para praticar. Para manter os dados, não remova o volume `frota-autoria_postgres_data`.

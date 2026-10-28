@@ -2,6 +2,14 @@
 
 Alternativa ao endpoint de vínculo do guia [Users](modelos/users.md). Use a tabela de [00](00_tabela_e_tres_registros.md), a listagem de categorias de [01](01_api_services_e_rotas.md) e a FK em `Users`. Este caminho não precisa do `CategoriaEditor`, do `AutoriaStore` ou da página `/autoria`.
 
+```bash
+# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural.
+```
+
 ## 1 Serializer de entrada
 
 `BackEnd/users/serializer.py` — acrescentar em `PROFILE_FIELDS`:
@@ -157,12 +165,13 @@ No JSX, fora dos formulários de perfil e senha:
 ## 10 Validar
 
 ```bash
-docker exec "$AUTORIA_BACKEND" python manage.py makemigrations users
-docker exec "$AUTORIA_BACKEND" python manage.py migrate
-docker exec "$AUTORIA_BACKEND" python manage.py check
+python manage.py makemigrations users
+python manage.py migrate
+python manage.py check
 ```
 
 ```bash
+# Obter AUTORIA_TOKEN pelo login do passo 2 do guia 03_validacao_e_erros.md.
 AUTORIA_ID='COLE_O_ID_DO_USUARIO_LOGADO'
 curl --fail-with-body -X PATCH "$AUTORIA_API/users/$AUTORIA_ID" \
   -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
@@ -172,7 +181,7 @@ curl --fail-with-body "$AUTORIA_API/users/$AUTORIA_ID" \
 ```
 
 ```text
-Login -> Minha Conta -> Categoria do perfil -> Prioridade -> Salvar categoria -> F5
+http://localhost:5183 -> Login -> Minha Conta -> Categoria do perfil -> Prioridade -> Salvar categoria -> F5
 GET /api/users/<UUID> deve trazer categoria_nome = Prioridade.
 
 Endpoint original: payload usa categoria_autoria.

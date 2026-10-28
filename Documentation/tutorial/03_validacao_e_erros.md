@@ -1,13 +1,21 @@
 # Validar o exercício
 
+```bash
+# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural.
+```
+
 ## 1 Banco e migrations
 
 ```bash
-docker exec "$AUTORIA_BACKEND" python manage.py check
-docker exec "$AUTORIA_BACKEND" python manage.py makemigrations --check --dry-run
-docker exec "$AUTORIA_BACKEND" python manage.py migrate --plan
-docker exec "$AUTORIA_BACKEND" python manage.py showmigrations autoria
-docker exec "$AUTORIA_BACKEND" python manage.py shell -c 'from autoria.models import CategoriaAutoria; assert CategoriaAutoria.objects.count() == 3; print(list(CategoriaAutoria.objects.values("id", "nome")))'
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py migrate --plan
+python manage.py showmigrations autoria
+python manage.py shell -c 'from autoria.models import CategoriaAutoria; assert CategoriaAutoria.objects.count() == 3; print(list(CategoriaAutoria.objects.values("id", "nome")))'
 ```
 
 ## 2 Login e API
@@ -17,7 +25,7 @@ docker exec "$AUTORIA_BACKEND" python manage.py shell -c 'from autoria.models im
 AUTORIA_TOKEN=$(curl --fail-with-body -s "$AUTORIA_API/login" \
   -H 'Content-Type: application/json' \
   -d '{"email":"joao.silva@example.test","password":"Teste1234"}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access"])')
+  | python -c 'import json,sys; print(json.load(sys.stdin)["access"])')
 
 curl --fail-with-body "$AUTORIA_API/autoria/categorias" \
   -H "Authorization: Bearer $AUTORIA_TOKEN"
@@ -36,7 +44,7 @@ curl --fail-with-body "$AUTORIA_API/autoria/categorias" \
 
 ## 3 Teste executável para o guia Users
 
-Use depois de aplicar [Users](modelos/users.md). Este teste cria seu próprio banco de testes local.
+Use depois de aplicar [Users](modelos/users.md). Este teste cria e remove `test_frota_rural` no PostgreSQL de ensaio da porta `5442`; preserva os dados do seed em `frota_rural`.
 
 <!-- file: BackEnd/autoria/tests.py -->
 ```python
@@ -121,21 +129,23 @@ class AutoriaUsuariosTests(APITestCase):
 ```
 
 ```bash
-# Somente no PostgreSQL local; não executar testes na conexão Supabase.
-docker exec "$AUTORIA_BACKEND" python manage.py test autoria --noinput
-docker exec "$AUTORIA_BACKEND" python manage.py spectacular --validate --fail-on-warn --file /tmp/autoria-schema.yaml
+# No terminal configurado acima: PostgreSQL de ensaio em 127.0.0.1:5442.
+python manage.py test autoria --noinput
+python manage.py spectacular --validate --fail-on-warn --file /tmp/autoria-schema.yaml
 ```
 
 ## 4 Frontend
 
 ```bash
-cd FrontEnd
-npm run build
-npm run lint
+# A partir de BackEnd/. O subshell preserva a pasta para o próximo passo SQL.
+(
+  cd ../FrontEnd
+  npm run build && npm run lint
+)
 ```
 
 ```text
-Login -> /autoria/users/ID_DO_USUARIO
+http://localhost:5183 -> Login -> /autoria/users/ID_DO_USUARIO
 Selecionar Prioridade -> Salvar categoria
 Network: PATCH 200 seguido de GET 200
 Valor persistido: Prioridade
@@ -145,7 +155,7 @@ F5 -> Valor persistido: Prioridade
 ## 5 Conferir por SQL usando a conexão do Django
 
 ```bash
-docker exec -i "$AUTORIA_BACKEND" python manage.py shell <<'PY'
+python manage.py shell <<'PY'
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute("""
@@ -166,7 +176,11 @@ PY
 | `column categoria_autoria_id does not exist` | Gerar e aplicar a migration do modelo existente. |
 | `No installed app with label autoria` | Acrescentar `autoria` em `INSTALLED_APPS`. |
 | 404 no endpoint | Incluir `autoria.urls`, adicionar o `path` do modelo e conferir ID/permissão. |
-| 401 | Fazer login; usar `httpClient` do container, que envia/renova token. |
+| 401 | Fazer login; usar `httpClient` de `FrontEnd/src/app/container.ts`, que envia/renova token. |
+| `python: command not found` ou `No module named django` | Em `BackEnd/`, executar `source .venv/bin/activate`. |
+| Conexão diferente de `127.0.0.1:5442` | Executar `source ../Devops/autoria.env.sh` no terminal de `BackEnd/` e conferir `python manage.py verify_database`. |
+| `Connection refused` na porta `5442` | Ligar Docker Desktop e executar `docker start frota-autoria-db-1`. |
+| Porta `8010` ocupada | O Django já pode estar rodando; abrir o Swagger e usar outro terminal para migrations. |
 | 403/404 para outro registro | Usar o responsável pelo registro ou a conta admin, conforme o guia. |
 | 400 na categoria | Enviar UUID real em `categoria_id`, não o nome nem o objeto inteiro. |
 | 405 em revisão/assinatura | A gravação é na criação; usar o guia específico e não remover as triggers. |

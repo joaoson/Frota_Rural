@@ -2,6 +2,8 @@
 
 Execute depois de [criar a tabela](00_tabela_e_tres_registros.md). Cada guia de modelo adiciona seu service e sua rota.
 
+API do ensaio: `http://localhost:8010/api`. Edite os caminhos abaixo a partir da raiz do repositório; o Django nativo recarrega o código automaticamente.
+
 ## Serializers
 
 <!-- file: BackEnd/autoria/serializers.py -->

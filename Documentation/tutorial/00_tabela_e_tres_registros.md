@@ -2,15 +2,17 @@
 
 ## 1 Ambiente local
 
-Para usar um banco exclusivo de ensaio, começar pelo [guia do ambiente](05_ambiente_dev_e_banco_isolado.md). Ele também mostra a substituição dos comandos abaixo quando Django roda diretamente no terminal.
+Use o banco isolado preparado no [guia do ambiente](05_ambiente_dev_e_banco_isolado.md). Todos os comandos abaixo são nativos, no terminal de `BackEnd/`.
 
 ```bash
-# Na raiz do repositório. Preserva o ambiente escolhido no guia de preparação.
-export AUTORIA_BACKEND=${AUTORIA_BACKEND:-frota-local-715856fc-backend-1}
-export AUTORIA_API=${AUTORIA_API:-http://localhost:8002/api}
-docker exec "$AUTORIA_BACKEND" python manage.py verify_database
-docker exec "$AUTORIA_BACKEND" python manage.py showmigrations
-docker exec "$AUTORIA_BACKEND" python manage.py startapp autoria
+# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Confirmar 127.0.0.1:5442 / frota_rural antes de continuar.
+python manage.py showmigrations
+# Executar uma vez; se BackEnd/autoria já existir, continuar nas edições abaixo.
+python manage.py startapp autoria
 ```
 
 ## 2 Registrar o app
@@ -43,7 +45,7 @@ class CategoriaAutoria(models.Model):
 
 ```bash
 # Execute antes de adicionar a FK no modelo existente.
-docker exec "$AUTORIA_BACKEND" python manage.py makemigrations autoria
+python manage.py makemigrations autoria
 # Resultado esperado para um app novo: autoria/migrations/0001_initial.py.
 ```
 
@@ -82,9 +84,9 @@ class Migration(migrations.Migration):
 ```
 
 ```bash
-docker exec "$AUTORIA_BACKEND" python manage.py migrate --plan
-docker exec "$AUTORIA_BACKEND" python manage.py migrate
-docker exec "$AUTORIA_BACKEND" python manage.py shell -c 'from autoria.models import CategoriaAutoria; print(list(CategoriaAutoria.objects.values("id", "nome")))'
+python manage.py migrate --plan
+python manage.py migrate
+python manage.py shell -c 'from autoria.models import CategoriaAutoria; print(list(CategoriaAutoria.objects.values("id", "nome")))'
 ```
 
 ```sql
