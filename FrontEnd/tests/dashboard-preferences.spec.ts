@@ -1,4 +1,11 @@
+import type { Page } from '@playwright/test';
 import { test, expect, loginViaAPI } from './support/fixtures';
+
+// Until Material Symbols loads, icons render as their ligature names ("notifications"),
+// which widens narrow viewports. Reloads refetch it because routed contexts skip the cache.
+async function waitForIconFont(page: Page) {
+  await page.evaluate(() => document.fonts.load('24px "Material Symbols Outlined"'));
+}
 
 for (const width of [360, 768, 1440]) {
   test(`owner preferences survive reload and reset without horizontal overflow at ${width}px`, async ({ page, data }) => {
@@ -16,6 +23,7 @@ for (const width of [360, 768, 1440]) {
     await expect(page.getByLabel('Itens por página')).toHaveValue('12');
     await expect(page.getByRole('heading', { name: 'John Deere 6125J', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'John Deere 6110J', exact: true })).toHaveCount(0);
+    await waitForIconFont(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: `test-results/dashboard-owner-${width}.png`, fullPage: true });
     if (width < 768) {
@@ -40,6 +48,7 @@ for (const width of [360, 768, 1440]) {
     await page.reload();
     await expect(search).toHaveValue('John Deere');
     await expect(page.getByRole('button', { name: 'Encerrados', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await waitForIconFont(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: `test-results/dashboard-tenant-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Restaurar painel', exact: true }).click();
