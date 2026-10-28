@@ -14,6 +14,7 @@ vi.mock("sonner", () => ({ toast: ui.toast }));
 vi.mock("recharts", () => Object.fromEntries(["AreaChart", "Area", "BarChart", "Bar", "XAxis", "YAxis", "CartesianGrid", "Tooltip", "ResponsiveContainer"].map(name => [name, () => null])));
 vi.mock("@/components/NotificationPopover", () => ({ default: () => null }));
 vi.mock("@/components/ThemeToggle", () => ({ default: () => null }));
+vi.mock("@/components/OperadoresPanel", () => ({ default: () => <p>Equipe de operadores</p> }));
 vi.mock("@/features/chat/components/ChatInboxPanel", () => ({ default: ({ subtitle }: { subtitle: string }) => <p>Chat: {subtitle}</p> }));
 vi.mock("@/features/notifications/components/NotificationsPanel", () => ({ NotificationsPanel: () => <p>Painel de notificações</p> }));
 vi.mock("@/features/dashboard/components/AccountSection", () => ({ AccountSection: () => <p>Seção da conta</p> }));
@@ -273,7 +274,7 @@ it("groups contracts by signature state and lets the owner sign pending ones", a
   expect(screen.getAllByRole("heading", { level: 3 }).map(h => h.textContent)).toEqual(["FR-DONE — John Deere S790"]);
 });
 
-it.each([["chat", "Chat: Converse com seus locatários"], ["notificacoes", "Painel de notificações"], ["conta", "Seção da conta"], ["avaliacoes", "Avaliações Recebidas"]])(
+it.each([["operadores", "Equipe de operadores"], ["chat", "Chat: Converse com seus locatários"], ["notificacoes", "Painel de notificações"], ["conta", "Seção da conta"], ["avaliacoes", "Avaliações Recebidas"]])(
   "shows the %s tab", async (tab, text) => {
     api(); open(tab);
     expect(await screen.findAllByText(text)).not.toHaveLength(0);

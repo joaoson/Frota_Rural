@@ -17,6 +17,7 @@ import { AccountSection } from "@/features/dashboard/components/AccountSection";
 import { DashboardShell } from "@/features/dashboard/components/DashboardShell";
 import { RentalCard } from "@/features/dashboard/components/RentalCard";
 import { ReviewsSection } from "@/features/dashboard/components/ReviewsSection";
+import OperadoresPanel from "@/components/OperadoresPanel";
 import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import AssinaturaContratoModal, {
   type PapelAssinatura,
@@ -62,6 +63,7 @@ const sidebarItems = [
   { icon: "campaign", label: "Anúncios", tab: "anuncios" },
   { icon: "event_available", label: "Locações", tab: "reservas" },
   { icon: "description", label: "Contratos", tab: "contratos" },
+  { icon: "engineering", label: "Operadores", tab: "operadores" },
   { icon: "badge", label: "Documentos", tab: "documentos" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
@@ -722,6 +724,8 @@ const DashboardLocador = () => {
 
         </div>
       )}
+
+      {tab === "operadores" && <OperadoresPanel />}
 
       {/* Documentos */}
       {tab === "documentos" && <DocumentsSection userId={userId} />}
