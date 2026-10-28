@@ -1,3 +1,16 @@
+# cnh_image (classificador de imagem + OCR dos campos)
 tensorflow==2.21.0
 Pillow==12.2.0
 pdf2image==1.17.0
+# OCR: modelos PP-OCR embutidos no wheel (sem download em runtime e sem PyTorch). A 1.4.x exige
+# Python < 3.13, então a série 1.2.x é a que instala no venv 3.13. O opencv-python (não
+# headless) é dependência dele: em Docker slim precisa de libgl1 e libglib2.0-0 (ver Dockerfile).
+rapidocr-onnxruntime==1.2.3
+onnxruntime==1.31.0
+opencv-python==5.0.0.93
+
+# cnh_data (plausibilidade dos dados). O .joblib é acoplado à versão do scikit-learn:
+# ao atualizá-lo, retreine com `ml/cnh_data/train.py`.
+numpy==2.4.6
+scikit-learn==1.9.1
+joblib==1.6.0

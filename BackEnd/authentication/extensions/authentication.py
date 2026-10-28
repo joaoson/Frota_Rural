@@ -1,36 +1,33 @@
-from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
 from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import Token
+
+from users.enums import DISABLED_STATUSES
 from users.models import Users
 
+
 class AppJWTAuthentication(JWTAuthentication):
-    """
-    Extends JWTAuthentication to resolve the authenticated user from the
-    custom `Users` model instead of Django's AUTH_USER_MODEL.
+    """Resolve o usuário autenticado a partir do model `Users` da plataforma.
 
-    Only get_user() is overridden; header parsing and token validation
-    are inherited from the parent class unchanged.
+    Só `get_user()` é sobrescrito; a leitura do header e a validação do token
+    continuam as do SimpleJWT.
     """
 
-    def get_user(self, validated_token):
+    # O SimpleJWT anota o retorno com um TypeVar restrito a AbstractBaseUser |
+    # TokenUser; `Users` é um AbstractBaseUser, mas o mypy não aceita o override.
+    def get_user(self, validated_token: Token) -> Users:  # type: ignore[override]
         try:
-            user_id = validated_token[api_settings.USER_ID_CLAIM]  # 'user_id' claim
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
         except KeyError as exc:
-            raise InvalidToken(
-                _('Token contained no recognizable user identification')
-            ) from exc
+            raise InvalidToken("Token sem identificação de usuário.") from exc
 
         try:
             user = Users.objects.get(id=user_id)
         except Users.DoesNotExist as exc:
-            raise AuthenticationFailed(
-                _('User not found'), code='user_not_found'
-            ) from exc
+            raise AuthenticationFailed("Usuário não encontrado.", code="user_not_found") from exc
 
-        if user.status in ('suspended', 'banned'):
-            raise AuthenticationFailed(
-                _('User account is disabled.'), code='user_inactive'
-            )
+        if user.status in DISABLED_STATUSES:
+            raise AuthenticationFailed("Conta suspensa ou banida.", code="user_inactive")
 
         return user

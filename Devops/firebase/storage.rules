@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Fotos de anúncio são públicas para leitura (o anúncio também é).
+    match /postings/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;  // escrita só pelo backend, que ignora estas regras
+    }
+    // Fotos de perfil usam o mesmo acesso público das fotos de anúncio.
+    match /profiles/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

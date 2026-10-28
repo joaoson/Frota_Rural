@@ -1,12 +1,11 @@
 from django.urls import path
-from .views import (
-    posting_detail,
-    postings_list,
-    posting_photos,
-)
+
+from postings.views import PostingDetailView, PostingListView, PostingPhotoUploadView
+from postings.views.recommendations import PostingRecommendationView
 
 urlpatterns = [
-    path('postings/', postings_list, name='postings_list'),
-    path('postings/<uuid:pk>', posting_detail, name='posting_detail'),
-    path('postings/<uuid:pk>/photos/', posting_photos, name='posting_photos'),
+    path("postings", PostingListView.as_view(), name="postings_list"),
+    path("postings/recommendations", PostingRecommendationView.as_view(), name="posting_recommendations"),
+    path("postings/<uuid:pk>", PostingDetailView.as_view(), name="posting_detail"),
+    path("postings/<uuid:pk>/photos", PostingPhotoUploadView.as_view(), name="posting_photos"),
 ]

@@ -1,10 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import MaterialIcon from "@/components/MaterialIcon";
+import { useUnreadCount } from "@/features/chat/hooks/useChat";
+import NotificationPopover from "@/components/NotificationPopover";
+import ThemeToggle from "@/components/ThemeToggle";
+import { homeRouteForRole } from "@/shared/utils/homeRoute";
+import { useUser } from "@/features/users/hooks/useUsers";
+import { UserAvatar } from "@/shared/components/UserAvatar";
+import { getInitials } from "@/shared/utils/getInitials";
 
 const Navbar = () => {
-  const { isAuthenticated, userRole, logout } = useAuth();
+  const { isAuthenticated, isLoading, userId, userRole, logout } = useAuth();
+  const { data: user } = useUser(isAuthenticated && !isLoading ? userId : null);
+  const unreadTotal = useUnreadCount().data?.unreadTotal ?? 0;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -18,26 +27,22 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const getDashboardLink = () => {
-    if (userRole === "locatario") return "/dashboard-locatario";
-    if (userRole === "admin") return "/admin";
-    return "/dashboard";
-  };
+  const dashboardLink = homeRouteForRole(userRole);
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-surface-container-lowest/70 backdrop-blur-md shadow-sm">
       <div className="flex justify-between items-center max-w-[1200px] mx-auto px-6 h-20">
-        <Link to="/" className="text-2xl font-black text-primary tracking-tighter font-headline">
+        <Link to="/" className="text-2xl font-black text-primary dark:text-primary-bright tracking-tighter font-headline">
           Frota Rural
         </Link>
         <div className="hidden md:flex items-center gap-8 font-headline font-bold text-sm tracking-tight">
           <Link
             to="/buscar-maquinario"
-            className="text-primary border-b-2 border-primary pb-1 hover:text-primary-container transition-colors duration-200"
+            className="text-primary dark:text-primary-bright border-b-2 border-primary pb-1 hover:text-primary-container transition-colors duration-200"
           >
             Explorar Máquinas
           </Link>
-          {userRole !== "locatario" && (
+          {(!isAuthenticated || userRole === "locador" || userRole === "admin") && (
             <Link
               to="/dashboard/novo-equipamento"
               className="text-tertiary font-medium hover:text-primary-container transition-colors duration-200"
@@ -48,13 +53,39 @@ const Navbar = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <NotificationPopover />
+
           {isAuthenticated ? (
+            <Link
+              to="/mensagens"
+              aria-label="Mensagens"
+              className="relative text-on-surface-variant hover:text-primary dark:hover:text-primary-bright transition-colors"
+            >
+              <MaterialIcon icon="chat_bubble" size={24} />
+              {unreadTotal > 0 ? (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-error text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-surface-container-lowest">
+                  {unreadTotal > 9 ? "9+" : unreadTotal}
+                </span>
+              ) : null}
+            </Link>
+          ) : null}
+
+          {isLoading ? (
+            <div className="w-10 h-10" aria-hidden />
+          ) : isAuthenticated ? (
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors"
+                aria-label="Menu da conta"
+                aria-expanded={dropdownOpen}
+                className="w-10 h-10 rounded-full bg-primary/10 text-primary dark:text-primary-bright flex items-center justify-center hover:bg-primary/20 transition-colors"
               >
-                <MaterialIcon icon="person" size={24} />
+                <UserAvatar
+                  photoUrl={user?.profilePhotoUrl}
+                  initials={user ? getInitials(user.name) : "…"}
+                  className="w-10 h-10 text-sm"
+                />
               </button>
               
               {dropdownOpen && (
@@ -63,7 +94,7 @@ const Navbar = () => {
                     <p className="text-xs font-bold text-outline uppercase tracking-wider">Sua Conta</p>
                   </div>
                   <Link
-                    to={getDashboardLink()}
+                    to={dashboardLink}
                     onClick={() => setDropdownOpen(false)}
                     className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 transition-colors"
                   >
@@ -73,7 +104,7 @@ const Navbar = () => {
                     <button
                       onClick={() => {
                         setDropdownOpen(false);
-                        window.location.href = `${getDashboardLink()}?tab=conta`;
+                        window.location.href = `${dashboardLink}?tab=conta`;
                       }}
                       className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container flex items-center gap-2 transition-colors"
                     >
@@ -94,12 +125,12 @@ const Navbar = () => {
             </div>
           ) : (
             <>
-              <Link to="/login" className="px-5 py-2.5 text-sm font-bold text-primary hover:text-primary-container transition-colors">
+              <Link to="/login" className="px-5 py-2.5 text-sm font-bold text-primary dark:text-primary-bright hover:text-primary-container transition-colors">
                 Entrar
               </Link>
               <Link
                 to="/signup"
-                className="bg-primary-container text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-all shadow-sm"
+                className="hidden sm:inline-flex bg-primary-container text-on-primary px-6 py-2.5 rounded-lg font-bold text-sm hover:opacity-90 transition-all shadow-sm"
               >
                 Criar Conta
               </Link>

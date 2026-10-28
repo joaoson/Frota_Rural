@@ -1,2 +1,18 @@
 FrontEnd/.env
 .claude
+videos/
+.env
+.env.supabase
+.env.local
+test-reports/
+BackEnd/coverage-report/
+Devops/__pycache__/
+Devops/tests/__pycache__/
+
+# Workstation metadata and generated video caches
+.DS_Store
+.ai-memory.toml
+brag-output/composition/.thumbnails/
+brag-output/render.log
+
+.observability/

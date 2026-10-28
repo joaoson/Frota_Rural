@@ -1,0 +1,23 @@
+.git
+.agents
+.claude
+**/.env
+**/.env.*
+!**/.env.example
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/node_modules
+**/dist
+**/media
+
+# Inference reads only ml/data/names and ml/data/cities.
+BackEnd/ml/data/cnh
+BackEnd/ml/data/not_cnh
+BackEnd/ml/data/raw
+BackEnd/ml/data/synth
+Database/backups
+videos
+
+# Local credentials are supplied through the development bind mount.
+**/firebase-service-account*.json

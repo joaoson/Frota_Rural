@@ -1,111 +1,62 @@
-# Guia de Migrações de Banco de Dados: Adicionando Colunas
+# Migrações de banco de dados
 
-Este guia explica o processo passo-a-passo para adicionar uma nova coluna a qualquer tabela no backend Django. Ele também inclui exemplos de simulação (mock) para cada uma das tabelas atualmente definidas no sistema.
+O schema é versionado por Django migrations. O [histórico extraído do Git](MIGRACOES_HISTORICO.md) lista arquivo, operações, commit, data e autoria. Uma data de commit não comprova aplicação no banco nem utilização em determinada sprint; essa correspondência deve ser confirmada no ADO.
 
-## Passos para Adicionar uma Coluna
+## Módulos atuais
 
-Para adicionar uma nova coluna ao seu banco de dados com segurança, você deve usar o Object-Relational Mapping (ORM) integrado do Django e o seu sistema de migrações.
+| Dados | App |
+| --- | --- |
+| Usuários | `users` |
+| Recuperação de senha | `authentication` |
+| Máquinas / anúncios e fotos | `machines` / `postings` |
+| Locações, preço acordado e horímetro | `rentals` |
+| Séries de recorrência | `api` |
+| Contratos, revisões, aceites, OTP e propostas | `contracts` |
+| Pagamentos, tentativas, eventos e estornos | `payments` |
+| Conversas, mensagens e denúncias | `chat` |
+| Notificações | `notifications` |
+| Avaliações | `reviews` |
+| CNH / certificações | `document_validation` |
+| Moderação | `administration` |
 
-1. **Localize o Arquivo de Models:**
-   Abra o arquivo que contém os modelos do banco de dados: `Frota_Rural/BackEnd/api/models.py`.
+## Alteração profissional
 
-2. **Adicione o Campo à Classe do Modelo:**
-   Encontre a classe do modelo correspondente à tabela que você deseja modificar (por exemplo, `Machines`, `Users`). Adicione a definição do novo campo utilizando os tipos de campos de modelo do Django.
-   *Importante*: Se a tabela já contiver dados, você deve fornecer um valor `default` (padrão) ou permitir que o campo seja nulo adicionando `null=True, blank=True`.
-   
-   ```python
-   # Exemplo: Adicionando um campo de texto (string)
-   novo_nome_da_coluna = models.CharField(max_length=100, null=True, blank=True)
-   ```
+1. Altere o model do domínio e gere `python manage.py makemigrations <app> --name <finalidade>`.
+2. Revise dependências e SQL com `python manage.py sqlmigrate <app> <numero>`. Não reescreva uma migration que já foi compartilhada/aplicada.
+3. Para adicionar campos obrigatórios em tabelas com dados, use expansão (campo opcional), preenchimento com `RunPython` e depois restrição. Use `apps.get_model` no preenchimento histórico; não importe o model atual.
+4. Determine custo de locks e volume. Operações longas precisam de estratégia própria, como lotes e índices concorrentes em migration não atômica. Não assuma que toda alteração é instantânea.
+5. Escreva um teste de upgrade com dados anteriores quando a migração transformar dados ou relacionamentos. Valide valores e FKs, além de conferir que o comando termina.
+6. Execute em PostgreSQL descartável: `check`, `makemigrations --check --dry-run`, `migrate --plan`, `migrate --noinput` e testes. A CI aplica desde banco vazio e executa os testes de upgrade.
+7. Registre o commit/PR e o item real da sprint. Atualize o ledger com `python3 Devops/migration_inventory.py` na raiz do repositório.
 
-3. **Gere o Arquivo de Migração:**
-   Abra seu terminal, navegue até a pasta do backend (`Frota_Rural/BackEnd`) e execute o seguinte comando para gerar o arquivo de migração baseado nas alterações feitas:
-   ```bash
-   python manage.py makemigrations
-   ```
-   *Nota: Isso criará um novo arquivo Python na pasta `api/migrations/`.*
+## Antes de aplicar em um ambiente existente
 
-4. **Aplique a Migração:**
-   Aplique a migração gerada para atualizar o esquema real do banco de dados PostgreSQL:
-   ```bash
-   python manage.py migrate
-   ```
+Na raiz, use o helper com o ambiente explicitamente escolhido:
 
-5. **Atualize Serializers e Views (Opcional, mas provavelmente necessário):**
-   Se você quiser que esta nova coluna seja acessível através da API, lembre-se de atualizar o serializer correspondente em `api/serializer.py` e, potencialmente, qualquer lógica de negócio em `api/views.py`.
-
----
-
-## Exemplos (Mocks) de Migrações para Cada Tabela
-
-Abaixo estão exemplos mostrando como adicionar uma coluna fictícia (`coluna_mock`) a cada tabela existente em `api/models.py`.
-
-### 1. Contracts
-```python
-class Contracts(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.CharField(max_length=50, blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
+```bash
+python3 Devops/dev.py check-db --mode local
+python3 Devops/dev.py plan-migrations --mode local
+python3 Devops/dev.py migrate --mode local
 ```
 
-### 2. Credentials
-```python
-class Credentials(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.IntegerField(default=0, help_text='Coluna mock adicionada para demonstração')
-```
+Confirme a identidade do banco com `verify_database`, revise o plano, interrompa escritas quando necessário e faça um backup consistente **antes** da alteração. Para PostgreSQL, `pg_dump --format=custom` gera um arquivo que pode ser restaurado com `pg_restore` em **outro banco vazio**. Credenciais ficam no ambiente ou em `.pgpass`, não no histórico de comandos. Mantenha os backups fora do Git e confira a restauração, contagens e relações relevantes.
 
-### 3. Machines
-```python
-class Machines(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.BooleanField(default=False, help_text='Coluna mock adicionada para demonstração')
-```
+O modo Supabase exige `--allow-remote` para escrita. Isso é uma proteção do helper, não uma autorização para migrar sem conferir o destino. Testes automatizados nunca devem usar Supabase. Após a aplicação, execute `migrate --check`, saúde da aplicação e uma jornada essencial.
 
-### 4. Messages
-```python
-class Messages(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.TextField(blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+## Rollback e recuperação
 
-### 5. Postings
-```python
-class Postings(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text='Coluna mock adicionada para demonstração')
-```
+- Revise `migrate <app> <migration_anterior> --plan` antes de qualquer reversão. Dependentes de outros apps também podem ser revertidos.
+- Um `reverse_code` que apenas retorna não recupera dados alterados. Não trate uma migration como reversível só porque Django permite executá-la ao contrário.
+- Snapshot financeiro, revisão contratual e obrigações de pagamento exigem preservação de dados: prefira correção progressiva. Reverter apenas a imagem da aplicação não reverte schema nem dados.
+- Para perda ou corrupção de dados, restaure o backup em banco separado, valide e planeje a troca. Nunca faça uma tentativa de restore destrutivo diretamente no banco em uso.
+- Não use `--fake` para esconder divergência de schema; ele altera apenas o histórico de execução.
 
-### 6. PostingsPhotos
-```python
-class PostingsPhotos(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.CharField(max_length=255, blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+## Evidências existentes
 
-### 7. Rentals
-```python
-class Rentals(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.DateField(blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+`BackEnd/api/test_migration_upgrade.py` usa `MigrationExecutor` e cobre duas histórias reais anteriores à integração: recorrência/notificações e extração de `rentals`. Verifica que locação, contrato, participante, série e notificação mantêm suas relações. Também valida o preenchimento do preço acordado a partir do pagamento aprovado, preservando R$ 3.024 em vez do preço recalculado incorreto de R$ 5.040.
 
-### 8. Reviews
-```python
-class Reviews(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.CharField(max_length=100, blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+`rentals.0007_lessor_dashboard_monthly` cria a rotina PL/pgSQL do painel do locador com `RunSQL` e `reverse_sql`, e o índice parcial `rentals_finished_end_idx`, declarado também no model para que a verificação de drift o enxergue. `LessorDashboardMigrationTests` volta para `rentals.0006`, confirma que rotina e índice saíram e reaplica a migração.
 
-### 9. Users
-```python
-class Users(AbstractBaseUser):
-    # ... campos existentes ...
-    coluna_mock = models.CharField(max_length=50, blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+Esses testes restauram o estado mais recente no cleanup e rodam no banco de testes descartável. Não criamos migrations artificiais nesta entrega: as mudanças de preferências e observabilidade não precisam alterar o banco.
 
-### 10. PasswordResets
-```python
-class PasswordResets(models.Model):
-    # ... campos existentes ...
-    coluna_mock = models.CharField(max_length=20, blank=True, null=True, help_text='Coluna mock adicionada para demonstração')
-```
+Referência: [migrations no Django 6.0](https://docs.djangoproject.com/en/6.0/topics/migrations/).

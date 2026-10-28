@@ -1,0 +1,1 @@
+{"duration":22,"assertions":[{"kind":"appearsBy","selector":".hook-sub","bySec":1.6},{"kind":"appearsBy","selector":"#card3","bySec":5.5},{"kind":"appearsBy","selector":"#signed","bySec":17},{"kind":"appearsBy","selector":".end-cta","bySec":20}]}

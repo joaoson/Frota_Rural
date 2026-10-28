@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: Frota Rural
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
