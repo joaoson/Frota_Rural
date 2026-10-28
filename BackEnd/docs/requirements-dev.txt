@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Ferramentas de qualidade (não entram na imagem Docker)
+mypy==2.3.1
+ruff==0.16.6

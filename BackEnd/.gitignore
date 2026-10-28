@@ -217,10 +217,38 @@ __marimo__/
 
 # Local virtual environment
 .env
+.env.stripe-*
 .idea
 
+# O `lib/` do template Python acima ignora qualquer pasta com esse nome, mas `ml/<modelo>/lib/` é
+# código-fonte (apoio dos scripts de cada modelo) e precisa ir para o git.
+!ml/*/lib/
+!ml/*/lib/**
+ml/*/lib/__pycache__/
+
 # ML Training
+# ml/data/ é compartilhada entre os modelos. Imagens, CSVs brutos e o dataset sintético
+# (regenerável) ficam fora do git. São versionados só os dados pequenos que o modelo de
+# dados precisa: bases do IBGE (names, cities), listas de palavras (lexicon) e os casos de
+# avaliação escritos à mão (eval).
 ml/data/**
+!ml/data/README.md
+!ml/data/names/
+!ml/data/names/**
+!ml/data/cities/
+!ml/data/cities/**
+!ml/data/lexicon/
+!ml/data/lexicon/**
+!ml/data/eval/
+!ml/data/eval/**
+ml/data/eval/ocr_readings.jsonl
 
 # Local image cache
 /media
+
+# Firebase service account (NUNCA versionar — dá acesso total ao bucket)
+# Padrões amplos de propósito: pegam também nomes digitados errado.
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json

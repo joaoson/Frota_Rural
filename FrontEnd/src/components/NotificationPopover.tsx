@@ -1,78 +1,45 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router";
+import { Popover } from "radix-ui";
 import MaterialIcon from "@/components/MaterialIcon";
+import { useAuth } from "@/contexts/useAuth";
+import { NotificationList } from "@/features/notifications/components/NotificationList";
+import { useNotifications } from "@/features/notifications/hooks/useNotifications";
+import { notificationDashboard } from "@/features/notifications/types/notification";
 
-interface Notification {
-  id: number;
-  icon: string;
-  title: string;
-  desc: string;
-  time: string;
-  unread: boolean;
-}
-
-interface NotificationPopoverProps {
-  notifications: Notification[];
-}
-
-const NotificationPopover = ({ notifications }: NotificationPopoverProps) => {
+function AuthenticatedBell() {
+  const { userRole } = useAuth();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const query = useNotifications();
+  const unread = query.data?.unread_count ?? 0;
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const unreadCount = notifications.filter((n) => n.unread).length;
-
-  return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="relative text-on-surface-variant hover:text-primary transition-colors">
+  return <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Trigger asChild>
+      <button type="button" aria-label={unread ? `Notificações, ${unread} não lidas` : "Notificações"}
+        className="relative p-1 text-on-surface-variant transition-colors hover:text-primary">
         <MaterialIcon icon="notifications" size={24} />
-        {unreadCount > 0 ? (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-error text-on-primary rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-surface-container-lowest">
-            {unreadCount}
-          </span>
-        ) : null}
+        {unread > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-surface-container-lowest bg-error px-0.5 text-[10px] font-bold text-on-primary">{unread > 99 ? "99+" : unread}</span>}
+        {query.isError && <span aria-hidden="true" className="absolute -right-1 -top-1 rounded-full bg-error px-1 text-xs font-bold text-on-primary">!</span>}
       </button>
-
-      {open ? (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl z-50 overflow-hidden">
-          <div className="p-4 border-b border-outline-variant/30 flex items-center justify-between">
-            <h3 className="font-headline font-bold text-on-surface">Notificações</h3>
-            <span className="text-xs font-bold text-primary">{unreadCount} novas</span>
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                className={`w-full p-4 flex items-start gap-3 hover:bg-surface-container-high transition-colors border-b border-outline-variant/10 text-left ${
-                  n.unread ? "bg-primary/5" : ""
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${n.unread ? "bg-primary/10" : "bg-surface-container-high"}`}>
-                  <MaterialIcon icon={n.icon} className={n.unread ? "text-primary" : "text-on-surface-variant"} size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm text-on-surface">{n.title}</div>
-                  <div className="text-sm text-on-surface-variant truncate">{n.desc}</div>
-                  <div className="text-[11px] text-outline mt-1">{n.time}</div>
-                </div>
-                {n.unread ? <span className="w-2.5 h-2.5 bg-primary rounded-full mt-1.5 shrink-0" /> : null}
-              </button>
-            ))}
-          </div>
-          <div className="p-3 border-t border-outline-variant/30">
-            <button className="w-full text-center text-sm font-bold text-primary hover:underline py-1">Ver todas as notificações</button>
-          </div>
+    </Popover.Trigger>
+    <Popover.Portal>
+      <Popover.Content align="end" sideOffset={8} collisionPadding={12} aria-label="Central de notificações"
+        className="z-[100] w-[min(26rem,calc(100vw-24px))] max-h-[calc(100dvh-100px)] overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest text-on-surface shadow-xl">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <h2 className="font-headline font-bold">Notificações</h2>
+          <Popover.Close aria-label="Fechar notificações" className="rounded-lg p-1 text-on-surface-variant hover:bg-surface-container-high"><MaterialIcon icon="close" size={20} /></Popover.Close>
         </div>
-      ) : null}
-    </div>
-  );
-};
+        <NotificationList compact onOpen={() => setOpen(false)} />
+        <div className="border-t border-outline-variant/30 p-3 text-center">
+          <Link to={`${notificationDashboard(userRole)}?tab=notificacoes`} onClick={() => setOpen(false)}
+            className="inline-block py-1 text-sm font-bold text-primary hover:underline">Ver todas as notificações</Link>
+        </div>
+      </Popover.Content>
+    </Popover.Portal>
+  </Popover.Root>;
+}
 
-export default NotificationPopover;
-
+export default function NotificationPopover() {
+  const { userId, isAuthenticated, isLoading } = useAuth();
+  return isAuthenticated && !isLoading && userId ? <AuthenticatedBell key={userId} /> : null;
+}

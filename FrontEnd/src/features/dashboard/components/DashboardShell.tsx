@@ -1,0 +1,172 @@
+import { AuthContext } from "@/contexts/authContextValue";
+import { resetDashboardPreferences } from "../hooks/useDashboardPreference";
+import { useContext, useState } from "react";
+import { Link } from "react-router";
+
+import MaterialIcon from "@/components/MaterialIcon";
+import NotificationPopover from "@/components/NotificationPopover";
+import ThemeToggle from "@/components/ThemeToggle";
+import { UserAvatar } from "@/shared/components/UserAvatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
+export interface SidebarItem<Tab extends string> {
+  icon: string;
+  label: string;
+  tab: Tab;
+}
+
+interface DashboardShellProps<Tab extends string> {
+  items: readonly SidebarItem<Tab>[];
+  tab: Tab;
+  onTabChange: (tab: Tab) => void;
+  onLogout: () => void;
+  logoutTab: Tab;
+  initials: string;
+  profilePhotoUrl?: string | null;
+  accountName: React.ReactNode;
+  accountRole: React.ReactNode;
+  avatarClassName?: string;
+  children: React.ReactNode;
+}
+
+export function DashboardShell<Tab extends string>({
+  items,
+  tab,
+  onTabChange,
+  onLogout,
+  logoutTab,
+  initials,
+  profilePhotoUrl,
+  accountName,
+  accountRole,
+  avatarClassName = "bg-primary-container text-on-primary",
+  children,
+}: DashboardShellProps<Tab>) {
+  const userId = useContext(AuthContext)?.userId;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`w-64 shrink-0 border-r border-outline-variant/30 h-screen fixed md:sticky top-0 bg-surface-container-low flex flex-col z-50 transform transition-transform duration-300 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="p-6 pb-4">
+          <Link
+            to="/"
+            className="font-headline font-black text-xl text-primary tracking-tighter"
+          >
+            Frota Rural
+          </Link>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+          {items.map((item) => {
+            const buttonEl = (
+              <button
+                key={item.tab}
+                aria-current={tab === item.tab ? "page" : undefined}
+                onClick={
+                  item.tab !== logoutTab
+                    ? () => {
+                        onTabChange(item.tab);
+                        setIsSidebarOpen(false);
+                      }
+                    : undefined
+                }
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  tab === item.tab
+                    ? "bg-primary/10 text-primary font-bold border-l-2 border-primary"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+              >
+                <MaterialIcon icon={item.icon} size={20} />
+                <span>{item.label}</span>
+              </button>
+            );
+
+            if (item.tab === logoutTab) {
+              return (
+                <AlertDialog key={item.tab}>
+                  <AlertDialogTrigger asChild>{buttonEl}</AlertDialogTrigger>
+                  <AlertDialogContent size="sm">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sair da conta</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja sair?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel variant="outline">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={onLogout}>Sair</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              );
+            }
+
+            return buttonEl;
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-outline-variant/30">
+          <div className="flex items-center gap-3">
+            <UserAvatar
+              photoUrl={profilePhotoUrl}
+              initials={initials}
+              className={`w-10 h-10 text-sm ${avatarClassName}`}
+            />
+            <div>
+              <div className="font-bold text-sm text-on-surface">{accountName}</div>
+              <div className="text-[11px] text-on-surface-variant">{accountRole}</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 min-w-0">
+        <header className="h-16 border-b border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-md flex items-center justify-between px-4 md:px-8 sticky top-0 z-10">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              aria-label="Abrir menu"
+              aria-expanded={isSidebarOpen}
+              className="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+            >
+              <MaterialIcon icon="menu" size={24} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {userId && <button type="button" onClick={() => resetDashboardPreferences(userId)}
+              title="Limpar filtros e restaurar a visualização salva neste navegador"
+              className="min-h-11 rounded-lg px-2 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high">
+              Restaurar painel
+            </button>}
+            <ThemeToggle />
+            <NotificationPopover />
+          </div>
+        </header>
+
+        <div className="max-w-[1200px] p-4 sm:p-6 xl:p-8">{children}</div>
+      </main>
+    </div>
+  );
+}

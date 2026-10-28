@@ -1,0 +1,30 @@
+[run]
+branch = True
+source = .
+relative_files = True
+data_file = .coverage
+omit =
+    */migrations/*
+    */tests/*
+    */tests.py
+    */test_*.py
+    */venv/*
+    */.venv/*
+    ml/*
+    manage.py
+    seed.py
+
+[report]
+precision = 2
+show_missing = True
+fail_under = 90
+
+[html]
+directory = coverage-report
+title = Frota Rural - Backend Django
+
+[json]
+output = coverage-report/coverage.json
+
+[xml]
+output = coverage-report/coverage.xml

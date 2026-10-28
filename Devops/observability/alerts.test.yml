@@ -1,0 +1,53 @@
+rule_files: [alerts.yml]
+evaluation_interval: 15s
+tests:
+  - name: Backend outage reaches critical after one minute
+    interval: 15s
+    input_series:
+      - series: 'up{job="frota-backend",instance="backend:8000"}'
+        values: '0+0x8'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FrotaBackendDown
+        exp_alerts:
+          - exp_labels: {job: frota-backend, instance: 'backend:8000', severity: critical}
+            exp_annotations:
+              summary: "API Frota Rural indisponível para coleta"
+              description: "Confira o processo ASGI, conectividade e credencial de /metrics."
+  - name: Dependency failure
+    interval: 15s
+    input_series:
+      - series: 'frota_dependency_up{dependency="redis"}'
+        values: '0+0x8'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FrotaDependencyDown
+        exp_alerts:
+          - exp_labels: {dependency: redis, severity: critical}
+            exp_annotations:
+              summary: "Dependência redis indisponível"
+              description: "Confira /health/ready e os serviços PostgreSQL/Redis."
+  - name: Idle service does not produce a false error-rate alert
+    interval: 1m
+    input_series:
+      - series: 'frota_http_requests_total{status="500"}'
+        values: '1+0x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: FrotaHighErrorRate
+        exp_alerts: []
+  - name: Sustained server errors with enough traffic
+    interval: 1m
+    input_series:
+      - series: 'frota_http_requests_total{status="500"}'
+        values: '0+10x12'
+      - series: 'frota_http_requests_total{status="200"}'
+        values: '0+90x12'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: FrotaHighErrorRate
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: "Mais de 5% de erros HTTP 5xx"
+              description: "Correlacione a rota e o X-Request-ID com os logs JSON do backend."

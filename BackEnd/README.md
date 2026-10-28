@@ -1,3 +1,5 @@
+> API atual: [guia dos serviços](../Documentation/README_Servicos_Backend.md), [catálogo](../Documentation/SERVICOS_BACKEND_CATALOGO.md), [cobertura e evidências](../Documentation/EVIDENCIAS_QUALIDADE.md), [migrações](../Documentation/README_Database_Migrations.md) e [observabilidade](../Devops/OBSERVABILIDADE.md).
+
 # Frota Rural - BackEnd
 
 Um backend baseado em Django para o projeto Frota Rural.
@@ -21,21 +23,25 @@ BackEnd/
 ├── venv/              ← Django (Python 3.14)
 │   └── ...               Roda o servidor, API REST, migrations
 │
-├── ml/
-│   ├── venv/          ← Machine Learning (Python 3.13 + TensorFlow)
-│   │   └── ...           Treino e inferência do modelo de classificação
-│   ├── data/
-│   │   ├── cnh/       ← Imagens de CNH (dataset positivo)
-│   │   └── not_cnh/   ← Imagens que NÃO são CNH (dataset negativo)
-│   ├── models/
-│   │   └── cnh_classifier.keras   ← Modelo treinado (gerado pelo script)
-│   ├── train_cnh_classifier.py    ← Script de treino
-│   ├── classify.py                ← Script de inferência (chamado via subprocess)
-│   └── requirements.txt           ← Dependências do ML (tensorflow, Pillow, pdf2image)
+├── ml/                ← Machine Learning (detalhes em ml/README.md)
+│   ├── venv/          ← Python 3.13 + TensorFlow + scikit-learn (treino e inferência)
+│   ├── requirements.txt   ← Dependências do ML, compartilhadas pelos dois modelos
+│   ├── data/          ← Dados compartilhados, uma subpasta por conjunto
+│   │   ├── cnh/, not_cnh/   ← Imagens de treino do modelo de imagem (fora do git)
+│   │   ├── names/, cities/  ← Bases do IBGE usadas pelo modelo de dados (versionadas)
+│   │   ├── lexicon/, eval/  ← Listas de palavras e casos de avaliação do modelo de dados (versionados)
+│   │   └── synth/           ← Dataset sintético em CSV, gerado (fora do git)
+│   ├── cnh_image/     ← Modelo 1: o arquivo enviado é uma CNH? (imagem)
+│   │   ├── train.py, classify.py
+│   │   └── models/cnh_classifier.keras
+│   └── cnh_data/      ← Modelo 2: índice de veracidade dos dados digitados (foto × formulário + plausibilidade)
+│       ├── train.py, classify.py     ← igual ao cnh_image
+│       ├── scripts/, lib/, tests/    ← preparação de dados, código de apoio e testes
+│       └── models/cnh_plausibility.joblib
 ```
 
 **Por que dois venvs?**
-O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess` por meio de arquivos temporários que o Django salva e o script de ML com modelo treinado `ml/classify.py`.
+O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess`: o Django chama o `classify.py` de cada modelo (`ml/cnh_image/` recebe o caminho de um arquivo; `ml/cnh_data/` recebe o registro e o OCR da foto, se houver, em JSON pelo stdin).
 
 ## Instruções de Configuração
 
@@ -130,88 +136,64 @@ O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em
    - Abra seu navegador e vá para `http://127.0.0.1:8000/`
    - Para popular o banco de dados, é possível executar o arquivo `seed.py`
 
-## Machine Learning — Classificador de CNH
+## Qualidade de código e testes
 
-O projeto inclui um classificador de imagem baseado em TensorFlow que verifica se um arquivo enviado pelo usuário é uma CNH (Carteira Nacional de Habilitação) ou não. Usa transfer learning com MobileNetV2.
+As ferramentas de desenvolvimento ficam em um arquivo de dependências separado, fora da imagem Docker:
 
-### Preparar o dataset
-
-Faça o download e coloque as imagens nas pastas correspondentes:
-
-- Datasets recomendados: `https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset` e `https://www.kaggle.com/datasets/prasunroy/natural-images`
-
-```
-ml/data/cnh/        ← Fotos/scans de CNH (formato antigo ou novo)
-ml/data/not_cnh/    ← Fotos aleatórias, selfies, outros documentos
+```bash
+pip install -r docs/requirements-dev.txt
 ```
 
-- Formatos aceitos: `.jpg`, `.png`, `.jpeg`
-- As pastas devem ter quantidades aproximadamente iguais
+A configuração de `ruff` (lint + formatter) e `mypy` (tipagem estrita, com os plugins do Django e do DRF) está em `pyproject.toml`. Antes de abrir um PR, os quatro comandos abaixo precisam passar:
 
-### Treinar o modelo
+```bash
+ruff check .
+ruff format --check .
+mypy .
+CHANNEL_LAYER_BACKEND=memory DJANGO_DEBUG=true python manage.py test
+```
+
+Os testes rodam sem Redis local graças ao channel layer em memória, que o `settings.py` só aceita com `DJANGO_DEBUG=true`.
+
+## Machine Learning — validação do cadastro de CNH
+
+Dois modelos independentes, cada um no seu módulo (visão geral e comparação em [`ml/README.md`](ml/README.md)):
+
+| Modelo | O que faz | Documentação |
+|---|---|---|
+| `ml/cnh_image` | Classifica a **imagem** enviada (é uma CNH? TensorFlow/MobileNetV2) e lê os campos por **OCR** (RapidOCR), da CNH antiga e da digital, para preencher o formulário. Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
+| `ml/cnh_data` | Calcula o **índice de veracidade** dos dados digitados: conferem com a foto (OCR) e parecem reais? (consistência + regras + scikit-learn). Guarda o índice em `veracity_score` e, se parecerem falsos, grava a CNH como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
+
+Fontes dos dados (IBGE, Base dos Dados e o dataset de imagens): [`ml/data/README.md`](ml/data/README.md#referências-de-onde-vêm-os-dados).
+
+Treinar e testar cada um:
 
 ```bash
 cd BackEnd
-./ml/venv/bin/python ml/train_cnh_classifier.py
+./ml/venv/bin/python ml/cnh_image/train.py                                  # precisa das imagens em ml/data/cnh e ml/data/not_cnh
+./ml/venv/bin/python ml/cnh_data/train.py                                   # lê (ou gera) ml/data/synth/cnh_records.csv
+./ml/venv/bin/python -m unittest discover -s ml/cnh_data/tests -t ml/cnh_data
+./ml/venv/bin/python ml/cnh_data/scripts/evaluate_veracity.py                  # calibra o índice (precisa do export_readings.py antes)
+./ml/venv/bin/python -m unittest discover -s ml/cnh_image/tests -t ml/cnh_image
+./ml/venv/bin/python ml/cnh_image/scripts/evaluate_ocr.py                    # mede o OCR no dataset
 ```
 
-O script:
+### Variáveis de ambiente do ML
 
-1. Carrega as imagens das pastas `data/cnh/` e `data/not_cnh/`
-2. Aplica data augmentation (rotação, zoom, brilho, contraste)
-3. Usa MobileNetV2 pré-treinado como base (transfer learning)
-4. Treina por até 30 epochs com early stopping
-5. Salva o melhor modelo em `ml/models/cnh_classifier.keras`
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `ML_PYTHON` | `ml/venv/bin/python` (no Docker: `/opt/ml-venv/bin/python`) | Interpretador que roda os dois modelos |
+| `ML_PLAUSIBILITY_MODE` | `enforce` | `off` não avalia os dados; `shadow` avalia e só registra em log; `enforce` recusa automaticamente. Comece em `shadow` para ver quantos cadastros reais seriam recusados |
+| `ML_PLAUSIBILITY_THRESHOLD` | `0.60` | Probabilidade de dado falso a partir da qual o modelo recusa (lida direto pelo `ml/cnh_data/classify.py`) |
 
-Saída esperada: acurácia de validação >= 85%.
+## Endereço base e documentação da API
 
-### Testar a inferência manualmente (com venv ativado)
-
-```bash
-# Classificar uma imagem
-python ml/classify.py /caminho/para/imagem.jpg
-
-# Classificar um PDF
-python ml/classify.py /caminho/para/cnh.pdf
-```
-
-Saída (JSON):
-
-```json
-{
-  "is_valid": true,
-  "confidence": "high",
-  "score": 0.9523
-}
-```
-
-## Endereço base da API
-
-O endereço base da API é:
-
-```
-http://127.0.0.1:8000/api/
-```
-
-Você pode ver todas as rotas no arquivo djangoapi/urls.py.
-
-As requisições podem ser feitas via Postman (ou qualquer cliente HTTP). A collection está em `docs/postman/Frota_Rural_API.postman_collection.json`.
-
-Exemplo de requisição POST para criar um usuário (rota: users/create):
-
-Request body (JSON):
-
-```json
-{
-  "name": "João Silva2",
-  "document": "123.456.789-02",
-  "email": "joao.silva@example.com",
-  "password_hash": "pbkdf2_sha256$720000$randomsalt$hashedpassword",
-  "phone": "+5511999999999",
-  "role": "locador",
-  "status": "active"
-}
-```
+A API local usa `http://127.0.0.1:8000/api` (ajuste a porta conforme o ambiente).
+Consulte o [guia dos serviços](../Documentation/README_Servicos_Backend.md) e o
+[catálogo de operações](../Documentation/SERVICOS_BACKEND_CATALOGO.md).
+Swagger está em `/api/schema/swagger-ui`; ele informa campos, autenticação,
+exemplos e erros conforme os serializers atuais. Senhas de cadastro são enviadas
+no campo definido pelo serializer, nunca como um hash produzido pelo cliente.
 
 ## Notas Adicionais
 

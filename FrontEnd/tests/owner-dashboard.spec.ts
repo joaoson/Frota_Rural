@@ -1,0 +1,98 @@
+import { test, expect, loginViaAPI, apiURL } from './support/fixtures';
+
+test('owner dashboard uses persisted records, filters fleet, and submits reviews for the selected tenant', async ({ page, data }) => {
+  const token = await loginViaAPI(page.context(), data.owner);
+  await page.goto('/dashboard');
+  await expect(page.getByText('R$ 38.400', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Sem avaliações', { exact: true })).toBeVisible();
+  await page.goto('/dashboard?tab=frota');
+  await expect(page.getByRole('heading', { name: 'John Deere 6110J', exact: true })).toBeVisible();
+  await page.getByPlaceholder('Buscar por marca, modelo ou registro...').fill('6125');
+  await expect(page.getByRole('heading', { name: 'John Deere 6110J', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'John Deere 6125J', exact: true })).toBeVisible();
+  await page.getByPlaceholder('Buscar por marca, modelo ou registro...').clear();
+  await page.getByRole('combobox', { name: 'Ano', exact: true }).selectOption('2019');
+  await expect(page.getByRole('heading', { name: 'John Deere 6110J', exact: true })).toBeVisible();
+  await page.goto('/dashboard?tab=reservas');
+  const rental = page.locator(`[id="locacao-${data.sourceRental}"]`);
+  await rental.getByRole('button', { name: 'Avaliar Locatário', exact: true }).click();
+  await rental.getByPlaceholder('Conte como foi a experiência...').fill('Entrega pontual e bom cuidado.');
+  await rental.getByRole('button', { name: 'Enviar Avaliação', exact: true }).click();
+  await expect(rental.getByText('Avaliação enviada', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(rental.getByRole('button', { name: 'Avaliar Locatário', exact: true })).toHaveCount(0);
+  const reviews = await page.request.get(`${apiURL}reviews?reviewer=${data.owner.id}`, { headers: { Authorization: `Bearer ${token}` } });
+  expect(reviews.status()).toBe(200);
+  expect(await reviews.json()).toEqual(expect.arrayContaining([expect.objectContaining({ rental: data.sourceRental, reviewee: data.renter.id, comment: 'Entrega pontual e bom cuidado.' })]));
+});
+
+test('owner can pause and reopen a listing without losing its saved location', async ({ page, data }) => {
+  const token = await loginViaAPI(page.context(), data.owner);
+  const auth = { Authorization: `Bearer ${token}` };
+  const setup = await page.request.patch(`${apiURL}postings/${data.posting}`, { headers: auth, data: { location_cep: '84165000', location_lat: -24.79, location_lng: -50.01 } });
+  expect(setup.status()).toBe(200);
+  await page.goto(`/dashboard/gerenciar-anuncio/${data.posting}`);
+  await expect(page.getByRole('heading', { name: 'Gerenciar Anúncio', exact: true })).toBeVisible();
+  await expect(page.getByLabel('CEP', { exact: true })).toHaveValue('84165-000');
+  await page.getByLabel('Status do Anúncio', { exact: true }).selectOption('inactive');
+  await page.getByLabel('Valor por Hora (R$) *', { exact: true }).fill('230');
+  await page.getByRole('button', { name: 'Salvar Alterações', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard\?tab=anuncios$/);
+  await expect(page.getByText(/Inativo$/)).toBeVisible();
+  await page.reload();
+  await page.getByRole('link', { name: 'Gerenciar', exact: true }).click();
+  await expect(page.getByLabel('Status do Anúncio', { exact: true })).toHaveValue('inactive');
+  const saved = await page.request.get(`${apiURL}postings/${data.posting}`, { headers: auth });
+  expect(saved.status()).toBe(200);
+  const payload = await saved.json() as { hourly_rate: string; location_lat: string; location_lng: string; location_cep: string };
+  expect(Number(payload.hourly_rate)).toBe(230);
+  expect(Number(payload.location_lat)).toBe(-24.79);
+  expect(Number(payload.location_lng)).toBe(-50.01);
+  expect(payload.location_cep).toBe('84165000');
+  await page.getByLabel('Status do Anúncio', { exact: true }).selectOption('active');
+  await page.getByRole('button', { name: 'Salvar Alterações', exact: true }).click();
+  await expect(page.getByText(/Ativo$/)).toBeVisible();
+});
+
+test('editing a fleet machine persists optional fields and refreshes the cached listing name', async ({ page, data }) => {
+  const token = await loginViaAPI(page.context(), data.owner);
+  const auth = { Authorization: `Bearer ${token}` };
+  const renagro = `BR${BigInt(`0x${data.machines[0].replaceAll('-', '')}`).toString().slice(-10)}`;
+  const setup = await page.request.patch(`${apiURL}machines/${data.machines[0]}`, { headers: auth, data: { renagro_number: renagro } });
+  expect(setup.status()).toBe(200);
+  await page.goto('/dashboard?tab=anuncios');
+  await expect(page.getByRole('heading', { name: 'John Deere 6110J', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Minha frota', exact: true }).click();
+  const machine = page.getByRole('heading', { name: 'John Deere 6110J', exact: true }).locator('..').locator('..').locator('..');
+  await machine.getByRole('button', { name: 'Editar', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Modelo *', { exact: true }).fill('6110J Revisado');
+  await dialog.getByLabel('Ano de Fabricação', { exact: true }).clear();
+  await expect(dialog.getByLabel('Finalidade de Uso', { exact: true })).toHaveValue('trator');
+  await dialog.getByRole('button', { name: 'Salvar Alterações', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Anúncios', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'John Deere 6110J Revisado', exact: true })).toBeVisible();
+  const saved = await page.request.get(`${apiURL}machines/${data.machines[0]}`, { headers: auth });
+  expect(saved.status()).toBe(200);
+  expect(await saved.json()).toEqual(expect.objectContaining({ model: '6110J Revisado', year: null, usage_purpose: 'trator' }));
+});
+
+test('owner dashboard indicators come from the database and follow the saved period and machine filters', async ({ page, data }) => {
+  await loginViaAPI(page.context(), data.owner);
+  const summaries: URL[] = [];
+  page.on('request', (request) => { if (request.url().includes('/dashboard/lessor')) summaries.push(new URL(request.url())); });
+  await page.goto('/dashboard');
+  const ranking = page.getByRole('region', { name: 'Máquinas com maior valor concluído' });
+  await expect(ranking.getByText('1. John Deere 6110J', { exact: true })).toBeVisible();
+  await expect(ranking.getByText(/R\$\s4\.321,00/)).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Situação das locações' }).getByText('Concluída: 1', { exact: true })).toBeAttached();
+  await page.getByLabel('Máquina', { exact: true }).selectOption(data.machines[1]);
+  await expect(ranking.getByText('Nenhuma locação concluída no período.', { exact: true })).toBeVisible();
+  expect(summaries.at(-1)?.searchParams.get('machine')).toBe(data.machines[1]);
+  await page.getByLabel('Período', { exact: true }).selectOption('12');
+  await expect.poll(() => summaries.at(-1)?.searchParams.get('months')).toBe('12');
+  await page.reload();
+  await expect(page.getByLabel('Período', { exact: true })).toHaveValue('12');
+  await expect(page.getByLabel('Máquina', { exact: true })).toHaveValue(data.machines[1]);
+});

@@ -1,0 +1,150 @@
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+import { HttpPricingRepository } from "../api/PricingRepository";
+import { PricingStore } from "../api/PricingStore";
+import { usePricingSuggestion } from "../hooks/usePricingSuggestion";
+import type { PricingSuggestion } from "../types/pricing";
+import type { HttpClient } from "@/shared/http/HttpClient";
+import { pricingSuggestionSchema } from "../types/pricingSchemas";
+import SugestaoPrecoPanel from "../components/SugestaoPrecoPanel";
+
+const { suggest } = vi.hoisted(() => ({ suggest: vi.fn() }));
+vi.mock("@/app/container", () => ({ pricingStore: { suggest } }));
+
+afterEach(() => { cleanup(); suggest.mockReset(); });
+
+const fixture: PricingSuggestion = {
+  suggestion_id: "suggestion-a", sugerido_brl_hora: "192.15",
+  faixa_brl_hora: ["172.94", "211.37"], custo_brl_hora: "160.13",
+  locatario_paga_brl_hora: "211.37", equivalente_diaria_brl: "1537.20",
+  composicao: [{ chave: "capital", item: "Capital", brl_hora: "40.00" }],
+  premissas: {
+    categoria: "trator", idade_anos: 7, horimetro: 4900, horimetro_declarado: true,
+    potencia_cv: 110, valor_mercado_usado_brl: 380000, valor_novo_equivalente_brl: 620000,
+    horas_faturaveis_ano: 528, horas_motor_ano: 343, comparaveis_internos: 0,
+    tarifas_mercado_encontradas: 0, inclui_combustivel: false, inclui_operador: false,
+    custo_antes_da_ancoragem: "192.15",
+  },
+  fontes: [{ url: "https://example.com/tractor", title: "Trator" }],
+  confianca: "alta", origem: "pesquisa", versao_parametros: "v1",
+};
+
+function wrapper({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+describe("pricing through the new architecture", () => {
+  it("preserves optional estimate assumptions and accepts older or explicitly sourced responses", () => {
+    const estimate = { taxa_anual: 0.1, fracao_residual_minima: 0.4, retencao_aplicada: 0.4782969 };
+    const parsed = pricingSuggestionSchema.parse({ ...fixture, premissas: { ...fixture.premissas, estimativa_valor_novo: estimate } });
+    expect(parsed.premissas).toMatchObject({ estimativa_valor_novo: estimate });
+    expect(pricingSuggestionSchema.parse(fixture)).toEqual(fixture);
+    expect(pricingSuggestionSchema.parse({ ...fixture, premissas: { ...fixture.premissas, estimativa_valor_novo: null } }).premissas)
+      .toMatchObject({ estimativa_valor_novo: null });
+  });
+
+  it("explains the estimate before confirmation and distinguishes its sources from the assumed new value", () => {
+    const onApply = vi.fn();
+    const estimated = pricingSuggestionSchema.parse({ ...fixture, confianca: "baixa", premissas: {
+      ...fixture.premissas, valor_novo_equivalente_brl: 794485.6,
+      estimativa_valor_novo: { taxa_anual: 0.1, fracao_residual_minima: 0.4, retencao_aplicada: 0.4782969 },
+    } });
+    render(<SugestaoPrecoPanel suggestion={estimated} onApply={onApply} onDismiss={vi.fn()} />);
+    expect(screen.getByText("Estimativa")).toBeTruthy();
+    expect(screen.getByText("Confiança baixa")).toBeTruthy();
+    const assumptions = screen.getByRole("region", { name: "Premissas da estimativa" });
+    expect(assumptions.closest("details")).toBeNull();
+    expect(assumptions.textContent).toContain("Não encontramos um preço publicado de uma máquina nova equivalente");
+    expect(assumptions.textContent).toContain("10% ao ano");
+    expect(assumptions.textContent).toContain("7 anos");
+    expect(assumptions.textContent).toContain("40%");
+    expect(assumptions.textContent).toContain("47,83%");
+    expect(within(assumptions).getByText(/380\.000,00/)).toBeTruthy();
+    expect(within(assumptions).getByText(/794\.485,60/)).toBeTruthy();
+    expect(screen.getByText("Fontes do valor usado")).toBeTruthy();
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /Usar R\$\s*192,15/ }));
+    expect(onApply).toHaveBeenCalledWith("192.15");
+  });
+
+  it("keeps the existing sourced-price presentation when no estimate was used", () => {
+    render(<SugestaoPrecoPanel suggestion={fixture} onApply={vi.fn()} onDismiss={vi.fn()} />);
+    expect(screen.queryByText("Estimativa")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Premissas da estimativa" })).toBeNull();
+    expect(screen.getByText("Fontes")).toBeTruthy();
+  });
+
+  it("accepts a market discount while rejecting negative operating costs", () => {
+    const discounted = { ...fixture, composicao: [
+      ...fixture.composicao,
+      { chave: "ajuste_mercado", item: "Ajuste ao mercado", brl_hora: "-12.00" },
+    ] };
+    expect(pricingSuggestionSchema.parse(discounted).composicao.at(-1)?.brl_hora).toBe("-12.00");
+    expect(pricingSuggestionSchema.safeParse({ ...fixture, composicao: [
+      { chave: "capital", item: "Capital", brl_hora: "-12.00" },
+    ] }).success).toBe(false);
+    expect(pricingSuggestionSchema.safeParse({ ...fixture, sugerido_brl_hora: "-1.00" }).success).toBe(false);
+  });
+
+  it("sends the machine and validates the real response shape through store/repository/client", async () => {
+    const send = vi.fn().mockResolvedValue({ status: 200, data: fixture });
+    const store = new PricingStore(new HttpPricingRepository({ send } as HttpClient));
+    expect(await store.suggest({ machinery: "machine-a" })).toEqual(fixture);
+    expect(send).toHaveBeenCalledWith({ method: "POST", path: "pricing/suggest", body: { machinery: "machine-a" } });
+    send.mockResolvedValue({ status: 200, data: { ...fixture, sugerido_brl_hora: "invalid" } });
+    await expect(store.suggest({ machinery: "machine-a" })).rejects.toThrow();
+  });
+
+  it("requests only on user action and clears a completed suggestion on machine change", async () => {
+    suggest.mockResolvedValue(fixture);
+    const { result, rerender } = renderHook(({ machine }) => usePricingSuggestion(machine), {
+      initialProps: { machine: "machine-a" }, wrapper,
+    });
+    expect(suggest).not.toHaveBeenCalled();
+    act(() => result.current.request());
+    await waitFor(() => expect(result.current.suggestion).toEqual(fixture));
+    rerender({ machine: "machine-b" });
+    expect(result.current.suggestion).toBeNull();
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it("ignores a late response after A → B → A, even while a fresh request is pending", async () => {
+    const old = deferred<PricingSuggestion>();
+    const fresh = deferred<PricingSuggestion>();
+    suggest.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+    const { result, rerender } = renderHook(({ machine }) => usePricingSuggestion(machine), {
+      initialProps: { machine: "machine-a" }, wrapper,
+    });
+    act(() => result.current.request());
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(1));
+    rerender({ machine: "machine-b" });
+    rerender({ machine: "machine-a" });
+    act(() => result.current.request());
+    await waitFor(() => expect(suggest).toHaveBeenCalledTimes(2));
+    await act(async () => old.resolve(fixture));
+    expect(result.current.suggestion).toBeNull();
+    await act(async () => fresh.resolve({ ...fixture, suggestion_id: "fresh" }));
+    await waitFor(() => expect(result.current.suggestion?.suggestion_id).toBe("fresh"));
+    act(() => result.current.dismiss());
+    expect(result.current.suggestion).toBeNull();
+    expect(result.current.suggestionId).toBe("fresh");
+  });
+
+  it("does not retry an unavailable market suggestion and permits a later manual retry", async () => {
+    suggest.mockRejectedValueOnce(new Error("Sem dados confiáveis")).mockResolvedValueOnce(fixture);
+    const { result } = renderHook(() => usePricingSuggestion("machine-a"), { wrapper });
+    act(() => result.current.request());
+    await waitFor(() => expect(result.current.error?.message).toBe("Sem dados confiáveis"));
+    expect(suggest).toHaveBeenCalledTimes(1);
+    act(() => result.current.request());
+    await waitFor(() => expect(result.current.suggestion).toEqual(fixture));
+  });
+});
