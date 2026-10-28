@@ -32,6 +32,8 @@ import { PostingStore } from "@/features/postings/api/PostingStore";
 import { HttpUserRepository } from "@/features/users/api/UserRepository";
 import { UserStore } from "@/features/users/api/UserStore";
 import { MachineStore } from "@/features/machines/api/MachineStore";
+import { HttpDashboardRepository } from "@/features/dashboard/api/DashboardRepository";
+import { DashboardStore } from "@/features/dashboard/api/DashboardStore";
 import { InMemoryTokenStore } from "@/shared/auth/InMemoryTokenStore";
 import { SessionService } from "@/shared/auth/SessionService";
 import { ViaCepClient } from "@/shared/http/ViaCepClient";
@@ -49,6 +51,7 @@ export const viaCepClient = new ViaCepClient(httpClient);
 export const authStore = new AuthStore(new HttpAuthRepository(httpClient), tokenStore, queryClient);
 
 const stores = {
+  dashboard: new DashboardStore(new HttpDashboardRepository(httpClient), queryClient),
   notifications: new NotificationStore(new HttpNotificationRepository(httpClient), queryClient),
   pricing: new PricingStore(new HttpPricingRepository(httpClient)),
   machines: new MachineStore(new HttpMachineRepository(httpClient), queryClient),
@@ -64,6 +67,7 @@ const stores = {
 } as const;
 
 export const {
+  dashboard: dashboardStore,
   notifications: notificationStore,
   pricing: pricingStore,
   machines: machineStore,

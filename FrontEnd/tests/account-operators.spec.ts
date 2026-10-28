@@ -33,8 +33,8 @@ test('account edits persist and the changed password can log in again', async ({
 });
 
 test('operator create, edit and unlink persist; operator login opens its own account', async ({ page, data }) => {
-  const access = await loginViaAPI(page.context(), data.renter);
-  await page.goto('/dashboard-locatario?tab=operadores');
+  const access = await loginViaAPI(page.context(), data.owner);
+  await page.goto('/dashboard?tab=operadores');
   await page.getByRole('button', { name: /Cadastrar Operador/ }).click();
   const email = data.owner.email.replace('pw-owner-', 'pw-operator-');
   await page.getByLabel('Nome Completo*').fill('Operador Teste');
@@ -44,7 +44,7 @@ test('operator create, edit and unlink persist; operator login opens its own acc
   await page.getByLabel('Telefone*').fill('11999999999');
   await page.getByLabel('CEP*').fill('84165000');
   await expect(page.getByLabel('Cidade*')).toHaveValue('Castro');
-  await page.getByLabel('Senha Inicial*').fill(data.renter.password);
+  await page.getByLabel('Senha Inicial*').fill(data.owner.password);
   await page.getByRole('button', { name: /Cadastrar Operador/ }).click();
   await expect(page.getByRole('heading', { name: 'Operador Teste', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /Editar/ }).click();
@@ -58,12 +58,13 @@ test('operator create, edit and unlink persist; operator login opens its own acc
   await expect(page.getByText('Nenhum operador cadastrado')).toBeVisible();
   const list = await page.request.get(`${apiURL}users/operators`, { headers: { Authorization: `Bearer ${access}` } });
   expect(await list.json()).toEqual([]);
-  await loginViaUI(page, { ...data.renter, email });
+  await loginViaUI(page, { ...data.owner, email });
   await expect(page.getByRole('heading', { name: 'Minha Conta' })).toBeVisible();
   await expect(page.getByLabel('Nome Completo')).toHaveValue('Operador Atualizado');
   await expect(page.getByRole('button', { name: 'Operadores', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Enviar ou atualizar CNH' })).toHaveAttribute('href', '/document/cnh');
-  await expect(page.getByRole('link', { name: 'Enviar certificação' })).toHaveAttribute('href', '/document/certification');
+  await page.getByRole('button', { name: 'Documentos', exact: true }).click();
+  await expect(page.getByRole('link', { name: /Nova CNH/ })).toHaveAttribute('href', '/document/cnh');
+  await expect(page.getByRole('link', { name: /Nova Certificação/ })).toHaveAttribute('href', '/document/certification');
 });
 
 test('login preserves dashboard deep links and roles cannot open the wrong dashboard', async ({ page, data }) => {

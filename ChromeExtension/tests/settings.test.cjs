@@ -9,16 +9,16 @@ const context = vm.createContext({ URL });
 vm.runInContext(fs.readFileSync(path.join(directory, "settings.js"), "utf8"), context);
 const config = context.FrotaRuralValidation;
 
-test("defaults match the current demo seed; admin requires an explicit account", () => {
+test("all three profiles match the current demo seed", () => {
   const seed = fs.readFileSync(path.join(directory, "../BackEnd/seed.py"), "utf8");
-  for (const role of config.roles.filter(({ id }) => id !== "admin")) {
+  for (const role of config.roles) {
     const account = config.defaults().accounts[role.id];
     const row = seed.split("\n").find((line) => line.includes(account.email));
     assert.ok(row?.includes(role.id), `Missing seed account for ${role.id}`);
     assert.ok(seed.includes(`DEFAULT_PASSWORD = '${account.password}'`));
   }
-  assert.equal(config.defaults().accounts.admin.email, "");
-  assert.equal(config.defaults().accounts.admin.password, "");
+  assert.equal(config.defaults().accounts.admin.email, "admin@example.test");
+  assert.equal(config.defaults().accounts.admin.password, "Teste1234");
   assert.equal(config.roles.map((role) => role.id).join(","), "locador,locatario,admin");
 });
 
@@ -48,6 +48,9 @@ test("preserves custom and deliberately empty credentials and boolean preference
   assert.equal(saved.autoSubmit, false);
   assert.equal(saved.accounts.admin.email, "qa@example.test");
   assert.equal(saved.accounts.admin.password, "");
+  const empty = config.normalize({ accounts: { admin: { email: "", password: "" } } });
+  assert.equal(empty.accounts.admin.email, "");
+  assert.equal(empty.accounts.admin.password, "");
   assert.equal(saved.accounts.locador.email, config.defaults().accounts.locador.email);
   const first = config.defaults();
   first.accounts.admin.email = "changed";

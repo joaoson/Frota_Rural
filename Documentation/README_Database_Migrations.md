@@ -55,6 +55,8 @@ O modo Supabase exige `--allow-remote` para escrita. Isso é uma proteção do h
 
 `BackEnd/api/test_migration_upgrade.py` usa `MigrationExecutor` e cobre duas histórias reais anteriores à integração: recorrência/notificações e extração de `rentals`. Verifica que locação, contrato, participante, série e notificação mantêm suas relações. Também valida o preenchimento do preço acordado a partir do pagamento aprovado, preservando R$ 3.024 em vez do preço recalculado incorreto de R$ 5.040.
 
+`rentals.0007_lessor_dashboard_monthly` cria a rotina PL/pgSQL do painel do locador com `RunSQL` e `reverse_sql`, e o índice parcial `rentals_finished_end_idx`, declarado também no model para que a verificação de drift o enxergue. `LessorDashboardMigrationTests` volta para `rentals.0006`, confirma que rotina e índice saíram e reaplica a migração.
+
 Esses testes restauram o estado mais recente no cleanup e rodam no banco de testes descartável. Não criamos migrations artificiais nesta entrega: as mudanças de preferências e observabilidade não precisam alterar o banco.
 
 Referência: [migrations no Django 6.0](https://docs.djangoproject.com/en/6.0/topics/migrations/).

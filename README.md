@@ -312,7 +312,7 @@ Frota_Rural/
 
 ## Extensão Chrome para validação
 
-A pasta [ChromeExtension](ChromeExtension/README.md) adiciona atalhos **Locador**, **Locatário** e **Admin** ao login local. Carregue-a em `chrome://extensions` com **Modo do desenvolvedor → Carregar sem compactação**. Configure a porta e as contas de teste no popup; o seed atual fornece locador e locatário, e a conta admin é configurada separadamente.
+A pasta [ChromeExtension](ChromeExtension/README.md) adiciona atalhos **Locador**, **Locatário** e **Admin** ao login local. Carregue-a em `chrome://extensions` com **Modo do desenvolvedor → Carregar sem compactação**. Configure a porta e as contas de teste no popup; o seed fornece os três perfis, incluindo `admin@example.test`, com senha inicial `Teste1234`.
 
 ## Vídeo de apresentação
 

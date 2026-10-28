@@ -226,6 +226,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Máquinas", "description": "Métricas de utilização do maquinário pelo locador."},
         {"name": "Anúncios", "description": "Publicação de maquinário disponível para locação."},
         {"name": "Locações", "description": "Reservas e ciclo de vida das locações."},
+        {"name": "Painéis", "description": "Indicadores agregados no banco para os painéis gerenciais."},
         {"name": "Contratos", "description": "Geração e assinatura dos contratos de locação."},
         {"name": "Pagamentos", "description": "Cotação, checkout, confirmação de pagamentos e webhook Stripe."},
         {"name": "Precificação", "description": "Simulação do preço por diária e consulta da ocupação do anúncio."},

@@ -14,13 +14,13 @@ Passos de instalação também disponíveis na [documentação oficial do Chrome
 
 ## Contas iniciais
 
-Locador e locatário vêm de `BackEnd/seed.py`, com a senha inicial `Teste1234`. O seed atual não cria administradores; configure no popup uma conta admin de teste existente:
+Locador, locatário e administrador vêm de `BackEnd/seed.py`, com a senha inicial `Teste1234`. Se o seed foi executado com `SEED_DEMO_PASSWORD`, configure essa senha no popup:
 
 | Perfil | E-mail | Destino padrão após login |
 | --- | --- | --- |
 | Locador | `joao.silva@example.test` | `/dashboard` |
 | Locatário | `maria.oliveira@example.test` | `/dashboard-locatario` |
-| Admin | Configurar no popup | `/admin/users` |
+| Admin | `admin@example.test` | `/admin/users` |
 
 As contas precisam existir no banco conectado ao backend. A extensão não cria usuários nem altera o papel de uma conta. Use o [seed seguro e idempotente](../Devops/SEED.md) no banco local. Ele preserva contas e senhas existentes. Bancos antigos podem usar e-mails `@email.com`; nesse caso configure essas contas no popup. O botão Admin exige e-mail e senha antes de enviar.
 
@@ -33,6 +33,7 @@ As contas precisam existir no banco conectado ao backend. A extensão não cria 
 - **Salvar e abrir login** abre uma aba no endereço configurado. Para trocar de perfil, use **Sair** no aplicativo e escolha outra conta no login. Abas do mesmo site compartilham o cookie de sessão; use perfis separados do Chrome se precisar validar usuários simultaneamente.
 - Os erros de autenticação continuam aparecendo na própria aplicação. A extensão informa apenas que o formulário foi enviado, sem presumir sucesso.
 - Ao atualizar os arquivos da extensão, clique em **Recarregar** em `chrome://extensions` e recarregue a aba do projeto.
+- Configurações salvas são preservadas, inclusive um Admin vazio. Após atualizar, preencha o perfil **Admin** com `admin@example.test` e sua senha inicial e clique em **Salvar**. Execute o seed se a conta ainda não existir no banco. Para restaurar os três perfis padrão, use **Restaurar contas do seed → Salvar**.
 
 ## Escopo e dados
 

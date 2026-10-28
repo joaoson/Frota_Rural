@@ -23,7 +23,7 @@
       const input = document.createElement("input");
       input.id = `${role.id}-${key}`;
       input.type = type;
-      // A profile may be left unconfigured (the demo seed has no admin).
+      // A profile may be deliberately left unconfigured.
       input.required = false;
       input.autocomplete = key === "password" ? "new-password" : "off";
       input.spellcheck = false;

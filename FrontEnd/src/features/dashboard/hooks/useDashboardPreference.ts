@@ -9,6 +9,11 @@ export const yearPreference = z.string().regex(/^(Todos|\d{4})$/);
 export const contractPreference = z.enum(["Todos", "Pendentes", "Assinados", "Encerrados"]);
 export const searchMapPreference = z.record(z.string(), searchPreference);
 export const yearMapPreference = z.record(z.string(), yearPreference);
+/** Período e máquina dos indicadores do painel do locador; `machine` vazio é a frota toda. */
+export const overviewPreference = z.object({
+  months: z.union([z.literal(3), z.literal(6), z.literal(12)]),
+  machine: z.string().max(64),
+});
 
 function read(key: string | null): string | null {
   if (!key) return null;

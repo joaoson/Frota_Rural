@@ -50,6 +50,13 @@ function api(routes: Record<string, Route> = {}) {
     "GET machines": () => [machineDto(), machineDto({ id: "machine-b", brand: "Case", model: "Magnum", year: 2024, status: "maintenance", usage_purpose: null, power_cv: null, hour_meter: null }), machineDto({ id: "machine-c", model: "6110J", status: "inactive", year: null })],
     "GET postings": () => [postingListDto({ machinery: "machine-a", primary_photo_url: "https://cdn/p.jpg" }), postingListDto({ id: "posting-b", machinery: "machine-b", machine_brand: "Case", machine_model: "Magnum", status: "draft", machine_year: 2024 }), postingListDto({ id: "alheio", machinery: "outra-maquina" })],
     "GET rentals": () => rentals,
+    "GET dashboard/lessor": () => ({
+      period: { months: 6, start: "2026-05-01", end: "2026-10-21", time_zone: "America/Sao_Paulo" },
+      machine: null,
+      totals: { revenue: "0.00", current_month_revenue: "0.00", completed_rentals: 0,
+        reviews: 0, average_rating: null, open_rentals: 3, rentals: 4 },
+      monthly: [], status_breakdown: [], top_machines: [],
+    }),
     "GET reviews": () => [],
     "GET operator-licenses": () => [license(), license({ id: "lic-2", validation_status: "rejected", review_note: "Foto ilegível" }), license({ id: "lic-3", validation_status: "pending" })],
     "GET certifications": () => [certification(), certification({ id: "cert-2", validation_status: "approved" }), certification({ id: "cert-3", validation_status: "rejected", review_note: "Sem carimbo" })],

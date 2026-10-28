@@ -49,9 +49,9 @@ com mais de um worker o fan-out entre processos não aconteceria.
 
 ## Dados, arquivos e testes
 
-Depois do seed, use `joao.silva@example.test` (locador) ou
-`maria.oliveira@example.test` (locatário), ambos com senha inicial `Teste1234`.
-São contas fictícias para desenvolvimento, sem administrador. O seed é
+Depois do seed, use `joao.silva@example.test` (locador),
+`maria.oliveira@example.test` (locatário) ou `admin@example.test` (administrador),
+todos com senha inicial `Teste1234`. São contas fictícias para desenvolvimento. O seed é
 reexecutável e preserva registros existentes; confira antes com `seed-preview`.
 Consulte [o inventário](SEED.md). Para testar upload, configure o Firebase no
 arquivo do ambiente selecionado.

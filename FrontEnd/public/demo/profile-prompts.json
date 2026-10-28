@@ -1,0 +1,32 @@
+[
+  {
+    "file": "profiles/joao.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 42-year-old Brazilian male farm owner, warm medium-brown skin, short dark hair with a little gray, neatly trimmed beard, plain olive cotton work shirt. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  },
+  {
+    "file": "profiles/maria.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 38-year-old Brazilian female agricultural business owner, warm brown skin, shoulder-length dark wavy hair, plain cream blouse, warm confident expression. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  },
+  {
+    "file": "profiles/carlos.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 45-year-old Brazilian male agricultural equipment operator, dark brown skin, short close-cropped black hair, clean-shaven, plain navy work shirt. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  },
+  {
+    "file": "profiles/ana.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 43-year-old Brazilian female farm owner, fair lightly freckled skin, auburn hair tied loosely back, plain sage green cotton shirt. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  },
+  {
+    "file": "profiles/pedro.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 35-year-old Brazilian male rural producer, tan skin, short dark hair, light beard stubble, plain blue denim shirt. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  },
+  {
+    "file": "profiles/fernanda.png",
+    "tool": "image_gen (built-in)",
+    "prompt": "Use case: photorealistic-natural. Create a single square realistic profile photo of a fictional 32-year-old Brazilian female agricultural equipment operator, medium-brown skin, shoulder-length dark curly hair, plain rust-colored work shirt. Head and shoulders centered with generous margin for circular avatar crop. Natural relaxed slight smile, eye contact with camera. Soft daylight, subtle defocused rural greenery background. Professional environmental portrait, 85mm lens, natural skin texture, believable facial details, no glamour retouching. One entirely fictional adult only; no text, logos, badge, watermark, collage or frame. Intended as an explicitly fictitious demonstration account in a Brazilian agricultural machinery rental application."
+  }
+]

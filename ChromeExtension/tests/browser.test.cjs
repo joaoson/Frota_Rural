@@ -43,6 +43,12 @@ test("real extension: three roles, session restore, React navigation and editabl
       }
     };
     await options.locator("#app-url").fill(origin);
+    assert.equal(await options.locator("#admin-email").inputValue(), "admin@example.test");
+    assert.equal(await options.locator("#admin-password").inputValue(), "Teste1234");
+    // An explicitly cleared profile must still be guarded before submission.
+    await options.locator("#admin-email").evaluate((input) => { input.closest("details").open = true; });
+    await options.locator("#admin-email").fill("");
+    await options.locator("#admin-password").fill("");
     await options.getByRole("button", { name: "Salvar", exact: true }).click();
     await options.getByText("Salvo. Os atalhos já foram atualizados na página de login.", { exact: true }).waitFor();
 
@@ -115,7 +121,8 @@ test("real extension: three roles, session restore, React navigation and editabl
     assert.equal(await page.getByRole("button", { name: "Entrar como Locatário", exact: true }).isEnabled(), true);
     await options.getByRole("button", { name: "Restaurar contas do seed", exact: true }).click();
     assert.equal(await options.locator("#locatario-email").inputValue(), "maria.oliveira@example.test");
-    assert.equal(await options.locator("#admin-email").inputValue(), "");
+    assert.equal(await options.locator("#admin-email").inputValue(), "admin@example.test");
+    assert.equal(await options.locator("#admin-password").inputValue(), "Teste1234");
     await fillAccounts();
     await options.getByRole("button", { name: "Salvar", exact: true }).click();
 

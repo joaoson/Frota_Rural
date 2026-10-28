@@ -4,7 +4,7 @@ globalThis.FrotaRuralValidation = (() => {
   const roles = [
     { id: "locador", label: "Locador", description: "Máquinas e anúncios", email: "joao.silva@example.test" },
     { id: "locatario", label: "Locatário", description: "Busca e locações", email: "maria.oliveira@example.test" },
-    { id: "admin", label: "Admin", description: "Configure uma conta de teste", email: "" },
+    { id: "admin", label: "Admin", description: "Moderação e usuários", email: "admin@example.test" },
   ];
   const localHosts = new Set(["localhost", "127.0.0.1"]);
 

@@ -158,3 +158,25 @@ class RentalPriceSnapshotMigrationTests(TransactionTestCase):
         unpaid = Rentals.objects.get(pk=unpaid.pk)
         self.assertEqual(unpaid.total_price, Decimal("2520.00"))
         self.assertEqual(unpaid.hourly_rate_snapshot, Decimal("150.00"))
+
+
+class LessorDashboardMigrationTests(TransactionTestCase):
+    """rentals.0007 creates the dashboard routine and its partial index; rollback removes both."""
+
+    def setUp(self):
+        self.latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(self.latest))
+
+    @staticmethod
+    def installed():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT to_regprocedure('lessor_dashboard_monthly(uuid, integer, text, timestamptz, uuid)'), "
+                           "to_regclass('rentals_finished_end_idx')")
+            return tuple(value is not None for value in cursor.fetchone())
+
+    def test_rollback_and_reapply(self):
+        self.assertEqual(self.installed(), (True, True))
+        MigrationExecutor(connection).migrate([("rentals", "0006_rentals_cancellation_policy_version_and_more")])
+        self.assertEqual(self.installed(), (False, False))
+        MigrationExecutor(connection).migrate(self.latest)
+        self.assertEqual(self.installed(), (True, True))

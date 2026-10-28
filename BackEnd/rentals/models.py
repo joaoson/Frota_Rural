@@ -50,6 +50,14 @@ class Rentals(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["recurrence", "recurrence_index"], name="unique_recurrence_occurrence"),
         ]
+        # Índice parcial do PostgreSQL para a receita mensal do painel (`lessor_dashboard_monthly`).
+        indexes = [
+            models.Index(
+                fields=["end_date"],
+                condition=models.Q(status__in=[RentalStatus.COMPLETED, RentalStatus.CLOSED]),
+                name="rentals_finished_end_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Locação {self.id}"
