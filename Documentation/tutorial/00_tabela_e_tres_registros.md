@@ -2,10 +2,12 @@
 
 ## 1 Ambiente local
 
+Para usar um banco exclusivo de ensaio, começar pelo [guia do ambiente](05_ambiente_dev_e_banco_isolado.md). Ele também mostra a substituição dos comandos abaixo quando Django roda diretamente no terminal.
+
 ```bash
-# Na raiz do repositório. Ajuste o nome se trabalhar em outro checkout.
-export AUTORIA_BACKEND=frota-local-715856fc-backend-1
-export AUTORIA_API=http://localhost:8002/api
+# Na raiz do repositório. Preserva o ambiente escolhido no guia de preparação.
+export AUTORIA_BACKEND=${AUTORIA_BACKEND:-frota-local-715856fc-backend-1}
+export AUTORIA_API=${AUTORIA_API:-http://localhost:8002/api}
 docker exec "$AUTORIA_BACKEND" python manage.py verify_database
 docker exec "$AUTORIA_BACKEND" python manage.py showmigrations
 docker exec "$AUTORIA_BACKEND" python manage.py startapp autoria

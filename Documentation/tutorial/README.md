@@ -6,6 +6,7 @@ São exemplos para implementar à mão. Nenhuma migration ou mudança de aplica�
 
 ## Ordem de execução
 
+0. [Preparar banco de ensaio e escolher Django no Docker ou no terminal](05_ambiente_dev_e_banco_isolado.md).
 1. [Tabela e três registros](00_tabela_e_tres_registros.md)
 2. [API, serializers, services e rotas](01_api_services_e_rotas.md)
 3. [Repository, Store, componente e página](02_frontend_repository_store_componente.md)
