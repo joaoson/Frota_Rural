@@ -1,157 +1,54 @@
-# Denúncias de mensagens · `MessageReports`
+# Denúncias de mensagens — `MessageReports`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/chat/models.py` → `MessageReports` |
-| Tabela | `message_reports` |
-| Fluxo original | `BackEnd/chat/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/admin/Denuncias.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/message_reports/<ID>` |
+`BackEnd/chat/models.py:113` — dentro de `MessageReports`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Somente admin classifica. Decisão de moderação permanece em ChatModerationService.resolve.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/chat/models.py — dentro de MessageReports, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations chat
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/chat/autoria_message_reports_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/chat/services.py:434` — procurar `def report_message(`
+
+Dentro de `MessageReports.objects.create`, depois de `reported_by=user`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from chat.models import MessageReports
-from autoria.serializers import VinculoInputSerializer
-
-
-class MessageReportsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return MessageReports.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            MessageReportsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            MessageReportsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=user.categoria_autoria_id,
 ```
+Manter a validação de participação, a proibição de denunciar a própria mensagem e a unicidade de denúncia.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/chat/autoria_message_reports_views.py -->
+Em `BackEnd/administration/services.py`, `ChatModerationService._queue_item`, dentro do dicionário de cada `report` em `"reports"`, depois de `"id": str(report.id)`, inserir:
 ```python
-from autoria.views import RegistroCategoriaView
-from chat.autoria_message_reports_services import MessageReportsCategoriaService
-
-
-class MessageReportsCategoriaView(RegistroCategoriaView):
-    service = MessageReportsCategoriaService
+"categoria_autoria": str(report.categoria_autoria_id) if report.categoria_autoria_id else None,
+"categoria_nome": report.categoria_autoria.Genero if report.categoria_autoria_id else None,
 ```
+Em `administration/serializer.py`, `ModerationReportOutputSerializer`, declarar UUID nullable e CharField nullable. Acrescentar `"categoria_autoria"` ao `select_related` de reports.
 
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+## 5 Frontend e comprovação
 
-```python
-from chat.autoria_message_reports_views import MessageReportsCategoriaView
+Em `features/administration/types/moderationSchemas.ts`, ampliar o schema de cada denúncia; propagar no tipo/mapper se houver. Na tela administrativa que renderiza `reports`, exibir o campo de cada denúncia. A gravação continua em `ReportMessageDialog` → `ChatRepository` → `ThreadService.report_message`; a leitura é administrativa. Denunciar mensagem de outro participante e conferir com a conta admin.
 
-# Dentro de urlpatterns:
-path("autoria/message_reports/<uuid:pk>", MessageReportsCategoriaView.as_view(), name="autoria_message_reports"),
-```
-
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/message_reports/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
-
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from chat.models import MessageReports; print(list(MessageReports.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM message_reports AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/message_reports/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/message_reports/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/admin/Denuncias.tsx`. Renderize fora de outro `<form>` e passe o ID de **MessageReports**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function MessageReportsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="message_reports" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em message_reports, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Somente admin classifica. Decisão de moderação permanece em ChatModerationService.resolve.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

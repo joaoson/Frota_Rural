@@ -1,156 +1,124 @@
-# Anúncios · `Postings`
+# Anúncios — `Postings`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/postings/models.py` → `Postings` |
-| Tabela | `postings` |
-| Fluxo original | `BackEnd/postings/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/postings/GerenciarAnuncio.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/postings/<ID>` |
+`BackEnd/postings/models.py:25` — dentro de `Postings`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Não alterar preço, disponibilidade ou status de moderação pelo endpoint de categoria.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/postings/models.py — dentro de Postings, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations postings
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Entrada no serializer usado pelo service
 
-<!-- file: BackEnd/postings/autoria_postings_services.py -->
-```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from postings.models import Postings
-from autoria.serializers import VinculoInputSerializer
+`BackEnd/postings/serializer.py:29` — procurar `class PostingInputSerializer`. Em `PostingInputSerializer.Meta.fields`, acrescentar `"categoria_autoria"` antes do fechamento da lista. Manter todos os campos e validações existentes.
 
+## 3 Service existente
 
-class PostingsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Postings.objects.all()
-        return Postings.objects.filter(machinery__owner=actor)
+`BackEnd/postings/services.py:37` — procurar `class PostingService`. `PostingService.create` e `PostingService.update` já usam `PostingInputSerializer` e `serializer.save()`. A nova FK entra em `validated_data`; não criar outro service.
 
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            PostingsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            PostingsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
-```
-
-## 3 View e rota
-
-<!-- file: BackEnd/postings/autoria_postings_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from postings.autoria_postings_services import PostingsCategoriaService
-
-
-class PostingsCategoriaView(RegistroCategoriaView):
-    service = PostingsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+Trecho atual do método de atualização (referência, não substituir):
 
 ```python
-from postings.autoria_postings_views import PostingsCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/postings/<uuid:pk>", PostingsCategoriaView.as_view(), name="autoria_postings"),
+def update(posting_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False) -> Postings:
+    posting = PostingService.get(posting_id, actor=actor, write=True)
+    serializer = PostingInputSerializer(posting, data=data, partial=partial, context={"actor": actor})
+    serializer.is_valid(raise_exception=True)
+    serializer.validated_data.pop("suggestion_id", None)
+    try:
+        return serializer.save(updated_at=timezone.now())
+    except IntegrityError as exc:
+        raise Conflict("Dados em conflito com um anúncio existente.") from exc
 ```
 
-## 4 Gravar e exibir no frontend
+## 4 Saída existente
 
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/postings/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+`BackEnd/postings/serializer.py:132` — procurar `class PostingOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
+
+```python
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `PostingOutputSerializer.Meta.fields`, acrescentar ao final da lista:
+
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 5 Identificar o registro e conferir a FK
+`BackEnd/postings/serializer.py:163` — procurar `class PostingListOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
-```bash
-python manage.py shell -c 'from postings.models import Postings; print(list(Postings.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
+```python
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
 ```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM postings AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/postings/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/postings/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
+Em `PostingListOutputSerializer.Meta.fields`, acrescentar ao final da lista:
+
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 6 Integrar na tela original quando solicitado
+`BackEnd/postings/serializer.py:203` — procurar `class PostingDetailOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
-Ponto de partida: `FrontEnd/src/pages/postings/GerenciarAnuncio.tsx`. Renderize fora de outro `<form>` e passe o ID de **Postings**, não o ID do objeto pai.
+```python
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `PostingDetailOutputSerializer.Meta.fields`, acrescentar ao final da lista:
 
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function PostingsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="postings" id={id} />;
-}
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 7 Conferências
+Para listas que exibem o nome, acrescentar `"categoria_autoria"` ao `select_related` do queryset utilizado; preservar os filtros de acesso.
 
-```text
-[ ] A FK está em postings, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Não alterar preço, disponibilidade ou status de moderação pelo endpoint de categoria.
-```
+## 5 Frontend existente
+
+Aplicar os campos do [guia 02, passo 3](../02_frontend_repository_store_componente.md#3-contrato-de-dados-no-fluxo-existente) nestes pontos:
+
+| Alteração | Arquivo e âncora |
+| --- | --- |
+| Resposta Zod | `FrontEnd/src/features/postings/types/postingSchemas.ts:37` — procurar `export const postingDetailApiSchema` |
+| Tipo de domínio | `FrontEnd/src/features/postings/types/posting.ts:22` — procurar `export interface PostingDetail` |
+| Mapper de leitura | `FrontEnd/src/features/postings/api/postingMapper.ts:46` — procurar `export function detailToDomain` |
+| Entrada/payload | `FrontEnd/src/features/postings/types/postingSchemas.ts:139` — procurar `export interface PostingWritePayload` |
+
+
+Também ampliar `postingListItemApiSchema`, `PostingListItem` e `listItemToDomain` para o nome aparecer nos cartões.
+
+`pages/postings/GerenciarAnuncio.tsx` já chama `updatePosting.mutateAsync({ id, payload: toEditPayload(values, coordenadas) })`.
+
+1. Dentro de `postingEditFormSchema`, acrescentar `categoriaId: z.string().optional()`.
+2. No carregamento do formulário em `GerenciarAnuncio`, preencher `categoriaId` com `posting.categoriaAutoriaId ?? ""` (usar o nome local do resultado de `usePosting`).
+3. No objeto retornado por `postingMapper.toEditPayload`, acrescentar `categoria_autoria: values.categoriaId || null`.
+4. Inserir `CategoriaSelect` antes do botão de salvar, usando `watch("categoriaId")` e `setValue("categoriaId", id)` do formulário existente.
+5. Exibir `categoriaNome` na leitura do anúncio; `PostingRepository.update` já faz `PATCH /api/postings/<id>` e a mutation invalida o detalhe.
+
+Na criação, repetir o campo no `postingFormSchema` e `toCreatePayload`; não remover `suggestion_id`, que pertence ao fluxo de precificação.
+
+
+
+
+## 6 Comprovar
+
+Salvar pelo formulário indicado, consultar a FK no banco e recarregar a mesma tela. Aplicar os casos de ID inexistente/permissão do [guia 03](../03_validacao_e_erros.md).

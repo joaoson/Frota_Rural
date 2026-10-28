@@ -1,156 +1,78 @@
-# Leituras de horímetro · `RentalMeterReadings`
+# Leituras de horímetro — `RentalMeterReadings`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/rentals/models.py` → `RentalMeterReadings` |
-| Tabela | `rental_meter_readings` |
-| Fluxo original | `BackEnd/rentals/meter.py` |
-| Tela original relacionada | `FrontEnd/src/features/dashboard/components/RentalCard.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/rental_meter_readings/<ID>` |
+`BackEnd/rentals/models.py:83` — dentro de `RentalMeterReadings`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Classificação é metadado. Correção de value deve criar leitura com supersedes, pelo serviço de horímetro.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/rentals/models.py — dentro de RentalMeterReadings, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations rentals
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/rentals/autoria_rental_meter_readings_services.py -->
+Este caso recebe o UUID diretamente no formulário do horímetro. Criar `CategoriaSelect` do guia 02; não precisa modificar o perfil de usuários.
+
+## 3 Alteração no service real
+
+`BackEnd/rentals/meter.py:85` — procurar `def record(`
+
+Para seleção no próprio formulário de leitura, importar `Genero` e acrescentar a `MeterReadingInputSerializer`, após `note`:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rentals.models import RentalMeterReadings
-from autoria.serializers import VinculoInputSerializer
-
-
-class RentalMeterReadingsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return RentalMeterReadings.objects.all()
-        return RentalMeterReadings.objects.filter(rental__postings__machinery__owner=actor)
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            RentalMeterReadingsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            RentalMeterReadingsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria = serializers.PrimaryKeyRelatedField(
+    queryset=Genero.objects.all(), required=False, allow_null=True,
+)
 ```
-
-## 3 View e rota
-
-<!-- file: BackEnd/rentals/autoria_rental_meter_readings_views.py -->
+Dentro de `RentalMeterReadings.objects.create`, entre `supersedes=latest.get(kind),` e `)`, inserir:
 ```python
-from autoria.views import RegistroCategoriaView
-from rentals.autoria_rental_meter_readings_services import RentalMeterReadingsCategoriaService
-
-
-class RentalMeterReadingsCategoriaView(RegistroCategoriaView):
-    service = RentalMeterReadingsCategoriaService
+categoria_autoria=serializer.validated_data.get("categoria_autoria"),
 ```
+Manter o fluxo de `MeterService.record`: somente locador, contrato assinado, valores e ordem de retirada/devolução válidos.
 
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+## 4 Saída persistida
+
+`BackEnd/rentals/serializer.py:238` — procurar `class RentalMeterReadingOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
 ```python
-from rentals.autoria_rental_meter_readings_views import RentalMeterReadingsCategoriaView
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `RentalMeterReadingOutputSerializer.Meta.fields`, acrescentar ao final da lista:
 
-# Dentro de urlpatterns:
-path("autoria/rental_meter_readings/<uuid:pk>", RentalMeterReadingsCategoriaView.as_view(), name="autoria_rental_meter_readings"),
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/rental_meter_readings/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+Em `rentals/meter.py`, `_reading_payload`, depois de `"id": str(reading.id)`, inserir:
+```python
+"categoria_autoria": str(reading.categoria_autoria_id) if reading.categoria_autoria_id else None,
+"categoria_nome": reading.categoria_autoria.Genero if reading.categoria_autoria_id else None,
 ```
+Essa projeção alimenta `rental.meter.check_in/check_out` depois de recarregar.
 
-## 5 Identificar o registro e conferir a FK
+## 5 Frontend e comprovação
 
-```bash
-python manage.py shell -c 'from rentals.models import RentalMeterReadings; print(list(RentalMeterReadings.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM rental_meter_readings AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/rental_meter_readings/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/rental_meter_readings/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
+`features/contracts/types/rentalSchemas.ts`: ampliar `meterReadingApiSchema`; `rental.ts`: ampliar `MeterReading`; `contractMapper.ts`: ampliar `readingToDomain`.
 
-## 6 Integrar na tela original quando solicitado
+Em `ContractRepository.ts`, localizar `recordMeterReading`; acrescentar `categoria_autoria?: string | null` ao tipo de entrada e ao body se ele for montado manualmente. Propagar pelo `ContractStore.recordMeterReading` e pela variável de `useRecordMeterReading`.
 
-Ponto de partida: `FrontEnd/src/features/dashboard/components/RentalCard.tsx`. Renderize fora de outro `<form>` e passe o ID de **RentalMeterReadings**, não o ID do objeto pai.
+No formulário de leitura de `features/dashboard/components/RentalCard.tsx`, adicionar estado/seletor e enviar o ID junto de `kind`, `value`, `note` através do callback existente. Exibir `rental.meter.checkIn?.categoriaNome` e `checkOut?.categoriaNome` usando os nomes de domínio locais.
 
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function RentalMeterReadingsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="rental_meter_readings" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em rental_meter_readings, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Classificação é metadado. Correção de value deve criar leitura com supersedes, pelo serviço de horímetro.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

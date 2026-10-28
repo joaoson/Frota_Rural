@@ -1,149 +1,54 @@
-# Revisões de contrato · `ContractRevisions`
+# Revisões de contrato — `ContractRevisions`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/contracts/models.py` → `ContractRevisions` |
-| Tabela | `contract_revisions` |
-| Fluxo original | `BackEnd/contracts/revisions.py` |
-| Tela original relacionada | `FrontEnd/src/pages/contracts/Contrato.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/contract_revisions/<ID>` |
+`BackEnd/contracts/models.py:54` — dentro de `ContractRevisions`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Append-only: incluir a categoria somente em uma NOVA revisão pelo fluxo existente; PATCH deve retornar 405.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/contracts/models.py — dentro de ContractRevisions, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations contracts
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/contracts/autoria_contract_revisions_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/contracts/revisions.py:19` — procurar `def freeze_revision(`
+
+Dentro de `ContractRevisions.objects.create`, entre `contract=contract,` e `number=last + 1,`, inserir:
 ```python
-from django.db.models import Q
-from django.shortcuts import get_object_or_404
-from contracts.models import ContractRevisions
-
-
-class ContractRevisionsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return ContractRevisions.objects.all()
-        return ContractRevisions.objects.filter(Q(contract__rental__lessee=actor) | Q(contract__rental__postings__machinery__owner=actor))
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            ContractRevisionsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
+categoria_autoria_id=contract.rental.lessee.categoria_autoria_id,
 ```
+A atribuição acontece apenas no INSERT. Não alterar revisões existentes nem o hash/documento congelado.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/contracts/autoria_contract_revisions_views.py -->
+Em `BackEnd/contracts/services.py`, `ContractService._revision_summary`, no dicionário depois de `"id": revision.id`, inserir:
 ```python
-from autoria.views import RegistroCategoriaView
-from contracts.autoria_contract_revisions_services import ContractRevisionsCategoriaService
-
-
-class ContractRevisionsCategoriaView(RegistroCategoriaView):
-    service = ContractRevisionsCategoriaService
-    http_method_names = ["get", "head", "options"]
+"categoria_autoria": revision.categoria_autoria_id,
+"categoria_nome": revision.categoria_autoria.Genero if revision.categoria_autoria_id else None,
 ```
+Em `BackEnd/contracts/serializer.py`, `_RevisionSummarySerializer`, declarar os dois campos simples: UUID nullable e CharField nullable. Manter `_revision_summary(None) → None`.
 
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+## 5 Frontend e comprovação
 
-```python
-from contracts.autoria_contract_revisions_views import ContractRevisionsCategoriaView
+Em `features/contracts/types/contractDocument.ts`, ampliar `RevisaoContrato` com os campos snake_case acima. Em `pages/contracts/Contrato.tsx`, exibir o nome dentro da seção da revisão usando `documento.revisao?.categoria_nome` (substituir `documento` pelo identificador local). Uma revisão nasce no congelamento após pagamento ou no aditivo aceito. O ambiente isolado não tem Stripe configurado; use o fluxo de teste já existente ou contrato pago do seed elegível. Não simular aprovação editando status no banco.
 
-# Dentro de urlpatterns:
-path("autoria/contract_revisions/<uuid:pk>", ContractRevisionsCategoriaView.as_view(), name="autoria_contract_revisions"),
-```
-
-## 4 Gravar somente durante a criação
-
-Antes, aplique o guia de [Contracts](contracts.md). A seleção é salva no contrato e copiada quando o fluxo real criar uma nova evidência. Registros antigos continuam sem categoria.
-
-`BackEnd/contracts/revisions.py` → `freeze_revision`: inserir o argumento abaixo na chamada `ContractRevisions.objects.create(...)` já existente.
-
-```python
-# Apenas metadado administrativo; não representa cláusula ou prova de aceite.
-categoria_autoria=contract.categoria_autoria,
-```
-```text
-1. Abrir /autoria/contracts/ID_DO_CONTRATO e salvar uma categoria.
-2. Completar o pagamento de teste para congelar a revisão inicial, ou aceitar um aditivo válido.
-3. Copiar o ID NOVO de contract_revisions usando o comando abaixo.
-4. Abrir /autoria/contract_revisions/ID_NOVO; a página é somente leitura.
-5. PATCH neste recurso deve retornar 405, inclusive para admin.
-Não desativar triggers, não usar UPDATE direto e não recalcular evidências antigas.
-```
-
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from contracts.models import ContractRevisions; print(list(ContractRevisions.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM contract_revisions AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-AUTORIA_ID='COLE_O_ID_NOVO_AQUI'
-curl --fail-with-body "$AUTORIA_API/autoria/contract_revisions/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# categoria_id é a escolha copiada do contrato no instante da criação.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/contracts/Contrato.tsx`. Renderize fora de outro `<form>` e passe o ID de **ContractRevisions**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function ContractRevisionsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="contract_revisions" id={id} somenteLeitura />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em contract_revisions, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH retorna 405; uma criação pelo fluxo real grava a nova FK.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Append-only: incluir a categoria somente em uma NOVA revisão pelo fluxo existente; PATCH deve retornar 405.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

@@ -1,190 +1,240 @@
-# Usuários pelo endpoint e formulário existentes
+# Usuários: continuar seu exercício no fluxo real
 
-Alternativa ao endpoint de vínculo do guia [Users](modelos/users.md). Use a tabela de [00](00_tabela_e_tres_registros.md), a listagem de categorias de [01](01_api_services_e_rotas.md) e a FK em `Users`. Este caminho não precisa do `CategoriaEditor`, do `AutoriaStore` ou da página `/autoria`.
+Estado de partida: `autoria.Genero`, três registros e `Users.categoria_autoria` já existem e foram migrados. Execute [01](01_api_services_e_rotas.md) e crie os dois arquivos do [02](02_frontend_repository_store_componente.md).
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+As linhas são referências do código revisado em 28/10/2026. Após inserir código elas mudam; use as duas linhas de contexto indicadas para localizar o ponto.
 
-## 1 Serializer de entrada
+## 1 Entrada: aceitar o UUID no PATCH de usuário
 
-`BackEnd/users/serializer.py` — acrescentar em `PROFILE_FIELDS`:
+`BackEnd/users/serializer.py:60` — procurar `class UserUpdateInputSerializer`. Dentro de **UserUpdateInputSerializer.Meta**, entre `model = Users` e `extra_kwargs = UNIQUE_FIELD_KWARGS`, substituir apenas `fields = PROFILE_FIELDS`:
+
+<!-- patch: users-input -->
 
 ```python
-    "categoria_autoria",
+class Meta:
+    model = Users
+    fields = [*PROFILE_FIELDS, "categoria_autoria"]
+    extra_kwargs = UNIQUE_FIELD_KWARGS
 ```
+
+O `ModelSerializer` cria o campo de FK validado automaticamente: UUID existente → objeto `Genero`; UUID inexistente → 400; `null` → remover vínculo. Manter `validate()` e os campos protegidos. Não modificar a lista global `PROFILE_FIELDS`, pois ela também atende cadastro e operadores.
+
+## 2 Saída: devolver ID e texto do banco
+
+`BackEnd/users/serializer.py:112` — procurar `class UserOutputSerializer`. Entre a declaração de `profile_photo_url` e `def get_profile_photo_url`, inserir:
+
+<!-- patch: users-output-field -->
 
 ```python
-# UserUpdateInputSerializer já utiliza PROFILE_FIELDS.
-# ModelSerializer cria automaticamente um PrimaryKeyRelatedField validado.
-# Não adicionar role/password/status/employer à lista de campos editáveis.
-# PROFILE_FIELDS também é usado pelo cadastro e pelos operadores.
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
 ```
 
-## 2 Serializer de saída
+Na lista `UserOutputSerializer.Meta.fields`, entre `"profile_photo_url",` e `"role",`, inserir:
 
-`BackEnd/users/serializer.py` — dentro de `UserOutputSerializer`:
+<!-- patch: users-output-list -->
 
 ```python
-    categoria_nome = serializers.CharField(
-        source="categoria_autoria.nome", read_only=True, allow_null=True, default=None,
-    )
+"categoria_autoria",
+"categoria_nome",
 ```
 
-Acrescentar em `UserOutputSerializer.Meta.fields`:
+A saída fica assim, além dos campos que já existiam:
+
+```json
+{"categoria_autoria": "11111111-1111-4111-8111-111111111111", "categoria_nome": "Masculino"}
+```
+
+## 3 Service: onde a alteração é persistida
+
+`BackEnd/users/services.py:82` — procurar `def update(`. **Manter o método existente**:
+
 
 ```python
-    "categoria_autoria",
-    "categoria_nome",
+user = UserService.get(user_id, actor=actor)
+serializer = UserUpdateInputSerializer(user, data=data, partial=partial)
+serializer.is_valid(raise_exception=True)
+# Aqui validated_data já contém categoria_autoria como objeto Genero.
+# O serializer.save() existente grava a FK junto com os campos de perfil.
 ```
 
-## 3 Service e view já existentes
+Não adicionar outro `.save()` e não substituir o tratamento de `IntegrityError`.
+
+Para carregar o nome sem uma consulta extra por usuário, em `UserService._visible`, substituir `queryset = Users.objects.all()` por:
+
+
+```python
+queryset = Users.objects.select_related("categoria_autoria")
+```
+
+Em `UserService.list`, substituir a expressão do retorno por:
+
+
+```python
+return Users.objects.select_related("categoria_autoria").order_by("name")
+```
+
+`BackEnd/users/views/users.py:124` — procurar `def patch(`: já chama `UserService.update(..., partial=True)` e serializa com `UserOutputSerializer`. Não criar rota ou view adicional.
 
 ```text
 PATCH /api/users/<UUID>
-  BackEnd/users/urls.py
-  BackEnd/users/views/users.py: UserDetailView.patch
-  BackEnd/users/services.py: UserService.update
-  BackEnd/users/serializer.py: UserUpdateInputSerializer
-  serializer.save() -> Users.categoria_autoria_id
-
-GET /api/users/<UUID>
-  UserOutputSerializer -> categoria_autoria + categoria_nome
-
-Não criar outro método de update: UserService.update já valida e chama serializer.save().
+GET   /api/users/<UUID>
 ```
 
-## 4 Schema da resposta
+## 4 Schema Zod: preservar os campos recebidos
 
-`FrontEnd/src/features/users/types/userSchemas.ts` — dentro de `userApiSchema`:
+`FrontEnd/src/features/users/types/userSchemas.ts:96` — procurar `export const userApiSchema`. Dentro de `userApiSchema`, entre `profile_photo_url: ...` e `role: ...`, inserir:
 
-```typescript
-  categoria_autoria: z.string().uuid().nullish(),
-  categoria_nome: z.string().nullish(),
+<!-- patch: users-zod -->
+
+```ts
+categoria_autoria: z.string().uuid().nullish(),
+categoria_nome: z.string().nullish(),
 ```
+
+Sem isso, o Zod remove os campos desconhecidos da resposta.
 
 ## 5 Tipo de domínio e mapper
 
-`FrontEnd/src/features/users/types/user.ts` — dentro de `User`:
+`FrontEnd/src/features/users/types/user.ts:1` — procurar `export interface User`. Entre `profilePhotoUrl` e `role`, inserir:
 
-```typescript
-  categoryId?: string | null;
-  categoryName?: string | null;
+<!-- patch: users-domain -->
+
+```ts
+categoriaAutoriaId?: string | null;
+categoriaNome?: string | null;
 ```
 
-`FrontEnd/src/features/users/api/userMapper.ts` — dentro do objeto retornado por `toDomain`:
+`FrontEnd/src/features/users/api/userMapper.ts:6` — procurar `export function toDomain`. No objeto retornado, entre `profilePhotoUrl: ...` e `role: ...`, inserir:
 
-```typescript
-    categoryId: dto.categoria_autoria ?? null,
-    categoryName: dto.categoria_nome ?? null,
+<!-- patch: users-mapper -->
+
+```ts
+categoriaAutoriaId: dto.categoria_autoria ?? null,
+categoriaNome: dto.categoria_nome ?? null,
 ```
 
-## 6 Payload de atualização
+## 6 Payload do repository existente
 
-`FrontEnd/src/features/users/api/UserRepository.ts` — dentro de `UpdateProfileInput`:
+`FrontEnd/src/features/users/api/UserRepository.ts:10` — procurar `export interface UpdateProfileInput`. Acrescentar depois de `cep?: string;`, antes do `}` da interface:
 
-```typescript
-  categoria_autoria?: string;
+<!-- patch: users-payload -->
+
+```ts
+categoria_autoria?: string | null;
 ```
 
-```text
-HttpUserRepository.updateProfile já envia input no PATCH.
-UserStore.updateProfile já chama o repository.
-useUpdateProfile já invalida o cache do usuário e da listagem.
-```
+O método `HttpUserRepository.updateProfile` já envia `body: input`; manter. `UserStore.updateProfile` e `useUpdateProfile` já persistem e invalidam as consultas; manter.
 
-## 7 Serviço frontend para as três opções
+## 7 Tela Minha Conta
 
-<!-- file: FrontEnd/src/features/autoria/api/listCategorias.ts -->
-```typescript
-import { z } from "zod";
-import { httpClient } from "@/app/container";
+Arquivo: `FrontEnd/src/features/dashboard/components/AccountSection.tsx`.
 
-const categoriasSchema = z.array(z.object({ id: z.string().uuid(), nome: z.string() }));
+**Import**: depois de `ProfilePhotoUpload`, antes do import de `User`:
 
-export async function listCategorias() {
-  const response = await httpClient.send<unknown>({ method: "GET", path: "autoria/categorias" });
-  return categoriasSchema.parse(response.data);
-}
-```
-
-## 8 Componente para Minha Conta
-
-<!-- file: FrontEnd/src/features/users/components/UserCategoryField.tsx -->
-```tsx
-import { useId, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { listCategorias } from "@/features/autoria/api/listCategorias";
-import { useUpdateProfile } from "../hooks/useUsers";
-import type { User } from "../types/user";
-
-export function UserCategoryField({ user }: { user: User }) {
-  const inputId = useId();
-  const [escolha, setEscolha] = useState<string | null>(null);
-  const categorias = useQuery({ queryKey: ["autoria", "categorias"], queryFn: listCategorias });
-  const update = useUpdateProfile();
-  const value = escolha ?? user.categoryId ?? "";
-  if (categorias.isPending) return <p>Carregando categorias...</p>;
-  if (categorias.isError) return <p role="alert">{categorias.error.message}</p>;
-  return <section className="space-y-3 rounded-lg border p-4">
-    <label htmlFor={inputId}>Categoria do perfil</label>
-    <select id={inputId} value={value} disabled={update.isPending}
-      onChange={(event) => setEscolha(event.target.value)}>
-      <option value="">Selecione</option>
-      {categorias.data.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
-    </select>
-    <button type="button" disabled={!value || update.isPending}
-      onClick={() => update.mutate({ id: user.id, input: { categoria_autoria: value } })}>
-      {update.isPending ? "Salvando..." : "Salvar categoria"}
-    </button>
-    {update.isError && <p role="alert">{update.error.message}</p>}
-    {update.isSuccess && <p role="status">Categoria salva.</p>}
-    <p>Categoria persistida: {user.categoryName ?? "Não definida"}</p>
-  </section>;
-}
-```
-
-## 9 Inserir no formulário existente
-
-`FrontEnd/src/features/dashboard/components/AccountSection.tsx` — importar:
+<!-- patch: users-import -->
 
 ```tsx
-import { UserCategoryField } from "@/features/users/components/UserCategoryField";
+import { CategoriaSelect } from "@/features/autoria/CategoriaSelect";
 ```
 
-No JSX, fora dos formulários de perfil e senha:
+**Estado**: depois de `const [formCep, setFormCep] = useState("");`, antes de `currentPassword` (referência original: linha 54):
+
+<!-- patch: users-state -->
 
 ```tsx
-{user && <UserCategoryField key={user.id} user={user} />}
+const [formCategoriaId, setFormCategoriaId] = useState("");
 ```
 
-## 10 Validar
+**Carregar registro**: dentro de `if (user && user.id !== syncedUserId)`, depois de `setFormCep(...)`, antes do `}` (referência original: linha 78):
+
+<!-- patch: users-load -->
+
+```tsx
+setFormCategoriaId(user.categoriaAutoriaId ?? "");
+```
+
+**Salvar**: dentro de `updateProfile.mutateAsync({ id: userId, input: { ... } })`, depois de `cep: clearSpecialChars(formCep),`, antes de fechar `input` (referência original: linha 141):
+
+<!-- patch: users-send -->
+
+```tsx
+categoria_autoria: formCategoriaId || null,
+```
+
+**Seletor e leitura**: logo após abrir `<fieldset disabled={!user || updateProfile.isPending} ...>`, antes do `FormField` de Nome Completo (referência original: linha 206):
+
+<!-- patch: users-render -->
+
+```tsx
+<CategoriaSelect
+  label="Gênero"
+  value={formCategoriaId}
+  onChange={setFormCategoriaId}
+/>
+<p className="text-sm text-on-surface-variant">
+  Salvo no banco: {user?.categoriaNome ?? "Não informado"}
+</p>
+```
+
+O seletor mostra o rascunho; o parágrafo mostra `user` recebido da API. O botão **Salvar** já existente envia o formulário todo.
+
+## 8 Conferir
+
 
 ```bash
-python manage.py makemigrations users
-python manage.py migrate
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py check
+python manage.py makemigrations --check --dry-run
 ```
 
 ```bash
-# Obter AUTORIA_TOKEN pelo login do passo 2 do guia 03_validacao_e_erros.md.
-AUTORIA_ID='COLE_O_ID_DO_USUARIO_LOGADO'
-curl --fail-with-body -X PATCH "$AUTORIA_API/users/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_autoria":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/users/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
+# Outro terminal, na raiz:
+cd FrontEnd
+npx tsc -b
+npm run lint
 ```
 
-```text
-http://localhost:5183 -> Login -> Minha Conta -> Categoria do perfil -> Prioridade -> Salvar categoria -> F5
-GET /api/users/<UUID> deve trazer categoria_nome = Prioridade.
+Abrir `http://localhost:5183`, entrar com uma conta do seed, abrir Minha Conta, escolher gênero, salvar e pressionar F5. O mesmo gênero deve aparecer no seletor e em “Salvo no banco”.
 
-Endpoint original: payload usa categoria_autoria.
-Endpoint do tutorial /autoria/users: payload usa categoria_id.
-Escolha um dos fluxos; não misture os dois payloads.
+```sql
+SELECT u.email, u.categoria_autoria_id, g."Genero"
+FROM users u
+LEFT JOIN "Genero" g ON g.id = u.categoria_autoria_id
+WHERE u.email = 'joao.silva@example.test';
 ```
+
+Não executar o seed novamente para validar: ele não substitui a gravação pelo formulário. Para testes de API e IDs inválidos, seguir o [guia 03](03_validacao_e_erros.md).
+
+## 9 Ajustar os testes de tela existentes ao novo catálogo
+
+`FrontEnd/src/test/container.ts`: trocar `const httpClient = fakeHttp();` por `export const httpClient = fakeHttp();`. O hook do catálogo importa esse mesmo nome.
+
+Em `accountSectionFlows.test.tsx`, no helper `api`, acrescentar a rota:
+
+```ts
+"GET autoria/categorias": () => [
+  { id: "11111111-1111-4111-8111-111111111111", nome: "Masculino" },
+],
+```
+
+O teste que compara o payload completo de perfil precisa incluir `categoria_autoria: null` quando não houver seleção. Asserções de “nenhuma chamada” devem verificar ausência de PATCH de perfil, pois a abertura agora faz GET do catálogo:
+
+```ts
+expect(net.http.send.mock.calls.filter(([request]) => request.method === "PATCH")).toHaveLength(0);
+```
+
+Em `accountSettings.test.tsx`, que monta a conta sem QueryClientProvider e isola seus hooks, adicionar o mock do novo hook:
+
+```ts
+vi.mock("@/features/autoria/useCategorias", () => ({
+  useCategorias: () => ({ data: [], isPending: false, isError: false }),
+}));
+```
+
+Os testes específicos de gênero devem usar o hook/repository reais com rede simulada e verificar a sequência seleção → PATCH → GET → remontagem. Não verificar apenas o valor local do select.

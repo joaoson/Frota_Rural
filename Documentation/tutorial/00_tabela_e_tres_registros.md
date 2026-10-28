@@ -1,130 +1,117 @@
-# Criar a tabela e os três registros
+# Tabela e três registros
 
-## 1 Ambiente local
+Seu ensaio já chegou ao passo 5. Não repetir `startapp`, não apagar migrations e não recriar o banco.
 
-Use o banco isolado preparado no [guia do ambiente](05_ambiente_dev_e_banco_isolado.md). Todos os comandos abaixo são nativos, no terminal de `BackEnd/`.
+## 1 Ambiente
+
 
 ```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+# Terminal em BackEnd/
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Confirmar 127.0.0.1:5442 / frota_rural_autoria antes de continuar.
-python manage.py showmigrations
-# Executar uma vez; se BackEnd/autoria já existir, continuar nas edições abaixo.
-python manage.py startapp autoria
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 ```
 
-## 2 Registrar o app
+## 2 Modelo utilizado neste ensaio
 
-`BackEnd/djangoapi/settings.py` — acrescentar em `INSTALLED_APPS`:
+`BackEnd/autoria/models.py` — estado atual; manter os nomes para continuar:
+
 
 ```python
-    "autoria",
-```
-
-## 3 Modelo da tabela nova
-
-<!-- file: BackEnd/autoria/models.py -->
-```python
-import uuid
-from django.db import models
-
-
-class CategoriaAutoria(models.Model):
+class Genero(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nome = models.CharField(max_length=60, unique=True)
+    Genero = models.CharField(max_length=60, unique=True)
 
     class Meta:
-        db_table = "categorias_autoria"
-        ordering = ["nome"]
+        db_table = "Genero"
+        ordering = ["Genero"]
 
     def __str__(self):
-        return self.nome
+        return self.Genero
 ```
+
+Imports: `import uuid` e `from django.db import models`. App `"autoria"` já registrado em `INSTALLED_APPS`.
+
+## 3 Conferir o que já foi aplicado
+
 
 ```bash
-# Execute antes de adicionar a FK no modelo existente.
-python manage.py makemigrations autoria
-# Resultado esperado para um app novo: autoria/migrations/0001_initial.py.
+python manage.py showmigrations autoria users
+python manage.py makemigrations --check --dry-run
+python manage.py shell -c 'from autoria.models import Genero; print(list(Genero.objects.values("id", "Genero")))'
 ```
 
-## 4 Migration dos três registros
+```text
+11111111-1111-4111-8111-111111111111 → Masculino
+22222222-2222-4222-8222-222222222222 → Feminino
+33333333-3333-4333-8333-333333333333 → Indefinido
+```
 
-<!-- file: BackEnd/autoria/migrations/0002_categorias_iniciais.py -->
+## 4 Se precisar criar OUTRA tabela na defesa
+
+Criar o novo modelo, gerar sua migration e depois uma migration de dados:
+
+
+```bash
+python manage.py makemigrations autoria
+python manage.py makemigrations autoria --empty --name registros_iniciais_nova_tabela
+```
+
+Na migration vazia, manter a dependência gerada. Exemplo do corpo para um modelo `Departamento` com campo `nome`:
+
+
 ```python
-from django.db import migrations
-
-
 REGISTROS = (
-    ("11111111-1111-4111-8111-111111111111", "Rotina"),
-    ("22222222-2222-4222-8222-222222222222", "Acompanhamento"),
-    ("33333333-3333-4333-8333-333333333333", "Prioridade"),
+    ("11111111-1111-4111-8111-111111111111", "Operações"),
+    ("22222222-2222-4222-8222-222222222222", "Manutenção"),
+    ("33333333-3333-4333-8333-333333333333", "Administrativo"),
 )
 
-
 def inserir(apps, schema_editor):
-    Categoria = apps.get_model("autoria", "CategoriaAutoria")
-    for identificador, nome in REGISTROS:
-        Categoria.objects.using(schema_editor.connection.alias).get_or_create(
-            pk=identificador, defaults={"nome": nome},
+    Modelo = apps.get_model("autoria", "Departamento")
+    for pk, nome in REGISTROS:
+        Modelo.objects.using(schema_editor.connection.alias).get_or_create(
+            pk=pk, defaults={"nome": nome},
         )
 
-
 def remover(apps, schema_editor):
-    Categoria = apps.get_model("autoria", "CategoriaAutoria")
-    Categoria.objects.using(schema_editor.connection.alias).filter(
-        pk__in=[identificador for identificador, _ in REGISTROS],
+    Modelo = apps.get_model("autoria", "Departamento")
+    Modelo.objects.using(schema_editor.connection.alias).filter(
+        pk__in=[pk for pk, _ in REGISTROS],
     ).delete()
 
-
-class Migration(migrations.Migration):
-    dependencies = [("autoria", "0001_initial")]
-    operations = [migrations.RunPython(inserir, remover)]
+# Dentro de Migration; preservar dependencies:
+operations = [migrations.RunPython(inserir, remover)]
 ```
 
-```bash
-python manage.py migrate --plan
-python manage.py migrate
-python manage.py shell -c 'from autoria.models import CategoriaAutoria; print(list(CategoriaAutoria.objects.values("id", "nome")))'
-```
+## 5 FK no modelo existente
 
-```sql
-SELECT id, nome FROM categorias_autoria ORDER BY nome;
--- 3 linhas: Acompanhamento, Prioridade, Rotina.
-```
+Para o ensaio atual, inserir dentro da classe escolhida, imediatamente antes de `class Meta`. **Em `Users` já existe; não duplicar.**
 
-## 5 Relacionar uma tabela existente
-
-Escolha **um** arquivo em [modelos](README.md#modelos). Todos usam a mesma tabela nova.
 
 ```python
-# Inserir DENTRO da classe do modelo escolhido, antes de class Meta.
-# Não substituir a classe nem seus campos existentes.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria",
+    "autoria.Genero",
     on_delete=models.PROTECT,
-    null=True,       # Registros antigos continuam válidos.
+    null=True,
     blank=True,
     related_name="+",
 )
 ```
 
-```text
-Python: registro.categoria_autoria      -> objeto CategoriaAutoria
-Python: registro.categoria_autoria_id   -> UUID gravado
-SQL:    tabela.categoria_autoria_id     -> FK para categorias_autoria.id
-API:    categoria_id                   -> UUID recebido pelo novo endpoint
-API:    categoria_nome                 -> nome lido do relacionamento no banco
+```bash
+# Exemplo: users; trocar pelo app do modelo escolhido.
+python manage.py makemigrations users
+python manage.py migrate --plan
+python manage.py migrate
 ```
 
-## 6 Alterar o enunciado
-
 ```text
-Se pedirem departamentos: CategoriaAutoria -> Departamento; nomes -> 3 departamentos.
-Se pedirem tipos:        CategoriaAutoria -> Tipo; nomes -> 3 tipos.
-Se pedirem setores:     CategoriaAutoria -> Setor; nomes -> 3 setores.
-
-Renomear junto: classe, ForeignKey, migration, serializer, service, URL e componente.
-Não usar CharField com o nome da opção no lugar da FK pedida.
+Objeto: registro.categoria_autoria
+UUID no ORM/SQL: categoria_autoria_id
+Campo de entrada/saída da API existente: categoria_autoria
+Texto de saída: categoria_nome
 ```
+
+Nos outros guias, `Genero` é a tabela de exemplo do seu ensaio. Se o enunciado pedir departamentos/tipos/setores, use os nomes e os três valores pedidos; ajuste o destino da FK, o queryset e o `source` do texto juntos.

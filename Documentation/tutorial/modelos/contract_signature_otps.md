@@ -1,157 +1,58 @@
-# Códigos de assinatura · `ContractSignatureOtps`
+# Códigos de assinatura — `ContractSignatureOtps`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/contracts/models.py` → `ContractSignatureOtps` |
-| Tabela | `contract_signature_otps` |
-| Fluxo original | `BackEnd/contracts/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/contracts/Contrato.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/contract_signature_otps/<ID>` |
+`BackEnd/contracts/models.py:164` — dentro de `ContractSignatureOtps`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Somente admin classifica metadados. Não expor code_hash/email nem alterar attempts, consumed_at ou validade.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/contracts/models.py — dentro de ContractSignatureOtps, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations contracts
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/contracts/autoria_contract_signature_otps_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/contracts/services.py:221` — procurar `def request_otp(`
+
+Dentro de `ContractSignatureOtps.objects.create`, entre `signer=party,` e `revision=revision,`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from contracts.models import ContractSignatureOtps
-from autoria.serializers import VinculoInputSerializer
-
-
-class ContractSignatureOtpsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return ContractSignatureOtps.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            ContractSignatureOtpsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            ContractSignatureOtpsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=party.categoria_autoria_id,
 ```
+Manter geração/hash do código, envio de e-mail, validade e rollback se envio falhar. Não retornar código/hash.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/contracts/autoria_contract_signature_otps_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from contracts.autoria_contract_signature_otps_services import ContractSignatureOtpsCategoriaService
-
-
-class ContractSignatureOtpsCategoriaView(RegistroCategoriaView):
-    service = ContractSignatureOtpsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+Não há GET de OTP persistido na API atual. Para leitura autenticada mínima, acrescentar a `ContractService.get_document`, após obter `contract`:
 
 ```python
-from contracts.autoria_contract_signature_otps_views import ContractSignatureOtpsCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/contract_signature_otps/<uuid:pk>", ContractSignatureOtpsCategoriaView.as_view(), name="autoria_contract_signature_otps"),
+otp = contract.signature_otps.filter(signer=actor).select_related("categoria_autoria").order_by("-created_at").first()
 ```
-
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/contract_signature_otps/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+Confirmar o `related_name` do modelo antes de usar essa expressão; também pode usar `ContractSignatureOtps.objects.filter(contract=contract, signer=actor)` com import local. No retorno, acrescentar:
+```python
+"otp_categoria_nome": otp.categoria_autoria.Genero if otp and otp.categoria_autoria_id else None,
 ```
+Declarar `otp_categoria_nome = serializers.CharField(allow_null=True)` em `ContractDocumentOutputSerializer`. A leitura fica limitada ao signatário autenticado.
 
-## 5 Identificar o registro e conferir a FK
+## 5 Frontend e comprovação
 
-```bash
-python manage.py shell -c 'from contracts.models import ContractSignatureOtps; print(list(ContractSignatureOtps.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM contract_signature_otps AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/contract_signature_otps/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/contract_signature_otps/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
+Ampliar `ContratoData` com `otp_categoria_nome?: string | null`; exibir na seção de solicitação de código de `pages/contracts/Contrato.tsx`. Após solicitar OTP, refazer a consulta do documento e usar o campo persistido. O ambiente de ensaio tem OTP desativado e e-mail sem credenciais: esse caso exige configurar o envio ou testar o service com mock de e-mail, sem remover a autenticação.
 
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/contracts/Contrato.tsx`. Renderize fora de outro `<form>` e passe o ID de **ContractSignatureOtps**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function ContractSignatureOtpsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="contract_signature_otps" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em contract_signature_otps, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Somente admin classifica metadados. Não expor code_hash/email nem alterar attempts, consumed_at ou validade.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

@@ -1,156 +1,62 @@
-# Notificações · `Notification`
+# Notificações — `Notification`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/notifications/models.py` → `Notification` |
-| Tabela | `notifications` |
-| Fluxo original | `BackEnd/notifications/events.py` |
-| Tela original relacionada | `FrontEnd/src/features/notifications/components/NotificationsPanel.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/notifications/<ID>` |
+`BackEnd/notifications/models.py:25` — dentro de `Notification`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Não alterar event_key, destinatário ou estado de leitura; manter deduplicação.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/notifications/models.py — dentro de Notification, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations notifications
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/notifications/autoria_notifications_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/notifications/events.py:38` — procurar `def notify_rental_event(`
+
+O service real é a função `notify_rental_event`; não há `NotificationService`. Dentro de `defaults` de `Notification.objects.get_or_create`, acrescentar:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from notifications.models import Notification
-from autoria.serializers import VinculoInputSerializer
-
-
-class NotificationCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Notification.objects.all()
-        return Notification.objects.filter(recipient=actor)
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            NotificationCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            NotificationCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+"categoria_autoria_id": rental.lessee.categoria_autoria_id,
 ```
+O exemplo copia a seleção do locatário quando o evento nasce. Preservar a deduplicação `(recipient_id, event_key)`.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/notifications/autoria_notifications_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from notifications.autoria_notifications_services import NotificationCategoriaService
-
-
-class NotificationCategoriaView(RegistroCategoriaView):
-    service = NotificationCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+`BackEnd/notifications/serializers.py:6` — procurar `class NotificationSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
 ```python
-from notifications.autoria_notifications_views import NotificationCategoriaView
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `NotificationSerializer.Meta.fields`, acrescentar ao final da lista:
 
-# Dentro de urlpatterns:
-path("autoria/notifications/<uuid:pk>", NotificationCategoriaView.as_view(), name="autoria_notifications"),
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 4 Gravar e exibir no frontend
 
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/notifications/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
+## 5 Frontend e comprovação
 
-## 5 Identificar o registro e conferir a FK
+Em `features/notifications/types/notification.ts`, ampliar schema/tipo; em `NotificationRepository.ts`, ampliar o objeto de leitura se houver mapeamento explícito. Exibir o nome em `features/notifications/components/NotificationList.tsx`. Criar uma reserva para gerar notificações, abrir o painel e recarregar. O PATCH existente só marca leitura e não deve aceitar categoria.
 
-```bash
-python manage.py shell -c 'from notifications.models import Notification; print(list(Notification.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM notifications AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/notifications/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/notifications/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/features/notifications/components/NotificationsPanel.tsx`. Renderize fora de outro `<form>` e passe o ID de **Notification**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function NotificationCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="notifications" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em notifications, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Não alterar event_key, destinatário ou estado de leitura; manter deduplicação.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

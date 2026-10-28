@@ -1,156 +1,98 @@
-# Máquinas · `Machines`
+# Máquinas — `Machines`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/machines/models.py` → `Machines` |
-| Tabela | `machines` |
-| Fluxo original | `BackEnd/machines/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/machines/NovoEquipamento.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/machines/<ID>` |
+`BackEnd/machines/models.py:32` — dentro de `Machines`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Categoria não altera proprietário, RENAGRO nem horímetro.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/machines/models.py — dentro de Machines, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations machines
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Entrada no serializer usado pelo service
 
-<!-- file: BackEnd/machines/autoria_machines_services.py -->
-```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from machines.models import Machines
-from autoria.serializers import VinculoInputSerializer
+`BackEnd/machines/serializer.py:17` — procurar `class MachineInputSerializer`. Em `MachineInputSerializer.Meta.fields`, acrescentar `"categoria_autoria"` antes do fechamento da lista. Manter todos os campos e validações existentes.
 
+## 3 Service existente
 
-class MachinesCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Machines.objects.all()
-        return Machines.objects.filter(owner=actor)
+`BackEnd/machines/services.py:20` — procurar `class MachineService`. `MachineService.create` e `MachineService.update` já usam `MachineInputSerializer` e `serializer.save()`. A nova FK entra em `validated_data`; não criar outro service.
 
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            MachinesCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            MachinesCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
-```
-
-## 3 View e rota
-
-<!-- file: BackEnd/machines/autoria_machines_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from machines.autoria_machines_services import MachinesCategoriaService
-
-
-class MachinesCategoriaView(RegistroCategoriaView):
-    service = MachinesCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+Trecho atual do método de atualização (referência, não substituir):
 
 ```python
-from machines.autoria_machines_views import MachinesCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/machines/<uuid:pk>", MachinesCategoriaView.as_view(), name="autoria_machines"),
+def update(machine_id: UUID, data: Mapping[str, Any], *, actor: Users, partial: bool = False) -> Machines:
+    machine = MachineService.get(machine_id, actor=actor)
+    serializer = MachineInputSerializer(machine, data=data, partial=partial, context={"actor": actor})
+    serializer.is_valid(raise_exception=True)
+    now = timezone.now()
+    if "hour_meter" in serializer.validated_data and serializer.validated_data["hour_meter"] != machine.hour_meter:
+        serializer.validated_data["hour_meter_updated_at"] = now
+    try:
+        return serializer.save(updated_at=now)
+    except IntegrityError as exc:
+        raise Conflict(CONFLICT_MESSAGE) from exc
 ```
 
-## 4 Gravar e exibir no frontend
+## 4 Saída existente
 
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/machines/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+`BackEnd/machines/serializer.py:75` — procurar `class MachineOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
+
+```python
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `MachineOutputSerializer.Meta.fields`, acrescentar ao final da lista:
+
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 5 Identificar o registro e conferir a FK
+Para listas que exibem o nome, acrescentar `"categoria_autoria"` ao `select_related` do queryset utilizado; preservar os filtros de acesso.
 
-```bash
-python manage.py shell -c 'from machines.models import Machines; print(list(Machines.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM machines AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/machines/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/machines/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
+## 5 Frontend existente
 
-## 6 Integrar na tela original quando solicitado
+Aplicar os campos do [guia 02, passo 3](../02_frontend_repository_store_componente.md#3-contrato-de-dados-no-fluxo-existente) nestes pontos:
 
-Ponto de partida: `FrontEnd/src/pages/machines/NovoEquipamento.tsx`. Renderize fora de outro `<form>` e passe o ID de **Machines**, não o ID do objeto pai.
+| Alteração | Arquivo e âncora |
+| --- | --- |
+| Resposta Zod | `FrontEnd/src/features/machines/types/machineSchemas.ts:21` — procurar `export const machineApiSchema` |
+| Tipo de domínio | `FrontEnd/src/features/machines/types/machine.ts:1` — procurar `export interface Machine` |
+| Mapper de leitura | `FrontEnd/src/features/machines/api/machineMapper.ts:15` — procurar `export function toDomain` |
+| Entrada/payload | `FrontEnd/src/features/machines/types/machineSchemas.ts:79` — procurar `export interface CreateMachinePayload` |
 
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
 
-export function MachinesCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="machines" id={id} />;
-}
-```
+**Criação existente:** `features/machines/hooks/useMachineForm.ts` → `toCreatePayload` → `useCreateMachine` → `MachineRepository.create` → `POST /api/machines`.
 
-## 7 Conferências
+1. Acrescentar `categoriaId: z.string().optional()` ao objeto de `machineFormSchema`, antes de `.superRefine`.
+2. Em `machineMapper.ts`, dentro de `toCreatePayload`, acrescentar `categoria_autoria: values.categoriaId || null` ao retorno.
+3. Em `pages/machines/NovoEquipamento.tsx`, usar `CategoriaSelect` no formulário e ligar `value={form.watch("categoriaId") ?? ""}` / `onChange={(id) => form.setValue("categoriaId", id)}`; usar o nome real da instância de `useForm` retornada por `useMachineForm`.
 
-```text
-[ ] A FK está em machines, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Categoria não altera proprietário, RENAGRO nem horímetro.
-```
+**Edição existente:** `components/EditEquipamentoModal.tsx` → `DashboardLocador.tsx` → `useUpdateMachine` → `PATCH /api/machines/<id>`.
+
+- Em `EquipamentoData`, adicionar `categoriaId?: string`; no modal, `value={form.categoriaId ?? ""}` e `onChange={(id) => handleChange("categoriaId", id)}`.
+- Em `DashboardLocador`, preencher `categoriaId` no objeto de `setSelectedEquipamento` a partir da máquina persistida e incluir `categoria_autoria: data.categoriaId || null` junto de `technical_specifications` no payload de `updateMachine.mutateAsync`.
+- Em `DashboardLocador.tsx`, o `useMemo` chamado `machines` transforma `machinesQuery.data`. Acrescentar `categoriaAutoriaId: m.categoriaAutoriaId` e `categoriaNome: m.categoriaNome` nesse objeto, logo após `purpose`. Em `openEditModalForMachine`, inserir `categoriaId: m.categoriaAutoriaId ?? ""` no objeto de `setSelectedEquipamento`. Exibir `m.categoriaNome` no cartão persistido.
+
+
+
+
+## 6 Comprovar
+
+Salvar pelo formulário indicado, consultar a FK no banco e recarregar a mesma tela. Aplicar os casos de ID inexistente/permissão do [guia 03](../03_validacao_e_erros.md).

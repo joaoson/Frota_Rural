@@ -1,157 +1,67 @@
-# Recuperações de senha · `PasswordResets`
+# Recuperações de senha — `PasswordResets`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/authentication/models.py` → `PasswordResets` |
-| Tabela | `password_resets` |
-| Fluxo original | `BackEnd/authentication/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/admin/AdminPlaceholder.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/password_resets/<ID>` |
+`BackEnd/authentication/models.py:16` — dentro de `PasswordResets`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Somente admin acessa metadados. Não retornar token_hash nem alterar used, user ou expires_at.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/authentication/models.py — dentro de PasswordResets, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations authentication
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/authentication/autoria_password_resets_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/authentication/services.py:78` — procurar `def request_reset(`
+
+Dentro de `PasswordResets.objects.create`, entre `user=user,` e `token_hash=...`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from authentication.models import PasswordResets
-from autoria.serializers import VinculoInputSerializer
-
-
-class PasswordResetsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return PasswordResets.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            PasswordResetsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            PasswordResetsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=user.categoria_autoria_id,
 ```
+Manter a resposta pública genérica, o hash, a expiração e o rollback se o e-mail falhar. Não devolver ID, categoria, token ou existência da conta na resposta de recuperação.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/authentication/autoria_password_resets_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from authentication.autoria_password_resets_services import PasswordResetsCategoriaService
+Não há endpoint de consulta pública deste registro. Para o ensaio, acrescentar uma leitura mínima ao perfil autenticado já existente.
 
-
-class PasswordResetsCategoriaView(RegistroCategoriaView):
-    service = PasswordResetsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+`BackEnd/users/serializer.py` → `UserOutputSerializer`, antes de `class Meta`:
 
 ```python
-from authentication.autoria_password_resets_views import PasswordResetsCategoriaView
+ultimo_registro_autoria = serializers.SerializerMethodField()
 
-# Dentro de urlpatterns:
-path("autoria/password_resets/<uuid:pk>", PasswordResetsCategoriaView.as_view(), name="autoria_password_resets"),
+def get_ultimo_registro_autoria(self, obj):
+    from authentication.models import PasswordResets
+    registro = (PasswordResets.objects.filter(user=obj)
+                .select_related("categoria_autoria").order_by("-created_at").first())
+    if registro is None:
+        return None
+    return {"id": str(registro.pk),
+            "categoria_nome": registro.categoria_autoria.Genero if registro.categoria_autoria_id else None}
 ```
+Acrescentar `"ultimo_registro_autoria"` a `UserOutputSerializer.Meta.fields`. Usar somente um modelo neste exemplo; se combinar vários, dar um nome distinto a cada projeção. Manter o acesso ao próprio perfil/admin em `UserService.get`.
 
-## 4 Gravar e exibir no frontend
+## 5 Frontend e comprovação
 
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/password_resets/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
+Em `userApiSchema`, acrescentar `ultimo_registro_autoria: z.object({ id: z.string(), categoria_nome: z.string().nullable() }).nullish()`. Em `User`, acrescentar `ultimoRegistroAutoria?: { id: string; categoria_nome: string | null } | null`; em `userMapper.toDomain`, copiar `ultimoRegistroAutoria: dto.ultimo_registro_autoria ?? null`.
 
-## 5 Identificar o registro e conferir a FK
+Em `AccountSection`, abaixo do texto do gênero salvo, exibir `<p>Último registro: {user?.ultimoRegistroAutoria?.categoria_nome ?? "Nenhum"}</p>`. Executar a operação do modelo e recarregar Minha Conta. O texto vem do registro alvo persistido, não da seleção atual do perfil. O ambiente local exige provedor de e-mail ou mock no teste do service para concluir a solicitação. A projeção autenticada não expõe token/hash.
 
-```bash
-python manage.py shell -c 'from authentication.models import PasswordResets; print(list(PasswordResets.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM password_resets AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/password_resets/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/password_resets/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/admin/AdminPlaceholder.tsx`. Renderize fora de outro `<form>` e passe o ID de **PasswordResets**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function PasswordResetsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="password_resets" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em password_resets, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Somente admin acessa metadados. Não retornar token_hash nem alterar used, user ou expires_at.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

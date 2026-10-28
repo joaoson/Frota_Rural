@@ -1,157 +1,69 @@
-# Contratos · `Contracts`
+# Contratos — `Contracts`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/contracts/models.py` → `Contracts` |
-| Tabela | `contracts` |
-| Fluxo original | `BackEnd/contracts/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/contracts/Contrato.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/contracts/<ID>` |
+`BackEnd/contracts/models.py:25` — dentro de `Contracts`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Categoria administrativa não faz parte das cláusulas nem modifica documento, pagamento ou assinatura.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/contracts/models.py — dentro de Contracts, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations contracts
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/contracts/autoria_contracts_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/contracts/services.py:73` — procurar `def create_for_rental(`
+
+Dentro de `Contracts.objects.create`, entre `rental=rental,` e `accepted_by_lessor=False,`, inserir:
 ```python
-from django.db import transaction
-from django.db.models import Q
-from django.shortcuts import get_object_or_404
-from contracts.models import Contracts
-from autoria.serializers import VinculoInputSerializer
-
-
-class ContractsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Contracts.objects.all()
-        return Contracts.objects.filter(Q(rental__lessee=actor) | Q(rental__postings__machinery__owner=actor))
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            ContractsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            ContractsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=rental.lessee.categoria_autoria_id,
 ```
 
-## 3 View e rota
+A criação por recorrência usa outro ponto: `BackEnd/api/recurrence.py`, dentro do `Contracts.objects.create`, acrescentar a mesma atribuição. Não existe CRUD genérico de edição de contrato; não acrescentar uma edição que altere termos já assinados.
 
-<!-- file: BackEnd/contracts/autoria_contracts_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from contracts.autoria_contracts_services import ContractsCategoriaService
+## 4 Saída persistida
 
-
-class ContractsCategoriaView(RegistroCategoriaView):
-    service = ContractsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+`BackEnd/contracts/serializer.py:61` — procurar `class ContractOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
 ```python
-from contracts.autoria_contracts_views import ContractsCategoriaView
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `ContractOutputSerializer.Meta.fields`, acrescentar ao final da lista:
 
-# Dentro de urlpatterns:
-path("autoria/contracts/<uuid:pk>", ContractsCategoriaView.as_view(), name="autoria_contracts"),
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/contracts/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+Para a página de documento, em `ContractService.get_document`, no dicionário do retorno, depois de `**document`, acrescentar:
+```python
+"categoria_autoria": contract.categoria_autoria_id,
+"categoria_nome": contract.categoria_autoria.Genero if contract.categoria_autoria_id else None,
 ```
+Em `ContractDocumentOutputSerializer` (Serializer comum, sem Meta), declarar `categoria_autoria = serializers.UUIDField(allow_null=True)` e `categoria_nome = serializers.CharField(allow_null=True)`. Esses metadados ficam fora do documento canônico assinado.
 
-## 5 Identificar o registro e conferir a FK
+## 5 Frontend e comprovação
 
-```bash
-python manage.py shell -c 'from contracts.models import Contracts; print(list(Contracts.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM contracts AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/contracts/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/contracts/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
+Em `features/contracts/types/contractDocument.ts`, ampliar `ContratoData` com `categoria_autoria?: string | null` e `categoria_nome?: string | null`. O repository retorna esse objeto para `pages/contracts/Contrato.tsx`; exibir `contrato.categoria_nome` usando o nome real do objeto carregado. Se usar a listagem, ampliar também `contractApiSchema`, `Contract`, `contractToDomain` como no guia 02. Criar uma locação nova após salvar o perfil.
 
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/contracts/Contrato.tsx`. Renderize fora de outro `<form>` e passe o ID de **Contracts**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function ContractsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="contracts" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em contracts, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Categoria administrativa não faz parte das cláusulas nem modifica documento, pagamento ou assinatura.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

@@ -1,123 +1,67 @@
-# API comum de categorias e vínculo
+# Catálogo da tabela nova; gravação pelo service existente
 
-Execute depois de [criar a tabela](00_tabela_e_tres_registros.md). Cada guia de modelo adiciona seu service e sua rota.
+## 1 Ajustar a saída já criada
 
-API do ensaio: `http://localhost:8010/api`. Edite os caminhos abaixo a partir da raiz do repositório; o Django nativo recarrega o código automaticamente.
+`BackEnd/autoria/serializers.py` — substituir **somente** `CategoriaOutputSerializer` (linhas 5–9). Os serializers `Vinculo*` não participam do fluxo recomendado.
 
-## Serializers
 
-<!-- file: BackEnd/autoria/serializers.py -->
 ```python
-from rest_framework import serializers
-from autoria.models import CategoriaAutoria
-
-
 class CategoriaOutputSerializer(serializers.ModelSerializer):
+    nome = serializers.CharField(source="Genero", read_only=True)
+
     class Meta:
-        model = CategoriaAutoria
+        model = Genero
         fields = ["id", "nome"]
         read_only_fields = fields
-
-
-class VinculoInputSerializer(serializers.Serializer):
-    categoria_id = serializers.PrimaryKeyRelatedField(
-        queryset=CategoriaAutoria.objects.all(), source="categoria_autoria",
-    )
-
-    def validate(self, attrs):
-        extras = set(self.initial_data) - {"categoria_id"}
-        if extras:
-            raise serializers.ValidationError("Envie somente categoria_id.")
-        return attrs
-
-
-class VinculoOutputSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    categoria_id = serializers.UUIDField(source="categoria_autoria_id", allow_null=True)
-    categoria_nome = serializers.CharField(
-        source="categoria_autoria.nome", allow_null=True, default=None,
-    )
 ```
 
-## Service do catálogo
+## 2 Service do catálogo já existente
 
-<!-- file: BackEnd/autoria/services.py -->
+`BackEnd/autoria/services.py` — manter:
+
+
 ```python
-from autoria.models import CategoriaAutoria
-
+from autoria.models import Genero
 
 class CategoriaAutoriaService:
     @staticmethod
     def listar():
-        return CategoriaAutoria.objects.order_by("nome")
+        return Genero.objects.order_by("Genero")
 ```
 
-## Views
+## 3 View e rota já existentes
 
-<!-- file: BackEnd/autoria/views.py -->
+`BackEnd/autoria/views.py` — a lista deve usar `IsAuthenticated`:
+
+
 ```python
-from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
-from common.request import authenticated_user
-from autoria.serializers import (
-    CategoriaOutputSerializer, VinculoInputSerializer, VinculoOutputSerializer,
-)
-from autoria.services import CategoriaAutoriaService
-
-
 class CategoriaAutoriaListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Autoria"], responses={200: CategoriaOutputSerializer(many=True)})
     def get(self, request):
-        return Response(CategoriaOutputSerializer(
-            CategoriaAutoriaService.listar(), many=True,
-        ).data)
-
-
-class RegistroCategoriaView(APIView):
-    permission_classes = [IsAuthenticated]
-    service = None  # Definido pela subclasse do modelo escolhido.
-
-    @extend_schema(tags=["Autoria"], responses={200: VinculoOutputSerializer})
-    def get(self, request, pk):
-        registro = self.service.obter(pk, actor=authenticated_user(request))
-        return Response(VinculoOutputSerializer(registro).data)
-
-    @extend_schema(tags=["Autoria"], request=VinculoInputSerializer,
-                   responses={200: VinculoOutputSerializer})
-    def patch(self, request, pk):
-        registro = self.service.salvar(pk, request.data, actor=authenticated_user(request))
-        return Response(VinculoOutputSerializer(registro).data)
+        registros = CategoriaAutoriaService.listar()
+        return Response(CategoriaOutputSerializer(registros, many=True).data)
 ```
 
-## Rotas
+`BackEnd/autoria/urls.py` — manter `path("autoria/categorias", CategoriaAutoriaListView.as_view(), name="autoria_categorias")`.
 
-<!-- file: BackEnd/autoria/urls.py -->
-```python
-from django.urls import path
-from autoria.views import CategoriaAutoriaListView
-
-urlpatterns = [
-    path("autoria/categorias", CategoriaAutoriaListView.as_view(), name="autoria_categorias"),
-]
-# Os guias dos modelos acrescentam imports e paths neste arquivo.
-```
-
-`BackEnd/djangoapi/urls.py` — acrescentar em `urlpatterns`; `include` e `path` já são importados:
-
-```python
-path(BASE_PATH, include("autoria.urls")),
-```
+`BackEnd/djangoapi/urls.py` — `path(BASE_PATH, include("autoria.urls"))` já está registrado.
 
 ```text
-GET   /api/autoria/categorias               -> as 3 opções do banco
-GET   /api/autoria/users/<UUID>              -> vínculo persistido
-PATCH /api/autoria/users/<UUID>              -> {"categoria_id": "UUID"}
+GET /api/autoria/categorias
+→ [{"id": "11111111-1111-4111-8111-111111111111", "nome": "Masculino"}, ...]
 
-Os endpoints de vínculo só existem depois de copiar o guia do modelo.
-O endpoint novo recebe somente a FK; os fluxos de negócio existentes continuam nos seus services.
+PATCH /api/users/<id>
+→ {"categoria_autoria": "11111111-1111-4111-8111-111111111111"}
+→ UserDetailView.patch → UserService.update → UserUpdateInputSerializer.save
 ```
+
+## 4 Em cada modelo escolhido
+
+1. FK no modelo e migration.
+2. Entrada no serializer utilizado pelo service existente.
+3. Gravação no `serializer.save()` existente ou no `objects.create()` indicado no guia do modelo.
+4. Saída no serializer/projeção existente.
+5. Campo no schema Zod, mapper e formulário existente.
+
+Não usar `RegistroCategoriaView` nem criar `autoria_users_services.py` para este roteiro. O cadastro de categorias é o único endpoint novo necessário no exemplo de usuários.

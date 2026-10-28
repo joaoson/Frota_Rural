@@ -1,157 +1,56 @@
-# Pesquisas de valor de máquina · `MachineValuations`
+# Pesquisas de valor — `MachineValuations`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/pricing/models.py` → `MachineValuations` |
-| Tabela | `machine_valuations` |
-| Fluxo original | `BackEnd/pricing/service.py` |
-| Tela original relacionada | `FrontEnd/src/pages/admin/AdminPlaceholder.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/machine_valuations/<ID>` |
+`BackEnd/pricing/models.py:27` — dentro de `MachineValuations`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Preservar cache por marca/modelo/ano, payload e validade. Classificação não chama IA.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/pricing/models.py — dentro de MachineValuations, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations pricing
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/pricing/autoria_machine_valuations_services.py -->
+Para esta tabela interna, adaptar o catálogo ao domínio (por exemplo, tipos de pesquisa). O formulário de sugestão recebe a escolha; `Genero` é apenas o nome técnico já existente no ensaio. Cache compartilhado pede uma regra de negócio explícita para quem pode reclassificá-lo.
+
+## 3 Alteração no service real
+
+`BackEnd/pricing/service.py:105` — procurar `def _store_valuation(`
+
+O cache é compartilhado por marca/modelo/ano. Este caso exige definir uma classificação do cache, não copiar gênero pessoal. No exemplo de categoria do exercício:
+
+1. Acrescentar parâmetro keyword opcional `categoria_autoria=None` a `_store_valuation` e a `build_suggestion`.
+2. Na chamada de `_store_valuation` dentro de `build_suggestion`, repassar o objeto validado.
+3. Nos dois dicionários `create_defaults` e `defaults` do `update_or_create`, acrescentar:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from pricing.models import MachineValuations
-from autoria.serializers import VinculoInputSerializer
-
-
-class MachineValuationsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return MachineValuations.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            MachineValuationsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            MachineValuationsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+"categoria_autoria": categoria_autoria,
 ```
+4. Em `SuggestionRequestSerializer`, declarar `PrimaryKeyRelatedField(queryset=Genero.objects.all(), required=False, allow_null=True)` após importar `Genero`.
+5. Em `pricing_suggest`, repassar `categoria_autoria=serializer.validated_data.get("categoria_autoria")` a `build_suggestion`.
 
-## 3 View e rota
+Uma consulta com cache válido não chama `_store_valuation`. Para testar, usar marca/modelo/ano sem cache ou expiração controlada no banco de ensaio. Não apagar todo o cache.
 
-<!-- file: BackEnd/pricing/autoria_machine_valuations_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from pricing.autoria_machine_valuations_services import MachineValuationsCategoriaService
+## 4 Saída persistida
 
+`MachineValuations` não tem GET próprio. Em `pricing_suggest`, após calcular a sugestão, consultar `_cached_valuation(machine.brand, machine.model, machine.year)` pelo service existente e retornar `pesquisa_categoria_nome` do registro encontrado. Declarar o campo em `SuggestionResponseSerializer`. Para leitura posterior sem refazer pesquisa, ampliar `MachineOutputSerializer` com um método que consulte o cache por marca/modelo/ano e devolva apenas a classificação; registrar esse campo em Meta.fields.
 
-class MachineValuationsCategoriaView(RegistroCategoriaView):
-    service = MachineValuationsCategoriaService
-```
+## 5 Frontend e comprovação
 
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+Adicionar `categoria_autoria` ao tipo de pedido e body de `PricingRepository`; usar `CategoriaSelect` no formulário que solicita a sugestão. Ampliar `pricingSuggestionSchema`/`PricingSuggestion` para a resposta imediata; ampliar `machineApiSchema`, `Machine`, `machineMapper.toDomain` para `pesquisa_categoria_nome` e exibir no cartão da máquina após recarregar. Não afirmar sucesso se somente a resposta transitória mostrar a escolha.
 
-```python
-from pricing.autoria_machine_valuations_views import MachineValuationsCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/machine_valuations/<uuid:pk>", MachineValuationsCategoriaView.as_view(), name="autoria_machine_valuations"),
-```
-
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/machine_valuations/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
-
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from pricing.models import MachineValuations; print(list(MachineValuations.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM machine_valuations AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/machine_valuations/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/machine_valuations/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/admin/AdminPlaceholder.tsx`. Renderize fora de outro `<form>` e passe o ID de **MachineValuations**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function MachineValuationsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="machine_valuations" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em machine_valuations, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Preservar cache por marca/modelo/ano, payload e validade. Classificação não chama IA.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

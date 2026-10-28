@@ -1,149 +1,63 @@
-# Evidências de assinatura · `ContractSignatures`
+# Assinaturas — `ContractSignatures`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/contracts/models.py` → `ContractSignatures` |
-| Tabela | `contract_signatures` |
-| Fluxo original | `BackEnd/contracts/signature_evidence.py` |
-| Tela original relacionada | `FrontEnd/src/pages/contracts/Contrato.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/contract_signatures/<ID>` |
+`BackEnd/contracts/models.py:114` — dentro de `ContractSignatures`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Append-only: capturar categoria na NOVA assinatura; manter OTP, hash, encadeamento e triggers.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/contracts/models.py — dentro de ContractSignatures, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations contracts
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/contracts/autoria_contract_signatures_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/contracts/signature_evidence.py:130` — procurar `def record_signature(`
+
+Dentro de `ContractSignatures.objects.create`, entre `signer=signer,` e `signer_name=signer_name,`, inserir:
 ```python
-from django.db.models import Q
-from django.shortcuts import get_object_or_404
-from contracts.models import ContractSignatures
-
-
-class ContractSignaturesCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return ContractSignatures.objects.all()
-        return ContractSignatures.objects.filter(Q(contract__rental__lessee=actor) | Q(contract__rental__postings__machinery__owner=actor))
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            ContractSignaturesCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
+categoria_autoria_id=signer.categoria_autoria_id if signer else None,
 ```
+A FK é metadado auxiliar do exercício, fora da impressão digital atual. Se o enunciado exigir que integre a evidência assinada, também será necessário versionar a canonicalização/verificação; este trecho sozinho não faz isso. Não atualizar registros de assinatura.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/contracts/autoria_contract_signatures_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from contracts.autoria_contract_signatures_services import ContractSignaturesCategoriaService
-
-
-class ContractSignaturesCategoriaView(RegistroCategoriaView):
-    service = ContractSignaturesCategoriaService
-    http_method_names = ["get", "head", "options"]
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+`BackEnd/contracts/serializer.py:79` — procurar `class ContractSignatureOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
 ```python
-from contracts.autoria_contract_signatures_views import ContractSignaturesCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/contract_signatures/<uuid:pk>", ContractSignaturesCategoriaView.as_view(), name="autoria_contract_signatures"),
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
 ```
-
-## 4 Gravar somente durante a criação
-
-Antes, aplique o guia de [Contracts](contracts.md). A seleção é salva no contrato e copiada quando o fluxo real criar uma nova evidência. Registros antigos continuam sem categoria.
-
-`BackEnd/contracts/signature_evidence.py` → `record_signature`: inserir o argumento abaixo na chamada `ContractSignatures.objects.create(...)` já existente.
+Em `ContractSignatureOutputSerializer.Meta.fields`, acrescentar ao final da lista:
 
 ```python
-# Apenas metadado administrativo; não representa cláusula ou prova de aceite.
-categoria_autoria=contract.categoria_autoria,
-```
-```text
-1. Abrir /autoria/contracts/ID_DO_CONTRATO e salvar uma categoria.
-2. Concluir o fluxo existente de assinatura: conta da parte + pagamento confirmado + revisão atual + OTP.
-3. Copiar o ID NOVO de contract_signatures usando o comando abaixo.
-4. Abrir /autoria/contract_signatures/ID_NOVO; a página é somente leitura.
-5. PATCH neste recurso deve retornar 405, inclusive para admin.
-Não desativar triggers, não usar UPDATE direto e não recalcular evidências antigas.
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 5 Identificar o registro e conferir a FK
+`ContractService.get_evidence` já retorna `contract.signatures.all()` serializadas por `ContractEvidenceOutputSerializer.assinaturas`. Este é o caminho para exibir a FK efetivamente gravada.
 
-```bash
-python manage.py shell -c 'from contracts.models import ContractSignatures; print(list(ContractSignatures.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM contract_signatures AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-AUTORIA_ID='COLE_O_ID_NOVO_AQUI'
-curl --fail-with-body "$AUTORIA_API/autoria/contract_signatures/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# categoria_id é a escolha copiada do contrato no instante da criação.
-```
+## 5 Frontend e comprovação
 
-## 6 Integrar na tela original quando solicitado
+Ampliar `signatureEvidenceApiSchema`, `SignatureEvidence` e seu mapper em `features/contracts/api/contractMapper.ts`. Em `pages/contracts/Contrato.tsx`, no painel de evidências, exibir `categoriaNome` de cada assinatura recebida por `useContractEvidence`. Não pegar o gênero atual do perfil para exibir o histórico.
 
-Ponto de partida: `FrontEnd/src/pages/contracts/Contrato.tsx`. Renderize fora de outro `<form>` e passe o ID de **ContractSignatures**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function ContractSignaturesCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="contract_signatures" id={id} somenteLeitura />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em contract_signatures, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH retorna 405; uma criação pelo fluxo real grava a nova FK.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Append-only: capturar categoria na NOVA assinatura; manter OTP, hash, encadeamento e triggers.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

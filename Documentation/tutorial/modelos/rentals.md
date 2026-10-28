@@ -1,156 +1,138 @@
-# Locações · `Rentals`
+# Locações — `Rentals`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/rentals/models.py` → `Rentals` |
-| Tabela | `rentals` |
-| Fluxo original | `BackEnd/rentals/services.py` |
-| Tela original relacionada | `FrontEnd/src/features/dashboard/components/RentalCard.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/rentals/<ID>` |
+`BackEnd/rentals/models.py:48` — dentro de `Rentals`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Somente o locatário ou administrador classifica; datas, preço e status continuam no fluxo de locação.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/rentals/models.py — dentro de Rentals, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations rentals
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Entrada no serializer usado pelo service
 
-<!-- file: BackEnd/rentals/autoria_rentals_services.py -->
+`BackEnd/rentals/serializer.py:41` — procurar `class RentalInputSerializer`. Em `RentalInputSerializer.Meta.fields`, acrescentar `"categoria_autoria"` antes do fechamento da lista. Manter todos os campos e validações existentes.
+
+## 3 Service existente
+
+`BackEnd/rentals/services.py:31` — procurar `class RentalService`. `RentalService.create` e `RentalService.update` já usam `RentalInputSerializer` e `serializer.save()`. A nova FK entra em `validated_data`; não criar outro service.
+
+Trecho atual do método de atualização (referência, não substituir):
+
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rentals.models import Rentals
-from autoria.serializers import VinculoInputSerializer
-
-
-class RentalsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Rentals.objects.all()
-        return Rentals.objects.filter(lessee=actor)
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            RentalsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
+def update(rental_id: UUID, data: Mapping[str, Any], *, user, partial: bool = False) -> Rentals:
+    reference = RentalService.get(rental_id, user=user)
+    posting = Postings.objects.select_for_update().select_related("machinery").get(pk=reference.postings_id)
+    # Avoid locking nullable outer joins from the output queryset.
+    rental = Rentals.objects.select_for_update().get(pk=reference.pk)
+    rental.postings = posting
+    for field, current in (("lessee", rental.lessee_id), ("postings", rental.postings_id)):
+        if field in data and str(data[field]) != str(current):
+            raise ValidationError({field: "Este vínculo não pode ser alterado após a criação."})
+    if "total_price" in data:
+        raise ValidationError({"total_price": "O valor é calculado pelo servidor."})
+    if "status" in data:
+        raise Conflict("Use /api/rentals/<id>/cancel para cancelar ou /complete para concluir.", code="use_rental_action")
+    if any(field in data for field in ("start_date", "end_date", "operator")):
+        if user.pk != rental.lessee_id:
+            raise PermissionDenied("Somente o locatário pode alterar os dados de uma reserva pendente.")
+        if rental.status != RentalStatus.PENDING or rental.payments.filter(status__in=OPEN_PAYMENT_STATUSES).exists():
+            raise Conflict("Uma reserva em pagamento ou confirmada não pode ter seus dados alterados.")
+    if any(field in data for field in ("initial_hour_meter", "final_hour_meter")):
+        raise ValidationError({"detail": (
+            "Registre as leituras do horímetro em /api/rentals/<id>/meter-readings: "
+            "elas são validadas e ficam no histórico da locação."
+        )})
+    if "notes" in data:
+        if user.pk != rental.lessee_id:
+            raise PermissionDenied("Somente o locatário pode alterar as observações da reserva.")
+        if rental.status in (RentalStatus.CANCELLED, RentalStatus.COMPLETED, RentalStatus.CLOSED):
+            raise Conflict("As observações de uma locação encerrada não podem ser alteradas.")
+    serializer = RentalInputSerializer(rental, data=data, partial=partial)
+    serializer.is_valid(raise_exception=True)
+    validated = serializer.validated_data
+    if any(field in validated for field in ("operator", "start_date", "end_date")):
+        validated["operator"] = validate_operator_assignment(
+            validated.get("operator", rental.operator), rental.lessee, lock=True,
         )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            RentalsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+    changed = any(getattr(rental, field) != value for field, value in validated.items())
+    save_fields = {"updated_at": timezone.now()}
+    if any(field in validated for field in ("start_date", "end_date")):
+        start = validated.get("start_date", rental.start_date)
+        end = validated.get("end_date", rental.end_date)
+        RentalService._ensure_period_available(posting, start, end, ignore_rental_id=rental.pk)
+        # Only an unpaid pending booking reaches this point (checked above).
+        # The agreed price changes only when the tenant picks other dates.
+        if (start, end) != (rental.start_date, rental.end_date):
+            policy.ensure_lead_time(start)
+            quote = RentalService.quote(posting, start, end)
+            save_fields.update(quote.snapshot())
+            changed = changed or rental.total_price != quote.total
+    rental = serializer.save(**save_fields)
+    if changed:
+        notify_rental_event(rental, "rental_updated", event_key=f"rental:{rental.pk}:rental_updated:{uuid4()}")
+    return rental
 ```
 
-## 3 View e rota
+## 4 Saída existente
 
-<!-- file: BackEnd/rentals/autoria_rentals_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from rentals.autoria_rentals_services import RentalsCategoriaService
-
-
-class RentalsCategoriaView(RegistroCategoriaView):
-    service = RentalsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+`BackEnd/rentals/serializer.py:114` — procurar `class RentalOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
 
 ```python
-from rentals.autoria_rentals_views import RentalsCategoriaView
+categoria_nome = serializers.CharField(
+    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
+)
+```
+Em `RentalOutputSerializer.Meta.fields`, acrescentar ao final da lista:
 
-# Dentro de urlpatterns:
-path("autoria/rentals/<uuid:pk>", RentalsCategoriaView.as_view(), name="autoria_rentals"),
+```python
+"categoria_autoria",
+"categoria_nome",
 ```
 
-## 4 Gravar e exibir no frontend
+Para listas que exibem o nome, acrescentar `"categoria_autoria"` ao `select_related` do queryset utilizado; preservar os filtros de acesso.
 
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/rentals/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
+## 5 Frontend existente
 
-## 5 Identificar o registro e conferir a FK
+Aplicar os campos do [guia 02, passo 3](../02_frontend_repository_store_componente.md#3-contrato-de-dados-no-fluxo-existente) nestes pontos:
 
-```bash
-python manage.py shell -c 'from rentals.models import Rentals; print(list(Rentals.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM rentals AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/rentals/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/rentals/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
+| Alteração | Arquivo e âncora |
+| --- | --- |
+| Resposta Zod | `FrontEnd/src/features/contracts/types/rentalSchemas.ts:14` — procurar `export const rentalApiSchema` |
+| Tipo de domínio | `FrontEnd/src/features/contracts/types/rental.ts:4` — procurar `export interface Rental` |
+| Mapper de leitura | `FrontEnd/src/features/contracts/api/contractMapper.ts:35` — procurar `export function rentalToDomain` |
+| Entrada/payload | `FrontEnd/src/features/contracts/types/rentalSchemas.ts:85` — procurar `export interface CreateRentalPayload` |
 
-## 6 Integrar na tela original quando solicitado
 
-Ponto de partida: `FrontEnd/src/features/dashboard/components/RentalCard.tsx`. Renderize fora de outro `<form>` e passe o ID de **Rentals**, não o ID do objeto pai.
+`pages/postings/Reservar.tsx` → `contractStore.createRental` → `ContractRepository.createRental` → `POST /api/rentals`.
 
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
+1. Adicionar estado `categoriaId` perto de `observacoes`.
+2. Inserir `CategoriaSelect` ao lado do campo de observações.
+3. Dentro do objeto de `contractStore.createRental`, depois de `notes`, acrescentar `categoria_autoria: categoriaId || null`.
+4. Propagar `categoriaNome` no objeto de locação montado pelos dashboards e no tipo de `features/dashboard/components/RentalCard.tsx`; exibir no cartão a partir da locação retornada pelo GET.
 
-export function RentalsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="rentals" id={id} />;
-}
-```
+O fluxo de pagamento pode reutilizar uma reserva já criada. Testar com uma reserva NOVA; não mostrar uma escolha ainda não enviada como se já estivesse salva.
 
-## 7 Conferências
 
-```text
-[ ] A FK está em rentals, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Somente o locatário ou administrador classifica; datas, preço e status continuam no fluxo de locação.
-```
+
+**Regra de edição:** se permitir PATCH de categoria, em `RentalService.update`, antes de construir `RentalInputSerializer`, aplicar a mesma restrição de `notes`: somente locatário e locação aberta. Não incluir o campo na lista de parâmetros imutáveis de preço/datas nem permitir que o frontend controle preço, status ou disponibilidade.
+
+
+## 6 Comprovar
+
+Salvar pelo formulário indicado, consultar a FK no banco e recarregar a mesma tela. Aplicar os casos de ID inexistente/permissão do [guia 03](../03_validacao_e_erros.md).

@@ -1,210 +1,135 @@
-# Frontend com carregamento gravação e leitura
+# Seletor compartilhado; salvar pelo repository do modelo
 
-Arquivos completos. A base HTTP já contém `/api`; os paths abaixo começam em `autoria/`.
+Pré-requisito: catálogo do [guia 01](01_api_services_e_rotas.md) retorna `{id, nome}`. Os caminhos são relativos à raiz do projeto.
 
-Use `http://localhost:5183`, conectado à API `http://localhost:8010/api`. Os caminhos abaixo são relativos à raiz do repositório. Para reiniciar o Vite com essa conexão, consulte o [guia do ambiente](05_ambiente_dev_e_banco_isolado.md).
+## 1 Criar o hook do catálogo
 
-## Tipos e validação
+Arquivo novo completo: `FrontEnd/src/features/autoria/useCategorias.ts`.
 
-<!-- file: FrontEnd/src/features/autoria/types/autoria.ts -->
-```typescript
+<!-- file: FrontEnd/src/features/autoria/useCategorias.ts -->
+
+```ts
+import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { httpClient } from "@/app/container";
 
-export const categoriaSchema = z.object({ id: z.string().uuid(), nome: z.string() });
-export const categoriasSchema = z.array(categoriaSchema);
-export const vinculoSchema = z.object({
-  id: z.string(), // PaymentEvents usa ID textual; os demais usam UUID.
-  categoria_id: z.string().uuid().nullable(),
-  categoria_nome: z.string().nullable(),
-});
-export type Categoria = z.infer<typeof categoriaSchema>;
-export type Vinculo = z.infer<typeof vinculoSchema>;
-```
+const categoriasSchema = z.array(z.object({
+  id: z.string().uuid(),
+  nome: z.string(),
+}));
 
-## Repository
-
-<!-- file: FrontEnd/src/features/autoria/api/AutoriaRepository.ts -->
-```typescript
-import type { HttpClient } from "@/shared/http/HttpClient";
-import { categoriasSchema, vinculoSchema } from "../types/autoria";
-
-export class AutoriaRepository {
-  private readonly http: HttpClient;
-  constructor(http: HttpClient) { this.http = http; }
-
-  async categorias() {
-    const response = await this.http.send<unknown>({ method: "GET", path: "autoria/categorias" });
-    return categoriasSchema.parse(response.data);
-  }
-
-  async obter(recurso: string, id: string) {
-    const response = await this.http.send<unknown>({
-      method: "GET", path: `autoria/${encodeURIComponent(recurso)}/${encodeURIComponent(id)}`,
-    });
-    return vinculoSchema.parse(response.data);
-  }
-
-  async salvar(recurso: string, id: string, categoriaId: string) {
-    const response = await this.http.send<unknown>({
-      method: "PATCH", path: `autoria/${encodeURIComponent(recurso)}/${encodeURIComponent(id)}`,
-      body: { categoria_id: categoriaId },
-    });
-    return vinculoSchema.parse(response.data);
-  }
+export function useCategorias() {
+  return useQuery({
+    queryKey: ["autoria", "categorias"],
+    queryFn: async () => {
+      const response = await httpClient.send<unknown>({
+        method: "GET", path: "autoria/categorias",
+      });
+      return categoriasSchema.parse(response.data);
+    },
+    staleTime: 60_000,
+  });
 }
 ```
 
-## Store e chave de cache
+O `httpClient` existente já trata token, renovação da sessão e URL base.
 
-<!-- file: FrontEnd/src/features/autoria/api/AutoriaStore.ts -->
-```typescript
-import type { QueryClient } from "@tanstack/react-query";
-import type { AutoriaRepository } from "./AutoriaRepository";
+## 2 Criar o componente
 
-export class AutoriaStore {
-  private readonly repository: AutoriaRepository;
-  private readonly queryClient: QueryClient;
-  constructor(repository: AutoriaRepository, queryClient: QueryClient) {
-    this.repository = repository;
-    this.queryClient = queryClient;
-  }
-  categoriasOptions() {
-    return { queryKey: ["autoria", "categorias"] as const,
-      queryFn: () => this.repository.categorias() };
-  }
-  registroOptions(recurso: string, id: string) {
-    return { queryKey: ["autoria", recurso, id] as const,
-      queryFn: () => this.repository.obter(recurso, id) };
-  }
-  async salvar(recurso: string, id: string, categoriaId: string) {
-    await this.repository.salvar(recurso, id, categoriaId);
-    // Faz GET novamente: a exibição usa a resposta persistida do servidor.
-    await this.queryClient.invalidateQueries({ queryKey: ["autoria", recurso, id] });
-  }
-  clear() { this.queryClient.removeQueries({ queryKey: ["autoria"] }); }
-}
-```
+Arquivo novo completo: `FrontEnd/src/features/autoria/CategoriaSelect.tsx`.
 
-## Registrar no container de dependências do frontend
+<!-- file: FrontEnd/src/features/autoria/CategoriaSelect.tsx -->
 
-`FrontEnd/src/app/container.ts` — acrescentar os imports:
-
-```typescript
-import { AutoriaRepository } from "@/features/autoria/api/AutoriaRepository";
-import { AutoriaStore } from "@/features/autoria/api/AutoriaStore";
-```
-
-Dentro de `const stores = { ... }`:
-
-```typescript
-autoria: new AutoriaStore(new AutoriaRepository(httpClient), queryClient),
-```
-
-Dentro de `export const { ... } = stores`:
-
-```typescript
-autoria: autoriaStore,
-```
-
-## Seletor reutilizável
-
-<!-- file: FrontEnd/src/features/autoria/components/CategoriaSelect.tsx -->
 ```tsx
 import { useId } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { autoriaStore } from "@/app/container";
+import { useCategorias } from "./useCategorias";
 
-interface Props { value: string; onChange: (id: string) => void; disabled?: boolean }
+interface Props {
+  value: string;
+  onChange: (id: string) => void;
+  label?: string;
+  disabled?: boolean;
+}
 
-export function CategoriaSelect({ value, onChange, disabled = false }: Props) {
+export function CategoriaSelect({ value, onChange, label = "Categoria", disabled }: Props) {
   const id = useId();
-  const categorias = useQuery(autoriaStore.categoriasOptions());
-  if (categorias.isPending) return <p>Carregando categorias...</p>;
-  if (categorias.isError) return <p role="alert">Não foi possível carregar as categorias.</p>;
-  return <div>
-    <label htmlFor={id}>Categoria</label>
-    <select id={id} value={value} disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}>
-      <option value="">Selecione</option>
-      {categorias.data.map((categoria) =>
-        <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}
-    </select>
-  </div>;
+  const query = useCategorias();
+  return (
+    <div className="space-y-2">
+      <label htmlFor={id} className="text-sm font-medium">{label}</label>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled || query.isPending || query.isError}
+        className="w-full rounded-lg border p-3 bg-surface-container text-on-surface"
+      >
+        <option value="">{query.isPending ? "Carregando…" : "Não informado"}</option>
+        {query.data?.map((categoria) => (
+          <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+        ))}
+      </select>
+      {query.isError && <p role="alert">Não foi possível carregar as opções.</p>}
+    </div>
+  );
 }
 ```
 
-## Salvar e mostrar o valor do banco
+## 3 Contrato de dados no fluxo existente
 
-<!-- file: FrontEnd/src/features/autoria/components/CategoriaEditor.tsx -->
-```tsx
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { autoriaStore } from "@/app/container";
-import { CategoriaSelect } from "./CategoriaSelect";
+Aplicar estes trechos nos arquivos/classes exatos indicados no guia de cada modelo. Não substituir objetos inteiros pelos trechos.
 
-interface Props { recurso: string; id: string; somenteLeitura?: boolean }
+```ts
+// Dentro do schema Zod de RESPOSTA:
+categoria_autoria: z.string().uuid().nullish(),
+categoria_nome: z.string().nullish(),
 
-export function CategoriaEditor({ recurso, id, somenteLeitura = false }: Props) {
-  const [selecionada, setSelecionada] = useState<string | null>(null);
-  const registro = useQuery(autoriaStore.registroOptions(recurso, id));
-  const salvar = useMutation({
-    mutationFn: (categoriaId: string) => autoriaStore.salvar(recurso, id, categoriaId),
-    onSuccess: () => setSelecionada(null),
-  });
-  if (registro.isPending) return <p>Carregando registro...</p>;
-  if (registro.isError) return <p role="alert">{registro.error.message}</p>;
-  const categoriaId = selecionada ?? registro.data.categoria_id ?? "";
-  return <section className="space-y-4 rounded-xl border p-6">
-    <h1>Categoria do registro</h1>
-    <p>ID: {registro.data.id}</p>
-    {!somenteLeitura && <>
-      <CategoriaSelect value={categoriaId} onChange={setSelecionada} disabled={salvar.isPending} />
-      <button type="button" disabled={!categoriaId || salvar.isPending}
-        onClick={() => salvar.mutate(categoriaId)}>
-        {salvar.isPending ? "Salvando..." : "Salvar categoria"}
-      </button>
-    </>}
-    {salvar.isError && <p role="alert">{salvar.error.message}</p>}
-    {salvar.isSuccess && <p role="status">Categoria salva.</p>}
-    <p>Valor persistido: <output aria-label="Categoria persistida">
-      {registro.data.categoria_nome ?? "Não definida"}
-    </output></p>
-    <button type="button" onClick={() => void registro.refetch()}>Ler novamente do banco</button>
-  </section>;
-}
+// Dentro da interface de domínio (opcionais para fixtures antigas):
+categoriaAutoriaId?: string | null;
+categoriaNome?: string | null;
+
+// Dentro do objeto retornado pelo mapper; dto = argumento real do mapper:
+categoriaAutoriaId: dto.categoria_autoria ?? null,
+categoriaNome: dto.categoria_nome ?? null,
+
+// Dentro do tipo/schema de ENTRADA, se for editável:
+// interface:
+categoria_autoria?: string | null;
+// OU schema Zod:
+categoria_autoria: z.string().uuid().nullable().optional(),
 ```
 
-## Página protegida
+Se o mapper monta o payload explicitamente, acrescentar também `categoria_autoria` nesse objeto. Adicionar só na interface não transmite o campo.
 
-<!-- file: FrontEnd/src/pages/autoria/AutoriaPage.tsx -->
-```tsx
-import { useParams } from "react-router";
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export default function AutoriaPage() {
-  const { recurso, id } = useParams();
-  if (!recurso || !id) return <p role="alert">Informe recurso e ID na URL.</p>;
-  const somenteLeitura = ["contract_revisions", "contract_signatures"].includes(recurso);
-  return <main className="mx-auto max-w-2xl p-6">
-    <CategoriaEditor key={`${recurso}:${id}`} recurso={recurso} id={id}
-      somenteLeitura={somenteLeitura} />
-  </main>;
-}
-```
-
-`FrontEnd/src/app/routes/protectedRoutes.tsx` — acrescentar import e rota dentro do `<Route element={<ProtectedRoute />}>` externo:
+## 4 Formulário existente
 
 ```tsx
-import AutoriaPage from "@/pages/autoria/AutoriaPage";
+import { CategoriaSelect } from "@/features/autoria/CategoriaSelect";
 
-// Dentro do Route protegido existente:
-<Route path="/autoria/:recurso/:id" element={<AutoriaPage />} />
+// Estado do formulário, inicializado com o registro carregado:
+const [categoriaId, setCategoriaId] = useState("");
+// No bloco existente que carrega os campos do registro:
+setCategoriaId(registro.categoriaAutoriaId ?? "");
+
+// Dentro do formulário, antes do botão de salvar:
+<CategoriaSelect value={categoriaId} onChange={setCategoriaId} />
+
+// Dentro do payload enviado pela mutation EXISTENTE:
+categoria_autoria: categoriaId || null,
+
+// Na leitura da resposta/consulta após salvar; não usar categoriaId aqui:
+<p>Salvo no banco: {registro.categoriaNome ?? "Não informado"}</p>
 ```
 
-```text
-1. Faça login pelo /login. O httpClient existente envia/renova o token.
-2. Abra /autoria/users/ID_REAL_DO_USUARIO.
-3. Selecione uma categoria -> Salvar categoria -> F5.
-4. O nome exibido deve continuar igual porque veio do GET no banco.
-5. A rota de cada recurso precisa ter sido adicionada pelo guia daquele modelo.
+`registro` acima é uma indicação do padrão, não uma variável global. O [guia de usuários](04_usuarios_pelo_fluxo_existente.md) contém o código com `user`, `formCategoriaId` e a mutation reais.
+
+## 5 Verificação
+
+```bash
+# Terminal na raiz
+cd FrontEnd
+npx tsc -b
+npm run lint
 ```
+
+Depois de salvar, a mutation deve invalidar/atualizar a consulta existente. Recarregar a página e conferir o texto vindo da API. Não criar outra página `/autoria/:recurso/:id` para contornar o formulário real.

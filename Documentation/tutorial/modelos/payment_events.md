@@ -1,157 +1,69 @@
-# Eventos de pagamento · `PaymentEvents`
+# Eventos de pagamento — `PaymentEvents`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/payments/models.py` → `PaymentEvents` |
-| Tabela | `payment_events` |
-| Fluxo original | `BackEnd/payments/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/admin/AdminPlaceholder.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/payment_events/<ID>` |
+`BackEnd/payments/models.py:44` — dentro de `PaymentEvents`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# PK é texto do provedor, não UUID. Nunca exibir payload/chaves nem forjar evento pago.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/payments/models.py — dentro de PaymentEvents, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations payments
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/payments/autoria_payment_events_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/payments/services.py:297` — procurar `def handle_webhook(`
+
+Depois de validar assinatura e extrair `session_id`, antes de `event_id = ...`, acrescentar:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from payments.models import PaymentEvents
-from autoria.serializers import VinculoInputSerializer
-
-
-class PaymentEventsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return PaymentEvents.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            PaymentEventsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            PaymentEventsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+payment_id = _get(_get(session, "metadata") or {}, "payment_id")
+payment = PaymentService._find_payment(session_id, payment_id) if event_type not in REFUND_EVENTS else None
+categoria_id = payment.rental.lessee.categoria_autoria_id if payment else None
 ```
+Dentro de `defaults` do `PaymentEvents.objects.get_or_create`, acrescentar `"categoria_autoria_id": categoria_id`. Remover a atribuição duplicada de `payment_id` mais abaixo. Este exemplo classifica eventos de checkout associados a pagamento; eventos de estorno/desconhecidos ficam nulos. A PK de PaymentEvents é string.
 
-## 3 View e rota
+Preservar assinatura do webhook, lista de tipos aceitos, `processed_at` e deduplicação. Um JSON comum enviado pelo navegador não substitui um webhook assinado.
 
-<!-- file: BackEnd/payments/autoria_payment_events_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from payments.autoria_payment_events_services import PaymentEventsCategoriaService
+## 4 Saída persistida
 
-
-class PaymentEventsCategoriaView(RegistroCategoriaView):
-    service = PaymentEventsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+Não existe GET de eventos públicos. Para mostrar somente os eventos do pagamento autorizado, em `PaymentStatusOutputSerializer` acrescentar um `SerializerMethodField`:
 
 ```python
-from payments.autoria_payment_events_views import PaymentEventsCategoriaView
+eventos_autoria = serializers.SerializerMethodField()
 
-# Dentro de urlpatterns:
-path("autoria/payment_events/<str:pk>", PaymentEventsCategoriaView.as_view(), name="autoria_payment_events"),
+def get_eventos_autoria(self, obj):
+    from payments.models import PaymentEvents
+    if not obj.session_id:
+        return []
+    return [
+        {"id": event.pk,
+         "categoria_nome": event.categoria_autoria.Genero if event.categoria_autoria_id else None}
+        for event in PaymentEvents.objects.filter(session_id=obj.session_id)
+        .select_related("categoria_autoria").order_by("received_at")
+    ]
 ```
+Acrescentar `"eventos_autoria"` a Meta.fields; manter o acesso à locação no service que consulta o status.
 
-## 4 Gravar e exibir no frontend
+## 5 Frontend e comprovação
 
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/payment_events/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
+No schema de status em `features/payments/types/paymentSchemas.ts`, acrescentar `eventos_autoria: z.array(z.object({ id: z.string(), categoria_nome: z.string().nullable() })).optional()`; propagar no tipo/mapper de pagamento. Exibir a lista na seção de status de `pages/postings/Reservar.tsx`. Recarregar o status após um evento de teste válido. O ambiente isolado não tem webhook/Stripe configurado; usar mocks nos testes existentes para exercitar a gravação sem alterar confirmações de pagamentos reais.
 
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from payments.models import PaymentEvents; print(list(PaymentEvents.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM payment_events AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/payment_events/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/payment_events/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/admin/AdminPlaceholder.tsx`. Renderize fora de outro `<form>` e passe o ID de **PaymentEvents**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function PaymentEventsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="payment_events" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em payment_events, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] PK é texto do provedor, não UUID. Nunca exibir payload/chaves nem forjar evento pago.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

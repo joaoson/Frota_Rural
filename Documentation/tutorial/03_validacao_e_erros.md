@@ -1,205 +1,79 @@
-# Validar o exercício
+# Validar o fluxo real
+
+## 1 Ambiente e migrations
+
 
 ```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
+# Terminal em BackEnd/
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
-
-## 1 Banco e migrations
-
-```bash
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py check
 python manage.py makemigrations --check --dry-run
-python manage.py migrate --plan
-python manage.py showmigrations autoria
-python manage.py shell -c 'from autoria.models import CategoriaAutoria; assert CategoriaAutoria.objects.count() == 3; print(list(CategoriaAutoria.objects.values("id", "nome")))'
+python manage.py showmigrations autoria users
 ```
 
-## 2 Login e API
+## 2 API — exemplo completo de usuários
+
+No terminal de `BackEnd/`, com o ambiente do passo 1:
 
 ```bash
-# As contas do seed local usam Teste1234; preserve senhas que você já alterou.
-AUTORIA_TOKEN=$(curl --fail-with-body -s "$AUTORIA_API/login" \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"joao.silva@example.test","password":"Teste1234"}' \
-  | python -c 'import json,sys; print(json.load(sys.stdin)["access"])')
+LOGIN=$(curl --fail-with-body -sS "$AUTORIA_API/login"   -H 'Content-Type: application/json'   -d '{"email":"joao.silva@example.test","password":"Teste1234"}')
+TOKEN=$(printf '%s' "$LOGIN" | python -c 'import json,sys; print(json.load(sys.stdin)["access"])')
+USER_ID=$(python manage.py shell -c 'from users.models import Users; print(Users.objects.get(email="joao.silva@example.test").pk)' | tail -n 1)
 
-curl --fail-with-body "$AUTORIA_API/autoria/categorias" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
+curl --fail-with-body -sS "$AUTORIA_API/autoria/categorias" -H "Authorization: Bearer $TOKEN"
 
-# Para os guias exclusivos de administrador, faça o mesmo login com admin@example.test.
-# Depois execute PATCH/GET usando o ID e a URL do guia do modelo escolhido.
+curl --fail-with-body -sS -X PATCH "$AUTORIA_API/users/$USER_ID"   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json'   -d '{"categoria_autoria":"11111111-1111-4111-8111-111111111111"}'
+
+curl --fail-with-body -sS "$AUTORIA_API/users/$USER_ID" -H "Authorization: Bearer $TOKEN"
 ```
 
-```json
-{
-  "id": "ID_REAL_DO_REGISTRO",
-  "categoria_id": "33333333-3333-4333-8333-333333333333",
-  "categoria_nome": "Prioridade"
-}
-```
+Esperado: `categoria_autoria` igual ao UUID enviado e `categoria_nome: "Masculino"` tanto no PATCH como no GET. Login do seed: `Teste1234`; `Senha1234` não é a senha dessas contas.
 
-## 3 Teste executável para o guia Users
-
-Use depois de aplicar [Users](modelos/users.md). Este teste cria e remove `test_frota_rural_autoria` no PostgreSQL de ensaio da porta `5442`; preserva os dados do seed em `frota_rural_autoria`.
-
-<!-- file: BackEnd/autoria/tests.py -->
-```python
-from datetime import date
-from uuid import uuid4
-
-from django.db.models.deletion import ProtectedError
-from rest_framework.test import APITestCase
-
-from autoria.models import CategoriaAutoria
-from users.models import Users
-
-
-class AutoriaUsuariosTests(APITestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.usuario = Users.objects.create_user(
-            email="autoria@example.test", password="SenhaDeTeste123",
-            name="Pessoa de teste", document="AUTORIA-01", role="locatario",
-            address="Endereço de teste", birth_date=date(1990, 1, 1), status="active",
-        )
-        cls.outro = Users.objects.create_user(
-            email="outro-autoria@example.test", password="OutraSenha123",
-            name="Outro usuário", document="AUTORIA-02", role="locatario",
-            address="Outro endereço", birth_date=date(1991, 1, 1), status="active",
-        )
-
-    def setUp(self):
-        self.client.force_authenticate(self.usuario)
-        self.url = f"/api/autoria/users/{self.usuario.pk}"
-
-    def test_catalogo_veio_da_migration(self):
-        response = self.client.get("/api/autoria/categorias")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual({item["nome"] for item in response.data},
-                         {"Rotina", "Acompanhamento", "Prioridade"})
-        self.assertEqual(len(response.data), 3)
-
-    def test_grava_fk_e_rele_o_nome_no_banco(self):
-        categoria = CategoriaAutoria.objects.get(nome="Prioridade")
-        senha_original = self.usuario.password
-        response = self.client.patch(self.url, {"categoria_id": str(categoria.pk)}, format="json")
-        self.assertEqual(response.status_code, 200)
-        self.usuario.refresh_from_db()
-        self.assertEqual(self.usuario.categoria_autoria_id, categoria.pk)
-        self.assertEqual(self.usuario.password, senha_original)
-        self.assertEqual(self.usuario.role, "locatario")
-        data = self.client.get(self.url).data
-        self.assertEqual(data["categoria_nome"], "Prioridade")
-        self.assertEqual(set(data), {"id", "categoria_id", "categoria_nome"})
-
-    def test_fk_inexistente_e_rejeitada(self):
-        response = self.client.patch(self.url, {"categoria_id": str(uuid4())}, format="json")
-        self.assertEqual(response.status_code, 400)
-        self.usuario.refresh_from_db()
-        self.assertIsNone(self.usuario.categoria_autoria_id)
-
-    def test_nao_classifica_outro_usuario(self):
-        categoria = CategoriaAutoria.objects.get(nome="Rotina")
-        response = self.client.patch(f"/api/autoria/users/{self.outro.pk}",
-                                     {"categoria_id": str(categoria.pk)}, format="json")
-        self.assertEqual(response.status_code, 404)
-
-    def test_campos_de_privilegio_nao_entram_no_patch(self):
-        categoria = CategoriaAutoria.objects.get(nome="Rotina")
-        response = self.client.patch(self.url,
-            {"categoria_id": str(categoria.pk), "role": "admin"}, format="json")
-        self.assertEqual(response.status_code, 400)
-        self.usuario.refresh_from_db()
-        self.assertEqual(self.usuario.role, "locatario")
-        self.assertIsNone(self.usuario.categoria_autoria_id)
-
-    def test_catalogo_exige_login(self):
-        self.client.force_authenticate(user=None)
-        self.assertEqual(self.client.get("/api/autoria/categorias").status_code, 401)
-
-    def test_categoria_em_uso_e_protegida(self):
-        categoria = CategoriaAutoria.objects.get(nome="Rotina")
-        self.client.patch(self.url, {"categoria_id": str(categoria.pk)}, format="json")
-        with self.assertRaises(ProtectedError):
-            categoria.delete()
-```
+## 3 Banco — comprovar persistência
 
 ```bash
-# No terminal configurado acima: PostgreSQL de ensaio em 127.0.0.1:5442.
-python manage.py test autoria --noinput
-python manage.py spectacular --validate --fail-on-warn --file /tmp/autoria-schema.yaml
+python manage.py shell -c 'from users.models import Users; u=Users.objects.select_related("categoria_autoria").get(email="joao.silva@example.test"); print(u.categoria_autoria_id, u.categoria_autoria.Genero if u.categoria_autoria else None)'
 ```
 
-## 4 Frontend
-
-```bash
-# A partir de BackEnd/. O subshell preserva a pasta para o próximo passo SQL.
-(
-  cd ../FrontEnd
-  npm run build && npm run lint
-)
+```sql
+-- DBeaver: conexão frota_rural_autoria, porta 5442.
+SELECT u.email, u.categoria_autoria_id, g."Genero"
+FROM users u LEFT JOIN "Genero" g ON g.id = u.categoria_autoria_id;
 ```
 
-```text
-http://localhost:5183 -> Login -> /autoria/users/ID_DO_USUARIO
-Selecionar Prioridade -> Salvar categoria
-Network: PATCH 200 seguido de GET 200
-Valor persistido: Prioridade
-F5 -> Valor persistido: Prioridade
-```
+## 4 Frontend e falhas
 
-## 5 Conferir por SQL usando a conexão do Django
-
-```bash
-python manage.py shell <<'PY'
-from django.db import connection
-with connection.cursor() as cursor:
-    cursor.execute("""
-        SELECT u.id, u.categoria_autoria_id, c.nome
-        FROM users u
-        LEFT JOIN categorias_autoria c ON c.id = u.categoria_autoria_id
-        ORDER BY u.id
-    """)
-    print(cursor.fetchall())
-PY
-```
-
-## 6 Erros frequentes
-
-| Sintoma | Corrigir |
+| Ensaio | Resultado esperado |
 | --- | --- |
-| `relation categorias_autoria does not exist` | Registrar app, gerar migration e executar `migrate` no mesmo banco da API. |
-| `column categoria_autoria_id does not exist` | Gerar e aplicar a migration do modelo existente. |
-| `No installed app with label autoria` | Acrescentar `autoria` em `INSTALLED_APPS`. |
-| 404 no endpoint | Incluir `autoria.urls`, adicionar o `path` do modelo e conferir ID/permissão. |
-| 401 | Fazer login; usar `httpClient` de `FrontEnd/src/app/container.ts`, que envia/renova token. |
-| `python: command not found` ou `No module named django` | Em `BackEnd/`, executar `source .venv/bin/activate`. |
-| Conexão diferente de `127.0.0.1:5442` | Executar `source ../Devops/autoria.env.sh` no terminal de `BackEnd/` e conferir `python manage.py verify_database`. |
-| `Connection refused` na porta `5442` | Ligar Docker Desktop e executar `docker start frota-autoria-db-1`. |
-| Porta `8010` ocupada | O Django já pode estar rodando; abrir o Swagger e usar outro terminal para migrations. |
-| 403/404 para outro registro | Usar o responsável pelo registro ou a conta admin, conforme o guia. |
-| 400 na categoria | Enviar UUID real em `categoria_id`, não o nome nem o objeto inteiro. |
-| 405 em revisão/assinatura | A gravação é na criação; usar o guia específico e não remover as triggers. |
-| Nome some no F5 | Conferir PATCH, FK no banco e GET; não exibir apenas o state do select. |
-| Nome não chega ao componente | Na API original, atualizar também schema Zod, mapper e tipo; na API do tutorial, usar `vinculoSchema`. |
-| Migration pede default | A FK nova deve começar com `null=True, blank=True`. |
-| `PROTECT` impede excluir categoria | Existe registro referenciando-a; é a integridade da FK. |
-| Tentativa de rollback bloqueada | Reverter primeiro a migration que adicionou a FK, conforme `migrate --plan`; não apagar dados do banco para contornar. |
+| Escolher, salvar, F5 | Mesmo ID e nome recebidos da API |
+| Enviar UUID `99999999-9999-4999-8999-999999999999` | 400; valor anterior permanece |
+| Remover seleção, salvar | FK `null`; texto “Não informado” |
+| Editar outro usuário como conta comum | 403/404; nenhum registro alterado |
+| Acessar sem sessão | 401 |
+| Catálogo indisponível | Mensagem de erro e seletor desabilitado |
 
-## 7 Mostrar durante a defesa
+## 5 Erros comuns
 
 ```text
-models.py             -> nova tabela e ForeignKey na tabela existente
-migrations/0002...    -> três INSERTs feitos pelo ORM histórico
-serializers.py        -> valida ID recebido e retorna o nome relacionado
-*_services.py         -> confere acesso e salva categoria_autoria
-urls.py               -> liga endpoint à view
-AutoriaRepository.ts  -> GET/PATCH reais
-CategoriaSelect.tsx   -> opções carregadas da tabela
-CategoriaEditor.tsx   -> salva; relê o banco; mostra categoria_nome
-SQL JOIN + F5         -> comprova persistência e relacionamento
+200, mas FK continua null → campo ausente em InputSerializer.Meta.fields.
+API contém nome, React não → schema Zod ou mapper descartando o campo.
+PATCH salva, F5 perde     → verifique se GET inclui campo e frontend usa porta 8010.
+Nome null com FK válida  → source deve ser categoria_autoria.Genero no seu modelo.
+Catalogo quebra Zod      → saída esperada é id/nome, não id/Genero.
+/api dá 404              → abrir /api/schema/swagger-ui.
+Migration não encontra CategoriaAutoria → usar Genero no código atual, nomes históricos nas migrations.
+401 login               → conta do seed + Teste1234; obter token antes do catálogo.
+```
+
+## 6 Mostrar na defesa
+
+```text
+1. Nova tabela e três linhas no DBeaver.
+2. Migration da FK e classe do modelo existente.
+3. InputSerializer → service existente → save/create.
+4. Selecionar no frontend e salvar.
+5. SELECT com JOIN + F5 no frontend: mesmo valor persistido.
 ```

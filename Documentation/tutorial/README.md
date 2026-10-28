@@ -1,89 +1,87 @@
-# Tutorial para o teste de autoria
+# Tutorial do teste de autoria
 
-Exercício: **nova tabela com três registros → seletor no frontend → FK em uma tabela existente → leitura do valor persistido**.
+**Nova tabela + três registros → componente → FK em tabela existente → dado persistido exibido após F5.**
 
-São exemplos para implementar à mão. Nenhuma migration ou mudança de aplicação desta pasta é aplicada automaticamente.
+Base: branch `codex/autoria-pratica`, código revisado em 28/10/2026. Seu ensaio utiliza `autoria.Genero` e `Users.categoria_autoria`. Os exemplos continuam com esses nomes; adaptar o domínio ao enunciado recebido.
 
-## Terminal de prática
+## Continuar seu exercício
 
-Branch de prática: `codex/autoria-pratica`. Banco exclusivo: `frota_rural_autoria` em `127.0.0.1:5442`.
+1. [Avaliação do que você já implementou](06_avaliacao_do_exercicio.md).
+2. [Ajustar a saída do catálogo existente](01_api_services_e_rotas.md).
+3. [Criar hook e seletor compartilhados](02_frontend_repository_store_componente.md).
+4. [Usuários: alterações exatas no fluxo existente](04_usuarios_pelo_fluxo_existente.md).
+5. [Validar API, banco e tela](03_validacao_e_erros.md).
+
+Você já criou a tabela, os três registros e a FK. O [guia 00](00_tabela_e_tres_registros.md) serve para conferir isso ou criar outra tabela durante a defesa.
+
+```text
+CategoriaSelect → GET /api/autoria/categorias → CategoriaAutoriaService.listar
+Minha Conta → useUpdateProfile → UserStore → UserRepository.updateProfile
+PATCH /api/users/<id> → UserDetailView → UserService.update
+UserUpdateInputSerializer.save() → users.categoria_autoria_id
+GET /api/users/<id> → UserOutputSerializer → Zod → mapper → tela
+```
+
+## Ambiente
+
 
 ```bash
-# Em um terminal novo, na raiz do repositório:
-cd BackEnd
+# Terminal em BackEnd/
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: Host: 127.0.0.1:5442 / Database: frota_rural_autoria.
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 ```
 
-Os comandos Django de todos os guias são executados dentro de `BackEnd/`, com esse ambiente ativo. Os caminhos dos arquivos para editar continuam relativos à raiz do repositório. Django e frontend já foram iniciados para o ensaio; para retomar após desligá-los, use o guia 05.
+- Frontend: [localhost:5183](http://localhost:5183).
+- Swagger: [localhost:8010/api/schema/swagger-ui](http://localhost:8010/api/schema/swagger-ui).
+- Banco: `frota_rural_autoria`, host `127.0.0.1`, porta `5442`.
+- [Reiniciar Django nativo e frontend](05_ambiente_dev_e_banco_isolado.md).
 
-## Ordem de execução
-
-0. [Conferir ou retomar o banco isolado, Django nativo e frontend](05_ambiente_dev_e_banco_isolado.md).
-1. [Tabela e três registros](00_tabela_e_tres_registros.md)
-2. [API, serializers, services e rotas](01_api_services_e_rotas.md)
-3. [Repository, Store, componente e página](02_frontend_repository_store_componente.md)
-4. Escolher **um** dos modelos abaixo e aplicar seu guia.
-5. [Validar, testar e resolver erros](03_validacao_e_erros.md)
-
-Para alterar diretamente **Minha Conta** e `PATCH /api/users/<id>`, use [Usuários pelo fluxo existente](04_usuarios_pelo_fluxo_existente.md). O arquivo indica cada alteração no serializer, schema Zod, mapper, tipo, payload e componente.
+## Como ler os guias
 
 ```text
-CategoriaSelect -> AutoriaRepository -> /api/autoria/categorias -> categorias_autoria
-CategoriaEditor -> PATCH /api/autoria/<recurso>/<id> -> Service -> tabela_existente.categoria_autoria_id
-F5              -> GET /api/autoria/<recurso>/<id>   -> JOIN    -> categoria_nome no frontend
-
-Criar: arquivos identificados como completos.
-Acrescentar: trechos dentro da classe/lista/função indicada; preservar o código atual.
-API base local: http://localhost:8010/api
-Frontend local: http://localhost:5183
-Swagger: http://localhost:8010/api/schema/swagger-ui
-PostgreSQL: 127.0.0.1:5442 / frota_rural_autoria
+Arquivo:linha → posição do código revisado; usar o nome da classe/método como âncora.
+“Inserir entre…” → adicionar só o trecho indicado, preservando o restante.
+“Referência, não substituir” → código atual mostrado para explicar o caminho.
+Arquivo novo completo → copiar o bloco inteiro para o caminho indicado.
 ```
+
+Os 26 guias apontam para os services e componentes reais. Usuários tem o exemplo completo de inserção linha a linha. Os demais são roteiros de adaptação ao modelo escolhido, com o ponto de gravação e as projeções de leitura que precisam receber o campo.
+
+Nos modelos internos, o guia identifica se a FK vem do formulário próprio ou de uma seleção já salva no perfil. Para esses casos, o significado da classificação deve seguir o enunciado. Pagamentos, envio de e-mail, upload e pesquisa externa podem exigir configuração do provedor ou mocks nos testes; o ambiente isolado mantém essas credenciais vazias.
+
+O código desta pasta é material para implementar à mão. Atualizar os guias não aplica a solução à aplicação nem às tabelas do ensaio.
 
 ## Modelos
 
-| Modelo real | Tabela | Guia | Quem classifica no exercício |
-| --- | --- | --- | --- |
-| `users.Users` | `users` | [Usuários](modelos/users.md) | Responsável pelo registro ou administrador |
-| `machines.Machines` | `machines` | [Máquinas](modelos/machines.md) | Responsável pelo registro ou administrador |
-| `document_validation.Certification` | `certifications` | [Certificações](modelos/certifications.md) | Responsável pelo registro ou administrador |
-| `contracts.ContractAmendments` | `contract_amendments` | [Aditivos de contrato](modelos/contract_amendments.md) | Responsável pelo registro ou administrador |
-| `contracts.ContractRevisions` | `contract_revisions` | [Revisões de contrato](modelos/contract_revisions.md) | Somente na criação; consulta pelas partes/admin |
-| `contracts.ContractSignatureOtps` | `contract_signature_otps` | [Códigos de assinatura](modelos/contract_signature_otps.md) | Administrador |
-| `contracts.ContractSignatures` | `contract_signatures` | [Evidências de assinatura](modelos/contract_signatures.md) | Somente na criação; consulta pelas partes/admin |
-| `contracts.Contracts` | `contracts` | [Contratos](modelos/contracts.md) | Responsável pelo registro ou administrador |
-| `pricing.MachineValuations` | `machine_valuations` | [Pesquisas de valor de máquina](modelos/machine_valuations.md) | Administrador |
-| `chat.MessageReports` | `message_reports` | [Denúncias de mensagens](modelos/message_reports.md) | Administrador |
-| `chat.Messages` | `messages` | [Mensagens](modelos/messages.md) | Responsável pelo registro ou administrador |
-| `notifications.Notification` | `notifications` | [Notificações](modelos/notifications.md) | Responsável pelo registro ou administrador |
-| `document_validation.OperatorLicense` | `operator_licenses` | [CNHs de operadores](modelos/operator_licenses.md) | Responsável pelo registro ou administrador |
-| `authentication.PasswordResets` | `password_resets` | [Recuperações de senha](modelos/password_resets.md) | Administrador |
-| `payments.PaymentEvents` | `payment_events` | [Eventos de pagamento](modelos/payment_events.md) | Administrador |
-| `payments.Payments` | `payments` | [Pagamentos](modelos/payments.md) | Administrador |
-| `administration.PostingModeration` | `posting_moderations` | [Histórico de moderação](modelos/posting_moderations.md) | Administrador |
-| `postings.Postings` | `postings` | [Anúncios](modelos/postings.md) | Responsável pelo registro ou administrador |
-| `postings.PostingsPhotos` | `postings_photos` | [Fotos dos anúncios](modelos/postings_photos.md) | Responsável pelo registro ou administrador |
-| `pricing.PricingSuggestions` | `pricing_suggestions` | [Sugestões de preço](modelos/pricing_suggestions.md) | Responsável pelo registro ou administrador |
-| `payments.RefundAttempts` | `refund_attempts` | [Tentativas de estorno](modelos/refund_attempts.md) | Administrador |
-| `payments.Refunds` | `refunds` | [Estornos](modelos/refunds.md) | Administrador |
-| `rentals.RentalMeterReadings` | `rental_meter_readings` | [Leituras de horímetro](modelos/rental_meter_readings.md) | Responsável pelo registro ou administrador |
-| `api.RentalRecurrence` | `rental_recurrences` | [Recorrências de locação](modelos/rental_recurrences.md) | Responsável pelo registro ou administrador |
-| `rentals.Rentals` | `rentals` | [Locações](modelos/rentals.md) | Responsável pelo registro ou administrador |
-| `reviews.Reviews` | `reviews` | [Avaliações](modelos/reviews.md) | Responsável pelo registro ou administrador |
+| Guia do modelo atual |
+| --- |
+| [Certificações — `Certification`](modelos/certifications.md) |
+| [Aditivos — `ContractAmendments`](modelos/contract_amendments.md) |
+| [Revisões de contrato — `ContractRevisions`](modelos/contract_revisions.md) |
+| [Códigos de assinatura — `ContractSignatureOtps`](modelos/contract_signature_otps.md) |
+| [Assinaturas — `ContractSignatures`](modelos/contract_signatures.md) |
+| [Contratos — `Contracts`](modelos/contracts.md) |
+| [Pesquisas de valor — `MachineValuations`](modelos/machine_valuations.md) |
+| [Máquinas — `Machines`](modelos/machines.md) |
+| [Denúncias de mensagens — `MessageReports`](modelos/message_reports.md) |
+| [Mensagens — `Messages`](modelos/messages.md) |
+| [Notificações — `Notification`](modelos/notifications.md) |
+| [CNHs — `OperatorLicense`](modelos/operator_licenses.md) |
+| [Recuperações de senha — `PasswordResets`](modelos/password_resets.md) |
+| [Eventos de pagamento — `PaymentEvents`](modelos/payment_events.md) |
+| [Pagamentos — `Payments`](modelos/payments.md) |
+| [Histórico de moderação — `PostingModeration`](modelos/posting_moderations.md) |
+| [Anúncios — `Postings`](modelos/postings.md) |
+| [Fotos de anúncios — `PostingsPhotos`](modelos/postings_photos.md) |
+| [Sugestões de preço — `PricingSuggestions`](modelos/pricing_suggestions.md) |
+| [Tentativas de estorno — `RefundAttempts`](modelos/refund_attempts.md) |
+| [Estornos — `Refunds`](modelos/refunds.md) |
+| [Leituras de horímetro — `RentalMeterReadings`](modelos/rental_meter_readings.md) |
+| [Recorrências — `RentalRecurrence`](modelos/rental_recurrences.md) |
+| [Locações — `Rentals`](modelos/rentals.md) |
+| [Avaliações — `Reviews`](modelos/reviews.md) |
+| [Users — perfil existente](modelos/users.md) |
 
-## Casos que merecem atenção
-
-```text
-Users: categoria não é role. Senhas e promoção para admin não entram no novo PATCH.
-PaymentEvents: a PK é string, portanto a URL usa <str:pk>.
-ContractRevisions / ContractSignatures: append-only; os guias usam criação, nunca UPDATE.
-PasswordResets / OTPs: endpoints do exercício só exibem id e categoria; nunca token/hash/código.
-API: RentalRecurrence pertence ao app api, mas sua tabela é rental_recurrences.
-Conversas: não há modelo Conversation; a conversa é derivada de Messages e seu escopo.
-Operadores: não há modelo Operator; são Users com role=operador e employer.
-```
-
-Os 26 guias cobrem os modelos próprios declarados em `BackEnd/*/models.py`. Tabelas internas do Django não fazem parte deste inventário.
+Operadores são `Users` com outro papel e empregador. Conversas são derivadas de `Messages`; não há model `Conversation`. Tabelas internas do Django não fazem parte dos 26 modelos de negócio listados.

@@ -36,18 +36,16 @@ Mantenha esse terminal dentro de `BackEnd/` durante os comandos Django e curl do
 
 ## 2 Executar o exercício
 
-Continuar no terminal do passo 1:
+O app `autoria`, o modelo `Genero`, os três registros e a FK de `Users` já estão criados. Continuar nos guias 01, 02 e 04; não repetir `startapp`.
 
 ```bash
-# Apenas na primeira vez, se BackEnd/autoria ainda não existir:
-python manage.py startapp autoria
-# Agora seguir o guia 00: registrar o app e escrever CategoriaAutoria.
-python manage.py makemigrations autoria
-# Escrever a migration dos três registros e a FK conforme os guias.
+python manage.py showmigrations autoria users
+python manage.py makemigrations --check --dry-run
+python manage.py check
+# Depois de alterar outro model:
 python manage.py makemigrations
 python manage.py migrate --plan
 python manage.py migrate
-python manage.py check
 ```
 
 ```text

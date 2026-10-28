@@ -1,157 +1,57 @@
-# Tentativas de estorno · `RefundAttempts`
+# Tentativas de estorno — `RefundAttempts`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/payments/models.py` → `RefundAttempts` |
-| Tabela | `refund_attempts` |
-| Fluxo original | `BackEnd/payments/refunds.py` |
-| Tela original relacionada | `FrontEnd/src/pages/admin/AdminPlaceholder.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/refund_attempts/<ID>` |
+`BackEnd/payments/models.py:83` — dentro de `RefundAttempts`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Preservar número, chave idempotente e resposta do provedor. Apenas categoria administrativa.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/payments/models.py — dentro de RefundAttempts, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations payments
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/payments/autoria_refund_attempts_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/payments/refunds.py:37` — procurar `def _prepare(refund_id)`
+
+Dentro de `RefundAttempts.objects.create`, antes de `idempotency_key`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
-from payments.models import RefundAttempts
-from autoria.serializers import VinculoInputSerializer
-
-
-class RefundAttemptsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return RefundAttempts.objects.all()
-        raise PermissionDenied("Apenas administradores acessam esta classificação.")
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            RefundAttemptsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            RefundAttemptsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=payment.rental.lessee.categoria_autoria_id,
 ```
+Manter a condição que só permite uma nova tentativa após falha terminal confirmada. Para congelar a classificação da obrigação em vez do perfil, concluir também o guia Refunds e usar `refund.categoria_autoria_id`.
 
-## 3 View e rota
+## 4 Saída persistida
 
-<!-- file: BackEnd/payments/autoria_refund_attempts_views.py -->
+Não existe listagem pública de tentativas. Na saída autenticada de locação (`RentalOutputSerializer.get_refunds`), acrescentar ao dicionário do estorno uma lista mínima:
 ```python
-from autoria.views import RegistroCategoriaView
-from payments.autoria_refund_attempts_services import RefundAttemptsCategoriaService
-
-
-class RefundAttemptsCategoriaView(RegistroCategoriaView):
-    service = RefundAttemptsCategoriaService
+"tentativas": [
+    {"id": str(attempt.pk), "numero": attempt.number,
+     "categoria_nome": attempt.categoria_autoria.Genero if attempt.categoria_autoria_id else None}
+    for attempt in refund.attempts.select_related("categoria_autoria").order_by("number")
+],
 ```
+Adaptar `refund` ao nome local do loop. Não expor chaves de idempotência nem dados internos do provedor.
 
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+## 5 Frontend e comprovação
 
-```python
-from payments.autoria_refund_attempts_views import RefundAttemptsCategoriaView
+No `refundSchema` de `features/contracts/types/management.ts`, adicionar `tentativas: z.array(z.object({ id: z.string(), numero: z.number(), categoria_nome: z.string().nullable() })).optional()`. Renderizar a lista no painel de estorno da locação; depois de F5, ler a mesma lista do GET. O fluxo depende de um estorno elegível e do provedor de teste.
 
-# Dentro de urlpatterns:
-path("autoria/refund_attempts/<uuid:pk>", RefundAttemptsCategoriaView.as_view(), name="autoria_refund_attempts"),
-```
-
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login com admin@example.test.
-2. Abrir http://localhost:5183/autoria/refund_attempts/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
-
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from payments.models import RefundAttempts; print(list(RefundAttempts.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM refund_attempts AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/refund_attempts/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/refund_attempts/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/admin/AdminPlaceholder.tsx`. Renderize fora de outro `<form>` e passe o ID de **RefundAttempts**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function RefundAttemptsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="refund_attempts" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em refund_attempts, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Preservar número, chave idempotente e resposta do provedor. Apenas categoria administrativa.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

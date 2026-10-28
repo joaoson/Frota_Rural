@@ -1,156 +1,56 @@
-# Sugestões de preço · `PricingSuggestions`
+# Sugestões de preço — `PricingSuggestions`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/pricing/models.py` → `PricingSuggestions` |
-| Tabela | `pricing_suggestions` |
-| Fluxo original | `BackEnd/pricing/service.py` |
-| Tela original relacionada | `FrontEnd/src/pages/postings/NovoAnuncio.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/pricing_suggestions/<ID>` |
+`BackEnd/pricing/models.py:74` — dentro de `PricingSuggestions`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Preservar inputs, breakdown, versão e valores; classificação não gera nova cotação.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/pricing/models.py — dentro de PricingSuggestions, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations pricing
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/pricing/autoria_pricing_suggestions_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/pricing/service.py:238` — procurar `def build_suggestion(`
+
+Dentro de `PricingSuggestions.objects.create`, entre `machinery=machine,` e `suggested_hourly_rate=anchored,`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
+categoria_autoria_id=machine.owner.categoria_autoria_id,
+```
+A função continua calculando e gravando o preço pelo fluxo atual. Não substituir cálculo por valor enviado pelo cliente.
+
+## 4 Saída persistida
+
+Em `pricing/views.py`, depois que `build_suggestion` retorna e antes de `return Response`, ler o registro criado:
+```python
 from pricing.models import PricingSuggestions
-from autoria.serializers import VinculoInputSerializer
-
-
-class PricingSuggestionsCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return PricingSuggestions.objects.all()
-        return PricingSuggestions.objects.filter(machinery__owner=actor)
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            PricingSuggestionsCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            PricingSuggestionsCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+registro = PricingSuggestions.objects.select_related("categoria_autoria").get(pk=suggestion.suggestion_id)
 ```
+Acrescentar ao dicionário da resposta `categoria_autoria` (UUID convertido para string ou null) e `categoria_nome`, lidos de `registro`. Declarar os campos em `SuggestionResponseSerializer`.
 
-## 3 View e rota
+Para persistência visível após F5: `PostingService._link_pricing_suggestion` já relaciona sugestão/anúncio. Acrescentar um `SerializerMethodField` em `PostingDetailOutputSerializer` que consulte `PricingSuggestions` pelo anúncio, ordene por `-created_at` e devolva o nome da categoria da sugestão vinculada; não gerar outra pesquisa para ler a anterior.
 
-<!-- file: BackEnd/pricing/autoria_pricing_suggestions_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from pricing.autoria_pricing_suggestions_services import PricingSuggestionsCategoriaService
+## 5 Frontend e comprovação
 
+Ampliar `pricingSuggestionSchema` e `PricingSuggestion` com os campos snake_case usados nessa feature; mostrar o nome no componente da sugestão. Para o F5, ampliar `postingDetailApiSchema`, `PostingDetail` e `detailToDomain` com o nome persistido exposto no passo 4 e exibir no detalhe do anúncio. A pesquisa externa exige provedor configurado ou teste com mock; o ambiente isolado tem as chaves vazias.
 
-class PricingSuggestionsCategoriaView(RegistroCategoriaView):
-    service = PricingSuggestionsCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
-
-```python
-from pricing.autoria_pricing_suggestions_views import PricingSuggestionsCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/pricing_suggestions/<uuid:pk>", PricingSuggestionsCategoriaView.as_view(), name="autoria_pricing_suggestions"),
-```
-
-## 4 Gravar e exibir no frontend
-
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/pricing_suggestions/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
-```
-
-## 5 Identificar o registro e conferir a FK
-
-```bash
-python manage.py shell -c 'from pricing.models import PricingSuggestions; print(list(PricingSuggestions.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
-```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM pricing_suggestions AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/pricing_suggestions/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/pricing_suggestions/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
-```
-
-## 6 Integrar na tela original quando solicitado
-
-Ponto de partida: `FrontEnd/src/pages/postings/NovoAnuncio.tsx`. Renderize fora de outro `<form>` e passe o ID de **PricingSuggestions**, não o ID do objeto pai.
-
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
-
-export function PricingSuggestionsCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="pricing_suggestions" id={id} />;
-}
-```
-
-## 7 Conferências
-
-```text
-[ ] A FK está em pricing_suggestions, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Preservar inputs, breakdown, versão e valores; classificação não gera nova cotação.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.

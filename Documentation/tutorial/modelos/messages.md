@@ -1,156 +1,82 @@
-# Mensagens · `Messages`
+# Mensagens — `Messages`
 
-Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_api_services_e_rotas.md) e [frontend](../02_frontend_repository_store_componente.md).
+Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
 
-```bash
-# Terminal em BackEnd/. Se estiver na raiz: cd BackEnd
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
-```
+## 1 Modelo e migration
 
-| Ponto | Arquivo ou valor |
-| --- | --- |
-| Modelo existente | `BackEnd/chat/models.py` → `Messages` |
-| Tabela | `messages` |
-| Fluxo original | `BackEnd/chat/services.py` |
-| Tela original relacionada | `FrontEnd/src/pages/messages/Mensagens.tsx` |
-| Componente do exercício | `FrontEnd/src/features/autoria/components/CategoriaEditor.tsx` |
-| API nova | `/api/autoria/messages/<ID>` |
+`BackEnd/chat/models.py:45` — dentro de `Messages`, imediatamente antes de `class Meta`, inserir:
 
 ```python
-# Somente remetente ou admin classifica; não alterar conteúdo, leitura, destinatário ou escopo.
-```
-
-## 1 Adicionar a FK
-
-```python
-# BackEnd/chat/models.py — dentro de Messages, antes de class Meta.
 categoria_autoria = models.ForeignKey(
-    "autoria.CategoriaAutoria", on_delete=models.PROTECT,
+    "autoria.Genero", on_delete=models.PROTECT,
     null=True, blank=True, related_name="+",
 )
 ```
 
 ```bash
-# Rodar depois de autoria.0002_categorias_iniciais.
+# Terminal em BackEnd/
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria
 python manage.py makemigrations chat
 python manage.py migrate --plan
 python manage.py migrate
-# A migration gerada deve ter AddField e dependência de autoria.
 ```
 
-## 2 Service do vínculo
+## 2 Origem da seleção
 
-<!-- file: BackEnd/chat/autoria_messages_services.py -->
+Concluir o [guia de usuários](../04_usuarios_pelo_fluxo_existente.md). Selecionar uma opção em Minha Conta e salvar antes da operação abaixo. Neste exemplo de ensaio, o registro novo copia o ID selecionado pelo usuário; adaptar o significado da categoria ao enunciado.
+
+## 3 Alteração no service real
+
+`BackEnd/chat/services.py:109` — procurar `def create_message(`
+
+Dentro de `Messages.objects.create`, entre `sender=sender,` e `receiver_id=receiver_id,`, inserir:
 ```python
-from django.db import transaction
-from django.shortcuts import get_object_or_404
-from chat.models import Messages
-from autoria.serializers import VinculoInputSerializer
-
-
-class MessagesCategoriaService:
-    @staticmethod
-    def _queryset(actor):
-        if actor.role == "admin":
-            return Messages.objects.all()
-        return Messages.objects.filter(sender=actor)
-
-    @staticmethod
-    def obter(pk, *, actor):
-        return get_object_or_404(
-            MessagesCategoriaService._queryset(actor).select_related("categoria_autoria"), pk=pk,
-        )
-
-    @staticmethod
-    @transaction.atomic
-    def salvar(pk, data, *, actor):
-        registro = get_object_or_404(
-            MessagesCategoriaService._queryset(actor).select_for_update(of=("self",)), pk=pk,
-        )
-        serializer = VinculoInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        registro.categoria_autoria = serializer.validated_data["categoria_autoria"]
-        registro.save(update_fields=["categoria_autoria"])
-        return registro
+categoria_autoria_id=sender.categoria_autoria_id,
 ```
+Essa criação é usada pelo fluxo de envio; manter replay/idempotência por `client_id` e fan-out WebSocket.
 
-## 3 View e rota
+## 4 Saída persistida — REST, WebSocket e inbox
 
-<!-- file: BackEnd/chat/autoria_messages_views.py -->
-```python
-from autoria.views import RegistroCategoriaView
-from chat.autoria_messages_services import MessagesCategoriaService
+`serialize_message` também recebe `InboxMessageRow`, que vem de SQL bruto. Alterar os dois formatos juntos:
 
-
-class MessagesCategoriaView(RegistroCategoriaView):
-    service = MessagesCategoriaService
-```
-
-`BackEnd/autoria/urls.py` — acrescentar o import e o `path` na lista existente:
+1. Em `BackEnd/chat/models.py`, dentro de `Messages`, acrescentar a propriedade:
 
 ```python
-from chat.autoria_messages_views import MessagesCategoriaView
-
-# Dentro de urlpatterns:
-path("autoria/messages/<uuid:pk>", MessagesCategoriaView.as_view(), name="autoria_messages"),
+@property
+def categoria_nome(self):
+    return self.categoria_autoria.Genero if self.categoria_autoria_id else None
 ```
 
-## 4 Gravar e exibir no frontend
+2. Em `BackEnd/chat/serializer.py`, no protocolo `MessageLike`, acrescentar propriedades `categoria_autoria_id: UUID | None` e `categoria_nome: str | None` seguindo o formato `@property` existente.
+3. No retorno de `serialize_message`, após `"id"`, inserir:
 
-```text
-1. Fazer login como dono do registro (ou administrador).
-2. Abrir http://localhost:5183/autoria/messages/ID_REAL.
-3. Categoria -> selecionar uma das três opções -> Salvar categoria.
-4. Ler novamente do banco -> F5 -> verificar Categoria persistida.
-O CategoriaEditor já está conectado ao Repository, Store, GET e PATCH da API.
+```python
+"categoria_autoria": str(message.categoria_autoria_id) if message.categoria_autoria_id else None,
+"categoria_nome": message.categoria_nome,
 ```
 
-## 5 Identificar o registro e conferir a FK
+4. Em `ChatMessageOutputSerializer`, declarar `categoria_autoria = serializers.UUIDField(allow_null=True)` e `categoria_nome = serializers.CharField(allow_null=True)`.
+5. Em `BackEnd/chat/selectors.py`, alterar `_INBOX_SQL`:
 
-```bash
-python manage.py shell -c 'from chat.models import Messages; print(list(Messages.objects.values_list("pk", flat=True)[:10]))'
-# Se a lista estiver vazia, crie um registro pelo fluxo original indicado acima.
-# Use um ID ao qual a conta autenticada tenha acesso.
-```
 ```sql
-SELECT r.id, r.categoria_autoria_id, c.nome AS categoria_nome
-FROM messages AS r
-LEFT JOIN categorias_autoria AS c ON c.id = r.categoria_autoria_id
-ORDER BY r.id;
-```
-```bash
-# TOKEN: login do passo 03_validacao_e_erros.md; ID: copiado do banco.
-AUTORIA_ID='COLE_O_ID_REAL_AQUI'
-curl --fail-with-body -X PATCH "$AUTORIA_API/autoria/messages/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"categoria_id":"33333333-3333-4333-8333-333333333333"}'
-curl --fail-with-body "$AUTORIA_API/autoria/messages/$AUTORIA_ID" \
-  -H "Authorization: Bearer $AUTORIA_TOKEN"
-# GET deve devolver categoria_nome = Prioridade.
+-- No SELECT do CTE mine, depois de m.client_id:
+m.categoria_autoria_id, g."Genero" AS categoria_nome,
+-- Depois de FROM messages m, antes de WHERE:
+LEFT JOIN "Genero" g ON g.id = m.categoria_autoria_id
+-- No SELECT final, depois de l.client_id e antes de COUNT(*) OVER ():
+l.categoria_autoria_id, l.categoria_nome,
 ```
 
-## 6 Integrar na tela original quando solicitado
+6. Acrescentar `categoria_autoria_id: UUID | None` e `categoria_nome: str | None` a `InboxMessageRow`. Na tupla desempacotada de cada linha, inserir esses dois valores entre `client_id` e `_total`; passá-los ao construtor de `InboxMessageRow`.
+7. O índice de `total_threads` muda de 15 para 17: substituir `total = int(rows[0][15])` por `total = int(rows[0][17])`.
 
-Ponto de partida: `FrontEnd/src/pages/messages/Mensagens.tsx`. Renderize fora de outro `<form>` e passe o ID de **Messages**, não o ID do objeto pai.
+Preservar as colunas de agrupamento e a ordenação do inbox. Testar mensagem nova, histórico REST, recebimento WebSocket e lista de conversas; uma delas pode quebrar se só o model for alterado.
 
-```tsx
-import { CategoriaEditor } from "@/features/autoria/components/CategoriaEditor";
+## 5 Frontend e comprovação
 
-export function MessagesCategoria({ id }: { id: string }) {
-  return <CategoriaEditor key={id} recurso="messages" id={id} />;
-}
-```
+Ampliar schema de mensagem em `features/chat/types/chatSchemas.ts`, tipo em `chat.ts` e leitura em `api/chatMapper.ts`. Em `components/MessageBubble.tsx`, exibir `message.categoriaNome`. Salvar o perfil, enviar uma mensagem nova, verificar nos dois participantes e recarregar o histórico. Não alterar mensagens antigas.
 
-## 7 Conferências
-
-```text
-[ ] A FK está em messages, não apenas no state do React.
-[ ] A tabela nova contém exatamente os três registros da migration.
-[ ] GET devolve ID e nome, sem campos sensíveis do modelo original.
-[ ] PATCH com categoria inexistente retorna 400; outro usuário sem acesso recebe 403/404.
-[ ] Recarregar a página mantém o valor gravado.
-[ ] Somente remetente ou admin classifica; não alterar conteúdo, leitura, destinatário ou escopo.
-```
+Executar a operação original, conferir a FK da tabela alvo no DBeaver e recarregar a consulta. Linhas antigas continuam com FK nula; não refazer pagamentos/assinaturas para preencher histórico.
