@@ -16,6 +16,7 @@ export const POSTING_FORM_DEFAULTS: PostingFormValues = {
   availabilityStart: "",
   availabilityEnd: "",
   description: "",
+  modalidadeEntrega: "",
 };
 
 export function usePostingForm(
@@ -41,6 +42,7 @@ export function usePostingEditForm(
       availabilityStart: "",
       availabilityEnd: "",
       description: "",
+      modalidadeEntrega: "",
       ...defaults,
     },
     mode: "onBlur",

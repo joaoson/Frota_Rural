@@ -14,7 +14,7 @@ from common.exceptions import BadGateway, Conflict, ServiceUnavailable
 from common.images import validate_image_upload
 from djangoapi import firebase_storage
 from postings.enums import PostingStatus
-from postings.models import Postings, PostingsPhotos
+from postings.models import ModalidadeEntrega, Postings, PostingsPhotos
 from postings.serializer import (
     PostingFilterSerializer,
     PostingInputSerializer,
@@ -184,3 +184,9 @@ class PostingPhotoService:
             is_primary=is_primary,
             created_at=timezone.now(),
         )
+
+
+class ModalidadeEntregaService:
+    @staticmethod
+    def list() -> QuerySet[ModalidadeEntrega]:
+        return ModalidadeEntrega.objects.order_by("nome")

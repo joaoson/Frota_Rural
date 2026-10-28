@@ -39,6 +39,13 @@ export interface PostingDetail {
   machineTechnicalSpecifications: string | null;
   machineRenagroNumber: string | null;
   photos: PostingPhoto[];
+  modalidadeEntregaId: string | null;
+  modalidadeEntregaNome: string | null;
+}
+
+export interface ModalidadeEntrega {
+  id: string;
+  nome: string;
 }
 
 export function postingMachineName(

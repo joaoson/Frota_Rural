@@ -68,6 +68,8 @@ export function detailToDomain(dto: PostingDetailApi): PostingDetail {
     machineTechnicalSpecifications: dto.machine_technical_specifications ?? null,
     machineRenagroNumber: dto.machine_renagro_number ?? null,
     photos,
+    modalidadeEntregaId: dto.modalidade_entrega ?? null,
+    modalidadeEntregaNome: dto.modalidade_entrega_nome ?? null,
   };
 }
 
@@ -88,6 +90,7 @@ export function toWritePayload(
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),
     availability_end: toDateTime(values.availabilityEnd, "23:59:59"),
     description: values.description,
+    modalidade_entrega: values.modalidadeEntrega || null,
   };
 }
 
@@ -104,6 +107,7 @@ export function toEditPayload(
     availability_start: toDateTime(values.availabilityStart, "00:00:00"),
     availability_end: toDateTime(values.availabilityEnd, "23:59:59"),
     description: values.description,
+    modalidade_entrega: values.modalidadeEntrega || null,
   };
 }
 

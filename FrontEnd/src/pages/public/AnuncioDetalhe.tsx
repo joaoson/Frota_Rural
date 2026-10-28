@@ -376,6 +376,7 @@ const AnuncioDetalhe = () => {
                     { label: "Ano", valor: anuncio.machineYear ? String(anuncio.machineYear) : null },
                     { label: "Atividade", valor: anuncio.machineUsagePurpose },
                     { label: "Nº Renagro", valor: anuncio.machineRenagroNumber },
+                    { label: "Entrega", valor: anuncio.modalidadeEntregaNome },
                     { label: "Disponível de", valor: formatDate(isoOuNulo(anuncio.availabilityStart)) },
                     { label: "Disponível até", valor: formatDate(isoOuNulo(anuncio.availabilityEnd)) },
                   ].map((item) =>

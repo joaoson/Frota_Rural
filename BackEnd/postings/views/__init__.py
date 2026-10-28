@@ -1,4 +1,4 @@
 from postings.views.photos import PostingPhotoUploadView
-from postings.views.postings import PostingDetailView, PostingListView
+from postings.views.postings import ModalidadeEntregaListView, PostingDetailView, PostingListView
 
-__all__ = ["PostingDetailView", "PostingListView", "PostingPhotoUploadView"]
+__all__ = ["ModalidadeEntregaListView", "PostingDetailView", "PostingListView", "PostingPhotoUploadView"]

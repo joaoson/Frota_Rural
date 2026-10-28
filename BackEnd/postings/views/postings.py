@@ -10,13 +10,14 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from common.request import authenticated_user, optional_user
 from common.schemas import error_response, error_responses
 from postings.serializer import (
+    ModalidadeEntregaOutputSerializer,
     PostingDetailOutputSerializer,
     PostingFilterSerializer,
     PostingInputSerializer,
     PostingListOutputSerializer,
     PostingOutputSerializer,
 )
-from postings.services import PostingService
+from postings.services import ModalidadeEntregaService, PostingService
 
 TAGS = ["Anúncios"]
 POSTING_NOT_FOUND = error_response(404, "Anúncio não encontrado.")
@@ -126,3 +127,17 @@ class PostingDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         PostingService.delete(pk, actor=authenticated_user(request))
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ModalidadeEntregaListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar modalidades de entrega",
+        description="Opções da tabela `modalidades_entrega` usadas no cadastro de anúncios.",
+        responses={200: ModalidadeEntregaOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        modalidades = ModalidadeEntregaService.list()
+        return Response(ModalidadeEntregaOutputSerializer(modalidades, many=True).data, status=status.HTTP_200_OK)

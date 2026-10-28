@@ -1,6 +1,20 @@
+import uuid
+
 from django.db import models
 
 from postings.enums import PostingStatus
+
+
+class ModalidadeEntrega(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "modalidades_entrega"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
 
 
 class Postings(models.Model):
@@ -21,6 +35,7 @@ class Postings(models.Model):
     status = models.TextField(choices=PostingStatus.choices, blank=True, null=True)
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    modalidade_entrega = models.ForeignKey(ModalidadeEntrega, models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = "postings"

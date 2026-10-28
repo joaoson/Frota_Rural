@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toDateInput, toEditPayload } from "@/features/postings/api/postingMapper";
 import { usePostingEditForm } from "@/features/postings/hooks/usePostingForm";
+import { useModalidadesEntrega } from "@/features/postings/hooks/useModalidadesEntrega";
 import {
   useDeletePosting,
   usePosting,
@@ -55,6 +56,7 @@ const GerenciarAnuncio = () => {
   const postingQuery = usePosting(id ?? null);
   const updatePosting = useUpdatePosting();
   const deletePosting = useDeletePosting();
+  const modalidades = useModalidadesEntrega();
   const { lookup } = useCepLookup();
 
   const form = usePostingEditForm();
@@ -88,6 +90,7 @@ const GerenciarAnuncio = () => {
       availabilityStart: toDateInput(posting.availabilityStart),
       availabilityEnd: toDateInput(posting.availabilityEnd),
       description: posting.description ?? "",
+      modalidadeEntrega: posting.modalidadeEntregaId ?? "",
     });
   }, [posting, form]);
 
@@ -235,6 +238,19 @@ const GerenciarAnuncio = () => {
                 className={inputClass(Boolean(errors.description))}
                 {...form.register("description")}
               />
+            </FormField>
+
+            <FormField label="Modalidade de Entrega" error={errors.modalidadeEntrega?.message}>
+              <select
+                className={inputClass(Boolean(errors.modalidadeEntrega))}
+                disabled={modalidades.isLoading}
+                {...form.register("modalidadeEntrega")}
+              >
+                <option value="">Não informada</option>
+                {(modalidades.data ?? []).map((modalidade) => (
+                  <option key={modalidade.id} value={modalidade.id}>{modalidade.nome}</option>
+                ))}
+              </select>
             </FormField>
 
             <div className="pt-4 border-t border-outline-variant/30 flex justify-end gap-3">

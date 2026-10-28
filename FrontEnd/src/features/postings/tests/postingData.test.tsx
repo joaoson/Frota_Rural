@@ -16,7 +16,7 @@ import { renderHookWithQuery } from "@/test/render";
 
 vi.mock("@/app/container", () => import("@/test/container"));
 
-const form = { machinery: "machine-a", hourlyRate: "350", cep: "", locationAddress: "Rio Verde, GO", availabilityStart: "2026-09-01", availabilityEnd: "2026-12-31", description: "Revisada" };
+const form = { machinery: "machine-a", hourlyRate: "350", cep: "", locationAddress: "Rio Verde, GO", availabilityStart: "2026-09-01", availabilityEnd: "2026-12-31", description: "Revisada", modalidadeEntrega: "" };
 
 beforeEach(() => { net.http.send.mockReset(); net.queryClient.clear(); });
 

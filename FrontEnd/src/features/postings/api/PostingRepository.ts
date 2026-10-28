@@ -2,12 +2,14 @@ import type { HttpClient } from "@/shared/http/HttpClient";
 import { machineRecommendationsApiSchema, type MachineNeeds, type MachineRecommendations } from "../types/recommendation";
 
 import type {
+  ModalidadeEntrega,
   PostingDetail,
   PostingListItem,
   UploadedPhoto,
   UploadPhotosResult,
 } from "../types/posting";
 import {
+  modalidadeEntregaListApiSchema,
   postingDetailApiSchema,
   postingListApiSchema,
   postingWriteApiSchema,
@@ -34,6 +36,7 @@ export interface PostingRepository {
   update(id: string, payload: PostingWritePayload): Promise<void>;
   remove(id: string): Promise<void>;
   uploadPhotos(postingId: string, files: File[]): Promise<UploadPhotosResult>;
+  listModalidadesEntrega(): Promise<ModalidadeEntrega[]>;
 }
 
 export class HttpPostingRepository implements PostingRepository {
@@ -143,4 +146,8 @@ export class HttpPostingRepository implements PostingRepository {
     return { uploaded, failed };
   }
 
+  async listModalidadesEntrega(): Promise<ModalidadeEntrega[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `${COLLECTION_PATH}/modalidades-entrega` });
+    return modalidadeEntregaListApiSchema.parse(response.data);
+  }
 }

@@ -53,8 +53,14 @@ export const postingDetailApiSchema = z.object({
   machine_technical_specifications: z.string().nullish(),
   machine_renagro_number: z.string().nullish(),
   photos: z.array(postingPhotoApiSchema).default([]),
+  modalidade_entrega: z.string().nullish(),
+  modalidade_entrega_nome: z.string().nullish(),
 });
 export type PostingDetailApi = z.infer<typeof postingDetailApiSchema>;
+
+export const modalidadeEntregaListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 
 export const postingWriteApiSchema = z.object({
   id: z.string(),
@@ -91,6 +97,7 @@ export const postingFormSchema = z
     availabilityStart: z.string().trim(),
     availabilityEnd: z.string().trim(),
     description: z.string().trim(),
+    modalidadeEntrega: z.string(),
   })
   .superRefine((values, ctx) => {
     if (
@@ -120,6 +127,7 @@ export const postingEditFormSchema = z
     availabilityStart: z.string().trim(),
     availabilityEnd: z.string().trim(),
     description: z.string().trim(),
+    modalidadeEntrega: z.string(),
   })
   .superRefine((values, ctx) => {
     if (
@@ -148,4 +156,5 @@ export interface PostingWritePayload {
   availability_end?: string | null;
   description?: string;
   status?: string;
+  modalidade_entrega?: string | null;
 }

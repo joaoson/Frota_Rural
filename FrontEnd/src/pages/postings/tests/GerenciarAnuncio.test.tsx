@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({ save: vi.fn().mockResolvedValue(undefined), po
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "owner-a" }) }));
 vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessor: () => ({ data: [] }) }));
 vi.mock("@/features/reviews/hooks/useReviews", () => ({ useReceivedReviews: () => ({ data: [] }) }));
+vi.mock("@/features/postings/hooks/useModalidadesEntrega", () => ({ useModalidadesEntrega: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/features/postings/hooks/usePostings", () => ({ usePosting: () => ({ data: mocks.posting }), useUpdatePosting: () => ({ mutateAsync: mocks.save }), useDeletePosting: () => ({ mutateAsync: vi.fn() }) }));
 vi.mock("@/shared/hooks/useCepLookup", () => ({ useCepLookup: () => ({ lookup: vi.fn() }), isCepComplete: () => false }));
 vi.mock("@/components/MapaLocalizacao", () => ({ default: () => null }));

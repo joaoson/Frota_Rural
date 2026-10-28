@@ -7,6 +7,7 @@ import NovoAnuncio from "../NovoAnuncio";
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "owner-a" }) }));
 vi.mock("@/features/machines/hooks/useMachines", () => ({ useMachines: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/features/pricing/hooks/usePricingSuggestion", () => ({ usePricingSuggestion: () => ({ suggestion: null }) }));
+vi.mock("@/features/postings/hooks/useModalidadesEntrega", () => ({ useModalidadesEntrega: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/features/postings/hooks/usePostings", () => ({
   useCreatePosting: () => ({ isPending: false }), useUploadPostingPhotos: () => ({ isPending: false }),
 }));

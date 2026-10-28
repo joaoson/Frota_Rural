@@ -1,6 +1,7 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type {
+  ModalidadeEntrega,
   PostingDetail,
   PostingListItem,
   UploadPhotosResult,
@@ -14,6 +15,7 @@ export const postingKeys = {
   lists: () => [...postingKeys.all, "list"] as const,
   list: (filter: PostingFilter) => [...postingKeys.lists(), filter] as const,
   detail: (id: string) => [...postingKeys.all, "detail", id] as const,
+  modalidadesEntrega: () => [...postingKeys.all, "modalidades-entrega"] as const,
 };
 
 export class PostingStore {
@@ -40,6 +42,10 @@ export class PostingStore {
     id: string,
   ): UseQueryOptions<PostingDetail, Error, PostingDetail, ReturnType<typeof postingKeys.detail>> {
     return { queryKey: postingKeys.detail(id), queryFn: () => this.repository.findById(id) };
+  }
+
+  modalidadesEntregaOptions(): UseQueryOptions<ModalidadeEntrega[], Error, ModalidadeEntrega[], ReturnType<typeof postingKeys.modalidadesEntrega>> {
+    return { queryKey: postingKeys.modalidadesEntrega(), queryFn: () => this.repository.listModalidadesEntrega() };
   }
 
   create(payload: PostingWritePayload): Promise<string> {

@@ -10,7 +10,7 @@ from rest_framework import serializers
 from djangoapi import firebase_storage
 from common.geography import BRAZILIAN_STATES
 from postings.enums import PostingStatus
-from postings.models import Postings, PostingsPhotos
+from postings.models import ModalidadeEntrega, Postings, PostingsPhotos
 from machines.models import Machines
 
 # created_at é nullable no banco; usado como piso para manter a ordenação estável.
@@ -53,6 +53,7 @@ class PostingInputSerializer(serializers.ModelSerializer[Postings]):
             "max_reservation_days",
             "description",
             "status",
+            "modalidade_entrega",
         ]
 
     def validate_machinery(self, value: Machines) -> Machines:
@@ -216,6 +217,9 @@ class PostingDetailOutputSerializer(serializers.ModelSerializer[Postings]):
         source="machinery.renagro_number", default=None, read_only=True
     )
     photos = serializers.SerializerMethodField()
+    modalidade_entrega_nome = serializers.CharField(
+        source="modalidade_entrega.nome", read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Postings
@@ -238,6 +242,8 @@ class PostingDetailOutputSerializer(serializers.ModelSerializer[Postings]):
             "machine_technical_specifications",
             "machine_renagro_number",
             "photos",
+            "modalidade_entrega",
+            "modalidade_entrega_nome",
         ]
         read_only_fields = fields
 
@@ -303,3 +309,10 @@ class RecommendationOutputSerializer(serializers.Serializer[Any]):
     dates_checked = serializers.BooleanField()
     match_type = serializers.ChoiceField(choices=["exact", "similar", "none"])
     ai_unavailable = serializers.BooleanField()
+
+
+class ModalidadeEntregaOutputSerializer(serializers.ModelSerializer[ModalidadeEntrega]):
+    class Meta:
+        model = ModalidadeEntrega
+        fields = ["id", "nome"]
+        read_only_fields = fields

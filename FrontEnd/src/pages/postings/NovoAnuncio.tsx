@@ -16,6 +16,7 @@ import {
   useUploadPostingPhotos,
 } from "@/features/postings/hooks/usePostings";
 import { usePostingForm } from "@/features/postings/hooks/usePostingForm";
+import { useModalidadesEntrega } from "@/features/postings/hooks/useModalidadesEntrega";
 import { isCepComplete, useCepLookup } from "@/shared/hooks/useCepLookup";
 import type { Coordenadas } from "@/shared/http/GeocodingClient";
 import { HttpError } from "@/shared/http/errors";
@@ -44,6 +45,7 @@ const NovoAnuncio = () => {
   const pricing = usePricingSuggestion(machinery);
   const createPosting = useCreatePosting();
   const uploadPhotos = useUploadPostingPhotos();
+  const modalidades = useModalidadesEntrega();
   // Guardadas no anúncio para o mapa não geocodificar a cada exibição.
   const [coordenadas, setCoordenadas] = useState<Coordenadas | null>(null);
   const { lookup } = useCepLookup();
@@ -253,6 +255,19 @@ const NovoAnuncio = () => {
             className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
             {...form.register("description")}
           />
+        </FormField>
+
+        <FormField label="Modalidade de Entrega" error={errors.modalidadeEntrega?.message}>
+          <select
+            className={inputClass(Boolean(errors.modalidadeEntrega))}
+            disabled={modalidades.isLoading}
+            {...form.register("modalidadeEntrega")}
+          >
+            <option value="">Selecione a modalidade de entrega</option>
+            {(modalidades.data ?? []).map((modalidade) => (
+              <option key={modalidade.id} value={modalidade.id}>{modalidade.nome}</option>
+            ))}
+          </select>
         </FormField>
 
         <FormField label="Fotos do Anúncio (Opcional)" className="space-y-3">
