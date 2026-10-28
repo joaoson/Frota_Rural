@@ -111,6 +111,19 @@ class DevelopmentCommandsTests(DevelopmentFixture):
                 self.assertEqual(install[:4], ["run", "--rm", "--no-deps", "-T"])
                 self.assertEqual(install[4:], ["frontend", "npm", "ci"])
 
+    def test_seed_images_use_selected_frontend_port_and_forward_upgrade_options(self):
+        for action in ("seed", "seed-preview"):
+            command = dev.action_arguments(self.arguments("local", action, "--port-offset", "2", "--enrich-demo", "--skip-admin"))
+            self.assertIn("http://localhost:5175/demo", command)
+            self.assertIn("--enrich-demo", command)
+            self.assertIn("--skip-admin", command)
+            self.assertEqual("--dry-run" in command, action == "seed-preview")
+        remote = dev.action_arguments(self.arguments("supabase", "seed-preview"))
+        self.assertIn("http://localhost:5174/demo", remote)
+        custom = dev.action_arguments(self.arguments("local", "seed", "--basic", "--asset-base-url", "https://demo.example.test/demo"))
+        self.assertIn("https://demo.example.test/demo", custom)
+        self.assertIn("--basic", custom)
+
 
 @unittest.skipUnless(shutil.which("docker"), "Docker Compose is needed for configuration rendering")
 class ComposeIsolationTests(DevelopmentFixture):

@@ -1,7 +1,8 @@
 """Repeatable demonstration data: inspect ``python seed.py --dry-run`` first.
 
-Existing records are never updated or deleted. No mail, payment request or
-signature evidence is created. A remote write requires --allow-remote.
+Existing records are preserved. --enrich-demo fills empty/legacy demo descriptions
+and portraits only. No mail, payment request or signature evidence is created.
+A remote write requires --allow-remote.
 """
 import argparse
 from collections import Counter
@@ -9,6 +10,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 import os
 import uuid
+from urllib.parse import urlsplit
 
 import django
 
@@ -32,6 +34,7 @@ from notifications.models import Notification
 from payments.pricing import cotar
 from postings.models import Postings
 from users.models import Users
+from demo_seed.details import expand_plan, safe_enrichment
 
 DEFAULT_PASSWORD = 'Teste1234'
 SEED_NAMESPACE = uuid.UUID('7ff6ec7c-31c4-4cb8-a751-95a718f6b956')
@@ -85,7 +88,7 @@ LOCATIONS = (
 )
 
 
-def build_plan(now=None):
+def _basic_plan(now=None):
     """Date defaults apply only to missing records, never to a rerun's history."""
     now = now or timezone.now()
     day = timezone.localtime(now).replace(hour=8, minute=0, second=0, microsecond=0)
@@ -156,6 +159,22 @@ def build_plan(now=None):
     return plan
 
 
+def build_plan(now=None, *, detailed=True, asset_base_url=None, skip_admin=False):
+    now = now or timezone.now()
+    plan = _basic_plan(now)
+    if skip_admin:
+        plan = [(model, pk, defaults) for model, pk, defaults in plan
+                if not (model is Users and defaults['role'] == 'admin')]
+    if not detailed:
+        return plan, {}
+    base = (asset_base_url or os.environ.get('SEED_ASSET_BASE_URL', 'http://localhost:5173/demo')).rstrip('/')
+    parsed = urlsplit(base)
+    if (parsed.scheme not in {'http', 'https'} or not parsed.netloc or parsed.username
+            or parsed.password or parsed.query or parsed.fragment or len(base) > 400):
+        raise ValueError('Informe --asset-base-url com uma URL http(s) pública, sem credenciais ou parâmetros.')
+    return expand_plan(plan, seed_id, MACHINES, timezone.localtime(now), base)
+
+
 def _check_conflicts(plan):
     for model, pk, defaults in plan:
         if model is Users:
@@ -173,24 +192,32 @@ def _check_conflicts(plan):
             )
 
 
-def seed_database(*, dry_run=False, allow_remote=False, now=None):
+def seed_database(*, dry_run=False, allow_remote=False, now=None, detailed=True,
+                  asset_base_url=None, enrich_demo=False, skip_admin=False):
     host = str(connection.settings_dict.get('HOST', '')).lower()
     if not dry_run and not allow_remote and host not in {'', 'localhost', '127.0.0.1', '::1', 'db'}:
         raise ImproperlyConfigured('Banco remoto: revise --dry-run e use --allow-remote para inserir os dados de demonstração.')
-    plan = build_plan(now)
-    created, existing = Counter(), Counter()
+    created, existing, enriched = Counter(), Counter(), Counter()
     new_rentals = set()
     with transaction.atomic():
         # Serialize concurrent runs without a separate seed metadata table.
         if not dry_run and connection.vendor == 'postgresql':
             with connection.cursor() as cursor:
                 cursor.execute('SELECT pg_advisory_xact_lock(%s)', [711563019462101])
+        plan, legacy = build_plan(now, detailed=detailed, asset_base_url=asset_base_url, skip_admin=skip_admin)
         _check_conflicts(plan)
         password_hash = None
         for model, pk, defaults in plan:
             label = model._meta.db_table
-            if model.objects.filter(pk=pk).exists():
+            record = model.objects.filter(pk=pk).first()
+            if record is not None:
                 existing[label] += 1
+                if enrich_demo and detailed:
+                    changes = safe_enrichment(model, record, defaults, legacy.get((model, pk), {}))
+                    if changes:
+                        enriched[label] += 1
+                        if not dry_run:
+                            model.objects.filter(pk=pk).update(**changes)
                 continue
             created[label] += 1
             if dry_run:
@@ -202,9 +229,12 @@ def seed_database(*, dry_run=False, allow_remote=False, now=None):
             model.objects.create(pk=pk, **defaults)
             if model is Rentals:
                 new_rentals.add(pk)
-        for i in range(8):
-            rental_pk = seed_id('rental', i)
-            event_key = f'seed:demo:v1:{rental_pk}'
+        basic_rental_ids = {seed_id('rental', i) for i in range(8)}
+        for model, rental_pk, defaults in plan:
+            if model is not Rentals:
+                continue
+            version = 'v1' if rental_pk in basic_rental_ids else 'v2'
+            event_key = f'seed:demo:{version}:{rental_pk}'
             present = Notification.objects.filter(event_key=event_key).count()
             existing['notifications'] += present
             # Only new rentals get new seed events. Re-running the fixture must
@@ -214,24 +244,31 @@ def seed_database(*, dry_run=False, allow_remote=False, now=None):
                 continue
             created['notifications'] += 2
             if not dry_run:
-                event = 'rental_completed' if i < 4 else 'rental_cancelled' if i >= 6 else 'rental_created'
+                status = defaults['status']
+                event = 'rental_completed' if status == 'completed' else 'rental_cancelled' if status == 'cancelled' else 'rental_created'
                 rental = Rentals.objects.select_related('postings__machinery').get(pk=rental_pk)
                 notify_rental_event(rental, event, event_key=event_key)
-    return {'created': dict(created), 'existing': dict(existing), 'dry_run': dry_run}
+    return {'created': dict(created), 'existing': dict(existing), 'enriched': dict(enriched), 'dry_run': dry_run}
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dry-run', action='store_true', help='Mostra contagens sem gravar nada.')
     parser.add_argument('--allow-remote', action='store_true', help='Autoriza explicitamente inserir demos no banco remoto configurado.')
+    parser.add_argument('--basic', action='store_true', help='Usa somente o inventário original, sem galeria ou histórico ampliado.')
+    parser.add_argument('--asset-base-url', help='URL de FrontEnd/public/demo (padrão: SEED_ASSET_BASE_URL ou http://localhost:5173/demo).')
+    parser.add_argument('--enrich-demo', action='store_true', help='Completa fotos de perfil vazias e textos vazios/originais dos registros demo, preservando edições.')
+    parser.add_argument('--skip-admin', action='store_true', help='Não cria nem modifica o admin; útil quando uma conta admin já existe fora do seed.')
     args = parser.parse_args(argv)
     try:
-        result = seed_database(dry_run=args.dry_run, allow_remote=args.allow_remote)
-    except (SeedConflict, ImproperlyConfigured) as exc:
+        result = seed_database(dry_run=args.dry_run, allow_remote=args.allow_remote,
+            detailed=not args.basic, asset_base_url=args.asset_base_url,
+            enrich_demo=args.enrich_demo, skip_admin=args.skip_admin)
+    except (SeedConflict, ImproperlyConfigured, ValueError) as exc:
         parser.exit(1, f'{exc}\n')
     action = 'A criar' if args.dry_run else 'Criados'
     for table in sorted(set(result['created']) | set(result['existing'])):
-        print(f"{table}: {action.lower()} {result['created'].get(table, 0)}; preservados {result['existing'].get(table, 0)}")
+        print(f"{table}: {action.lower()} {result['created'].get(table, 0)}; existentes {result['existing'].get(table, 0)}; enriquecidos {result['enriched'].get(table, 0)}")
     print('Demonstração: joao.silva@example.test (locador); maria.oliveira@example.test (locatário); admin@example.test (admin).')
     print('Senha inicial: SEED_DEMO_PASSWORD, se definida, ou a senha documentada em Devops/SEED.md. Senhas existentes são preservadas.')
 

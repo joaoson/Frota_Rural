@@ -38,6 +38,10 @@ def parser():
     result.add_argument("--port-offset", type=int, help="Offset all host ports; default local=0, supabase=1")
     result.add_argument("--observability", action="store_true", help="Add local Prometheus, Grafana and Alertmanager (run observability/setup.py first)")
     result.add_argument("--allow-remote", action="store_true", help="Explicitly allow Supabase migrate or seed writes")
+    result.add_argument("--asset-base-url", help="Seed images URL; defaults to this environment's frontend /demo")
+    result.add_argument("--enrich-demo", action="store_true", help="Seed: fill empty or original demo descriptions and profile fields")
+    result.add_argument("--skip-admin", action="store_true", help="Seed: leave administrator accounts outside the inventory")
+    result.add_argument("--basic", action="store_true", help="Seed: use the original small inventory without local images")
     return result
 
 
@@ -139,6 +143,13 @@ def action_arguments(args):
     }
     if args.action == "e2e":
         return None
+    if args.action in {"seed", "seed-preview"}:
+        offset = args.port_offset if args.port_offset is not None else (1 if args.mode == "supabase" else 0)
+        assets = args.asset_base_url or f"http://localhost:{BASE_PORTS['FRONTEND'] + offset}/demo"
+        commands[args.action] += ["--asset-base-url", assets]
+        for flag in ("enrich_demo", "skip_admin", "basic"):
+            if getattr(args, flag):
+                commands[args.action].append("--" + flag.replace("_", "-"))
     # A fresh one-off container uses the selected mode even if a running backend
     # has stale configuration. --no-deps never starts an unintended DB service.
     return ["run", "--rm", "--no-deps", "-T", "backend", "python", *commands[args.action]]

@@ -1,5 +1,6 @@
 """Seed safety is verified on an isolated local test database, never Supabase."""
 from datetime import date, timedelta
+from functools import partial
 from unittest.mock import patch
 
 from django.core.exceptions import ImproperlyConfigured
@@ -17,8 +18,12 @@ from notifications.models import Notification
 from payments.models import Payments
 from payments.pricing import calcular_total
 from postings.models import Postings, PostingsPhotos
-from seed import USERS, SeedConflict, seed_database, seed_id
+from seed import USERS, SeedConflict, seed_database as populate_seed, seed_id
 from users.models import Users
+
+# Keep the original inventory's upgrade and preservation contract covered.
+# Detailed catalog coverage lives in api.test_detailed_seed.
+seed_database = partial(populate_seed, detailed=False)
 
 
 class DevelopmentSeedTests(TestCase):
