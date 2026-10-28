@@ -318,6 +318,15 @@ RESEND_SUPPORT_EMAIL = os.getenv("RESEND_SUPPORT_EMAIL", "onboarding@resend.dev"
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 
+# --- Modelo de ML de plausibilidade dos dados da CNH (ml/cnh_data/) ---
+# off: não avalia | shadow: avalia e só registra em log | enforce: recusa automaticamente
+# a CNH cujos dados parecem falsos (validation_status=rejected + review_note).
+# Comece em `shadow` para ver quantos cadastros reais seriam recusados.
+# O limiar de recusa (ML_PLAUSIBILITY_THRESHOLD) é lido direto pelo script do modelo.
+ML_PLAUSIBILITY_MODE = os.getenv("ML_PLAUSIBILITY_MODE", "enforce").lower()
+if ML_PLAUSIBILITY_MODE not in {"off", "shadow", "enforce"}:
+    raise ImproperlyConfigured("ML_PLAUSIBILITY_MODE deve ser off, shadow ou enforce.")
+
 # --- Assinatura eletrônica de contratos ---
 # Exigir confirmação por e-mail (OTP) antes do aceite. Ligado por padrão: a
 # assinatura eletrônica simples já valeria entre as partes sem ele

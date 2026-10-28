@@ -18,6 +18,7 @@
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
+    "@stripe/cli": "^1.55.3",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-query": "^5.102.8",
     "axios": "^1.14.0",
@@ -26,6 +27,7 @@
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
     "next-themes": "^0.4.6",
+    "npm": "^12.2.1",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -42,7 +44,10 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.63.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

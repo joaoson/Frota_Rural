@@ -1,7 +1,7 @@
 import uuid
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from reviews.models import Reviews
@@ -200,6 +200,8 @@ class DashboardFlowTests(RecurrenceFixtures, TestCase):
         self.assertIsNone(response.data['review_note'])
         self.assertEqual(self.client.patch(url, {'user': str(self.other.pk)}, format='json').status_code, 400)
 
+    # O teste é sobre escopo e autoaprovação: o modelo de ML (dados de exemplo parecem falsos) fica fora.
+    @override_settings(ML_PLAUSIBILITY_MODE='off')
     def test_cnh_documents_are_scoped_and_owner_cannot_self_approve(self):
         payload = {
             'user': str(self.tenant.pk), 'name': 'Tenant', 'birth_date': '1990-01-01',

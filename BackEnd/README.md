@@ -23,21 +23,25 @@ BackEnd/
 ├── venv/              ← Django (Python 3.14)
 │   └── ...               Roda o servidor, API REST, migrations
 │
-├── ml/
-│   ├── venv/          ← Machine Learning (Python 3.13 + TensorFlow)
-│   │   └── ...           Treino e inferência do modelo de classificação
-│   ├── data/
-│   │   ├── cnh/       ← Imagens de CNH (dataset positivo)
-│   │   └── not_cnh/   ← Imagens que NÃO são CNH (dataset negativo)
-│   ├── models/
-│   │   └── cnh_classifier.keras   ← Modelo treinado (gerado pelo script)
-│   ├── train_cnh_classifier.py    ← Script de treino
-│   ├── classify.py                ← Script de inferência (chamado via subprocess)
-│   └── requirements.txt           ← Dependências do ML (tensorflow, Pillow, pdf2image)
+├── ml/                ← Machine Learning (detalhes em ml/README.md)
+│   ├── venv/          ← Python 3.13 + TensorFlow + scikit-learn (treino e inferência)
+│   ├── requirements.txt   ← Dependências do ML, compartilhadas pelos dois modelos
+│   ├── data/          ← Dados compartilhados, uma subpasta por conjunto
+│   │   ├── cnh/, not_cnh/   ← Imagens de treino do modelo de imagem (fora do git)
+│   │   ├── names/, cities/  ← Bases do IBGE usadas pelo modelo de dados (versionadas)
+│   │   ├── lexicon/, eval/  ← Listas de palavras e casos de avaliação do modelo de dados (versionados)
+│   │   └── synth/           ← Dataset sintético em CSV, gerado (fora do git)
+│   ├── cnh_image/     ← Modelo 1: o arquivo enviado é uma CNH? (imagem)
+│   │   ├── train.py, classify.py
+│   │   └── models/cnh_classifier.keras
+│   └── cnh_data/      ← Modelo 2: índice de veracidade dos dados digitados (foto × formulário + plausibilidade)
+│       ├── train.py, classify.py     ← igual ao cnh_image
+│       ├── scripts/, lib/, tests/    ← preparação de dados, código de apoio e testes
+│       └── models/cnh_plausibility.joblib
 ```
 
 **Por que dois venvs?**
-O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess` por meio de arquivos temporários que o Django salva e o script de ML com modelo treinado `ml/classify.py`.
+O TensorFlow suporta até Python 3.13. O Django e o restante do backend rodam em Python 3.14. A comunicação entre eles acontece via `subprocess`: o Django chama o `classify.py` de cada modelo (`ml/cnh_image/` recebe o caminho de um arquivo; `ml/cnh_data/` recebe o registro e o OCR da foto, se houver, em JSON pelo stdin).
 
 ## Instruções de Configuração
 
@@ -151,60 +155,36 @@ CHANNEL_LAYER_BACKEND=memory DJANGO_DEBUG=true python manage.py test
 
 Os testes rodam sem Redis local graças ao channel layer em memória, que o `settings.py` só aceita com `DJANGO_DEBUG=true`.
 
-## Machine Learning — Classificador de CNH
+## Machine Learning — validação do cadastro de CNH
 
-O projeto inclui um classificador de imagem baseado em TensorFlow que verifica se um arquivo enviado pelo usuário é uma CNH (Carteira Nacional de Habilitação) ou não. Usa transfer learning com MobileNetV2.
+Dois modelos independentes, cada um no seu módulo (visão geral e comparação em [`ml/README.md`](ml/README.md)):
 
-### Preparar o dataset
+| Modelo | O que faz | Documentação |
+|---|---|---|
+| `ml/cnh_image` | Classifica a **imagem** enviada (é uma CNH? TensorFlow/MobileNetV2) e lê os campos por **OCR** (RapidOCR), da CNH antiga e da digital, para preencher o formulário. Só avisa o usuário. | [`ml/cnh_image/README.md`](ml/cnh_image/README.md) |
+| `ml/cnh_data` | Calcula o **índice de veracidade** dos dados digitados: conferem com a foto (OCR) e parecem reais? (consistência + regras + scikit-learn). Guarda o índice em `veracity_score` e, se parecerem falsos, grava a CNH como `rejected` com o motivo. | [`ml/cnh_data/README.md`](ml/cnh_data/README.md) |
 
-Faça o download e coloque as imagens nas pastas correspondentes:
+Fontes dos dados (IBGE, Base dos Dados e o dataset de imagens): [`ml/data/README.md`](ml/data/README.md#referências-de-onde-vêm-os-dados).
 
-- Datasets recomendados: `https://github.com/ricardobnjunior/Brazilian-Identity-Document-Dataset` e `https://www.kaggle.com/datasets/prasunroy/natural-images`
-
-```
-ml/data/cnh/        ← Fotos/scans de CNH (formato antigo ou novo)
-ml/data/not_cnh/    ← Fotos aleatórias, selfies, outros documentos
-```
-
-- Formatos aceitos: `.jpg`, `.png`, `.jpeg`
-- As pastas devem ter quantidades aproximadamente iguais
-
-### Treinar o modelo
+Treinar e testar cada um:
 
 ```bash
 cd BackEnd
-./ml/venv/bin/python ml/train_cnh_classifier.py
+./ml/venv/bin/python ml/cnh_image/train.py                                  # precisa das imagens em ml/data/cnh e ml/data/not_cnh
+./ml/venv/bin/python ml/cnh_data/train.py                                   # lê (ou gera) ml/data/synth/cnh_records.csv
+./ml/venv/bin/python -m unittest discover -s ml/cnh_data/tests -t ml/cnh_data
+./ml/venv/bin/python ml/cnh_data/scripts/evaluate_veracity.py                  # calibra o índice (precisa do export_readings.py antes)
+./ml/venv/bin/python -m unittest discover -s ml/cnh_image/tests -t ml/cnh_image
+./ml/venv/bin/python ml/cnh_image/scripts/evaluate_ocr.py                    # mede o OCR no dataset
 ```
 
-O script:
+### Variáveis de ambiente do ML
 
-1. Carrega as imagens das pastas `data/cnh/` e `data/not_cnh/`
-2. Aplica data augmentation (rotação, zoom, brilho, contraste)
-3. Usa MobileNetV2 pré-treinado como base (transfer learning)
-4. Treina por até 30 epochs com early stopping
-5. Salva o melhor modelo em `ml/models/cnh_classifier.keras`
-
-Saída esperada: acurácia de validação >= 85%.
-
-### Testar a inferência manualmente (com venv ativado)
-
-```bash
-# Classificar uma imagem
-python ml/classify.py /caminho/para/imagem.jpg
-
-# Classificar um PDF
-python ml/classify.py /caminho/para/cnh.pdf
-```
-
-Saída (JSON):
-
-```json
-{
-  "is_valid": true,
-  "confidence": "high",
-  "score": 0.9523
-}
-```
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `ML_PYTHON` | `ml/venv/bin/python` (no Docker: `/opt/ml-venv/bin/python`) | Interpretador que roda os dois modelos |
+| `ML_PLAUSIBILITY_MODE` | `enforce` | `off` não avalia os dados; `shadow` avalia e só registra em log; `enforce` recusa automaticamente. Comece em `shadow` para ver quantos cadastros reais seriam recusados |
+| `ML_PLAUSIBILITY_THRESHOLD` | `0.60` | Probabilidade de dado falso a partir da qual o modelo recusa (lida direto pelo `ml/cnh_data/classify.py`) |
 
 ## Endereço base e documentação da API
 

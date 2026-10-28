@@ -1,13 +1,14 @@
 import { documentUrl } from "@/features/documents/api/documentUrl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
 import cnhExample from "@/assets/cnh_example.jpg";
 import MaterialIcon from "@/components/MaterialIcon";
 import { useAuth } from "@/contexts/useAuth";
+import { documentsRouteForRole } from "@/shared/utils/homeRoute";
 import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
-import { useCnhForm } from "@/features/documents/hooks/useDocumentForms";
+import { CNH_FORM_DEFAULTS, useCnhForm } from "@/features/documents/hooks/useDocumentForms";
 import {
   useOperatorLicenses,
   useSaveLicense,
@@ -41,11 +42,14 @@ const CNH_SITUATIONS = [
   { value: "ppd", label: "PPD" },
 ] as const;
 
+const OCR_UNCERTAIN_HINT = "Lido do documento com pouca certeza: confira antes de enviar.";
+
 const UPLOAD_INSTRUCTIONS = [
   "Abra sua CNH e posicione conforme o exemplo ao lado",
   "Não envie fotos de telas ou cópias",
   "Não recorte nem cubra partes do documento na foto",
   "Salve o documento sob formato PNG, JPEG ou PDF",
+  "Alternativamente, exporte o seu documento digital em PDF no aplicativo CNH do Brasil"
 ];
 
 const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
@@ -73,7 +77,8 @@ const API_FIELD_TO_FORM: Partial<Record<string, keyof CnhFormValues>> = {
 };
 
 const CNHUpload = () => {
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
+  const documentsRoute = documentsRouteForRole(userRole);
   const navigate = useNavigate();
 
   const today = new Date().toISOString().split("T")[0];
@@ -81,6 +86,14 @@ const CNHUpload = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [validationResult, setValidationResult] = useState<CnhValidationResult | null>(null);
+  const [uncertainFields, setUncertainFields] = useState<ReadonlySet<keyof CnhFormValues>>(
+    new Set(),
+  );
+  // Depois que um documento é processado, o formulário passa a vir só dele: o cadastro salvo (modo
+  // de edição) e o que veio de um documento anterior não podem se misturar com o do novo.
+  const replacedByDocument = useRef(false);
+  // Só vale o resultado do último arquivo anexado (um anexo mais antigo pode responder depois).
+  const latestAttachment = useRef(0);
 
   const licensesQuery = useOperatorLicenses({ userId: userId ?? undefined }, Boolean(userId));
   const saveLicense = useSaveLicense();
@@ -100,7 +113,7 @@ const CNHUpload = () => {
   const isSubmitting = saveLicense.isPending || uploadDocument.isPending;
 
   useEffect(() => {
-    if (!existingLicense) return;
+    if (!existingLicense || replacedByDocument.current) return;
     form.reset({
       ...licenseToFormValues(existingLicense),
       cpf: maskDocument(existingLicense.cpf),
@@ -108,17 +121,40 @@ const CNHUpload = () => {
     });
   }, [existingLicense, form]);
 
+  // Apaga tudo o que havia no formulário (inclusive o cadastro salvo, ao editar) e o preenche só
+  // com o que o OCR leu do novo documento. O resto fica em branco. Nada é enviado: o usuário
+  // confere e edita antes de cadastrar.
+  const replaceFormWithDocument = (result: CnhValidationResult) => {
+    replacedByDocument.current = true;
+    form.reset(CNH_FORM_DEFAULTS);
+    const entries = Object.entries(result.extractedFields) as [
+      keyof CnhFormValues,
+      CnhFormValues[keyof CnhFormValues],
+    ][];
+    for (const [key, value] of entries) {
+      form.setValue(key, value as never, { shouldDirty: true, shouldValidate: true });
+    }
+    setUncertainFields(new Set(result.uncertainFields));
+  };
+
   const handleFile = (selected: File) => {
     const allowed = selected.type.startsWith("image/") || selected.type === "application/pdf";
     if (!allowed) return;
 
+    const attachment = ++latestAttachment.current;
     setFile(selected);
     setValidationResult(null);
+    setUncertainFields(new Set());
 
     validateCnh
       .mutateAsync(selected)
-      .then(setValidationResult)
+      .then((result) => {
+        if (attachment !== latestAttachment.current) return;
+        setValidationResult(result);
+        replaceFormWithDocument(result);
+      })
       .catch((error: unknown) => {
+        if (attachment !== latestAttachment.current) return;
         setValidationResult({
           isValid: false,
           confidence: "low",
@@ -127,9 +163,14 @@ const CNHUpload = () => {
             error instanceof HttpError
               ? error.message
               : "Erro inesperado ao validar o documento.",
+          documentType: "desconhecido",
+          extractedFields: {},
+          uncertainFields: [],
         });
       });
   };
+
+  const filledCount = Object.keys(validationResult?.extractedFields ?? {}).length;
 
   const onSubmit = form.handleSubmit(async (values) => {
     if (!userId) {
@@ -147,7 +188,7 @@ const CNHUpload = () => {
       });
 
       toast.success(isEditing ? "CNH atualizada com sucesso." : "CNH cadastrada com sucesso.");
-      navigate("/dashboard");
+      navigate(documentsRoute);
     } catch (error) {
       if (applyFieldErrors(form, error, API_FIELD_TO_FORM)) return;
       toast.error(
@@ -162,7 +203,7 @@ const CNHUpload = () => {
 
   return (
     <PageShell responsive>
-      <BackLink to="/dashboard">Voltar ao Dashboard</BackLink>
+      <BackLink to={documentsRoute}>Voltar aos Documentos</BackLink>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
@@ -280,11 +321,17 @@ const CNHUpload = () => {
                       }
                       size={18}
                     />
-                    {validationResult.confidence === "high"
-                      ? "Documento reconhecido como CNH. Prossiga com o preenchimento dos dados."
-                      : validationResult.confidence === "medium"
-                        ? "Documento possivelmente é uma CNH"
-                        : "Documento não reconhecido como CNH, favor seguir as instruções de captura de imagem"}
+                    {validationResult.documentType !== "desconhecido"
+                      ? `CNH reconhecida.${
+                          filledCount > 0
+                            ? " Preenchemos alguns campos automaticamente, por favor confira antes de enviar."
+                            : " Prossiga com o preenchimento dos dados."
+                        }`
+                      : validationResult.confidence === "high"
+                        ? "Documento reconhecido como CNH. Prossiga com o preenchimento dos dados."
+                        : validationResult.confidence === "medium"
+                          ? "Documento possivelmente é uma CNH"
+                          : "Documento não reconhecido como CNH, favor seguir as instruções de captura de imagem"}
                   </div>
                 ))}
             </FormField>
@@ -338,7 +385,11 @@ const CNHUpload = () => {
                 Dados de Identificação
               </p>
 
-              <FormField label="Nome Completo *" error={errors.name?.message}>
+              <FormField
+                label="Nome Completo *"
+                error={errors.name?.message}
+                hint={uncertainFields.has("name") ? OCR_UNCERTAIN_HINT : undefined}
+              >
                 <input
                   type="text"
                   placeholder="Conforme consta na CNH"
@@ -367,10 +418,14 @@ const CNHUpload = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-5">
-                <FormField label="RG *" error={errors.rg?.message}>
+                <FormField
+                  label="RG *"
+                  error={errors.rg?.message}
+                  hint={uncertainFields.has("rg") ? OCR_UNCERTAIN_HINT : undefined}
+                >
                   <input
                     type="text"
-                    placeholder="00.000.000-0"
+                    placeholder="00.000.000-0 ou 0.000.000-0"
                     className={inputClass(Boolean(errors.rg))}
                     {...masked(form.register("rg"), maskRG)}
                   />
@@ -443,7 +498,11 @@ const CNHUpload = () => {
                     {...form.register("cnhNumber")}
                   />
                 </FormField>
-                <FormField label="Categoria *" error={errors.category?.message}>
+                <FormField
+                  label="Categoria *"
+                  error={errors.category?.message}
+                  hint={uncertainFields.has("category") ? OCR_UNCERTAIN_HINT : undefined}
+                >
                   <select
                     className={inputClass(Boolean(errors.category))}
                     {...form.register("category")}

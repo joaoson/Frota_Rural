@@ -57,10 +57,15 @@ class CnhValidationView(APIView):
         tags=TAGS,
         summary="Validar CNH via Inteligência Artificial",
         description=(
-            "Recebe o upload de uma imagem ou PDF e o processa com o modelo TensorFlow treinado "
-            "(MobileNetV2) para identificar se o arquivo é uma CNH.\n\n"
+            "Recebe o upload de uma imagem ou PDF e o processa com o modelo de imagem: uma rede "
+            "neural (MobileNetV2) diz se o arquivo é uma CNH e um OCR tenta ler os campos.\n\n"
+            "Há três layouts de CNH. A **antiga** (aberta) e a **digital** (CNH-e em PDF) são lidas "
+            "por OCR e devolvem `fields` para o front preencher o formulário. A **física nova** "
+            "provavelmente não é lida: nesse caso `document_type` vem `desconhecido`, `fields` vem "
+            "`null` e vale só o `is_valid` da rede neural.\n\n"
             "A inferência roda em um interpretador Python isolado, chamado por `subprocess`. "
-            "O endpoint apenas classifica o arquivo: não o armazena nem altera nenhum cadastro."
+            "O endpoint apenas lê o arquivo: não o armazena nem altera nenhum cadastro, e os "
+            "valores lidos (CPF, nome...) nunca vão para o log."
         ),
         request=FILE_REQUEST,
         responses={
@@ -71,13 +76,46 @@ class CnhValidationView(APIView):
         },
         examples=[
             OpenApiExample(
-                "CNH reconhecida",
-                value={"is_valid": True, "confidence": "high", "score": 0.9721},
+                "CNH antiga lida por OCR",
+                value={
+                    "is_valid": True,
+                    "confidence": "high",
+                    "score": 0.9721,
+                    "document_type": "cnh_antiga",
+                    "fields": {
+                        "name": "MARIA APARECIDA SILVA",
+                        "cpf": "52998224725",
+                        "birth_date": "1985-06-14",
+                        "category": "B",
+                        "issuing_state": "MG",
+                        "issuing_authority": "DETRAN-MG",
+                    },
+                    "uncertain_fields": ["name"],
+                },
                 response_only=True,
             ),
             OpenApiExample(
-                "Documento recusado",
-                value={"is_valid": False, "confidence": "low", "score": 0.1043},
+                "CNH digital: a rede rejeita, o OCR aprova",
+                value={
+                    "is_valid": True,
+                    "confidence": "medium",
+                    "score": 0.3467,
+                    "document_type": "cnh_digital",
+                    "fields": {"cpf": "52998224725", "birth_place": "CURITIBA – PR"},
+                    "uncertain_fields": [],
+                },
+                response_only=True,
+            ),
+            OpenApiExample(
+                "CNH física nova ou documento recusado (sem OCR)",
+                value={
+                    "is_valid": False,
+                    "confidence": "low",
+                    "score": 0.1043,
+                    "document_type": "desconhecido",
+                    "fields": None,
+                    "uncertain_fields": [],
+                },
                 response_only=True,
             ),
         ],
