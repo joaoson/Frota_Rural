@@ -5,6 +5,18 @@ from django.db import models
 from document_validation.enums import LicenseCategory, LicenseSituation, ValidationStatus
 
 
+class TipoVinculo(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "tipos_vinculo"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
 class OperatorLicense(models.Model):
     id = models.UUIDField(primary_key=True)
     user = models.ForeignKey("users.Users", models.CASCADE)
@@ -58,6 +70,7 @@ class OperatorLicense(models.Model):
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    tipo_vinculo = models.ForeignKey(TipoVinculo, models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = "operator_licenses"

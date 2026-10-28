@@ -10,6 +10,7 @@ from document_validation.views import (
     OperatorLicenseDetailView,
     OperatorLicenseListView,
     OperatorLicenseReviewView,
+    TipoVinculoListView,
 )
 
 urlpatterns = [
@@ -20,6 +21,7 @@ urlpatterns = [
         name="validate_cnh_document",
     ),
     path("operator-licenses", OperatorLicenseListView.as_view(), name="operator_licenses_list"),
+    path("operator-licenses/tipos-vinculo", TipoVinculoListView.as_view(), name="operator_license_tipos_vinculo"),
     path(
         "operator-licenses/<uuid:pk>/review",
         OperatorLicenseReviewView.as_view(),

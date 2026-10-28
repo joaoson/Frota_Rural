@@ -102,6 +102,9 @@ export function DocumentsSection({ userId }: { userId: string | null }) {
                       "pt-BR",
                     )}
                   </p>
+                  <p className="text-xs text-outline font-medium uppercase tracking-wide">
+                    Vínculo: {lic.tipoVinculoNome ?? "Não informado"}
+                  </p>
                   {lic.validationStatus === "rejected" && lic.reviewNote && (
                     <p className="text-xs text-error mt-1">
                       {lic.reviewNote}

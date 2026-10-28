@@ -11,12 +11,13 @@ from administration.permissions import IsPlatformAdmin
 from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from document_validation.serializer import (
+    TipoVinculoOutputSerializer,
     DocumentFilterSerializer,
     DocumentReviewInputSerializer,
     OperatorLicenseInputSerializer,
     OperatorLicenseOutputSerializer,
 )
-from document_validation.services import OperatorLicenseService
+from document_validation.services import OperatorLicenseService, TipoVinculoService
 
 TAGS = ["Documentos"]
 LICENSE_NOT_FOUND = error_response(404, "CNH não encontrada.")
@@ -148,3 +149,17 @@ class OperatorLicenseReviewView(APIView):
     def patch(self, request: Request, pk: UUID) -> Response:
         license_ = OperatorLicenseService.review(pk, request.data, actor=authenticated_user(request))
         return Response(OperatorLicenseOutputSerializer(license_).data, status=status.HTTP_200_OK)
+
+
+class TipoVinculoListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar tipos de vínculo",
+        description="Opções da tabela `tipos_vinculo` usadas no envio da CNH.",
+        responses={200: TipoVinculoOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        tipos = TipoVinculoService.list()
+        return Response(TipoVinculoOutputSerializer(tipos, many=True).data, status=status.HTTP_200_OK)

@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/useAuth";
 import { documentsRouteForRole } from "@/shared/utils/homeRoute";
 import { licenseToFormValues, licenseToPayload } from "@/features/documents/api/documentMapper";
 import { CNH_FORM_DEFAULTS, useCnhForm } from "@/features/documents/hooks/useDocumentForms";
+import { useTiposVinculo } from "@/features/documents/hooks/useTiposVinculo";
 import {
   useOperatorLicenses,
   useSaveLicense,
@@ -101,6 +102,7 @@ const CNHUpload = () => {
   const validateCnh = useValidateCnhFile();
 
   const form = useCnhForm();
+  const tiposVinculo = useTiposVinculo();
   const { errors } = form.formState;
 
   const existingLicense = licensesQuery.data?.[0] ?? null;
@@ -636,6 +638,19 @@ const CNHUpload = () => {
                   className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
                   {...form.register("observations")}
                 />
+              </FormField>
+
+              <FormField label="Tipo de Vínculo" error={errors.tipoVinculo?.message}>
+                <select
+                  className="w-full bg-surface-container border-none rounded-lg px-4 py-3.5 text-sm focus:ring-2 focus:ring-primary text-on-surface transition-shadow"
+                  disabled={tiposVinculo.isLoading}
+                  {...form.register("tipoVinculo")}
+                >
+                  <option value="">Selecione o tipo de vínculo</option>
+                  {(tiposVinculo.data ?? []).map((tipo) => (
+                    <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                  ))}
+                </select>
               </FormField>
 
               <button

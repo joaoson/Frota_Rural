@@ -9,6 +9,7 @@ from document_validation.views.licenses import (
     OperatorLicenseDetailView,
     OperatorLicenseListView,
     OperatorLicenseReviewView,
+    TipoVinculoListView,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "OperatorLicenseDetailView",
     "OperatorLicenseListView",
     "OperatorLicenseReviewView",
+    "TipoVinculoListView",
 ]

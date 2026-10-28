@@ -1,6 +1,6 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { AreaCertificacao, Certification, CnhValidationResult, OperatorLicense } from "../types/document";
+import type { AreaCertificacao, Certification, CnhValidationResult, OperatorLicense, TipoVinculo } from "../types/document";
 import type { ReviewDocumentPayload } from "../types/documentSchemas";
 import type { DocumentFilter, DocumentRepository } from "./DocumentRepository";
 
@@ -13,6 +13,7 @@ export const documentKeys = {
     [...documentKeys.certifications(), filter] as const,
   certificationDetail: (id: string) => [...documentKeys.certifications(), "detail", id] as const,
   areasCertificacao: () => [...documentKeys.all, "areas-certificacao"] as const,
+  tiposVinculo: () => [...documentKeys.all, "tipos-vinculo"] as const,
 };
 
 export class DocumentStore {
@@ -68,6 +69,10 @@ export class DocumentStore {
 
   areasCertificacaoOptions(): UseQueryOptions<AreaCertificacao[], Error, AreaCertificacao[], ReturnType<typeof documentKeys.areasCertificacao>> {
     return { queryKey: documentKeys.areasCertificacao(), queryFn: () => this.repository.listAreasCertificacao() };
+  }
+
+  tiposVinculoOptions(): UseQueryOptions<TipoVinculo[], Error, TipoVinculo[], ReturnType<typeof documentKeys.tiposVinculo>> {
+    return { queryKey: documentKeys.tiposVinculo(), queryFn: () => this.repository.listTiposVinculo() };
   }
 
   createLicense(payload: Record<string, unknown>): Promise<OperatorLicense> {

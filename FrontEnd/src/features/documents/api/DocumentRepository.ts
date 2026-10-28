@@ -1,6 +1,6 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
-import type { AreaCertificacao, Certification, CnhValidationResult, OperatorLicense } from "../types/document";
+import type { AreaCertificacao, Certification, CnhValidationResult, OperatorLicense, TipoVinculo } from "../types/document";
 import {
   areaCertificacaoListApiSchema,
   certificationApiSchema,
@@ -9,6 +9,7 @@ import {
   operatorLicenseApiSchema,
   operatorLicenseListApiSchema,
   type ReviewDocumentPayload,
+  tipoVinculoListApiSchema,
   uploadResponseSchema,
 } from "../types/documentSchemas";
 import { certificationToDomain, licenseToDomain, validationToDomain } from "./documentMapper";
@@ -40,6 +41,7 @@ export interface DocumentRepository {
   uploadFile(file: File): Promise<string>;
   validateCnhFile(file: File): Promise<CnhValidationResult>;
   listAreasCertificacao(): Promise<AreaCertificacao[]>;
+  listTiposVinculo(): Promise<TipoVinculo[]>;
 }
 
 export class HttpDocumentRepository implements DocumentRepository {
@@ -172,5 +174,10 @@ export class HttpDocumentRepository implements DocumentRepository {
   async listAreasCertificacao(): Promise<AreaCertificacao[]> {
     const response = await this.http.send<unknown>({ method: "GET", path: `${CERTIFICATIONS_PATH}/areas` });
     return areaCertificacaoListApiSchema.parse(response.data);
+  }
+
+  async listTiposVinculo(): Promise<TipoVinculo[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `${LICENSES_PATH}/tipos-vinculo` });
+    return tipoVinculoListApiSchema.parse(response.data);
   }
 }

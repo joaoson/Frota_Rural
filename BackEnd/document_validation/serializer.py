@@ -3,7 +3,7 @@ from typing import Any
 from rest_framework import serializers
 
 from document_validation.enums import ReviewDecision, ValidationStatus
-from document_validation.models import AreaCertificacao, Certification, OperatorLicense
+from document_validation.models import AreaCertificacao, Certification, OperatorLicense, TipoVinculo
 from users.models import Users
 
 # --- Entrada ----------------------------------------------------------------
@@ -52,6 +52,7 @@ class OperatorLicenseInputSerializer(OwnedDocumentInputSerializer):
             "observations",
             "points",
             "file_url",
+            "tipo_vinculo",
         ]
 
 
@@ -110,6 +111,8 @@ class DocumentReviewInputSerializer(serializers.Serializer[Any]):
 
 
 class OperatorLicenseOutputSerializer(serializers.ModelSerializer[OperatorLicense]):
+    tipo_vinculo_nome = serializers.CharField(source="tipo_vinculo.nome", read_only=True, allow_null=True)
+
     class Meta:
         model = OperatorLicense
         fields = [
@@ -144,6 +147,8 @@ class OperatorLicenseOutputSerializer(serializers.ModelSerializer[OperatorLicens
             "auto_rejection_reasons",
             "created_at",
             "updated_at",
+            "tipo_vinculo",
+            "tipo_vinculo_nome",
         ]
         read_only_fields = fields
 
@@ -239,5 +244,12 @@ class CnhValidationOutputSerializer(serializers.Serializer[Any]):
 class AreaCertificacaoOutputSerializer(serializers.ModelSerializer[AreaCertificacao]):
     class Meta:
         model = AreaCertificacao
+        fields = ["id", "nome"]
+        read_only_fields = fields
+
+
+class TipoVinculoOutputSerializer(serializers.ModelSerializer[TipoVinculo]):
+    class Meta:
+        model = TipoVinculo
         fields = ["id", "nome"]
         read_only_fields = fields

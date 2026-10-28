@@ -16,7 +16,7 @@ from users.models import Users
 from common.exceptions import Conflict, ServiceUnavailable
 from document_validation.enums import ValidationStatus
 from document_validation.ml_adapters import CnhClassifier, CnhDataChecker
-from document_validation.models import AreaCertificacao, Certification, OperatorLicense
+from document_validation.models import AreaCertificacao, Certification, OperatorLicense, TipoVinculo
 from document_validation.serializer import (
     CertificationInputSerializer,
     DocumentFilterSerializer,
@@ -347,3 +347,9 @@ class AreaCertificacaoService:
     @staticmethod
     def list() -> QuerySet[AreaCertificacao]:
         return AreaCertificacao.objects.order_by("nome")
+
+
+class TipoVinculoService:
+    @staticmethod
+    def list() -> QuerySet[TipoVinculo]:
+        return TipoVinculo.objects.order_by("nome")

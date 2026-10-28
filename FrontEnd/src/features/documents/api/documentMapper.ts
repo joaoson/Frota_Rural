@@ -43,6 +43,8 @@ export function licenseToDomain(dto: OperatorLicenseApi): OperatorLicense {
     autoRejected: dto.auto_rejected ?? false,
     veracityScore: dto.veracity_score ?? null,
     autoRejectionReasons: dto.auto_rejection_reasons ?? [],
+    tipoVinculoId: dto.tipo_vinculo ?? null,
+    tipoVinculoNome: dto.tipo_vinculo_nome ?? null,
   };
 }
 
@@ -151,6 +153,7 @@ export function licenseToPayload(
     observations: values.observations || null,
     points: values.points ? Number(values.points) : 0,
     file_url: fileUrl,
+    tipo_vinculo: values.tipoVinculo || null,
   };
 }
 
@@ -196,6 +199,7 @@ export function licenseToFormValues(license: OperatorLicense): CnhFormValues {
     medicalRestrictions: license.medicalRestrictions ?? "",
     observations: license.observations ?? "",
     points: String(license.points),
+    tipoVinculo: license.tipoVinculoId ?? "",
   };
 }
 

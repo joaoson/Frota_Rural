@@ -53,9 +53,14 @@ export const operatorLicenseApiSchema = z.object({
   auto_rejection_reasons: z.array(z.string()).nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
+  tipo_vinculo: z.string().nullish(),
+  tipo_vinculo_nome: z.string().nullish(),
 });
 export type OperatorLicenseApi = z.infer<typeof operatorLicenseApiSchema>;
 export const operatorLicenseListApiSchema = z.array(operatorLicenseApiSchema);
+export const tipoVinculoListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 
 export const certificationApiSchema = z.object({
   id: z.string(),
@@ -181,6 +186,7 @@ export const cnhFormSchema = z
         const parsed = Number(value);
         return Number.isInteger(parsed) && parsed >= 0 && parsed <= 40;
       }, "A pontuação deve ser entre 0 e 40."),
+    tipoVinculo: z.string(),
   })
   .superRefine((values, ctx) => {
     if (values.situation === "active" && values.expirationDate && values.expirationDate < todayIso()) {

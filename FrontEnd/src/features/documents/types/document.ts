@@ -59,6 +59,13 @@ export interface OperatorLicense extends ReviewableDocument {
   veracityScore: number | null;
   /** Motivos específicos da recusa automática, só para o administrador. */
   autoRejectionReasons: string[];
+  tipoVinculoId?: string | null;
+  tipoVinculoNome?: string | null;
+}
+
+export interface TipoVinculo {
+  id: string;
+  nome: string;
 }
 
 export interface Certification extends ReviewableDocument {

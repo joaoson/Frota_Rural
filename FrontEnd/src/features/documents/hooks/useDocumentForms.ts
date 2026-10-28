@@ -31,6 +31,7 @@ export const CNH_FORM_DEFAULTS: CnhFormValues = {
   medicalRestrictions: "",
   observations: "",
   points: "0",
+  tipoVinculo: "",
 };
 
 export function useCnhForm(defaults?: Partial<CnhFormValues>): UseFormReturn<CnhFormValues> {

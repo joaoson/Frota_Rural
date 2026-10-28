@@ -8,6 +8,7 @@ import { serve, type Route } from "@/test/http";
 import { renderWithProviders } from "@/test/render";
 
 const ui = vi.hoisted(() => ({ userId: "op-1" as string | null, toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/features/documents/hooks/useTiposVinculo", () => ({ useTiposVinculo: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/app/container", () => import("@/test/container"));
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: ui.userId }) }));
 vi.mock("sonner", () => ({ toast: ui.toast }));
