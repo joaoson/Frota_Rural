@@ -34,6 +34,7 @@ import {
   useReceivedReviews,
   useWrittenReviews,
 } from "@/features/reviews/hooks/useReviews";
+import { useCriteriosAvaliacao } from "@/features/reviews/hooks/useCriteriosAvaliacao";
 import { hasReviewedRental, type Review } from "@/features/reviews/types/review";
 import { formatCurrency, matchesSearch, yearOptions } from "@/features/dashboard/utils/ownerSummary";
 import { postingStatusBadge } from "@/features/postings/types/postingBadges";
@@ -95,6 +96,7 @@ const DashboardLocador = () => {
 
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>("");
+  const [reviewCriterio, setReviewCriterio] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const userQuery = useUser(userId);
@@ -107,6 +109,7 @@ const DashboardLocador = () => {
   const givenQuery = useWrittenReviews(userId);
 
   const createReview = useCreateReview();
+  const criteriosQuery = useCriteriosAvaliacao();
   const updateMachine = useUpdateMachine();
   const tiposPneuQuery = useTiposPneu();
   const cancelRental = useCancelRental();
@@ -260,11 +263,13 @@ const DashboardLocador = () => {
         rating: reviewRating,
         comment: reviewComment.trim(),
         rental: rental.id,
+        criterio: reviewCriterio || null,
       });
       toast.success("Avaliação enviada com sucesso!");
       setShowAvaliar(null);
       setReviewRating(5);
       setReviewComment("");
+      setReviewCriterio("");
     } catch (error) {
       toast.error(error instanceof HttpError ? error.message : "Erro ao enviar avaliação.");
     } finally {
@@ -327,6 +332,9 @@ const DashboardLocador = () => {
         onRatingChange: setReviewRating,
         comment: reviewComment.trim(),
         onCommentChange: setReviewComment,
+        criterio: reviewCriterio,
+        onCriterioChange: setReviewCriterio,
+        criterios: criteriosQuery.data ?? [],
         submitting: isSubmittingReview,
         onSubmit: () => void submitReview(r),
       }}

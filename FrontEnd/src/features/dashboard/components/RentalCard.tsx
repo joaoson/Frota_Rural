@@ -44,6 +44,9 @@ interface ReviewPanel {
   onRatingChange: (rating: number) => void;
   comment: string;
   onCommentChange: (comment: string) => void;
+  criterio?: string;
+  onCriterioChange?: (criterio: string) => void;
+  criterios?: { id: string; nome: string }[];
   submitting: boolean;
   onSubmit: () => void;
 }
@@ -379,6 +382,19 @@ export function RentalCard({
               onChange={(event) => review.onCommentChange(event.target.value)}
               className={`${PANEL_INPUT} resize-none`}
             />
+            {review.criterios && (
+              <select
+                aria-label="Critério da avaliação"
+                value={review.criterio ?? ""}
+                onChange={(event) => review.onCriterioChange?.(event.target.value)}
+                className={PANEL_INPUT}
+              >
+                <option value="">Critério principal (opcional)</option>
+                {review.criterios.map((criterio) => (
+                  <option key={criterio.id} value={criterio.id}>{criterio.nome}</option>
+                ))}
+              </select>
+            )}
             <button
               onClick={review.onSubmit}
               disabled={review.submitting}

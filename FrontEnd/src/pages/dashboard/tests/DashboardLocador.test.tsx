@@ -13,6 +13,7 @@ vi.mock("@/features/machines/hooks/useUpdateMachine", () => ({ useUpdateMachine:
 vi.mock("@/features/machines/hooks/useTiposPneu", () => ({ useTiposPneu: () => ({ data: [] }) }));
 vi.mock("@/features/postings/hooks/usePostings", () => ({ usePostings: (...args: unknown[]) => { mocks.postings(...args); return { data: mocks.postingsData }; } }));
 vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessor: () => ({ data: mocks.rentals }), useCancelRental: () => ({ mutateAsync: mocks.cancel }), useRecordMeterReading: () => ({ mutateAsync: mocks.record, isPending: false }), useCompleteRental: () => ({ mutateAsync: mocks.complete, isPending: false }), useMachineUsage: () => ({ data: undefined }) }));
+vi.mock("@/features/reviews/hooks/useCriteriosAvaliacao", () => ({ useCriteriosAvaliacao: () => ({ data: [] }) }));
 vi.mock("@/features/reviews/hooks/useReviews", () => ({ useCreateReview: () => ({ mutateAsync: mocks.review }), useReceivedReviews: () => ({ data: mocks.reviews }), useWrittenReviews: () => ({ data: mocks.given }) }));
 vi.mock("@/features/dashboard/hooks/useLessorDashboard", () => ({ browserTimeZone: () => "America/Sao_Paulo", useLessorDashboard: (...args: unknown[]) => { mocks.summaryArgs(...args); return { data: mocks.summary, isFetching: mocks.fetching, isError: false, isLoading: false, refetch: vi.fn() }; } }));
 vi.mock("@/features/documents/hooks/useDocuments", () => ({ useCertifications: () => ({ data: [] }), useOperatorLicenses: () => ({ data: [] }) }));
@@ -40,7 +41,7 @@ it("submits the selected rental and its tenant, then prevents duplicate reviews"
   fireEvent.click(screen.getByRole("button", { name: /Avaliar Locatário/ }));
   fireEvent.change(screen.getByPlaceholderText("Conte como foi a experiência..."), { target: { value: "Ótima experiência" } });
   fireEvent.click(screen.getByRole("button", { name: "Enviar Avaliação" }));
-  await waitFor(() => expect(mocks.review).toHaveBeenCalledWith({ reviewer: "owner-a", reviewee: "tenant-a", rental: "rental-a", rating: 5, comment: "Ótima experiência" }));
+  await waitFor(() => expect(mocks.review).toHaveBeenCalledWith({ reviewer: "owner-a", reviewee: "tenant-a", rental: "rental-a", rating: 5, comment: "Ótima experiência", criterio: null }));
   cleanup(); mocks.given = [{ rentalId: "rental-a" }]; open("reservas");
   expect(screen.queryByRole("button", { name: /Avaliar Locatário/ })).toBeNull();
 });

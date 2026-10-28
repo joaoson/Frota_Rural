@@ -12,6 +12,7 @@ function ReviewCard({
   date,
   rating,
   comment,
+  criterio,
   avatarClassName,
   action,
 }: {
@@ -19,6 +20,7 @@ function ReviewCard({
   date: Date | null | undefined;
   rating: number;
   comment: string | null | undefined;
+  criterio?: string | null;
   avatarClassName: string;
   action?: React.ReactNode;
 }) {
@@ -48,6 +50,7 @@ function ReviewCard({
         )}
       </div>
       <p className="text-sm text-on-surface leading-relaxed">"{comment}"</p>
+      {criterio && <p className="mt-2 text-xs font-bold uppercase tracking-wide text-outline">Critério: {criterio}</p>}
     </div>
   );
 }
@@ -76,6 +79,7 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
                 date={review.createdAt}
                 rating={review.rating}
                 comment={review.comment}
+                criterio={review.criterioNome}
                 avatarClassName="bg-secondary-container/30 text-tertiary"
               />
           )}
@@ -95,6 +99,7 @@ export function ReviewsSection({ receivedReviews, givenReviews }: ReviewsSection
                 date={review.createdAt}
                 rating={review.rating}
                 comment={review.comment}
+                criterio={review.criterioNome}
                 avatarClassName="bg-primary/10 text-primary"
                 action={
                   <button

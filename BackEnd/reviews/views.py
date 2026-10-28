@@ -9,11 +9,12 @@ from rest_framework.views import APIView
 
 from common.schemas import error_response, error_responses
 from reviews.serializer import (
+    CriterioAvaliacaoOutputSerializer,
     ReviewFilterSerializer,
     ReviewInputSerializer,
     ReviewOutputSerializer,
 )
-from reviews.services import ReviewService
+from reviews.services import CriterioAvaliacaoService, ReviewService
 
 TAGS = ["Avaliações"]
 REVIEW_NOT_FOUND = error_response(404, "Avaliação não encontrada.")
@@ -118,3 +119,17 @@ class ReviewDetailView(APIView):
     def delete(self, request: Request, pk: UUID) -> Response:
         ReviewService.delete(pk, user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CriterioAvaliacaoListView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar critérios de avaliação",
+        description="Opções da tabela `criterios_avaliacao` usadas ao avaliar uma locação.",
+        responses={200: CriterioAvaliacaoOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        criterios = CriterioAvaliacaoService.list()
+        return Response(CriterioAvaliacaoOutputSerializer(criterios, many=True).data, status=status.HTTP_200_OK)

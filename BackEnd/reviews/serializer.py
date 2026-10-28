@@ -3,7 +3,7 @@ from typing import Any
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
-from reviews.models import Reviews
+from reviews.models import CriterioAvaliacao, Reviews
 
 DUPLICATE_REVIEW_MESSAGE = "Este avaliador já avaliou esta locação."
 
@@ -13,7 +13,7 @@ class ReviewInputSerializer(serializers.ModelSerializer[Reviews]):
 
     class Meta:
         model = Reviews
-        fields = ["rental", "reviewer", "reviewee", "rating", "comment"]
+        fields = ["rental", "reviewer", "reviewee", "rating", "comment", "criterio"]
         extra_kwargs = {"rating": {"min_value": 1, "max_value": 5}}
         # Substitui o validador gerado a partir do unique_together só para trocar
         # a mensagem padrão, que o DRF escreve em inglês.
@@ -57,6 +57,7 @@ class ReviewFilterSerializer(serializers.Serializer[Any]):
 class ReviewOutputSerializer(serializers.ModelSerializer[Reviews]):
     reviewer_name = serializers.CharField(source="reviewer.name", read_only=True)
     reviewee_name = serializers.CharField(source="reviewee.name", read_only=True)
+    criterio_nome = serializers.CharField(source="criterio.nome", read_only=True, allow_null=True)
 
     class Meta:
         model = Reviews
@@ -70,5 +71,14 @@ class ReviewOutputSerializer(serializers.ModelSerializer[Reviews]):
             "rating",
             "comment",
             "created_at",
+            "criterio",
+            "criterio_nome",
         ]
+        read_only_fields = fields
+
+
+class CriterioAvaliacaoOutputSerializer(serializers.ModelSerializer[CriterioAvaliacao]):
+    class Meta:
+        model = CriterioAvaliacao
+        fields = ["id", "nome"]
         read_only_fields = fields

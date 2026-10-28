@@ -12,5 +12,6 @@ export function toDomain(dto: ReviewApi): Review {
     rating: dto.rating,
     comment: dto.comment ?? null,
     createdAt: dto.created_at ? new Date(dto.created_at) : null,
+    criterioNome: dto.criterio_nome ?? null,
   };
 }

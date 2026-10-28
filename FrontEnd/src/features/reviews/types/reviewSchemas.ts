@@ -13,9 +13,14 @@ export const reviewApiSchema = z.object({
   rating: z.number(),
   comment: z.string().nullish(),
   created_at: z.string().nullish(),
+  criterio: z.string().nullish(),
+  criterio_nome: z.string().nullish(),
 });
 export type ReviewApi = z.infer<typeof reviewApiSchema>;
 export const reviewListApiSchema = z.array(reviewApiSchema);
+export const criterioAvaliacaoListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 
 export const reviewFormSchema = z.object({
   rating: z
@@ -33,4 +38,5 @@ export interface CreateReviewPayload {
   reviewee: string;
   rating: number;
   comment?: string;
+  criterio?: string | null;
 }

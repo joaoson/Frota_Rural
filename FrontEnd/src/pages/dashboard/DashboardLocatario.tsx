@@ -27,6 +27,7 @@ import {
   useReceivedReviews,
   useWrittenReviews,
 } from "@/features/reviews/hooks/useReviews";
+import { useCriteriosAvaliacao } from "@/features/reviews/hooks/useCriteriosAvaliacao";
 import { averageRating, hasReviewedRental, type Review } from "@/features/reviews/types/review";
 import AssinaturaContratoModal from "@/components/AssinaturaContratoModal";
 import { StatusBadge } from "@/shared/components/StatusBadge";
@@ -100,6 +101,7 @@ const DashboardLocatario = () => {
   const givenQuery = useWrittenReviews(isOperator ? null : userId);
   const rentalsQuery = useRentalsAsLessee(isOperator ? null : userId);
   const createReview = useCreateReview();
+  const criteriosQuery = useCriteriosAvaliacao();
   const cancelRental = useCancelRental();
 
   const receivedReviews: Review[] = receivedQuery.data ?? [];
@@ -140,6 +142,7 @@ const DashboardLocatario = () => {
   
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>("");
+  const [reviewCriterio, setReviewCriterio] = useState("");
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const matches = (r: (typeof rentals)[number], search: string, year: string) =>
@@ -187,11 +190,13 @@ const DashboardLocatario = () => {
         rating: reviewRating,
         comment: reviewComment.trim(),
         rental: rental.id,
+        criterio: reviewCriterio || null,
       });
       toast.success("Avaliação enviada com sucesso!");
       setShowAvaliar(null);
       setReviewRating(5);
       setReviewComment("");
+      setReviewCriterio("");
     } catch (error) {
       toast.error(error instanceof HttpError ? error.message : "Erro ao enviar avaliação.");
     } finally {
@@ -232,6 +237,9 @@ const DashboardLocatario = () => {
         onRatingChange: setReviewRating,
         comment: reviewComment,
         onCommentChange: setReviewComment,
+        criterio: reviewCriterio,
+        onCriterioChange: setReviewCriterio,
+        criterios: criteriosQuery.data ?? [],
         submitting: isSubmittingReview,
         onSubmit: () => void submitReview(r.source),
       }}

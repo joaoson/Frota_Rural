@@ -8,6 +8,12 @@ export interface Review {
   rating: number;
   comment: string | null;
   createdAt: Date | null;
+  criterioNome?: string | null;
+}
+
+export interface CriterioAvaliacao {
+  id: string;
+  nome: string;
 }
 
 export function averageRating(reviews: Review[]): number | null {

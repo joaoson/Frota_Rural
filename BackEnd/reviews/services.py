@@ -9,7 +9,7 @@ from rest_framework.exceptions import NotFound
 
 from common.db import enforce_constraints_now
 from common.exceptions import Conflict
-from reviews.models import Reviews
+from reviews.models import CriterioAvaliacao, Reviews
 from reviews.serializer import (
     DUPLICATE_REVIEW_MESSAGE,
     ReviewFilterSerializer,
@@ -82,3 +82,9 @@ class ReviewService:
         if "rental" in params:
             queryset = queryset.filter(rental_id=params["rental"])
         return queryset
+
+
+class CriterioAvaliacaoService:
+    @staticmethod
+    def list() -> QuerySet[CriterioAvaliacao]:
+        return CriterioAvaliacao.objects.order_by("nome")

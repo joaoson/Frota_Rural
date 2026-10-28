@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({ rentals: [] as unknown[], reviews: [] as unkno
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "tenant-a", userRole: mocks.userRole, logout: vi.fn() }) }));
 vi.mock("@/features/users/hooks/useUsers", () => ({ useUser: () => ({ data: { name: "Maria Silva" } }) }));
 vi.mock("@/features/contracts/hooks/useContracts", () => ({ useRentalsAsLessee: (id: string | null) => { mocks.query(id); return { data: mocks.rentals }; }, useCancelRental: () => ({ mutateAsync: mocks.cancel }) }));
+vi.mock("@/features/reviews/hooks/useCriteriosAvaliacao", () => ({ useCriteriosAvaliacao: () => ({ data: [] }) }));
 vi.mock("@/features/reviews/hooks/useReviews", () => ({ useReceivedReviews: () => ({ data: [] }), useWrittenReviews: () => ({ data: mocks.reviews }), useCreateReview: () => ({ mutateAsync: mocks.create }) }));
 vi.mock("@/features/dashboard/components/DashboardShell", () => ({ DashboardShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("@/features/dashboard/components/AccountSection", () => ({ AccountSection: ({ roleLabel }: { roleLabel: string }) => <p>Conta: {roleLabel}</p> }));
@@ -32,7 +33,7 @@ it("submits a review for the selected rental and its real owner", async () => {
   fireEvent.click(screen.getByRole("button", { name: /Avaliar$/ }));
   fireEvent.change(screen.getByPlaceholderText("Conte como foi a experiência..."), { target: { value: "Máquina em boas condições." } });
   fireEvent.click(screen.getByRole("button", { name: "Enviar Avaliação" }));
-  await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ reviewer: "tenant-a", reviewee: "owner-a", rental: "rental-a", rating: 5, comment: "Máquina em boas condições." }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({ reviewer: "tenant-a", reviewee: "owner-a", rental: "rental-a", rating: 5, comment: "Máquina em boas condições.", criterio: null }));
 });
 it("filters rental lists and shows no unrelated machines", () => {
   show("locacoes");

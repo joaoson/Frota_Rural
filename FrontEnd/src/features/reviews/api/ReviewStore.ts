@@ -1,6 +1,6 @@
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
-import type { Review } from "../types/review";
+import type { CriterioAvaliacao, Review } from "../types/review";
 import type { CreateReviewPayload } from "../types/reviewSchemas";
 import type { ReviewFilter, ReviewRepository } from "./ReviewRepository";
 
@@ -8,6 +8,7 @@ export const reviewKeys = {
   all: ["reviews"] as const,
   lists: () => [...reviewKeys.all, "list"] as const,
   list: (filter: ReviewFilter) => [...reviewKeys.lists(), filter] as const,
+  criterios: () => [...reviewKeys.all, "criterios"] as const,
 };
 
 export class ReviewStore {
@@ -23,6 +24,10 @@ export class ReviewStore {
     filter: ReviewFilter,
   ): UseQueryOptions<Review[], Error, Review[], ReturnType<typeof reviewKeys.list>> {
     return { queryKey: reviewKeys.list(filter), queryFn: () => this.repository.find(filter) };
+  }
+
+  criteriosOptions(): UseQueryOptions<CriterioAvaliacao[], Error, CriterioAvaliacao[], ReturnType<typeof reviewKeys.criterios>> {
+    return { queryKey: reviewKeys.criterios(), queryFn: () => this.repository.listCriterios() };
   }
 
   create(payload: CreateReviewPayload): Promise<Review> {

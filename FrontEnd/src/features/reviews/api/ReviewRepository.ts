@@ -1,7 +1,8 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
-import type { Review } from "../types/review";
+import type { CriterioAvaliacao, Review } from "../types/review";
 import {
+  criterioAvaliacaoListApiSchema,
   type CreateReviewPayload,
   reviewApiSchema,
   reviewListApiSchema,
@@ -20,6 +21,7 @@ export interface ReviewRepository {
   find(filter: ReviewFilter): Promise<Review[]>;
   create(payload: CreateReviewPayload): Promise<Review>;
   remove(id: string): Promise<void>;
+  listCriterios(): Promise<CriterioAvaliacao[]>;
 }
 
 export class HttpReviewRepository implements ReviewRepository {
@@ -53,5 +55,10 @@ export class HttpReviewRepository implements ReviewRepository {
 
   async remove(id: string): Promise<void> {
     await this.http.send<unknown>({ method: "DELETE", path: `reviews/${id}` });
+  }
+
+  async listCriterios(): Promise<CriterioAvaliacao[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `${COLLECTION_PATH}/criterios` });
+    return criterioAvaliacaoListApiSchema.parse(response.data);
   }
 }
