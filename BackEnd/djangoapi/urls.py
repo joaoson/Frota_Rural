@@ -52,4 +52,5 @@ urlpatterns = [
     ),
     path(f"{BASE_PATH}schema/redoc", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
+    path(BASE_PATH, include("autoria.urls")),
 ]

@@ -60,6 +60,14 @@ class Users(AbstractBaseUser):
     REQUIRED_FIELDS = ["name", "document", "role", "address", "birth_date"]
     objects = UsersManager()
 
+    categoria_autoria = models.ForeignKey(
+    "autoria.Genero",
+    on_delete=models.PROTECT,
+    null=True,       # Registros antigos continuam válidos.
+    blank=True,
+    related_name="+",
+)
+
     class Meta:
         db_table = "users"
 

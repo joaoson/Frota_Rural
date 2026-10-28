@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "pricing",
     "notifications",
     "drf_spectacular",
+    "autoria"
 ]
 
 MIDDLEWARE = [
