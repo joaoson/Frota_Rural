@@ -8,9 +8,10 @@ Django e Vite rodam no computador. Somente o PostgreSQL usa Docker, com volume e
 | API | http://localhost:8010/api |
 | Swagger | http://localhost:8010/api/schema/swagger-ui |
 | PostgreSQL | `127.0.0.1:5442` |
-| Banco | `frota_rural` |
+| Banco | `frota_rural_autoria` |
 | Usuário / senha do banco local | `postgres` / `postgres` |
 | Container do banco | `frota-autoria-db-1` |
+| Branch de prática | `codex/autoria-pratica` |
 
 ## 1 Abrir o terminal para praticar
 
@@ -25,8 +26,8 @@ python manage.py verify_database
 
 ```text
 Host: 127.0.0.1:5442
-Database: frota_rural
-Connection OK: database=frota_rural, schema=public, TLS=disabled.
+Database: frota_rural_autoria
+Connection OK: database=frota_rural_autoria, schema=public, TLS=disabled.
 ```
 
 Mantenha esse terminal dentro de `BackEnd/` durante os comandos Django e curl dos tutoriais. Os caminhos dos arquivos a editar são relativos à raiz do repositório.
@@ -121,9 +122,11 @@ Pular esta seção no ambiente já preparado. Em outro checkout, use projeto e p
 Na raiz, criar o PostgreSQL isolado:
 
 ```bash
-POSTGRES_DB=frota_rural POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres POSTGRES_PORT=127.0.0.1:5442 \
+POSTGRES_DB=frota_rural_autoria POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres POSTGRES_PORT=127.0.0.1:5442 \
   docker compose --env-file .env.local.example --project-name frota-autoria -f compose.yaml up -d --wait db
 ```
+
+`POSTGRES_DB` cria o banco somente na inicialização de um volume vazio. Neste ambiente, `frota_rural_autoria` já foi criado explicitamente; mudar a variável de um container antigo não cria outro banco.
 
 Preparar Django com Python 3.13:
 

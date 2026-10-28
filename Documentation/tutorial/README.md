@@ -6,13 +6,15 @@ São exemplos para implementar à mão. Nenhuma migration ou mudança de aplica�
 
 ## Terminal de prática
 
+Branch de prática: `codex/autoria-pratica`. Banco exclusivo: `frota_rural_autoria` em `127.0.0.1:5442`.
+
 ```bash
 # Em um terminal novo, na raiz do repositório:
 cd BackEnd
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: Host: 127.0.0.1:5442 / Database: frota_rural.
+# Esperado: Host: 127.0.0.1:5442 / Database: frota_rural_autoria.
 ```
 
 Os comandos Django de todos os guias são executados dentro de `BackEnd/`, com esse ambiente ativo. Os caminhos dos arquivos para editar continuam relativos à raiz do repositório. Django e frontend já foram iniciados para o ensaio; para retomar após desligá-los, use o guia 05.
@@ -38,7 +40,7 @@ Acrescentar: trechos dentro da classe/lista/função indicada; preservar o códi
 API base local: http://localhost:8010/api
 Frontend local: http://localhost:5183
 Swagger: http://localhost:8010/api/schema/swagger-ui
-PostgreSQL: 127.0.0.1:5442 / frota_rural
+PostgreSQL: 127.0.0.1:5442 / frota_rural_autoria
 ```
 
 ## Modelos

@@ -9,7 +9,7 @@ Use o banco isolado preparado no [guia do ambiente](05_ambiente_dev_e_banco_isol
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Confirmar 127.0.0.1:5442 / frota_rural antes de continuar.
+# Confirmar 127.0.0.1:5442 / frota_rural_autoria antes de continuar.
 python manage.py showmigrations
 # Executar uma vez; se BackEnd/autoria já existir, continuar nas edições abaixo.
 python manage.py startapp autoria

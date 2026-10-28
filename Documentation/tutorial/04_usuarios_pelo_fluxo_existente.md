@@ -7,7 +7,7 @@ Alternativa ao endpoint de vínculo do guia [Users](modelos/users.md). Use a tab
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural.
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
 ```
 
 ## 1 Serializer de entrada

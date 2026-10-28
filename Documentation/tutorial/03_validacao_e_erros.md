@@ -5,7 +5,7 @@
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural.
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
 ```
 
 ## 1 Banco e migrations
@@ -44,7 +44,7 @@ curl --fail-with-body "$AUTORIA_API/autoria/categorias" \
 
 ## 3 Teste executável para o guia Users
 
-Use depois de aplicar [Users](modelos/users.md). Este teste cria e remove `test_frota_rural` no PostgreSQL de ensaio da porta `5442`; preserva os dados do seed em `frota_rural`.
+Use depois de aplicar [Users](modelos/users.md). Este teste cria e remove `test_frota_rural_autoria` no PostgreSQL de ensaio da porta `5442`; preserva os dados do seed em `frota_rural_autoria`.
 
 <!-- file: BackEnd/autoria/tests.py -->
 ```python

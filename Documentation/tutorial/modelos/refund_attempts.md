@@ -7,7 +7,7 @@ Pré-requisitos: [tabela](../00_tabela_e_tres_registros.md), [API comum](../01_a
 source .venv/bin/activate
 source ../Devops/autoria.env.sh
 python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural.
+# Esperado: 127.0.0.1:5442 / frota_rural_autoria.
 ```
 
 | Ponto | Arquivo ou valor |
