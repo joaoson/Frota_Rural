@@ -16,7 +16,6 @@ import { RentalCard } from "@/features/dashboard/components/RentalCard";
 import { ReviewsSection } from "@/features/dashboard/components/ReviewsSection";
 import ChatInboxPanel from "@/features/chat/components/ChatInboxPanel";
 import DashboardMachineSearch from "@/components/DashboardMachineSearch";
-import OperadoresPanel from "@/components/OperadoresPanel";
 import { DocumentsSection } from "@/features/documents/components/DocumentsSection";
 import { useCancelRental, useRentalsAsLessee } from "@/features/contracts/hooks/useContracts";
 import { RentalRecurrenceDialog } from "@/features/contracts/components/RentalRecurrenceDialog";
@@ -49,7 +48,6 @@ const sidebarItems: readonly SidebarItem<Tab>[] = [
   { icon: "search", label: "Buscar Máquinas", tab: "buscar" },
   { icon: "event_available", label: "Minhas Locações", tab: "locacoes" },
   { icon: "description", label: "Contratos", tab: "contratos" },
-  { icon: "engineering", label: "Operadores", tab: "operadores" },
   { icon: "badge", label: "Documentos", tab: "documentos" },
   { icon: "star", label: "Avaliações", tab: "avaliacoes" },
   { icon: "chat_bubble", label: "Chat", tab: "chat" },
@@ -63,7 +61,6 @@ type Tab =
   | "buscar"
   | "locacoes"
   | "contratos"
-  | "operadores"
   | "documentos"
   | "avaliacoes"
   | "chat"
@@ -489,7 +486,6 @@ const DashboardLocatario = () => {
       )}
 
       {/* Chat */}
-      {tab === "operadores" && <OperadoresPanel />}
 
       {tab === "documentos" && <DocumentsSection userId={userId} />}
 

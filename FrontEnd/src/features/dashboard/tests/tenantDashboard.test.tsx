@@ -15,7 +15,6 @@ vi.mock("@/features/dashboard/components/ReviewsSection", () => ({ ReviewsSectio
 vi.mock("@/features/notifications/components/NotificationsPanel", () => ({ NotificationsPanel: () => null }));
 vi.mock("@/features/chat/components/ChatInboxPanel", () => ({ default: () => null }));
 vi.mock("@/components/DashboardMachineSearch", () => ({ default: () => null }));
-vi.mock("@/components/OperadoresPanel", () => ({ default: () => null }));
 vi.mock("@/features/documents/components/DocumentsSection", () => ({ DocumentsSection: ({ userId }: { userId: string }) => <p>Documentos de {userId}</p> }));
 vi.mock("@/components/AssinaturaContratoModal", () => ({ default: () => null }));
 vi.mock("@/features/contracts/components/RentalRecurrenceDialog", () => ({ RentalRecurrenceDialog: () => null }));

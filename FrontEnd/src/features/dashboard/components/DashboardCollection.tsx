@@ -16,6 +16,8 @@ interface DashboardCollectionProps<T> {
   items: readonly T[];
   renderItem: (item: T, view: DashboardView) => ReactNode;
   defaultView?: DashboardView;
+  /** Hide the count / page-size / view bar for collections that never hold more than one record. */
+  showToolbar?: boolean;
   resetKey?: string;
   focusItemId?: string;
   getGroup?: (item: T) => string;
@@ -27,6 +29,7 @@ export function DashboardCollection<T extends { id: string }>({
   items,
   renderItem,
   defaultView = "grid",
+  showToolbar = true,
   resetKey = "",
   focusItemId,
   getGroup,
@@ -34,7 +37,8 @@ export function DashboardCollection<T extends { id: string }>({
   const sizeId = useId();
   const sectionRef = useRef<HTMLElement>(null);
   const userId = useContext(AuthContext)?.userId ?? null;
-  const [view, setView] = useDashboardPreference<DashboardView>(userId, `${label}:view`, viewSchema, defaultView);
+  const [storedView, setView] = useDashboardPreference<DashboardView>(userId, `${label}:view`, viewSchema, defaultView);
+  const view = showToolbar ? storedView : defaultView;
   const [pageSize, setPageSize] = useDashboardPreference<number>(userId, `${label}:size`, sizeSchema, 6);
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const focusIndex = items.findIndex((item) => item.id === focusItemId);
@@ -60,7 +64,7 @@ export function DashboardCollection<T extends { id: string }>({
 
   return (
     <section ref={sectionRef} aria-label={label} className="@container/collection min-w-0 scroll-mt-20 space-y-4" data-view={view}>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3">
+      {showToolbar && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3">
         <p role="status" className="text-sm text-on-surface-variant">
           {items.length === 0 ? "0 itens" : `${start + 1}–${Math.min(start + pageSize, items.length)} de ${items.length} ${items.length === 1 ? "item" : "itens"}`}
         </p>
@@ -94,7 +98,7 @@ export function DashboardCollection<T extends { id: string }>({
             ))}
           </div>
         </div>
-      </div>
+      </div>}
       {Array.from(groups, ([group, records]) => (
         <div key={group} className="space-y-4">
           {group && <h2 className="font-headline text-lg font-bold text-on-surface">{group}</h2>}

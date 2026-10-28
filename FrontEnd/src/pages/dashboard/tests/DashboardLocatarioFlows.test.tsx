@@ -15,7 +15,6 @@ vi.mock("recharts", () => Object.fromEntries(["AreaChart", "Area", "BarChart", "
 vi.mock("@/components/NotificationPopover", () => ({ default: () => null }));
 vi.mock("@/components/ThemeToggle", () => ({ default: () => null }));
 vi.mock("@/components/DashboardMachineSearch", () => ({ default: () => <p>Busca de máquinas</p> }));
-vi.mock("@/components/OperadoresPanel", () => ({ default: () => <p>Equipe de operadores</p> }));
 vi.mock("@/features/chat/components/ChatInboxPanel", () => ({ default: ({ subtitle }: { subtitle: string }) => <p>Chat: {subtitle}</p> }));
 vi.mock("@/features/notifications/components/NotificationsPanel", () => ({ NotificationsPanel: () => <p>Painel de notificações</p> }));
 vi.mock("@/features/dashboard/components/AccountSection", () => ({ AccountSection: ({ roleLabel }: { roleLabel: string }) => <p>Conta de {roleLabel}</p> }));
@@ -140,12 +139,18 @@ it("lists contracts with their signature state and opens signing", async () => {
   expect(screen.queryByRole("dialog", { name: "Assinar contrato" })).not.toBeInTheDocument();
 });
 
-it.each([["buscar", "Busca de máquinas"], ["operadores", "Equipe de operadores"], ["chat", "Chat: Converse com seus locadores"], ["notificacoes", "Painel de notificações"], ["conta", "Conta de Locatário"], ["avaliacoes", "Avaliações Recebidas"]])(
+it.each([["buscar", "Busca de máquinas"], ["chat", "Chat: Converse com seus locadores"], ["notificacoes", "Painel de notificações"], ["conta", "Conta de Locatário"], ["avaliacoes", "Avaliações Recebidas"]])(
   "shows the %s tab", async (tab, text) => {
     api(); open(tab);
     expect((await screen.findAllByText(text)).length).toBeGreaterThan(0);
   },
 );
+
+it("does not offer the operators team to tenants", async () => {
+  api(); open("operadores");
+  expect(await screen.findByRole("button", { name: /Minhas Locações/ })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Operadores/ })).not.toBeInTheDocument();
+});
 
 it("limits operators to chat, notifications and account", async () => {
   ui.role = "operador"; api();

@@ -79,7 +79,7 @@ export function DocumentsSection({ userId }: { userId: string | null }) {
             </p>
           </div>
         ) : (
-          <DashboardCollection label="CNH" items={licenses} defaultView="list" renderItem={(lic) => (
+          <DashboardCollection label="CNH" items={licenses} defaultView="list" showToolbar={false} renderItem={(lic) => (
             <div
               key={lic.id}
               className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 sm:p-6 flex flex-wrap gap-4 items-center justify-between hover:shadow-xl transition-all duration-300 shadow-sm"
