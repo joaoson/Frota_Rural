@@ -11,6 +11,7 @@ import {
   certificationToPayload,
 } from "@/features/documents/api/documentMapper";
 import { useCertificationForm } from "@/features/documents/hooks/useDocumentForms";
+import { useAreasCertificacao } from "@/features/documents/hooks/useAreasCertificacao";
 import {
   useCertification,
   useSaveCertification,
@@ -50,6 +51,7 @@ const CertificationUpload = () => {
   const uploadDocument = useUploadDocument();
 
   const form = useCertificationForm();
+  const areas = useAreasCertificacao();
   const { errors } = form.formState;
 
   const certification = certificationQuery.data ?? null;
@@ -181,6 +183,19 @@ const CertificationUpload = () => {
                 className={inputClass(Boolean(errors.description))}
                 {...form.register("description")}
               />
+            </FormField>
+
+            <FormField label="Área da Certificação" error={errors.area?.message}>
+              <select
+                className={inputClass(Boolean(errors.area))}
+                disabled={areas.isLoading}
+                {...form.register("area")}
+              >
+                <option value="">Selecione a área</option>
+                {(areas.data ?? []).map((area) => (
+                  <option key={area.id} value={area.id}>{area.nome}</option>
+                ))}
+              </select>
             </FormField>
 
             <p className="text-[10px] font-bold uppercase tracking-widest text-primary border-b border-outline-variant/30 pb-2">

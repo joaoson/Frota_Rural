@@ -230,6 +230,9 @@ export function DocumentsSection({ userId }: { userId: string | null }) {
                       "pt-BR",
                     )}
                   </p>
+                  <p className="text-xs text-outline font-medium uppercase tracking-wide">
+                    Área: {cert.areaNome ?? "Não informada"}
+                  </p>
                   {cert.validationStatus === "rejected" && cert.reviewNote && (
                     <p className="text-xs text-error mt-1">
                       {cert.reviewNote}

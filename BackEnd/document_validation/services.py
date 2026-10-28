@@ -16,7 +16,7 @@ from users.models import Users
 from common.exceptions import Conflict, ServiceUnavailable
 from document_validation.enums import ValidationStatus
 from document_validation.ml_adapters import CnhClassifier, CnhDataChecker
-from document_validation.models import Certification, OperatorLicense
+from document_validation.models import AreaCertificacao, Certification, OperatorLicense
 from document_validation.serializer import (
     CertificationInputSerializer,
     DocumentFilterSerializer,
@@ -341,3 +341,9 @@ class DocumentFileService:
         if (file.size or 0) > MAX_FILE_SIZE:
             raise ValidationError("Arquivo excede o tamanho máximo de 20MB.")
         return file
+
+
+class AreaCertificacaoService:
+    @staticmethod
+    def list() -> QuerySet[AreaCertificacao]:
+        return AreaCertificacao.objects.order_by("nome")

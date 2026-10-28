@@ -1,7 +1,8 @@
 import type { HttpClient } from "@/shared/http/HttpClient";
 
-import type { Certification, CnhValidationResult, OperatorLicense } from "../types/document";
+import type { AreaCertificacao, Certification, CnhValidationResult, OperatorLicense } from "../types/document";
 import {
+  areaCertificacaoListApiSchema,
   certificationApiSchema,
   certificationListApiSchema,
   cnhValidationApiSchema,
@@ -38,6 +39,7 @@ export interface DocumentRepository {
 
   uploadFile(file: File): Promise<string>;
   validateCnhFile(file: File): Promise<CnhValidationResult>;
+  listAreasCertificacao(): Promise<AreaCertificacao[]>;
 }
 
 export class HttpDocumentRepository implements DocumentRepository {
@@ -165,5 +167,10 @@ export class HttpDocumentRepository implements DocumentRepository {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return validationToDomain(cnhValidationApiSchema.parse(response.data));
+  }
+
+  async listAreasCertificacao(): Promise<AreaCertificacao[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: `${CERTIFICATIONS_PATH}/areas` });
+    return areaCertificacaoListApiSchema.parse(response.data);
   }
 }

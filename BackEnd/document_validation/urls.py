@@ -1,6 +1,7 @@
 from django.urls import path
 
 from document_validation.views import (
+    AreaCertificacaoListView,
     CertificationDetailView,
     CertificationListView,
     CertificationReviewView,
@@ -30,6 +31,7 @@ urlpatterns = [
         name="operator_license_detail",
     ),
     path("certifications", CertificationListView.as_view(), name="certifications_list"),
+    path("certifications/areas", AreaCertificacaoListView.as_view(), name="certification_areas"),
     path(
         "certifications/<uuid:pk>/review",
         CertificationReviewView.as_view(),

@@ -164,7 +164,7 @@ it.each([
   [{ expirationDate: "2025-03-01" }, "A data de validade deve ser posterior à data de emissão."],
   [{ description: "Curto" }, "A descrição deve conter pelo menos 10 caracteres."],
 ])("validates certifications (%j)", (override, message) => {
-  const base = { issuingOrganization: "SENAR", title: "Colheita", issueDate: "2025-03-01", expirationDate: "", credentialCode: "", description: "Curso de 40 horas." };
+  const base = { issuingOrganization: "SENAR", title: "Colheita", issueDate: "2025-03-01", expirationDate: "", credentialCode: "", description: "Curso de 40 horas.", area: "" };
   const result = certificationFormSchema.safeParse({ ...base, ...override });
   expect(result.success ? null : result.error.issues[0].message).toBe(message);
 });

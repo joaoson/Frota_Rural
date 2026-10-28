@@ -11,12 +11,13 @@ from administration.permissions import IsPlatformAdmin
 from common.request import authenticated_user
 from common.schemas import error_response, error_responses
 from document_validation.serializer import (
+    AreaCertificacaoOutputSerializer,
     CertificationInputSerializer,
     CertificationOutputSerializer,
     DocumentFilterSerializer,
     DocumentReviewInputSerializer,
 )
-from document_validation.services import CertificationService
+from document_validation.services import AreaCertificacaoService, CertificationService
 
 TAGS = ["Documentos"]
 CERTIFICATION_NOT_FOUND = error_response(404, "Certificação não encontrada.")
@@ -132,3 +133,17 @@ class CertificationReviewView(APIView):
         return Response(
             CertificationOutputSerializer(certification).data, status=status.HTTP_200_OK
         )
+
+
+class AreaCertificacaoListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar áreas de certificação",
+        description="Opções da tabela `areas_certificacao` usadas no envio de certificações.",
+        responses={200: AreaCertificacaoOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        areas = AreaCertificacaoService.list()
+        return Response(AreaCertificacaoOutputSerializer(areas, many=True).data, status=status.HTTP_200_OK)

@@ -69,6 +69,13 @@ export interface Certification extends ReviewableDocument {
   credentialCode: string | null;
   description: string;
   mediaUrl: string | null;
+  areaId?: string | null;
+  areaNome?: string | null;
+}
+
+export interface AreaCertificacao {
+  id: string;
+  nome: string;
 }
 
 export type CnhDocumentType = "cnh_antiga" | "cnh_digital" | "desconhecido";

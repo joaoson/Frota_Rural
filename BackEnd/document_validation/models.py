@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 from document_validation.enums import LicenseCategory, LicenseSituation, ValidationStatus
@@ -64,6 +66,18 @@ class OperatorLicense(models.Model):
         return f"CNH {self.cnh_number} ({self.name})"
 
 
+class AreaCertificacao(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "areas_certificacao"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
 class Certification(models.Model):
     id = models.UUIDField(primary_key=True)
     user = models.ForeignKey("users.Users", models.CASCADE)
@@ -85,6 +99,7 @@ class Certification(models.Model):
 
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
+    area = models.ForeignKey(AreaCertificacao, models.PROTECT, blank=True, null=True)
 
     class Meta:
         db_table = "certifications"

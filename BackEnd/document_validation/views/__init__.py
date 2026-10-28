@@ -1,4 +1,5 @@
 from document_validation.views.certifications import (
+    AreaCertificacaoListView,
     CertificationDetailView,
     CertificationListView,
     CertificationReviewView,
@@ -11,6 +12,7 @@ from document_validation.views.licenses import (
 )
 
 __all__ = [
+    "AreaCertificacaoListView",
     "CertificationDetailView",
     "CertificationListView",
     "CertificationReviewView",

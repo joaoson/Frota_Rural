@@ -48,6 +48,7 @@ export const CERTIFICATION_FORM_DEFAULTS: CertificationFormValues = {
   expirationDate: "",
   credentialCode: "",
   description: "",
+  area: "",
 };
 
 export function useCertificationForm(

@@ -3,7 +3,7 @@ from typing import Any
 from rest_framework import serializers
 
 from document_validation.enums import ReviewDecision, ValidationStatus
-from document_validation.models import Certification, OperatorLicense
+from document_validation.models import AreaCertificacao, Certification, OperatorLicense
 from users.models import Users
 
 # --- Entrada ----------------------------------------------------------------
@@ -69,6 +69,7 @@ class CertificationInputSerializer(OwnedDocumentInputSerializer):
             "credential_code",
             "description",
             "media_url",
+            "area",
         ]
 
 
@@ -148,6 +149,8 @@ class OperatorLicenseOutputSerializer(serializers.ModelSerializer[OperatorLicens
 
 
 class CertificationOutputSerializer(serializers.ModelSerializer[Certification]):
+    area_nome = serializers.CharField(source="area.nome", read_only=True, allow_null=True)
+
     class Meta:
         model = Certification
         fields = [
@@ -164,6 +167,8 @@ class CertificationOutputSerializer(serializers.ModelSerializer[Certification]):
             "review_note",
             "created_at",
             "updated_at",
+            "area",
+            "area_nome",
         ]
         read_only_fields = fields
 
@@ -229,3 +234,10 @@ class CnhValidationOutputSerializer(serializers.Serializer[Any]):
         required=False,
         help_text="Presente apenas quando o classificador falhou ao processar o arquivo.",
     )
+
+
+class AreaCertificacaoOutputSerializer(serializers.ModelSerializer[AreaCertificacao]):
+    class Meta:
+        model = AreaCertificacao
+        fields = ["id", "nome"]
+        read_only_fields = fields

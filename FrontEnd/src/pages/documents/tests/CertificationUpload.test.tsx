@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import CertificationUpload from "../CertificationUpload";
 const mocks = vi.hoisted(() => ({ role: "locador", save: vi.fn().mockResolvedValue(undefined), certificate: { id: "certificate-a", issuingOrganization: "SENAR", title: "Operação segura", issueDate: "2026-01-01", expirationDate: null, credentialCode: null, description: "Curso de segurança no uso de máquinas agrícolas.", mediaUrl: "/media/documents/certificate.pdf" } }));
 vi.mock("@/contexts/useAuth", () => ({ useAuth: () => ({ userId: "owner-a", userRole: mocks.role }) }));
+vi.mock("@/features/documents/hooks/useAreasCertificacao", () => ({ useAreasCertificacao: () => ({ data: [], isLoading: false }) }));
 vi.mock("@/features/documents/hooks/useDocuments", () => ({ useCertification: () => ({ data: mocks.certificate }), useSaveCertification: () => ({ mutateAsync: mocks.save }), useUploadDocument: () => ({ mutateAsync: vi.fn() }) }));
 vi.mock("@/shared/components/PageShell", () => ({ PageShell: ({ children }: { children: ReactNode }) => children }));
 afterEach(() => { cleanup(); mocks.save.mockClear(); mocks.role = "locador"; });

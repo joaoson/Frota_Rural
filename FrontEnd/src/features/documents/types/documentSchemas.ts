@@ -71,9 +71,14 @@ export const certificationApiSchema = z.object({
   review_note: z.string().nullish(),
   created_at: z.string().nullish(),
   updated_at: z.string().nullish(),
+  area: z.string().nullish(),
+  area_nome: z.string().nullish(),
 });
 export type CertificationApi = z.infer<typeof certificationApiSchema>;
 export const certificationListApiSchema = z.array(certificationApiSchema);
+export const areaCertificacaoListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
 
 export const CNH_DOCUMENT_TYPES = ["cnh_antiga", "cnh_digital", "desconhecido"] as const;
 
@@ -214,6 +219,7 @@ export const certificationFormSchema = z
       .trim()
       .min(1, "Descrição é obrigatória.")
       .min(10, "A descrição deve conter pelo menos 10 caracteres."),
+    area: z.string(),
   })
   .superRefine((values, ctx) => {
     if (values.expirationDate && values.issueDate && values.expirationDate <= values.issueDate) {

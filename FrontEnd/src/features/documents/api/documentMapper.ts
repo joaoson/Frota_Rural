@@ -60,6 +60,8 @@ export function certificationToDomain(dto: CertificationApi): Certification {
     credentialCode: dto.credential_code ?? null,
     description: dto.description,
     mediaUrl: dto.media_url ?? null,
+    areaId: dto.area ?? null,
+    areaNome: dto.area_nome ?? null,
   };
 }
 
@@ -166,6 +168,7 @@ export function certificationToPayload(
     credential_code: values.credentialCode || null,
     description: values.description,
     media_url: mediaUrl,
+    area: values.area || null,
   };
 }
 
@@ -206,5 +209,6 @@ export function certificationToFormValues(
     expirationDate: certification.expirationDate ?? "",
     credentialCode: certification.credentialCode ?? "",
     description: certification.description,
+    area: certification.areaId ?? "",
   };
 }
