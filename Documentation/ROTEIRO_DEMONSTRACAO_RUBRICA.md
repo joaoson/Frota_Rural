@@ -93,7 +93,7 @@ Não repetir uma interrupção em ambiente compartilhado. Se a banca pedir exerc
 
 **Demonstração de aproximadamente um minuto:** localizar login, consulta de locações, assinatura e webhook; mostrar sumário, descrição, autenticação, parâmetros e respostas. Abrir a seção de instalação/execução do README. Separar o protocolo [WebSocket do chat](README_Chat_Arquitetura.md) dos endpoints HTTP.
 
-**Como explicar:** “O contrato HTTP tem 106 operações canônicas em 72 caminhos. A CI valida o OpenAPI e um teste exige sumário, descrição, agrupamento e respostas em cada operação. O README explica ambiente e execução; WebSocket e endpoints operacionais têm guias próprios.”
+**Como explicar:** “O contrato HTTP tem 107 operações canônicas em 73 caminhos. A CI valida o OpenAPI e um teste exige sumário, descrição, agrupamento e respostas em cada operação. O README explica ambiente e execução; WebSocket e endpoints operacionais têm guias próprios.”
 
 **Atualização do Swagger em 21/10/2026:** reserva sem preço enviado pelo cliente; OTP e assinatura com `revision_id`; exemplos de aditivo, recorrência, cancelamento e horímetro; respostas JSON antes ausentes agora descritas. O guia inicial explica quais IDs guardar e como trocar de conta. O “Try it out” usa a porta em que a página foi aberta.
 
@@ -128,6 +128,22 @@ Os 514 testes já estão registrados na CI; não é necessário executá-los nov
 
 **Evidência que falta organizar:** uma tabela com sprint oficial, período, migração pertinente, commit/PR e resultado da aplicação. Calcular a proporção de sprints cobertas; não usar o total de migrations como substituto. Corrigir as quatro referências sem commit do inventário antes de incluí-las nessa conta.
 
+## SQL/ORM avançado no painel do locador
+
+**Onde mostrar:** locador em `/dashboard`, filtros **Período** e **Máquina**; Swagger → tag **Painéis** → `GET /api/dashboard/lessor`. No código, [rotina PL/pgSQL](../BackEnd/rentals/migrations/0007_lessor_dashboard_monthly.py), [serviço com consultas agrupadas](../BackEnd/rentals/dashboard.py) e [testes](../BackEnd/rentals/test_dashboard.py).
+
+**Demonstração de aproximadamente dois minutos:**
+
+1. No painel, trocar o período para 12 meses e escolher uma máquina. Abrir a aba de rede e mostrar `months`, `machine` e `time_zone` na chamada.
+2. Mostrar no gráfico de valores os meses sem movimento com zero e o ranking **Máquinas com maior valor concluído**.
+3. Abrir a migração: `generate_series` cria os meses, `GROUP BY` soma valores e média das avaliações, `AT TIME ZONE` separa os meses no fuso de quem consulta.
+4. No serviço, mostrar `values("status").annotate(total=Count("id"))`, que vira `GROUP BY status` e alimenta os cartões e o gráfico **Situação das locações**.
+5. Mostrar o teste em que uma devolução às 23h30 de 31/01 em Brasília conta em janeiro, mas em fevereiro quando o fuso é UTC.
+
+**Como explicar:** “Os indicadores são calculados no PostgreSQL. A série mensal é uma rotina armazenada, a situação e o ranking são consultas agrupadas do ORM, e um índice parcial cobre as locações concluídas usadas na receita. O navegador só desenha o resultado e guarda os filtros por conta.”
+
+**Limite a mencionar:** a rotina é uma `FUNCTION` PL/pgSQL, porque `PROCEDURE` no PostgreSQL não devolve linhas. Valores são brutos por data de término, sem confirmação de repasse. O card **Contratos** continua contado no navegador a partir da lista de locações.
+
 ## Ordem sugerida para a apresentação
 
 | Tempo aproximado | O que apresentar | Mensagem principal |
@@ -138,6 +154,7 @@ Os 514 testes já estão registrados na CI; não é necessário executá-los nov
 | 1 minuto | Swagger, catálogo e README | Contrato de uso e documentação dos serviços |
 | 2 minutos | Grafana e registro de incidente | Detecção, diagnóstico e recuperação |
 | 1 minuto | Migração com preservação de preço | Evolução do banco com dados anteriores |
+| 2 minutos | Filtros do painel, rotina PL/pgSQL e GROUP BY | Indicadores gerenciais calculados no banco |
 | 1 minuto | ADO → commit/PR → CI; pendências | Rastreabilidade atual e limites do escopo |
 
 Ajustar ao tempo autorizado pela banca. As falas podem ser divididas entre os integrantes por domínio de conhecimento; os créditos de implementação devem acompanhar a autoria real dos commits.

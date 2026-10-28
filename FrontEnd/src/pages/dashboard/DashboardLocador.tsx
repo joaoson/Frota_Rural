@@ -1,4 +1,5 @@
-import { useDashboardPreference, searchMapPreference, yearMapPreference, contractPreference } from "@/features/dashboard/hooks/useDashboardPreference";
+import { useDashboardPreference, searchMapPreference, yearMapPreference, contractPreference, overviewPreference } from "@/features/dashboard/hooks/useDashboardPreference";
+import { browserTimeZone, useLessorDashboard } from "@/features/dashboard/hooks/useLessorDashboard";
 import { ContractAmendmentsDialog } from "@/features/contracts/components/ContractAmendmentsPanel";
 import { DashboardCollection, type DashboardView } from "@/features/dashboard/components/DashboardCollection";
 import { isAwaitingPayment, isOpenRental } from "@/features/contracts/types/rentalLifecycle";
@@ -32,8 +33,8 @@ import {
   useReceivedReviews,
   useWrittenReviews,
 } from "@/features/reviews/hooks/useReviews";
-import { averageRating, hasReviewedRental, type Review } from "@/features/reviews/types/review";
-import { ownerSummary, formatCurrency, matchesSearch, yearOptions } from "@/features/dashboard/utils/ownerSummary";
+import { hasReviewedRental, type Review } from "@/features/reviews/types/review";
+import { formatCurrency, matchesSearch, yearOptions } from "@/features/dashboard/utils/ownerSummary";
 import { postingStatusBadge } from "@/features/postings/types/postingBadges";
 import { HttpError } from "@/shared/http/errors";
 import { useUser } from "@/features/users/hooks/useUsers";
@@ -83,6 +84,10 @@ const sidebarItems = [
 ] as const;
 
 type Tab = (typeof sidebarItems)[number]["tab"];
+
+const OVERVIEW_DEFAULT = { months: 6, machine: "" } as const satisfies { months: 3 | 6 | 12; machine: string };
+const OVERVIEW_PERIODS = [3, 6, 12] as const;
+const filterSelectClass = "bg-surface-container border-none rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary text-on-surface min-w-[180px]";
 
 const DashboardLocador = () => {
   const { userId, logout } = useAuth();
@@ -218,10 +223,19 @@ const DashboardLocador = () => {
     setIsEditEquipamentoOpen(true);
   };
 
-  const summary = ownerSummary(rentalsQuery.data ?? [], receivedReviews);
-  const revenueData = summary.months;
-  const ratingsData = summary.months;
-  const ratingAverage = averageRating(receivedReviews);
+  const [overview, setOverview] = useDashboardPreference<{ months: 3 | 6 | 12; machine: string }>(userId, "owner:overview", overviewPreference, OVERVIEW_DEFAULT);
+  // Uma máquina salva que saiu da frota volta para a frota toda, em vez de pedir um 404.
+  const overviewMachine = machines.some((m) => m.id === overview.machine) ? overview.machine : "";
+  const summaryQuery = useLessorDashboard(
+    { months: overview.months, machineId: overviewMachine || undefined, timeZone: browserTimeZone() },
+    Boolean(userId) && Boolean(machinesQuery.isSuccess),
+  );
+  const summary = summaryQuery.data;
+  const machineByPosting = new Map((postingsQuery.data ?? []).map((p) => [p.id, p.machineryId]));
+  const overviewContracts = overviewMachine
+    ? contracts.filter((contract) => machineByPosting.get(contract.source.postingId) === overviewMachine)
+    : contracts;
+  const topRevenue = Math.max(0, ...(summary?.topMachines ?? []).map((m) => m.revenue));
   const [search, setSearch] = useDashboardPreference<Record<string, string>>(userId, "owner:search", searchMapPreference, {});
   const [years, setYears] = useDashboardPreference<Record<string, string>>(userId, "owner:years", yearMapPreference, {});
   const [contractFilter, setContractFilter] = useDashboardPreference<string>(userId, "owner:contracts", contractPreference, "Todos");
@@ -339,7 +353,7 @@ const DashboardLocador = () => {
       accountRole={<span className="capitalize">{user?.role ?? "…"}</span>}
     >
       {(() => {
-        const relevant = tab === "dashboard" ? [rentalsQuery, receivedQuery]
+        const relevant = tab === "dashboard" ? [rentalsQuery, machinesQuery, summaryQuery]
           : tab === "frota" ? [machinesQuery]
           : tab === "anuncios" ? [machinesQuery, postingsQuery]
           : ["reservas", "contratos"].includes(tab) ? [rentalsQuery, givenQuery]
@@ -372,7 +386,7 @@ const DashboardLocador = () => {
       />
 
       {/* Dashboard */}
-      {tab === "dashboard" && !rentalsQuery.isLoading && !receivedQuery.isLoading && !rentalsQuery.isError && !receivedQuery.isError && (
+      {tab === "dashboard" && summary && !rentalsQuery.isLoading && !rentalsQuery.isError && !summaryQuery.isError && (
         <div className="space-y-8">
           <div>
             <h1 className="font-headline text-3xl font-bold text-primary">
@@ -384,29 +398,60 @@ const DashboardLocador = () => {
             </p>
           </div>
 
+          <div role="group" aria-label="Filtros dos indicadores" className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="overview-months" className="text-xs font-bold text-on-surface-variant">Período</label>
+              <select
+                id="overview-months"
+                value={overview.months}
+                onChange={(e) => setOverview((current) => ({ ...current, months: Number(e.target.value) as 3 | 6 | 12 }))}
+                className={filterSelectClass}
+              >
+                {OVERVIEW_PERIODS.map((months) => <option key={months} value={months}>Últimos {months} meses</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="overview-machine" className="text-xs font-bold text-on-surface-variant">Máquina</label>
+              <select
+                id="overview-machine"
+                value={overviewMachine}
+                onChange={(e) => setOverview((current) => ({ ...current, machine: e.target.value }))}
+                className={filterSelectClass}
+              >
+                <option value="">Toda a frota</option>
+                {machines.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {[m.brand, m.model].filter(Boolean).join(" ") || "Máquina"}{m.renagro ? ` · ${m.renagro}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {summaryQuery.isFetching ? <p role="status" className="text-xs text-on-surface-variant sm:pb-3">Atualizando indicadores...</p> : null}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {[
               {
                 label: "LOCAÇÕES EM ABERTO",
-                value: String(activeRentals.length),
+                value: String(summary.totals.openRentals),
                 sub: "pendentes e em andamento",
                 icon: "event_available",
               },
               {
                 label: "CONTRATOS",
-                value: String(contracts.length),
-                sub: `${contracts.filter((contract) => situacaoAssinatura(contract).completo).length} assinados`,
+                value: String(overviewContracts.length),
+                sub: `${overviewContracts.filter((contract) => situacaoAssinatura(contract).completo).length} assinados`,
                 icon: "description",
               },
               {
                 label: "LOCAÇÕES TOTAIS",
-                value: String(rentals.length),
+                value: String(summary.totals.rentals),
                 sub: "incluindo pendentes e canceladas",
                 icon: "inventory_2",
               },
               {
                 label: "LOCAÇÕES CONCLUÍDAS NO MÊS",
-                value: formatCurrency(summary.currentMonthTotal),
+                value: formatCurrency(summary.totals.currentMonthRevenue),
                 sub: new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
                 icon: "payments",
               },
@@ -443,21 +488,21 @@ const DashboardLocador = () => {
                   Valores das Locações Concluídas
                 </h2>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Últimos 6 meses · valor bruto por data de término, sem confirmação de repasse
+                  Últimos {summary.months} meses · valor bruto por data de término, sem confirmação de repasse
                 </p>
               </div>
               <div className="text-right">
                 <div className="text-2xl font-black text-primary">
-                  {formatCurrency(summary.sixMonthTotal)}
+                  {formatCurrency(summary.totals.revenue)}
                 </div>
                 <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                  Total acumulado
+                  Total no período
                 </div>
               </div>
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
+                <AreaChart data={summary.monthly}>
                   <defs>
                     <linearGradient
                       id="colorRevenue"
@@ -518,7 +563,7 @@ const DashboardLocador = () => {
                   />
                   <Area
                     type="monotone"
-                    dataKey="value"
+                    dataKey="revenue"
                     stroke="var(--chart-1)"
                     strokeWidth={2.5}
                     fill="url(#colorRevenue)"
@@ -547,16 +592,16 @@ const DashboardLocador = () => {
                   size={16}
                 />
                 <span className="font-black text-secondary text-sm">
-                  {ratingAverage == null ? "Sem avaliações" : ratingAverage.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  {summary.totals.averageRating == null ? "Sem avaliações" : summary.totals.averageRating.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
                 </span>
                 <span className="text-[10px] font-bold text-on-surface-variant uppercase">
-                  média
+                  média no período
                 </span>
               </div>
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ratingsData}>
+                <BarChart data={summary.monthly}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="var(--outline-variant)"
@@ -604,6 +649,63 @@ const DashboardLocador = () => {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <section aria-labelledby="status-breakdown-title" className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
+              <h2 id="status-breakdown-title" className="font-headline text-lg font-bold text-on-surface">
+                Situação das locações
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5 mb-4">
+                Todas as datas · {summary.totals.rentals} {summary.totals.rentals === 1 ? "locação" : "locações"}
+              </p>
+              <div className="h-64" aria-hidden="true">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={summary.statusBreakdown} layout="vertical" margin={{ left: 8, right: 16 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--outline-variant)" opacity={0.3} horizontal={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12, fill: "var(--on-surface-variant)" }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="label" width={140} tick={{ fontSize: 12, fill: "var(--on-surface-variant)" }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(value) => [String(value), "Locações"]}
+                      contentStyle={{ borderRadius: 12, border: "1px solid var(--outline-variant)", background: "var(--popover)", color: "var(--popover-foreground)", fontSize: 13 }}
+                      labelStyle={{ color: "var(--popover-foreground)" }}
+                      itemStyle={{ color: "var(--popover-foreground)" }}
+                    />
+                    <Bar dataKey="total" fill="var(--chart-3)" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="sr-only">
+                {summary.statusBreakdown.map((row) => <li key={row.status}>{row.label}: {row.total}</li>)}
+              </ul>
+            </section>
+
+            <section aria-labelledby="top-machines-title" className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 shadow-sm">
+              <h2 id="top-machines-title" className="font-headline text-lg font-bold text-on-surface">
+                Máquinas com maior valor concluído
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5 mb-4">Últimos {summary.months} meses</p>
+              {summary.topMachines.length === 0 ? (
+                <p className="text-sm text-on-surface-variant">Nenhuma locação concluída no período.</p>
+              ) : (
+                <ol className="space-y-4">
+                  {summary.topMachines.map((m, index) => (
+                    <li key={m.machineId}>
+                      <div className="flex justify-between gap-3 text-sm">
+                        <span className="font-bold text-on-surface">{index + 1}. {m.name || "Máquina"}</span>
+                        <span className="font-bold text-primary">{formatCurrency(m.revenue)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-surface-container mt-1.5" aria-hidden="true">
+                        <div className="h-2 rounded-full bg-primary" style={{ width: `${topRevenue > 0 ? (m.revenue / topRevenue) * 100 : 0}%` }} />
+                      </div>
+                      <div className="text-xs text-on-surface-variant mt-1">
+                        {m.completedRentals} {m.completedRentals === 1 ? "locação concluída" : "locações concluídas"}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           </div>
 
           <div>

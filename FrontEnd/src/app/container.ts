@@ -6,6 +6,8 @@ import { HttpAuthRepository } from "@/features/auth/api/AuthRepository";
 import { AuthStore } from "@/features/auth/api/AuthStore";
 import { HttpContractRepository } from "@/features/contracts/api/ContractRepository";
 import { ContractStore } from "@/features/contracts/api/ContractStore";
+import { HttpDashboardRepository } from "@/features/dashboard/api/DashboardRepository";
+import { DashboardStore } from "@/features/dashboard/api/DashboardStore";
 import { HttpReviewRepository } from "@/features/reviews/api/ReviewRepository";
 import { ReviewStore } from "@/features/reviews/api/ReviewStore";
 import { HttpDocumentRepository } from "@/features/documents/api/DocumentRepository";
@@ -78,6 +80,7 @@ const stores = {
   moderation: new ModerationStore(new HttpModerationRepository(httpClient), queryClient),
   documents: new DocumentStore(new HttpDocumentRepository(httpClient), queryClient),
   contracts: new ContractStore(new HttpContractRepository(httpClient), queryClient),
+  dashboard: new DashboardStore(new HttpDashboardRepository(httpClient), queryClient),
   reviews: new ReviewStore(new HttpReviewRepository(httpClient), queryClient),
 } as const;
 
@@ -93,6 +96,7 @@ export const {
   moderation: moderationStore,
   documents: documentStore,
   contracts: contractStore,
+  dashboard: dashboardStore,
   reviews: reviewStore,
 } = stores;
 

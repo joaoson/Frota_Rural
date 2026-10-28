@@ -80,7 +80,7 @@ Os itens abaixo mantêm a estimativa conservadora de 14/10 quando não houve nov
 | Modelagem de requisitos por sprint | 1,00 | Não contabilizado | 0,00 | Mostrar BDD/especificações e sua aplicação em 30%, 50% ou pelo menos 80% das sprints |
 | Processo de qualidade por sprint | 1,00 | Não contabilizado | 0,00 | Relacionar plano de testes, revisões e resultados às mesmas proporções de sprints; CI verde atual não determina essa frequência |
 | Figma e usabilidade | 1,50 | Não contabilizado | 0,00 | Apresentar Figma; para 60%, checklist aplicado; para 100%, também teste filmado com feedback |
-| SQL/ORM avançado | 1,50 | 60% | 0,90 | Demonstrar constraints/índices e triggers; para o terceiro item, uma consulta agrupada executada pelo dashboard. Agregação somente no frontend não comprova grouped query SQL/ORM |
+| SQL/ORM avançado | 1,50 | **100%** (era 60%) | 1,50 | Três itens demonstráveis: (a) o painel do locador lê `GET /api/dashboard/lessor`, com GROUP BY na rotina e no ORM; (b) constraints/índices únicos já existentes; (c) rotina PL/pgSQL `lessor_dashboard_monthly`, triggers append-only e índice parcial. Ver [atualização abaixo](#atualização-painel-agregado-no-banco) |
 | NoSQL avançado | 1,50 | Não contabilizado | 0,00 | Redis para canais/cache não comprova o conjunto JSON Schema, índices e sharding/agregações da rubrica |
 | Microsserviços | 1,50 | Não contabilizado | 0,00 | Descrever corretamente o monólito modular; containers PostgreSQL/Redis não são serviços de negócio independentes |
 | Service Discovery e API Gateway | 1,00 | Não contabilizado | 0,00 | Fora da arquitetura demonstrada; não apresentar proxy ou URLs configuradas como discovery |
@@ -94,6 +94,20 @@ Os itens abaixo mantêm a estimativa conservadora de 14/10 quando não houve nov
 | Modelo de imagem CNH | 1,50 | 60% | 0,90 | Mostrar treinamento TensorFlow e integração. Classificação de imagem não equivale a autenticação documental nem a múltiplos agentes |
 | Pagamento sandbox completo | 1,50 | Não contabilizado | 0,00 | Gravar Checkout → evento Stripe → webhook → pagamento persistido. Testes com provedor simulado e recorrência de reservas não comprovam pagamento agendado |
 
+## Atualização: painel agregado no banco
+
+Depois da CI acima, o painel do locador deixou de agrupar locações e avaliações no navegador. A evidência do item SQL/ORM é:
+
+| Item da rubrica | Onde está | Como comprovar |
+| --- | --- | --- |
+| a) Consultas agrupadas no dashboard | [rentals/dashboard.py](../BackEnd/rentals/dashboard.py): `values("status").annotate(Count)` e ranking de máquinas com `annotate(Sum, Count)`; série mensal com `GROUP BY` dentro da rotina. Tela: [DashboardLocador.tsx](../FrontEnd/src/pages/dashboard/DashboardLocador.tsx), filtros de período e máquina salvos por conta | Abrir `/dashboard`, trocar período/máquina e mostrar a chamada `GET /api/dashboard/lessor` no navegador ou no Swagger (tag **Painéis**) |
+| b) Índices para regras de negócio | Constraints únicas existentes, por exemplo `unique_recurrence_occurrence`, `unique_signature_per_revision_role` e `unique_contract_revision_number` | Mostrar as constraints no model e na migração. Já contavam na avaliação de 14/10; não há teste dedicado de duplicidade para essas três |
+| c) Recursos específicos do PostgreSQL | Rotina PL/pgSQL `lessor_dashboard_monthly` com `generate_series`, `AT TIME ZONE` e validação por `RAISE EXCEPTION`; índice parcial `rentals_finished_end_idx`; triggers append-only de assinaturas e revisões | [Migração 0007](../BackEnd/rentals/migrations/0007_lessor_dashboard_monthly.py), [testes da rotina e do endpoint](../BackEnd/rentals/test_dashboard.py) e [teste de rollback](../BackEnd/api/test_migration_upgrade.py) |
+
+No PostgreSQL, uma rotina que devolve linhas é uma `FUNCTION`; `CREATE PROCEDURE` não devolve conjunto de resultados ao chamador. Se o professor exigir literalmente `PROCEDURE`, confirmar antes de apresentar a rotina como *stored procedure*.
+
+Medição local desta mudança, ainda não executada pela CI: 535 testes backend aprovados com **91,70%** combinado; 173 testes frontend com 52,30% das linhas; OpenAPI com **107 operações em 73 caminhos**, validado sem avisos; Playwright do painel aprovado em Chromium, Firefox e WebKit. Usar os números da CI acima até uma nova execução publicar os artefatos.
+
 ## Pontuação e prioridades
 
 Usando a mesma soma simples da avaliação anterior, com **linhas** como métrica de cobertura frontend:
@@ -101,12 +115,12 @@ Usando a mesma soma simples da avaliação anterior, com **linhas** como métric
 | Componente | Antes | Agora |
 | --- | ---: | ---: |
 | Seis critérios priorizados | 1,80 | 4,90 |
-| Demais opcionais mantidos | 5,25 | 5,25 |
-| Soma bruta dos opcionais considerados | **7,05** | **10,15** |
+| Demais opcionais mantidos | 5,25 | 5,85 |
+| Soma bruta dos opcionais considerados | **7,05** | **10,75** |
 | Obrigatórios, somente se todos aceitos | 2,50 | 2,50 |
-| Soma bruta condicionada | 9,55 | 12,65 |
+| Soma bruta condicionada | 9,55 | 13,25 |
 
-O ganho estimado é **3,10 pontos nos opcionais**. **12,65 não é uma nota final**: a soma depende dos critérios escolhidos e da fórmula/teto da planilha oficial, ausentes no CSV. Se forem aceitos a soma simples e o teto 10 usados anteriormente, há margem para esse teto, condicionada aos obrigatórios e ao aceite das evidências. Se cobertura frontend for avaliada pelo menor percentual entre métricas, a soma dos opcionais cai para 9,85.
+O ganho estimado é **3,70 pontos nos opcionais**, dos quais 0,60 vem do SQL/ORM a 100%. **13,25 não é uma nota final**: a soma depende dos critérios escolhidos e da fórmula/teto da planilha oficial, ausentes no CSV. Se forem aceitos a soma simples e o teto 10 usados anteriormente, há margem para esse teto, condicionada aos obrigatórios e ao aceite das evidências. Se cobertura frontend for avaliada pelo menor percentual entre métricas, a soma dos opcionais cai para 10,45.
 
 Prioridades para a defesa:
 

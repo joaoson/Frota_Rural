@@ -3,6 +3,7 @@ from django.urls import path
 from api.recurrence_views import recurrence_create, recurrence_preview
 from rentals.views import (
     BookingPolicyView,
+    LessorDashboardView,
     MachineUsageView,
     RentalCompleteView,
     RentalDetailView,
@@ -24,4 +25,5 @@ urlpatterns = [
     path("rentals/<uuid:pk>/meter-readings", RentalMeterReadingsView.as_view(), name="rental_meter_readings"),
     path("rentals/<uuid:pk>/complete", RentalCompleteView.as_view(), name="rental_complete"),
     path("machines/<uuid:pk>/usage", MachineUsageView.as_view(), name="machine_usage"),
+    path("dashboard/lessor", LessorDashboardView.as_view(), name="lessor_dashboard"),
 ]

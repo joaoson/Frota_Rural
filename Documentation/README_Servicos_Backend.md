@@ -55,6 +55,17 @@ A suíte [test_documented_examples.py](../BackEnd/common/tests/test_documented_e
 
 Verificação de 21/10/2026: **21 testes aprovados** entre contrato OpenAPI, exemplos e regressões de horímetro; geração do schema sem avisos. Essa evidência cobre os fluxos descritos acima, não a execução manual de todas as 106 operações. Na apresentação, mostre o teste, o exemplo no Swagger e o resultado; identifique os registros de demonstração como fictícios.
 
+## Painel do locador
+
+`GET /api/dashboard/lessor` devolve os indicadores do painel já agregados no PostgreSQL: série mensal de valores concluídos e avaliações recebidas (rotina `lessor_dashboard_monthly`, meses sem movimento com zero), contagem por status e as cinco máquinas com maior valor concluído. Somente locadores; `machine` precisa ser uma máquina própria.
+
+```bash
+curl "$API_URL/dashboard/lessor?months=12&time_zone=America/Sao_Paulo" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+`months` aceita 1 a 24 (padrão 6). `time_zone` é um fuso IANA e decide em que mês cai uma devolução perto da meia-noite.
+
 ## Gerar e validar
 
 No container backend, execute:

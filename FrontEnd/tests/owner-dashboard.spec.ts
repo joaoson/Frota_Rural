@@ -77,3 +77,22 @@ test('editing a fleet machine persists optional fields and refreshes the cached 
   expect(saved.status()).toBe(200);
   expect(await saved.json()).toEqual(expect.objectContaining({ model: '6110J Revisado', year: null, usage_purpose: 'trator' }));
 });
+
+test('owner dashboard indicators come from the database and follow the saved period and machine filters', async ({ page, data }) => {
+  await loginViaAPI(page.context(), data.owner);
+  const summaries: URL[] = [];
+  page.on('request', (request) => { if (request.url().includes('/dashboard/lessor')) summaries.push(new URL(request.url())); });
+  await page.goto('/dashboard');
+  const ranking = page.getByRole('region', { name: 'Máquinas com maior valor concluído' });
+  await expect(ranking.getByText('1. John Deere 6110J', { exact: true })).toBeVisible();
+  await expect(ranking.getByText(/R\$\s4\.321,00/)).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Situação das locações' }).getByText('Concluída: 1', { exact: true })).toBeAttached();
+  await page.getByLabel('Máquina', { exact: true }).selectOption(data.machines[1]);
+  await expect(ranking.getByText('Nenhuma locação concluída no período.', { exact: true })).toBeVisible();
+  expect(summaries.at(-1)?.searchParams.get('machine')).toBe(data.machines[1]);
+  await page.getByLabel('Período', { exact: true }).selectOption('12');
+  await expect.poll(() => summaries.at(-1)?.searchParams.get('months')).toBe('12');
+  await page.reload();
+  await expect(page.getByLabel('Período', { exact: true })).toHaveValue('12');
+  await expect(page.getByLabel('Máquina', { exact: true })).toHaveValue(data.machines[1]);
+});

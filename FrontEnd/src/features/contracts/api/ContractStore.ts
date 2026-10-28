@@ -1,5 +1,6 @@
 import type { AmendmentInput, AmendmentDecision, CancellationQuote } from "../types/management";
 import { notificationKeys } from "@/features/notifications/api/NotificationStore";
+import { dashboardKeys } from "@/features/dashboard/api/DashboardStore";
 import type { QueryClient, UseQueryOptions } from "@tanstack/react-query";
 
 import type { ContratoData } from "../types/contractDocument";
@@ -179,7 +180,11 @@ export class ContractStore {
   }
 
   async invalidateRentals(): Promise<void> {
-    await this.queryClient.invalidateQueries({ queryKey: contractKeys.rentals() });
+    // Os indicadores do painel são agregados das mesmas locações.
+    await Promise.all([
+      this.queryClient.invalidateQueries({ queryKey: contractKeys.rentals() }),
+      this.queryClient.invalidateQueries({ queryKey: dashboardKeys.all }),
+    ]);
   }
 
   clear(): void {

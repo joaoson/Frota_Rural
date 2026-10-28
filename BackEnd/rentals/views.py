@@ -10,10 +10,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.schemas import error_response, error_responses
+from rentals.dashboard import LessorDashboardFilterSerializer, LessorDashboardService
 from rentals.meter import MeterReadingInputSerializer, MeterService
 from rentals.schema import (
-    BookingPolicyOutputSerializer, MachineUsageOutputSerializer, MeterRecordOutputSerializer,
-    RentalCompleteInputSerializer, RentalCreateInputSerializer, RentalUpdateInputSerializer,
+    BookingPolicyOutputSerializer, LessorDashboardOutputSerializer, MachineUsageOutputSerializer,
+    MeterRecordOutputSerializer, RentalCompleteInputSerializer, RentalCreateInputSerializer,
+    RentalUpdateInputSerializer,
 )
 from rentals.serializer import (
     RentalFilterSerializer,
@@ -242,6 +244,63 @@ class MachineUsageView(APIView):
     )
     def get(self, request: Request, pk: UUID) -> Response:
         return Response(MeterService.machine_usage(pk, user=request.user), status=status.HTTP_200_OK)
+
+
+LESSOR_DASHBOARD_EXAMPLE = {
+    "period": {"months": 3, "start": "2026-08-01", "end": "2026-10-21", "time_zone": "America/Sao_Paulo"},
+    "machine": None,
+    "totals": {
+        "revenue": "7560.00", "current_month_revenue": "2520.00", "completed_rentals": 3,
+        "reviews": 2, "average_rating": "4.50", "open_rentals": 2, "rentals": 6,
+    },
+    "monthly": [
+        {"month": "2026-08-01", "revenue": "0.00", "completed_rentals": 0, "reviews": 0, "average_rating": None},
+        {"month": "2026-09-01", "revenue": "5040.00", "completed_rentals": 2, "reviews": 1, "average_rating": "5.00"},
+        {"month": "2026-10-01", "revenue": "2520.00", "completed_rentals": 1, "reviews": 1, "average_rating": "4.00"},
+    ],
+    "status_breakdown": [
+        {"status": "pending", "label": "Pendente", "total": 1},
+        {"status": "awaiting_payment", "label": "Aguardando pagamento", "total": 0},
+        {"status": "active", "label": "Ativa", "total": 0},
+        {"status": "signed", "label": "Assinada", "total": 1},
+        {"status": "completed", "label": "Concluída", "total": 3},
+        {"status": "closed", "label": "Encerrada", "total": 0},
+        {"status": "cancelled", "label": "Cancelada", "total": 1},
+    ],
+    "top_machines": [
+        {"machine": "6d1f2c4e-8b7a-4f3e-9c21-5a0b7e3d9f10", "name": "John Deere 6110J",
+         "completed_rentals": 2, "revenue": "5040.00"},
+        {"machine": "0b9e7a52-3c4d-4e8f-a1b2-c3d4e5f60718", "name": "John Deere 6125J",
+         "completed_rentals": 1, "revenue": "2520.00"},
+    ],
+}
+
+
+class LessorDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["Painéis"],
+        summary="Indicadores do painel do locador",
+        description=(
+            "Série mensal de valores concluídos e avaliações recebidas, calculada pela rotina armazenada "
+            "`lessor_dashboard_monthly` do PostgreSQL no fuso informado, com zero nos meses sem movimento. "
+            "Situação das locações e máquinas de maior valor vêm de consultas agrupadas. Somente locadores; "
+            "`machine` restringe os indicadores a uma máquina própria. Valores brutos, sem confirmação de repasse."
+        ),
+        parameters=[LessorDashboardFilterSerializer],
+        examples=[OpenApiExample("Frota com dois tratores", value=LESSOR_DASHBOARD_EXAMPLE, response_only=True)],
+        responses={
+            200: LessorDashboardOutputSerializer,
+            400: error_response(400, "Período fora de 1 a 24 meses, máquina ou fuso inválido."),
+            401: error_response(401),
+            403: error_response(403, "Somente locadores consultam o painel."),
+            404: error_response(404, "Máquina não encontrada."),
+        },
+    )
+    def get(self, request: Request) -> Response:
+        summary = LessorDashboardService.summary(request.query_params, user=request.user)
+        return Response(LessorDashboardOutputSerializer(summary).data, status=status.HTTP_200_OK)
 
 
 class RentalCancellationView(APIView):
