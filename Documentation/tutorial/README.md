@@ -85,3 +85,9 @@ O código desta pasta é material para implementar à mão. Atualizar os guias n
 | [Users — perfil existente](modelos/users.md) |
 
 Operadores são `Users` com outro papel e empregador. Conversas são derivadas de `Messages`; não há model `Conversation`. Tabelas internas do Django não fazem parte dos 26 modelos de negócio listados.
+
+## Validação desta revisão
+
+O exemplo de usuários dos guias 01/02/04 foi aplicado em cópia temporária: 7 testes de backend passaram (incluindo FK, GET, UUID inválido e autorização), 3 testes de frontend passaram (salvar/reabrir, falha de catálogo e falha de gravação), além de TypeScript e lint dos arquivos alterados. O banco de testes foi removido ao terminar. Os outros 25 guias tiveram seus caminhos e pontos de integração revisados; suas adaptações não foram executadas como funcionalidades completas.
+
+Sua implementação e o banco `frota_rural_autoria` foram preservados para a prática.
