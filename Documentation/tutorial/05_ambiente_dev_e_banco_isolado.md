@@ -55,6 +55,24 @@ python3 Devops/dev.py down --mode local --project frota-autoria --port-offset 10
 
 Se já iniciou a opção A, execute o `down` acima antes. Os dados serão reutilizados.
 
+Atalho para uma nova sessão, depois da instalação inicial abaixo:
+
+```bash
+# Na raiz do repositório.
+docker start frota-autoria-db-1
+cd BackEnd
+source .venv/bin/activate
+source ../Devops/autoria.env.sh
+python manage.py verify_database
+# Comandos do exercício, por exemplo:
+python manage.py makemigrations
+python manage.py migrate
+# Apenas se a API ainda não estiver rodando na porta 8010:
+python manage.py runserver 127.0.0.1:8010
+```
+
+`Devops/autoria.env.sh` contém somente a configuração local de ensaio. Ele substitui os exports manuais do passo 3 e deve ser carregado em cada terminal usado para comandos Django. Não é necessário executar migrations antes de começar a editar; o exemplo acima mostra como aplicar suas próximas mudanças.
+
 ### 1 Subir somente o banco
 
 Na raiz do repositório:

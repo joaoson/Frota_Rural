@@ -1,0 +1,34 @@
+# Local rehearsal only. From BackEnd/: source ../Devops/autoria.env.sh
+# PostgreSQL: frota-autoria-db-1, persistent volume frota-autoria_postgres_data.
+export DJANGO_LOAD_ENV_FILES=false
+export DATABASE_URL=''
+export DB_SCHEMA=''
+export DB_SSLROOTCERT=''
+export DB_SSLMODE=disable
+export DB_HOST=127.0.0.1
+export DB_PORT=5442
+export DB_NAME=frota_rural
+export DB_USER=postgres
+export DB_PASSWORD=postgres
+export DJANGO_DEBUG=true
+export DJANGO_SECRET_KEY=django-insecure-autoria-local-rehearsal-only-key
+export DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+export CHANNEL_LAYER_BACKEND=memory
+export FRONTEND_URL=http://localhost:5183
+export AUTH_REFRESH_COOKIE_NAME=frota-autoria_refresh
+export SESSION_COOKIE_NAME=frota-autoria_session
+export CSRF_COOKIE_NAME=frota-autoria_csrf
+export CONTRACT_SIGNATURE_REQUIRE_OTP=false
+export STRIPE_SECRET_KEY=''
+export STRIPE_WEBHOOK_SECRET=''
+export RESEND_API_KEY=''
+export FIREBASE_CREDENTIALS_FILE=''
+export FIREBASE_STORAGE_BUCKET=''
+export GROQ_API_KEY=''
+export GEMINI_API_KEY=''
+export ANTHROPIC_API_KEY=''
+export METRICS_TOKEN=''
+export METRICS_TOKEN_FILE=''
+export AUTORIA_API=http://localhost:8010/api
+export VITE_API_BASE_URL=http://localhost:8010/api
+export VITE_WS_BASE_URL=ws://localhost:8010
