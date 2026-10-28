@@ -71,3 +71,15 @@ it("applies a single page-size limit across grouped rentals", () => {
   expect(screen.queryByRole("heading", { name: "Em andamento" })).toBeNull();
   expect(screen.getAllByRole("article")).toHaveLength(6);
 });
+
+it("hides the toolbar and pins the default view when showToolbar is false", () => {
+  const { container, rerender } = render(collection());
+  fireEvent.click(screen.getByRole("button", { name: "Lista" }));
+  expect(container.querySelector("section")?.getAttribute("data-view")).toBe("list");
+  rerender(<DashboardCollection label="Frota" items={items.slice(0, 1)} showToolbar={false} defaultView="grid" renderItem={renderItem} />);
+  expect(screen.queryByRole("group", { name: "Visualização" })).toBeNull();
+  expect(screen.queryByLabelText("Itens por página")).toBeNull();
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(container.querySelector("section")?.getAttribute("data-view")).toBe("grid");
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+});
