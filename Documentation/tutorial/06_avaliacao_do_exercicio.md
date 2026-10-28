@@ -15,7 +15,9 @@ Branch `codex/autoria-pratica`; banco consultado: `frota_rural_autoria`. Avalia�
 1. `BackEnd/users/serializer.py:77`: `UserUpdateInputSerializer.Meta.fields = PROFILE_FIELDS` não contém `categoria_autoria`. O serializer aceita o JSON, mas `validated_data` fica vazio quando só esse campo é enviado. Um HTTP 200, sozinho, não comprova gravação.
 2. `BackEnd/autoria/serializers.py:14`: `source="Genero"` gera a chave `Genero`; a FK de `Users` se chama `categoria_autoria`. Se mantiver esse serializer auxiliar, trocar para `source="categoria_autoria"`.
 3. `BackEnd/autoria/serializers.py:28`: `source="Genero.Genero"` não existe em `Users`. O caminho é `source="categoria_autoria.Genero"`. Com uma categoria atribuída apenas em memória, o serializer atual devolveu `categoria_nome: null`.
-4. O catálogo atual devolve `{id, Genero}`; o componente antigo esperava `{id, nome}`. O guia 01 normaliza a saída para `nome`.
+4. O catálogo atual devolve `{id, Genero}`. O padrão dos guias novos é `{id, nome}`. Você tem duas saídas:
+   - No front, faça o Zod do catálogo ler `{ id, Genero }`.
+   - No `CategoriaOutputSerializer`, exponha `nome = serializers.CharField(source="Genero", read_only=True)` e use `fields = ["id", "nome"]`.
 
 ## O que está correto
 
@@ -34,9 +36,11 @@ GET /api/autoria/categorias                  → rota registrada
 
 ## Continuar daqui
 
-1. [Guia 01](01_api_services_e_rotas.md): ajustar somente a saída do catálogo.
-2. [Guia 02](02_frontend_repository_store_componente.md): criar seletor compartilhado.
-3. [Guia 04](04_usuarios_pelo_fluxo_existente.md): ligar ao `UserService.update`, `UserRepository.updateProfile` e `AccountSection` existentes.
-4. [Guia 03](03_validacao_e_erros.md): salvar, consultar a FK, recarregar a tela e testar ID inexistente/permissões.
+O seu ensaio é o mesmo caso do [guia de usuários](modelos/users.md) (Minha Conta), trocando `PortePropriedade`/`porte_propriedade` por `Genero`/`categoria_autoria`. A diferença é que a sua tabela mora no app `autoria`.
+
+1. **Serializers** (`users/serializer.py`): passo 3 do guia de usuários. `"categoria_autoria"` entra em `UserUpdateInputSerializer.Meta.fields`, e `categoria_nome = serializers.CharField(source="categoria_autoria.Genero", read_only=True, allow_null=True)` + os dois campos entram em `UserOutputSerializer`.
+2. **Catálogo:** a rota `GET /api/autoria/categorias` já existe. Siga o passo 8 do guia de usuários apontando para ela.
+3. **Front e Minha Conta:** passos 6, 7 e 10 do guia de usuários (Zod, mapper, `AccountSection`).
+4. **Comprovar:** [checklist](03_validacao_e_erros.md#checklist-da-defesa): salvar, consultar a FK, recarregar a tela e testar um ID inexistente.
 
 A revisão não alterou seus arquivos de implementação nem gravou dados do exercício.

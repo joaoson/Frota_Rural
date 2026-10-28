@@ -1,93 +1,96 @@
-# Tutorial do teste de autoria
+# Tutorial da defesa — alteração individual
 
-**Nova tabela + três registros → componente → FK em tabela existente → dado persistido exibido após F5.**
+Na defesa, cada integrante recebe um pedido diferente, sempre com esta estrutura:
 
-Base: branch `codex/autoria-pratica`, código revisado em 28/10/2026. Seu ensaio utiliza `autoria.Genero` e `Users.categoria_autoria`. Os exemplos continuam com esses nomes; adaptar o domínio ao enunciado recebido.
+| O professor pede | O que isso vira no código | Passos da receita |
+| --- | --- | --- |
+| **Banco:** criar uma tabela nova e inserir 3 registros | `class NovaTabela(models.Model)` + migration de dados | 1 e 3 |
+| **Persistência e relacionamento:** gravar numa tabela existente o ID de um registro da tabela nova | FK `models.ForeignKey(NovaTabela, ...)` no model existente + o campo no serializer de entrada | 2 e 4 |
+| **Front-end:** um componente que use os registros da tabela nova | `GET` do catálogo + `<select>` no formulário da tela | 5, 6, 9 e 10 |
+| **Exibição:** mostrar um dado persistido | campo `<fk>_nome` no serializer de saída → Zod → mapper → tela, comprovado com F5 | 4, 7, 8 e 11 |
 
-## Continuar seu exercício
+> Exemplo: "Em máquina, adicione um dropdown com 3 tipos de pneu". Você cria a tabela `tipos_pneu`, insere Radial/Diagonal/Alta flutuação, cria `machines.tipo_pneu_id`, põe o select no cadastro de máquina e mostra "Pneu: Radial" na frota.
 
-1. [Avaliação do que você já implementou](06_avaliacao_do_exercicio.md).
-2. [Ajustar a saída do catálogo existente](01_api_services_e_rotas.md).
-3. [Criar hook e seletor compartilhados](02_frontend_repository_store_componente.md).
-4. [Usuários: alterações exatas no fluxo existente](04_usuarios_pelo_fluxo_existente.md).
-5. [Validar API, banco e tela](03_validacao_e_erros.md).
+## Como usar no dia
 
-Você já criou a tabela, os três registros e a FK. O [guia 00](00_tabela_e_tres_registros.md) serve para conferir isso ou criar outra tabela durante a defesa.
+1. **Ache a tela** do pedido na tabela abaixo e abra o guia dela.
+2. **Troque os nomes** do exemplo pelos do pedido, com a [tabela de nomes](01_receita_geral.md#2-escolher-os-nomes). Ex.: `TipoPneu` → `Combustivel`, `tipos_pneu` → `combustiveis`, `tipo_pneu` → `combustivel`.
+3. **Siga os passos na ordem:** backend → migrations → teste no Swagger → frontend → F5.
+4. **Comprove** com o [checklist](03_validacao_e_erros.md#checklist-da-defesa): SQL das 3 linhas, SQL da FK, tela depois do F5.
 
-```text
-CategoriaSelect → GET /api/autoria/categorias → CategoriaAutoriaService.listar
-Minha Conta → useUpdateProfile → UserStore → UserRepository.updateProfile
-PATCH /api/users/<id> → UserDetailView → UserService.update
-UserUpdateInputSerializer.save() → users.categoria_autoria_id
-GET /api/users/<id> → UserOutputSerializer → Zod → mapper → tela
-```
+Se travar, veja os [erros comuns](03_validacao_e_erros.md#erros-comuns).
+
+## Guias por tela
+
+Cada guia traz um pedido de exemplo **já aplicado e testado** numa cópia limpa do código (migrations, API, tela com F5 e testes unitários). Ele mostra o arquivo, a linha, o código para colar e os testes que precisam de ajuste.
+
+| Tela do sistema | Rota | Model | Guia | Exemplo do guia |
+| --- | --- | --- | --- | --- |
+| Cadastro de máquina / Minha frota / Editar máquina | `/dashboard/novo-equipamento`, `/dashboard?tab=frota` | `Machines` | **[Exemplo completo](02_exemplo_maquina_tipo_pneu.md)** | Tipo de pneu |
+| Novo anúncio / Gerenciar anúncio / Página do anúncio | `/dashboard/novo-anuncio`, `/dashboard/gerenciar-anuncio/<id>`, `/anuncio/<id>` | `Postings` | [postings.md](modelos/postings.md) | Modalidade de entrega |
+| Reserva de máquina / card da locação | `/reservar/<id>`, aba Locações | `Rentals` | [rentals.md](modelos/rentals.md) | Tipo de cultura |
+| Cadastro de conta / Minha Conta | `/signup`, aba Minha Conta | `Users` | [users.md](modelos/users.md) | Porte da propriedade |
+| Cadastro de operador | `/dashboard?tab=operadores` | `Users` (papel operador) | [operators.md](modelos/operators.md) | Função do operador |
+| Avaliação de locação | card de locação concluída, aba Avaliações | `Reviews` | [reviews.md](modelos/reviews.md) | Critério da avaliação |
+| Envio de CNH | `/document/cnh`, aba Documentos | `OperatorLicense` | [operator_licenses.md](modelos/operator_licenses.md) | Tipo de vínculo |
+| Envio de certificação | `/document/certification`, aba Documentos | `Certification` | [certifications.md](modelos/certifications.md) | Área da certificação |
+
+**Comece pelo [exemplo completo](02_exemplo_maquina_tipo_pneu.md).** Ele explica o porquê de cada passo; os outros guias só apontam onde mudar.
+
+### Modelos sem tela de cadastro própria
+
+Estes registros são criados pelo sistema (pagamento, assinatura, chat, moderação), e não por um formulário. É improvável que caiam na defesa. Se cair, aplique a [receita](01_receita_geral.md):
+
+1. **Origem do ID:** um select numa tela que já existe. Por exemplo, o perfil em Minha Conta, como no [guia de usuários](modelos/users.md).
+2. **Gravação:** passe o ID no ponto de criação abaixo.
+3. **Exibição:** o OutputSerializer dessa entidade.
+
+| Model | Onde o registro nasce |
+| --- | --- |
+| `Contracts` | `BackEnd/contracts/services.py:73` → `create_for_rental` |
+| `ContractSignatureOtps` | `BackEnd/contracts/services.py:221` → `request_otp` |
+| `ContractSignatures`, `ContractRevisions`, `ContractAmendments` | `BackEnd/contracts/models.py` (linhas 114, 54, 201) + services de `contracts` |
+| `Messages` | `BackEnd/chat/services.py:109` → `create_message` (tela `/mensagens`) |
+| `MessageReports` | `BackEnd/chat/services.py:434` → `report_message` (denúncia no chat) |
+| `Payments` / `PaymentEvents` | `BackEnd/payments/services.py:172` → `_new_attempt` / `:297` → `handle_webhook` |
+| `Refunds` / `RefundAttempts` | `BackEnd/payments/models.py` (linhas 67 e 83) + cancelamento em `rentals/cancellation.py` |
+| `PostingsPhotos` | `BackEnd/postings/services.py:174` → `_save_photo` |
+| `PostingModeration` | `BackEnd/administration/services.py:100` → `PostingModerationService` |
+| `PricingSuggestions` / `MachineValuations` | `BackEnd/pricing/models.py` (linhas 74 e 27) + `pricing/services.py` |
+| `Notification` | `BackEnd/notifications/models.py:25` + `notifications/services.py` |
+| `PasswordResets` | `BackEnd/authentication/services.py:78` → `request_reset` |
+| `RentalMeterReadings` | `BackEnd/rentals/models.py:83` + `rentals/meter.py` |
+| `RentalRecurrence` | `BackEnd/api/models.py:24` + `api/recurrence_views.py` |
+
+## Arquivos desta pasta
+
+| Arquivo | Para que serve |
+| --- | --- |
+| [01_receita_geral.md](01_receita_geral.md) | A receita de 11 passos com nomes genéricos, para qualquer tela |
+| [02_exemplo_maquina_tipo_pneu.md](02_exemplo_maquina_tipo_pneu.md) | Exemplo completo, linha a linha |
+| [03_validacao_e_erros.md](03_validacao_e_erros.md) | Como comprovar cada requisito, erros comuns e testes |
+| [05_ambiente_dev_e_banco_isolado.md](05_ambiente_dev_e_banco_isolado.md) | Banco isolado e Django nativo para ensaiar |
+| [06_avaliacao_do_exercicio.md](06_avaliacao_do_exercicio.md) | Avaliação do seu ensaio (`autoria.Genero` em `Users`) |
+| [modelos/](modelos/) | Um guia por tela de cadastro |
+
+## Sobre as linhas
+
+- Os números se referem ao código **original** do commit `0ca8c7e` (branch `develop_joaofre_locacoes_integradas`, PR para `develop`).
+- Cada passo diz "depois da linha N" **e** mostra o texto daquela linha (a âncora). Se você já colou algo antes no mesmo arquivo, os números andam; procure a âncora com `Ctrl+F`.
+- "Trocar a linha N por" significa substituir a linha inteira. "Colar" significa inserir sem apagar nada.
+- Na sua cópia local, `BackEnd/users/models.py`, `djangoapi/settings.py` e `djangoapi/urls.py` têm as alterações do ensaio (app `autoria`). Nesses arquivos, os números locais são diferentes.
 
 ## Ambiente
 
-
 ```bash
-# Terminal em BackEnd/
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria
+# Docker (stack padrão do projeto)
+docker compose exec backend python manage.py makemigrations <app>
+docker compose exec backend python manage.py migrate
+
+# Django nativo com o banco isolado do ensaio (guia 05)
+cd BackEnd && source .venv/bin/activate && source ../Devops/autoria.env.sh
+python manage.py verify_database   # esperado: 127.0.0.1:5442 / frota_rural_autoria
 ```
 
-- Frontend: [localhost:5183](http://localhost:5183).
-- Swagger: [localhost:8010/api/schema/swagger-ui](http://localhost:8010/api/schema/swagger-ui).
-- Banco: `frota_rural_autoria`, host `127.0.0.1`, porta `5442`.
-- [Reiniciar Django nativo e frontend](05_ambiente_dev_e_banco_isolado.md).
-
-## Como ler os guias
-
-```text
-Arquivo:linha → posição do código revisado; usar o nome da classe/método como âncora.
-“Inserir entre…” → adicionar só o trecho indicado, preservando o restante.
-“Referência, não substituir” → código atual mostrado para explicar o caminho.
-Arquivo novo completo → copiar o bloco inteiro para o caminho indicado.
-```
-
-Os 26 guias apontam para os services e componentes reais. Usuários tem o exemplo completo de inserção linha a linha. Os demais são roteiros de adaptação ao modelo escolhido, com o ponto de gravação e as projeções de leitura que precisam receber o campo.
-
-Nos modelos internos, o guia identifica se a FK vem do formulário próprio ou de uma seleção já salva no perfil. Para esses casos, o significado da classificação deve seguir o enunciado. Pagamentos, envio de e-mail, upload e pesquisa externa podem exigir configuração do provedor ou mocks nos testes; o ambiente isolado mantém essas credenciais vazias.
-
-O código desta pasta é material para implementar à mão. Atualizar os guias não aplica a solução à aplicação nem às tabelas do ensaio.
-
-## Modelos
-
-| Guia do modelo atual |
-| --- |
-| [Certificações — `Certification`](modelos/certifications.md) |
-| [Aditivos — `ContractAmendments`](modelos/contract_amendments.md) |
-| [Revisões de contrato — `ContractRevisions`](modelos/contract_revisions.md) |
-| [Códigos de assinatura — `ContractSignatureOtps`](modelos/contract_signature_otps.md) |
-| [Assinaturas — `ContractSignatures`](modelos/contract_signatures.md) |
-| [Contratos — `Contracts`](modelos/contracts.md) |
-| [Pesquisas de valor — `MachineValuations`](modelos/machine_valuations.md) |
-| [Máquinas — `Machines`](modelos/machines.md) |
-| [Denúncias de mensagens — `MessageReports`](modelos/message_reports.md) |
-| [Mensagens — `Messages`](modelos/messages.md) |
-| [Notificações — `Notification`](modelos/notifications.md) |
-| [CNHs — `OperatorLicense`](modelos/operator_licenses.md) |
-| [Recuperações de senha — `PasswordResets`](modelos/password_resets.md) |
-| [Eventos de pagamento — `PaymentEvents`](modelos/payment_events.md) |
-| [Pagamentos — `Payments`](modelos/payments.md) |
-| [Histórico de moderação — `PostingModeration`](modelos/posting_moderations.md) |
-| [Anúncios — `Postings`](modelos/postings.md) |
-| [Fotos de anúncios — `PostingsPhotos`](modelos/postings_photos.md) |
-| [Sugestões de preço — `PricingSuggestions`](modelos/pricing_suggestions.md) |
-| [Tentativas de estorno — `RefundAttempts`](modelos/refund_attempts.md) |
-| [Estornos — `Refunds`](modelos/refunds.md) |
-| [Leituras de horímetro — `RentalMeterReadings`](modelos/rental_meter_readings.md) |
-| [Recorrências — `RentalRecurrence`](modelos/rental_recurrences.md) |
-| [Locações — `Rentals`](modelos/rentals.md) |
-| [Avaliações — `Reviews`](modelos/reviews.md) |
-| [Users — perfil existente](modelos/users.md) |
-
-Operadores são `Users` com outro papel e empregador. Conversas são derivadas de `Messages`; não há model `Conversation`. Tabelas internas do Django não fazem parte dos 26 modelos de negócio listados.
-
-## Validação desta revisão
-
-O exemplo de usuários dos guias 01/02/04 foi aplicado em cópia temporária: 7 testes de backend passaram (incluindo FK, GET, UUID inválido e autorização), 3 testes de frontend passaram (salvar/reabrir, falha de catálogo e falha de gravação), além de TypeScript e lint dos arquivos alterados. O banco de testes foi removido ao terminar. Os outros 25 guias tiveram seus caminhos e pontos de integração revisados; suas adaptações não foram executadas como funcionalidades completas.
-
-Sua implementação e o banco `frota_rural_autoria` foram preservados para a prática.
+- Swagger: `/api/schema/swagger-ui` → confira o endpoint novo antes de ir para o front.
+- Frontend: `npx tsc -b` e `npx vitest run <pastas>` dentro de `FrontEnd/` (ver [03](03_validacao_e_erros.md#testes-automatizados)).

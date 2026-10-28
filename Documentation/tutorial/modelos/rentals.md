@@ -1,138 +1,341 @@
 # Locações — `Rentals`
 
-Base: [catálogo](../01_api_services_e_rotas.md) e [seletor](../02_frontend_repository_store_componente.md). Linhas do código em 28/10/2026; os nomes dos métodos são as âncoras estáveis.
+> **Pedido de exemplo:** "Na reserva de uma máquina, o locatário escolhe o tipo de cultura (3 opções). Mostre a cultura no card da locação."
 
-## 1 Modelo e migration
+**Telas:** reservar (`/reservar/<id do anúncio>` → `pages/postings/Reservar.tsx`); exibir no card de locação (`features/dashboard/components/RentalCard.tsx`), usado nos dois painéis.
 
-`BackEnd/rentals/models.py:48` — dentro de `Rentals`, imediatamente antes de `class Meta`, inserir:
+**Testado numa cópia limpa:** escolher "Milho" → `POST /api/rentals` 201 com `tipo_cultura_nome: "Milho"` → card mostra "Cultura: Milho" após F5.
+
+**Atenção:** a locação é criada quando você clica em **"Pagar e Avançar"**, antes do Stripe. Sem chaves do Stripe, aparece o erro de pagamento, mas a locação já foi gravada como `pending`. Isso basta para demonstrar.
+
+O raciocínio de cada passo está no [exemplo de máquina](../02_exemplo_maquina_tipo_pneu.md). As linhas são do arquivo **original**.
+
+## Mapa
+
+| # | Arquivo | O que |
+| --- | --- | --- |
+| 1 | `BackEnd/rentals/models.py` | `TipoCultura` + FK `tipo_cultura` |
+| 2 | `BackEnd/rentals/migrations/` | schema + 3 registros |
+| 3 | `BackEnd/rentals/serializer.py` | entrada, saída, catálogo |
+| 4 | `BackEnd/rentals/services.py` | `TipoCulturaService` |
+| 5 | `BackEnd/rentals/views.py` + `urls.py` | `GET /api/rentals/tipos-cultura` |
+| 6 | `features/contracts/types/rentalSchemas.ts`, `rental.ts` | Zod e tipos |
+| 7 | `features/contracts/api/contractMapper.ts` | ler o campo |
+| 8 | `ContractRepository.ts`, `ContractStore.ts` | buscar o catálogo |
+| 9 | `pages/postings/Reservar.tsx` | select + enviar na criação |
+| 10 | `RentalCard.tsx`, `DashboardLocatario.tsx`, `DashboardLocador.tsx` | exibir |
+
+A parte de locação no frontend fica na feature **`contracts`**, e não numa feature `rentals`.
+
+## Backend
+
+### 1. Model — `BackEnd/rentals/models.py`
+
+Linha 1: colar `import uuid` e uma linha em branco antes de `from django.db import models`.
+
+Depois da linha 5, antes de `class Rentals(models.Model):`:
 
 ```python
-categoria_autoria = models.ForeignKey(
-    "autoria.Genero", on_delete=models.PROTECT,
-    null=True, blank=True, related_name="+",
-)
+class TipoCultura(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nome = models.CharField(max_length=60, unique=True)
+
+    class Meta:
+        db_table = "tipos_cultura"
+        ordering = ["nome"]
+
+    def __str__(self) -> str:
+        return self.nome
+
+
+```
+
+Depois da linha 46 (`reservation_expires_at = models.DateTimeField(blank=True, null=True)`), antes de `class Meta:` (linha 48):
+
+```python
+    tipo_cultura = models.ForeignKey(TipoCultura, models.PROTECT, blank=True, null=True)
+```
+
+### 2. Migrations
+
+```bash
+python manage.py makemigrations rentals
+# 0008_tipocultura_rentals_tipo_cultura.py
+python manage.py makemigrations rentals --empty --name tipos_cultura_iniciais
+# 0009_tipos_cultura_iniciais.py
+```
+
+Conteúdo inteiro de `0009_tipos_cultura_iniciais.py`:
+
+```python
+from django.db import migrations
+
+TIPOS_CULTURA = [
+    ("3b8e5d20-0000-4000-8000-000000000001", "Soja"),
+    ("3b8e5d20-0000-4000-8000-000000000002", "Milho"),
+    ("3b8e5d20-0000-4000-8000-000000000003", "Trigo"),
+]
+
+
+def inserir_tipos(apps, schema_editor):
+    TipoCultura = apps.get_model("rentals", "TipoCultura")
+    for id_, nome in TIPOS_CULTURA:
+        TipoCultura.objects.update_or_create(id=id_, defaults={"nome": nome})
+
+
+def remover_tipos(apps, schema_editor):
+    TipoCultura = apps.get_model("rentals", "TipoCultura")
+    TipoCultura.objects.filter(id__in=[id_ for id_, _ in TIPOS_CULTURA]).delete()
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ("rentals", "0008_tipocultura_rentals_tipo_cultura"),
+    ]
+
+    operations = [
+        migrations.RunPython(inserir_tipos, remover_tipos),
+    ]
 ```
 
 ```bash
-# Terminal em BackEnd/
-source .venv/bin/activate
-source ../Devops/autoria.env.sh
-python manage.py verify_database
-# Esperado: 127.0.0.1:5442 / frota_rural_autoria
-python manage.py makemigrations rentals
-python manage.py migrate --plan
 python manage.py migrate
 ```
 
-## 2 Entrada no serializer usado pelo service
+### 3. Serializers — `BackEnd/rentals/serializer.py`
 
-`BackEnd/rentals/serializer.py:41` — procurar `class RentalInputSerializer`. Em `RentalInputSerializer.Meta.fields`, acrescentar `"categoria_autoria"` antes do fechamento da lista. Manter todos os campos e validações existentes.
-
-## 3 Service existente
-
-`BackEnd/rentals/services.py:31` — procurar `class RentalService`. `RentalService.create` e `RentalService.update` já usam `RentalInputSerializer` e `serializer.save()`. A nova FK entra em `validated_data`; não criar outro service.
-
-Trecho atual do método de atualização (referência, não substituir):
-
-```python
-def update(rental_id: UUID, data: Mapping[str, Any], *, user, partial: bool = False) -> Rentals:
-    reference = RentalService.get(rental_id, user=user)
-    posting = Postings.objects.select_for_update().select_related("machinery").get(pk=reference.postings_id)
-    # Avoid locking nullable outer joins from the output queryset.
-    rental = Rentals.objects.select_for_update().get(pk=reference.pk)
-    rental.postings = posting
-    for field, current in (("lessee", rental.lessee_id), ("postings", rental.postings_id)):
-        if field in data and str(data[field]) != str(current):
-            raise ValidationError({field: "Este vínculo não pode ser alterado após a criação."})
-    if "total_price" in data:
-        raise ValidationError({"total_price": "O valor é calculado pelo servidor."})
-    if "status" in data:
-        raise Conflict("Use /api/rentals/<id>/cancel para cancelar ou /complete para concluir.", code="use_rental_action")
-    if any(field in data for field in ("start_date", "end_date", "operator")):
-        if user.pk != rental.lessee_id:
-            raise PermissionDenied("Somente o locatário pode alterar os dados de uma reserva pendente.")
-        if rental.status != RentalStatus.PENDING or rental.payments.filter(status__in=OPEN_PAYMENT_STATUSES).exists():
-            raise Conflict("Uma reserva em pagamento ou confirmada não pode ter seus dados alterados.")
-    if any(field in data for field in ("initial_hour_meter", "final_hour_meter")):
-        raise ValidationError({"detail": (
-            "Registre as leituras do horímetro em /api/rentals/<id>/meter-readings: "
-            "elas são validadas e ficam no histórico da locação."
-        )})
-    if "notes" in data:
-        if user.pk != rental.lessee_id:
-            raise PermissionDenied("Somente o locatário pode alterar as observações da reserva.")
-        if rental.status in (RentalStatus.CANCELLED, RentalStatus.COMPLETED, RentalStatus.CLOSED):
-            raise Conflict("As observações de uma locação encerrada não podem ser alteradas.")
-    serializer = RentalInputSerializer(rental, data=data, partial=partial)
-    serializer.is_valid(raise_exception=True)
-    validated = serializer.validated_data
-    if any(field in validated for field in ("operator", "start_date", "end_date")):
-        validated["operator"] = validate_operator_assignment(
-            validated.get("operator", rental.operator), rental.lessee, lock=True,
-        )
-    changed = any(getattr(rental, field) != value for field, value in validated.items())
-    save_fields = {"updated_at": timezone.now()}
-    if any(field in validated for field in ("start_date", "end_date")):
-        start = validated.get("start_date", rental.start_date)
-        end = validated.get("end_date", rental.end_date)
-        RentalService._ensure_period_available(posting, start, end, ignore_rental_id=rental.pk)
-        # Only an unpaid pending booking reaches this point (checked above).
-        # The agreed price changes only when the tenant picks other dates.
-        if (start, end) != (rental.start_date, rental.end_date):
-            policy.ensure_lead_time(start)
-            quote = RentalService.quote(posting, start, end)
-            save_fields.update(quote.snapshot())
-            changed = changed or rental.total_price != quote.total
-    rental = serializer.save(**save_fields)
-    if changed:
-        notify_rental_event(rental, "rental_updated", event_key=f"rental:{rental.pk}:rental_updated:{uuid4()}")
-    return rental
-```
-
-## 4 Saída existente
-
-`BackEnd/rentals/serializer.py:114` — procurar `class RentalOutputSerializer`. Entre a abertura da classe e `class Meta`, acrescentar:
-
-```python
-categoria_nome = serializers.CharField(
-    source="categoria_autoria.Genero", read_only=True, allow_null=True, default=None,
-)
-```
-Em `RentalOutputSerializer.Meta.fields`, acrescentar ao final da lista:
-
-```python
-"categoria_autoria",
-"categoria_nome",
-```
-
-Para listas que exibem o nome, acrescentar `"categoria_autoria"` ao `select_related` do queryset utilizado; preservar os filtros de acesso.
-
-## 5 Frontend existente
-
-Aplicar os campos do [guia 02, passo 3](../02_frontend_repository_store_componente.md#3-contrato-de-dados-no-fluxo-existente) nestes pontos:
-
-| Alteração | Arquivo e âncora |
+| Linha original | Ação |
 | --- | --- |
-| Resposta Zod | `FrontEnd/src/features/contracts/types/rentalSchemas.ts:14` — procurar `export const rentalApiSchema` |
-| Tipo de domínio | `FrontEnd/src/features/contracts/types/rental.ts:4` — procurar `export interface Rental` |
-| Mapper de leitura | `FrontEnd/src/features/contracts/api/contractMapper.ts:35` — procurar `export function rentalToDomain` |
-| Entrada/payload | `FrontEnd/src/features/contracts/types/rentalSchemas.ts:85` — procurar `export interface CreateRentalPayload` |
+| 12 | Trocar por `from rentals.models import RentalMeterReadings, Rentals, TipoCultura` |
+| depois da 58 (`"status",` em `RentalInputSerializer.Meta.fields`) | `"tipo_cultura",` |
+| depois da 138 (o `)` que fecha `meter = serializers.SerializerMethodField(...)`) | `tipo_cultura_nome = serializers.CharField(source="tipo_cultura.nome", read_only=True, allow_null=True)` (com 4 espaços de recuo) |
+| depois da 183 (`"accepted_by_lessee",` em `RentalOutputSerializer.Meta.fields`) | `"tipo_cultura",` e `"tipo_cultura_nome",` |
+| fim do arquivo (depois da 242) | serializer do catálogo |
+
+```python
 
 
-`pages/postings/Reservar.tsx` → `contractStore.createRental` → `ContractRepository.createRental` → `POST /api/rentals`.
+class TipoCulturaOutputSerializer(serializers.ModelSerializer[TipoCultura]):
+    class Meta:
+        model = TipoCultura
+        fields = ["id", "nome"]
+        read_only_fields = fields
+```
 
-1. Adicionar estado `categoriaId` perto de `observacoes`.
-2. Inserir `CategoriaSelect` ao lado do campo de observações.
-3. Dentro do objeto de `contractStore.createRental`, depois de `notes`, acrescentar `categoria_autoria: categoriaId || null`.
-4. Propagar `categoriaNome` no objeto de locação montado pelos dashboards e no tipo de `features/dashboard/components/RentalCard.tsx`; exibir no cartão a partir da locação retornada pelo GET.
+`RentalCreateInputSerializer`, em `rentals/schema.py` (documentação do Swagger), herda os campos de `RentalInputSerializer`, então já mostra `tipo_cultura`.
 
-O fluxo de pagamento pode reutilizar uma reserva já criada. Testar com uma reserva NOVA; não mostrar uma escolha ainda não enviada como se já estivesse salva.
+**Gravação:** em `RentalService.create` (`rentals/services.py:56`), o `serializer.save(...)` da linha 76 grava o `tipo_cultura` validado. Não precisa mexer no service da reserva.
+
+### 4. Service — `BackEnd/rentals/services.py`
+
+Linha 23, trocar por `from rentals.models import Rentals, TipoCultura`. No fim (depois da linha 187):
+
+```python
 
 
+class TipoCulturaService:
+    @staticmethod
+    def list() -> QuerySet[TipoCultura]:
+        return TipoCultura.objects.order_by("nome")
+```
 
-**Regra de edição:** se permitir PATCH de categoria, em `RentalService.update`, antes de construir `RentalInputSerializer`, aplicar a mesma restrição de `notes`: somente locatário e locação aberta. Não incluir o campo na lista de parâmetros imutáveis de preço/datas nem permitir que o frontend controle preço, status ou disponibilidade.
+### 5. View e rota
+
+`BackEnd/rentals/views.py`:
+
+- Depois da linha 23 (`RentalOutputSerializer,`), colar `    TipoCulturaOutputSerializer,`.
+- Linha 26, trocar por `from rentals.services import RentalService, TipoCulturaService`.
+- No fim (depois da linha 329), colar:
+
+```python
 
 
-## 6 Comprovar
+class TipoCulturaListView(APIView):
+    permission_classes = [IsAuthenticated]
 
-Salvar pelo formulário indicado, consultar a FK no banco e recarregar a mesma tela. Aplicar os casos de ID inexistente/permissão do [guia 03](../03_validacao_e_erros.md).
+    @extend_schema(
+        tags=TAGS,
+        summary="Listar tipos de cultura",
+        description="Opções da tabela `tipos_cultura` usadas na reserva.",
+        responses={200: TipoCulturaOutputSerializer(many=True)},
+    )
+    def get(self, request: Request) -> Response:
+        tipos = TipoCulturaService.list()
+        return Response(TipoCulturaOutputSerializer(tipos, many=True).data, status=status.HTTP_200_OK)
+```
+
+`BackEnd/rentals/urls.py`:
+
+- Depois da linha 11 (`RentalMeterReadingsView,`), colar `    TipoCulturaListView,`.
+- Depois da linha 20 (`path("rentals/policy", ...)`), colar:
+
+```python
+    path("rentals/tipos-cultura", TipoCulturaListView.as_view(), name="rental_tipos_cultura"),
+```
+
+## Frontend (`FrontEnd/src/`)
+
+### 6. Zod e tipos
+
+`features/contracts/types/rentalSchemas.ts`:
+
+| Linha original | Colar |
+| --- | --- |
+| depois da 36 (`notes: z.string().nullish(),` em `rentalApiSchema`) | `tipo_cultura: z.string().nullish(),` e `tipo_cultura_nome: z.string().nullish(),` |
+| depois da 93 (`notes?: string;` em `CreateRentalPayload`) | `tipo_cultura?: string \| null;` |
+| depois da 94 (o `}` que fecha `CreateRentalPayload`) | bloco abaixo |
+
+```ts
+
+export const tipoCulturaListApiSchema = z.array(
+  z.object({ id: z.string(), nome: z.string() }),
+);
+```
+
+`features/contracts/types/rental.ts`:
+
+- Depois da linha 38 (`notes?: string;`, dentro de `Rental`), colar `tipoCulturaId?: string | null;` e `tipoCulturaNome?: string | null;`. São opcionais (`?`) porque vários testes montam objetos `Rental` à mão.
+- Depois da linha 44 (o `}` que fecha `Rental`), colar:
+
+```ts
+
+export interface TipoCultura {
+  id: string;
+  nome: string;
+}
+```
+
+### 7. Mapper — `features/contracts/api/contractMapper.ts`
+
+Depois da linha 67 (`notes: dto.notes ?? "",`), colar:
+
+```ts
+    tipoCulturaId: dto.tipo_cultura ?? null,
+    tipoCulturaNome: dto.tipo_cultura_nome ?? null,
+```
+
+### 8. Repository e Store
+
+`features/contracts/api/ContractRepository.ts`:
+
+| Linha original | Colar |
+| --- | --- |
+| depois da 16 (`SignatureReceipt,`) | `  TipoCultura,` |
+| depois da 28 (`type SignatureRole,`) | `  tipoCulturaListApiSchema,` |
+| depois da 71 (`findEvidence(id: string): Promise<ContractEvidence>;`) | `  listTiposCultura(): Promise<TipoCultura[]>;` |
+| depois da 272 (o `}` que fecha `findEvidence`), antes do `}` final | método abaixo |
+
+```ts
+
+  async listTiposCultura(): Promise<TipoCultura[]> {
+    const response = await this.http.send<unknown>({ method: "GET", path: "rentals/tipos-cultura" });
+    return tipoCulturaListApiSchema.parse(response.data);
+  }
+```
+
+`features/contracts/api/ContractStore.ts`:
+
+- Depois da linha 17 (`SignatureReceipt,`), colar `  TipoCultura,`.
+- Depois da linha 72 (linha em branco depois de `quotePosting`), **antes** do comentário `/** Antecedência mínima ... */` da linha 73, colar o bloco abaixo. Ele não pode ficar entre o comentário e `bookingPolicy`, senão o comentário passa a "documentar" o método errado.
+
+```ts
+  listTiposCultura(): Promise<TipoCultura[]> {
+    return this.repository.listTiposCultura();
+  }
+
+```
+
+### 9. Componente — `pages/postings/Reservar.tsx`
+
+Esta página usa `useState` + `useEffect` e chama o `contractStore` direto, sem React Query. Siga o mesmo padrão (é como ela carrega `bookingPolicy`).
+
+| Linha original | Ação |
+| --- | --- |
+| 12 | Acrescentar `TipoCultura` ao import: `import type { BookingPolicy, RentalOccupancy, RentalQuote, Rental, SignatureEvidence, TipoCultura } from "@/features/contracts/types/rental";` |
+| depois da 386 (`const [observacoes, setObservacoes] = useState("");`) | os dois estados abaixo |
+| depois da 403 (`}, []);` do `useEffect` de `bookingPolicy`) | o `useEffect` abaixo |
+| depois da 700 (`...(observacoes.trim() ? { notes: ... } : {}),`) | `          tipo_cultura: tipoCultura \|\| null,` |
+| depois da 1013 (o `</div>` do campo Observações), antes do `<button` | o select abaixo |
+
+```tsx
+  const [tipoCultura, setTipoCultura] = useState("");
+  const [tiposCultura, setTiposCultura] = useState<TipoCultura[]>([]);
+```
+
+```tsx
+  useEffect(() => {
+    let ignored = false;
+    contractStore.listTiposCultura()
+      .then((value) => { if (!ignored) setTiposCultura(value); })
+      .catch(() => {});
+    return () => { ignored = true; };
+  }, []);
+```
+
+```tsx
+
+                  <div className="mb-7">
+                    <label htmlFor="tipo-cultura" className="text-[10px] uppercase font-bold text-outline tracking-widest mb-1.5 block">
+                      Tipo de Cultura
+                    </label>
+                    <select id="tipo-cultura"
+                      value={tipoCultura}
+                      onChange={(e) => setTipoCultura(e.target.value)}
+                      className="w-full bg-surface-container-low border border-outline-variant/40 rounded-lg px-4 py-3 text-sm text-tertiary focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+                    >
+                      <option value="">Selecione o tipo de cultura</option>
+                      {tiposCultura.map((tipo) => (
+                        <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+```
+
+### 10. Exibição
+
+`features/dashboard/components/RentalCard.tsx`:
+
+- Depois da linha 18 (`notes?: string;`, em `RentalCardData`), colar `tipoCultura?: string | null;`.
+- Depois da linha 205 (o `</Field>` de "Valor"), dentro da mesma grade, colar:
+
+```tsx
+          <Field label="Cultura">
+            <div className="font-bold text-on-surface text-sm">{rental.tipoCultura ?? "Não informada"}</div>
+          </Field>
+```
+
+Os painéis convertem `Rental` em `RentalCardData`:
+
+| Arquivo | Depois da linha | Colar |
+| --- | --- | --- |
+| `pages/dashboard/DashboardLocatario.tsx` | 123 (`notes: rental.notes,`) | `tipoCultura: rental.tipoCulturaNome,` |
+| `pages/dashboard/DashboardLocador.tsx` | 165 (`notes: r.notes,`) | `tipoCultura: r.tipoCulturaNome,` |
+
+## Testes que quebram
+
+`features/payments/tests/paymentReview.test.tsx` mocka o `contractStore` com uma lista fixa de métodos. Sem o ajuste abaixo, 10 testes falham com `contractStore.listTiposCultura is not a function`:
+
+| Linha original | Ajuste |
+| --- | --- |
+| 10 (`const mocks = vi.hoisted(...)`) | Acrescentar `listTiposCultura: vi.fn()` ao objeto |
+| 13 (`contractStore: { ... }`) | Acrescentar `listTiposCultura: mocks.listTiposCultura,` |
+| depois da 22 (`mocks.bookingPolicy.mockRejectedValue(...)`, no `beforeEach`) | `mocks.listTiposCultura.mockResolvedValue([]);` |
+
+Com o ajuste: 215 testes passam (contracts, dashboard, postings, payments).
+
+## Demonstrar
+
+```sql
+SELECT id, nome FROM tipos_cultura;
+
+SELECT r.id, r.status, t.nome
+FROM rentals r LEFT JOIN tipos_cultura t ON t.id = r.tipo_cultura_id
+ORDER BY r.created_at DESC LIMIT 3;
+```
+
+Para demonstrar:
+
+1. Entre como locatário e abra `/reservar/<id do anúncio>`.
+2. Escolha as datas, depois a cultura, e clique em "Avançar para Pagamento" → "Pagar e Avançar".
+3. Abra "Minhas Locações", aperte F5 e mostre "Cultura: Milho" no card. O locador vê o mesmo card em "Locações".
